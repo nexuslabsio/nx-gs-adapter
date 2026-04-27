@@ -6,11 +6,11 @@
 
 Точка входа в адаптер — `NxAdapter.start()`, которую вызывает bootstrap-код игрового ядра.
 Запуск non-blocking: сразу возвращается, всё дальнейшее выполняется на daemon-потоках.
-Внутри — резолв конфига (`AdapterConfig` через sysprop / env / classpath chain), POST
-`/connect` через JDK `HttpURLConnection` + Gson, инициализация Kafka producer'а через
-`nx-gs-kafka`, и heartbeat-петля на `ScheduledExecutorService`. Lifecycle FSM (`AdapterState`)
-— единственный шарящийся state, доступный наружу через `state()` и опциональный
-`onStateChange` callback.
+Внутри — резолв конфига (`AdapterConfig` через file-first chain: properties-file → sysprop;
+env-vars в 0.1.0 нет), POST `/connect` через JDK `HttpURLConnection` + Gson, инициализация
+Kafka producer'а через `nx-gs-kafka`, и heartbeat-петля на `ScheduledExecutorService`.
+Lifecycle FSM (`AdapterState`) — единственный шарящийся state, доступный наружу через
+`state()` и опциональный `onStateChange` callback.
 
 ## Structure
 
@@ -18,10 +18,14 @@
     - `NxAdapter.java` [planned] — public entry point (`start`, `state`, `shutdown`,
       `onStateChange`)
     - `AdapterState.java` [planned] — lifecycle enum (`INIT`, `REGISTERING`, `ACTIVE`,
-      `DEGRADED`, `FAILED`, `REJECTED`, `CLOSED`)
-    - `config/AdapterConfig.java` [planned] — immutable holder (`serverKey`, `platformUrl`,
-      `adapterVersion`)
-    - `config/ConfigResolver.java` [planned] — sysprop → env → classpath properties chain
+      `DEGRADED`, `FAILED`, `REJECTED`, `DISABLED`, `CLOSED`)
+    - `config/AdapterConfig.java` [done] — immutable holder (`serverKey`, `platformUrl`,
+      `adapterVersion`, `enabled`)
+    - `config/ConfigResolver.java` [done] — file-first chain (properties-file → sysprop):
+      file path from `-Dl2nx.config-file` or classpath `l2nx.properties` fallback (with
+      multi-match guard); string + boolean resolution variants; UTF-8 reads
+    - `lifecycle/StartupBanner.java` [planned] — emits the multi-line L2NX ASCII banner +
+      adapterVersion via the logging facade
     - `connect/ConnectFlow.java` [planned] — POST `/connect` lifecycle, status-code dispatch,
       retry-with-backoff
     - `connect/ConnectClient.java` [planned] — thin `HttpURLConnection` wrapper with Gson
@@ -31,6 +35,9 @@
       `ConnectResponse.kafka`
     - `heartbeat/HeartbeatService.java` [planned] — `ScheduledExecutorService`-driven 60s
       loop
+    - `heartbeat/HeartbeatPayload.java` [planned] — package-private POJO carrying the
+      heartbeat fields; graduates to `nx-gs-adapter-api.kafka.HeartbeatMessage` in a
+      later minor
     - `lifecycle/ShutdownHook.java` [planned] — registers JVM shutdown hook
     - logging via `app.l2nx.log.NxLog` from sibling `:nx-log` subproject (shadow-included
       into the published jar — see Integration points)
@@ -40,13 +47,27 @@
 
 ## Key components
 
-- **`NxAdapter`** [planned] (R8) — singleton-style facade. `start()` returns the instance,
-  registers the JVM shutdown hook, kicks off the connect flow on a daemon `ExecutorService`.
-  State transitions are atomic via `AtomicReference<AdapterState>`.
-- **`ConfigResolver`** [planned] (R1, R2, R3) — pure JDK; reads from `System.getProperty` →
-  `System.getenv` → `ClassLoader.getSystemClassLoader().getResourceAsStream("l2nx.properties")`
-  parsed as `java.util.Properties`. Validates the server-key format (prefix `nx_sk_` + total
-  length 38) up front.
+- **`NxAdapter`** [planned] (R8, R14) — singleton-style facade. `start()` always emits the
+  startup banner (R15), then resolves config; if `enabled=false` (R14) it logs an INFO
+  "adapter disabled" line, transitions state `INIT → DISABLED`, and returns immediately —
+  no shutdown hook, no daemon threads, no network calls. Otherwise it registers the JVM
+  shutdown hook and kicks off the connect flow on a daemon `ExecutorService`. State
+  transitions are atomic via `AtomicReference<AdapterState>`.
+- **`ConfigResolver`** [done] (R1, R2, R3, R14) — pure JDK; two-source chain per key,
+  **file-first**: properties-file lookup → `System.getProperty(key)` (sysprop is only
+  consulted when the file does not provide the key, so the file is authoritative). The
+  properties file is loaded once at resolver construction: if
+  `System.getProperty("l2nx.config-file")` is set, that absolute path is read via
+  `java.nio.file.Files` (operator-preferred — file lives anywhere on the filesystem);
+  otherwise `ClassLoader.getResourceAsStream("l2nx.properties")` is used as the classpath
+  fallback. Validates the server-key format (prefix `nx_sk_` + total length 38) up front.
+  Provides `resolveString(key)` and `resolveBoolean(key, default)` variants — the latter
+  parses `true`/`false` case-insensitively for the `l2nx.enabled` flag and returns
+  `false` when no source supplies a value. Environment-variable resolution is intentionally
+  absent in 0.1.0 (see Decisions).
+- **`StartupBanner`** [planned] (R15) — emits the L2NX ASCII wordmark and the resolved
+  adapter version on `start()`, blank-line-padded so it's visually distinct from
+  surrounding host-JVM logs. Plain text via the logging facade — no ANSI escape codes.
 - **`ConnectFlow`** [planned] (R4, R5) — drives the connect lifecycle. On 200 → state `ACTIVE`,
   triggers `KafkaInitializer` + `HeartbeatService.start`. On 401/403 → terminal failure
   (`FAILED` / `REJECTED`). On 409/5xx/network → schedules a retry via `BackoffSchedule`.
@@ -59,8 +80,9 @@
   `NxKafka.configure().property(...).build()` call. Does NOT block on broker reachability —
   relies on nx-gs-kafka's graceful start.
 - **`HeartbeatService`** [planned] (R7) — single-threaded `ScheduledExecutorService` (daemon,
-  named `nx-adapter-heartbeat`). Each tick builds an `app.l2nx.gs.adapter.api.kafka.HeartbeatMessage`
-  (defined in `nx-gs-adapter-api`) carrying `serverId`, `adapterVersion`,
+  named `nx-adapter-heartbeat`). Each tick builds a heartbeat payload POJO defined inline
+  inside `nx-gs-adapter-core` (`heartbeat/HeartbeatPayload`, package-private — graduates
+  to `nx-gs-adapter-api` in a later minor) carrying `serverId`, `adapterVersion`,
   `uptime` = seconds since the most recent successful `/connect`, and an empty
   `enabledModules` list, then calls `NxKafka.send(topic, key, payload)`. The `uptime`
   clock is captured fresh on every successful `(re)connect`, so platform-side dashboards
@@ -75,32 +97,41 @@
 
 ## Data flows
 
-1. **Bootstrap** — game core calls `NxAdapter.start()` → `ConfigResolver.resolve()` builds
-   `AdapterConfig` → `ConnectFlow` schedules POST on the daemon executor → state
-   `INIT` → `REGISTERING`.
+1. **Bootstrap** — game core calls `NxAdapter.start()` → `StartupBanner.emit()` →
+   `ConfigResolver.resolve()` builds `AdapterConfig`.
+    - If `ConfigResolver` throws `IllegalStateException` (missing key, invalid format,
+      unreadable file, malformed boolean, multi-match classpath) → caught at the
+      `start()` boundary → `NxLog.error(...)` with the actionable message → state
+      `INIT → FAILED` (terminal; no daemon threads launched, no shutdown hook
+      registered) → return inert `NxAdapter`. **No exception propagates to the host JVM.**
+    - If `config.enabled == false` → `INIT → DISABLED` (no further work, banner already
+      emitted).
+    - Otherwise → `ConnectFlow` schedules POST on the daemon executor → state
+      `INIT → REGISTERING`.
 2. **Connect success** — `ConnectClient` parses `ConnectResponse` → `KafkaInitializer`
    builds the `NxKafka` instance → `HeartbeatService.start(serverId, kafka.topics.heartbeat)`
    → state `ACTIVE`.
 3. **Connect retry** — non-terminal failure (409/5xx/network) → `BackoffSchedule.next(attempt)`
    → `ScheduledExecutorService.schedule(...)` re-runs the connect attempt → state stays
    `REGISTERING` on first-time bootstrap or transitions to `DEGRADED` if previously `ACTIVE`.
-4. **Heartbeat tick** — every 60s `HeartbeatService` builds a `HeartbeatMessage` →
-   `NxKafka.send(heartbeatTopic, serverId, message)`. nx-gs-kafka handles producer-side retries
-   and reconnection; failed sends do not change adapter state.
+4. **Heartbeat tick** — every 60s `HeartbeatService` builds a `HeartbeatPayload` →
+   `NxKafka.send(heartbeatTopic, serverId, payload)`. nx-gs-kafka handles producer-side
+   retries and reconnection; failed sends do not change adapter state.
 5. **Shutdown** — JVM shutdown hook OR explicit `shutdown()` → cancel heartbeat scheduler →
    `NxKafka.shutdown()` → state `CLOSED`.
 
 ## Integration points
 
-- **`:nx-gs-adapter-api`** (R4, R7) — sibling subproject in this monorepo. Provides
+- **`:nx-gs-adapter-api`** (R4) — sibling subproject in this monorepo. Provides
   `ConnectRequest`, `ConnectResponse`, `KafkaConfig`, `Topics` (migrated from
   `nx-tenants/api/rest/dto/` as Java 8 POJOs in this slice — they were Lombok-`@Builder`
-  records there) under `app.l2nx.gs.adapter.api.rest`, plus `HeartbeatMessage` under
-  `app.l2nx.gs.adapter.api.kafka`. `nx-tenants` consumes the same published artifact
-  (`app.l2nx:nx-gs-adapter-api`) via Gradle composite include of the whole `nx-gs-adapter`
-  repo with a `dependencySubstitution` mapping — single source of truth for the wire
-  shape. Validation annotations (`jakarta.validation`) stay on the controller side; the
-  api lib has zero runtime deps. First published version is **0.1.0**.
+  records there) under `app.l2nx.gs.adapter.api.rest`. `nx-tenants` consumes the same
+  published artifact (`app.l2nx:nx-gs-adapter-api`) via Gradle composite include of the
+  whole `nx-gs-adapter` repo with a `dependencySubstitution` mapping — single source of
+  truth for the wire shape. Validation annotations (`jakarta.validation`) stay on the
+  controller side; the api lib has zero runtime deps. First published version is **0.1.0**.
+  Heartbeat-related types are deferred from this release (see R7 in spec.md and the
+  package-split decision below).
 - **`:nx-gs-kafka`** (R6, R7) — sibling subproject. `NxKafka.configure().build()` for the
   producer; `NxKafka.send(topic, key, value)` for heartbeat. `:nx-gs-adapter-core` depends
   on it via `project(":nx-gs-kafka")`.
@@ -117,10 +148,33 @@
 
 ## Decisions
 
-- **Three-source config chain (sysprop → env → classpath properties).** Sysprop wins for easy
-  override during testing/CI; env vars are 12-factor / k8s-native; classpath file is the
-  drop-in JAR scenario. `.properties` over YAML because SnakeYAML is a heavy dep for one
-  config file (zero-deps principle).
+- **`enabled` defaults to `false` — explicit operator opt-in.** Adding the JAR to a host
+  classpath alone must NEVER produce network calls or daemon threads on a JVM whose
+  operator hasn't deliberately turned the adapter on. Setting `l2nx.enabled=true` (sysprop /
+  env / classpath) flips the switch. The disabled path still emits the banner — operators
+  see the JAR loaded and version, just no work happens.
+- **`platformUrl` has no fallback — must be operator-supplied with the tenant-slug
+  embedded.** Format: `https://<tenant-slug>.api.l2nx.app`. A wrong URL silently routing
+  to the wrong tenant is a worse failure than a missing-config crash on startup. The
+  per-tenant subdomain pins requests to the correct tenant on the platform side; a single
+  generic host would require an extra header / path segment to disambiguate, which would
+  duplicate state already encoded in the subdomain.
+- **Two-source config chain, file-first (file → sysprop).** File is the preferred medium
+  for operators (drop a `l2nx.properties` next to the game-server JAR or point
+  `-Dl2nx.config-file` at an arbitrary path). The file is authoritative — its values win
+  over `System.getProperty(...)`. Sysprop is consulted only as a fallback when the file
+  does not provide the key, so a CI pipeline that runs without a config file can still
+  pass values via `-D` flags. Environment-variable resolution is intentionally absent in
+  0.1.0 — file is cleaner for the L2J / Lucera / Essence host scenario (operators already
+  maintain per-server config files), and env can be added later as a non-breaking third
+  source if a deployment scenario demands it. `.properties` over YAML because SnakeYAML is
+  a heavy dep for one config file (zero-deps principle).
+- **Explicit `-Dl2nx.config-file=<path>` over recursive classpath search.** Operators who
+  want the config file outside the classpath root point `-Dl2nx.config-file` at the
+  absolute path. Recursive classpath scanning would mean walking every JAR in the host
+  JVM's classpath at startup — high IO cost, ambiguity when duplicates exist, and the
+  adapter probing arbitrary host JARs feels invasive for a JVM the operator audited
+  before deploying. A single explicit override keeps resolution predictable.
 - **Server-key validation up-front.** Fail fast with `IllegalStateException` before any
   network call when the format is wrong — avoids attributing format errors to "platform
   unreachable" symptoms.
@@ -139,6 +193,14 @@
 - **All daemon threads catch `Throwable`.** Game-server stability dominates — uncaught
   exceptions in adapter threads must NEVER bring down the host JVM. Same philosophy as
   `nx-gs-kafka`.
+- **`NxAdapter.start()` never throws into the host JVM either.** Config-resolution errors
+  bubble out of `ConfigResolver` as `IllegalStateException` (its private contract), but
+  are caught once at the `start()` boundary, logged via `NxLog`, and surface as state
+  `FAILED`. The adapter is an open-core add-on — the host game server must keep running
+  even if the adapter cannot bootstrap. Operators inspect via logs (primary) or
+  `state()` / `onStateChange` (programmatic). This extends R10's "no exceptions to host"
+  philosophy from daemon threads to the calling thread, so consumers truly never need
+  a `try/catch` around `NxAdapter.start()`.
 - **Backoff cap = 5 minutes.** Matches architecture v2 §6.4. After 5m the adapter keeps
   retrying at the cap (no give-up); operator intervention (revoke / fix tenant) is signalled
   via terminal `FAILED` / `REJECTED` states instead.
@@ -162,17 +224,21 @@
   record syntactic sugar; gain is single source of truth for the contract and the adapter
   side gets the same types it sees on the wire — no parallel definitions to drift.
 - **Package split `api.rest` vs `api.kafka`.** REST request/response DTOs live in
-  `app.l2nx.gs.adapter.api.rest` (0.1.0: `ConnectRequest`, `ConnectResponse`, `KafkaConfig`,
-  `Topics`). Kafka message payloads live in `app.l2nx.gs.adapter.api.kafka` (0.1.0:
-  `HeartbeatMessage`). The split keeps wire-protocol concerns visually separate, mirrors
-  how nx-tenants is structured internally (`api/rest/` vs `infra/kafka/`), and makes it
-  obvious to a consumer where to look for the contract of a given transport.
-- **`HeartbeatMessage` ships in 0.1.0 of the api lib.** Despite the platform-side
-  consumer not existing yet (server-registration R9–R11), the type lives in
-  `nx-gs-adapter-api` from day one — single source of truth for the wire shape, identical
-  reasoning to the REST DTOs. Avoids a future "graduation" step where an inline POJO
-  would need to be promoted, refactored at call-sites, and re-released across two
-  artifacts.
+  `app.l2nx.gs.adapter.api.rest` (current population in 0.1.0: `ConnectRequest`,
+  `ConnectResponse`, `KafkaConfig`, `Topics`). Kafka message payloads will live in
+  `app.l2nx.gs.adapter.api.kafka` once introduced — that package is intentionally absent
+  from 0.1.0 because no Kafka payload yet has a platform-side consumer demanding a
+  shared type. The split (when the kafka package lands) keeps wire-protocol concerns
+  visually separate, mirrors how nx-tenants is structured internally (`api/rest/` vs
+  `infra/kafka/`), and makes it obvious to a consumer where to look for the contract of
+  a given transport.
+- **Heartbeat payload deferred from api lib.** For 0.1.0 the heartbeat payload is
+  defined inline inside `nx-gs-adapter-core` (`heartbeat/HeartbeatPayload`,
+  package-private). It graduates into `app.l2nx.gs.adapter.api.kafka.HeartbeatMessage`
+  only when the platform-side consumer lands (server-registration R9–R11) and both
+  producer and consumer need to compile against the same type. Until then there's
+  nothing to share — the adapter serializes its POJO via Gson, and the platform doesn't
+  read it yet.
 
 ## Extension points
 

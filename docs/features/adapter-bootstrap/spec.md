@@ -15,25 +15,32 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
 
 **Must:**
 
-- [todo] R1. Adapter MUST resolve `serverKey` on startup from one of three sources, in priority
-  order:
-    1. JVM system property `-Dl2nx.gs-key=<value>`
-    2. Environment variable `L2NX_GS_KEY=<value>`
-    3. Classpath file `l2nx.properties` with key `l2nx.gs-key=<value>`
-       If none yields a value — fail with `IllegalStateException` whose message lists all three options.
+- [done] R1. Adapter MUST resolve `serverKey` on startup from one of two sources, file-first
+  (file value wins; JVM system property is consulted only when the file does not provide the
+  key):
+    1. Properties file with key `l2nx.gs-key=<value>` — either at the absolute filesystem
+       path given by JVM system property `-Dl2nx.config-file=<path>` (operator-preferred),
+       or, if that property is unset, the classpath resource `l2nx.properties`.
+    2. JVM system property `-Dl2nx.gs-key=<value>` — fallback for when the file does not
+       provide the key.
 
-    - SC1. Resolution MUST be zero-dep — only JDK `System.getProperty`/`getenv`,
-      `ClassLoader.getResourceAsStream`, and `java.util.Properties`. No SnakeYAML, no Spring,
-      no third-party config library.
-- [todo] R2. Adapter MUST validate the resolved server-key format before any platform call: prefix
+  If neither yields a value — adapter logs an operator-actionable ERROR (listing both
+  options) via `NxLog` and transitions to terminal `FAILED` state. **No exception
+  propagates to the host JVM — see R10.** Environment-variable resolution is intentionally
+  NOT included in 0.1.0 — file is the preferred config medium; env support can be added
+  later as a non-breaking extension.
+
+    - SC1. Resolution MUST be zero-dep — only JDK `System.getProperty`,
+      `ClassLoader.getResourceAsStream`, `java.nio.file` (for the explicit-path case), and
+      `java.util.Properties`. No SnakeYAML, no Spring, no third-party config library.
+- [done] R2. Adapter MUST validate the resolved server-key format before any platform call: prefix
   `nx_sk_` + total length 38 chars (matches `Base62GameServerKeyGenerator` in nx-tenants).
-  Invalid format → `IllegalStateException` thrown from `start()`.
-- [todo] R3. Adapter MUST resolve `platformUrl` from the same three-source chain (key
-  `l2nx.platform-url`), falling back to a hardcoded default when none is provided. `platformUrl`
-  is the bare host (scheme + host + optional port), NOT a full base URL with context-path.
-    - SC2. Hardcoded default `platformUrl` MUST be the production nx-tenants public host
-      (e.g. `https://api.l2nx.app`); exact public DNS host is decided at first prod deploy
-      (open question).
+  Invalid format → adapter logs an actionable ERROR and transitions to `FAILED` (per R10).
+- [done] R3. Adapter MUST resolve `platformUrl` from the same two-source chain (key
+  `l2nx.platform-url`). `platformUrl` is the bare host with the tenant-slug subdomain already
+  embedded (e.g. `https://acme.api.l2nx.app`), NOT a full base URL with context-path. There is
+  no fallback — if missing → adapter logs an actionable ERROR (listing both options) and
+  transitions to `FAILED` (per R10).
 - [todo] R4. Adapter MUST POST to `{platformUrl}/api/tenants/servers/connect` with header
   `Authorization: Bearer <serverKey>` and JSON body `{"adapterVersion": "<version>"}`, using JDK
   `HttpURLConnection`. JSON serialization via Gson. The `/api/tenants` servlet context-path of
@@ -56,12 +63,12 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
       Kafka init MUST NOT block on broker reachability — `nx-gs-kafka` is graceful when the broker
       is unreachable.
 - [todo] R7. Adapter MUST publish a heartbeat message to `kafka.topics.heartbeat` every 60
-  seconds (Kafka message key = `serverId`). Payload type is `HeartbeatMessage` defined in
-  `nx-gs-adapter-api` under `app.l2nx.gs.adapter.api.kafka` (single source of truth — the
-  platform-side consumer in `server-registration` R9–R11 will compile against the same
-  type). Fields: `serverId`, `adapterVersion`, `uptime` (seconds since the most recent
-  successful `/connect` — session uptime, resets on reconnect), `enabledModules` (empty
-  list in MVP). Gson serializes the POJO to JSON.
+  seconds (Kafka message key = `serverId`). Payload fields: `serverId`, `adapterVersion`,
+  `uptime` (seconds since the most recent successful `/connect` — session uptime, resets
+  on reconnect), `enabledModules` (empty list in MVP). For 0.1.0 the payload type is
+  defined inline inside `nx-gs-adapter-core` (Gson serializes the POJO directly to JSON);
+  it will graduate into `nx-gs-adapter-api` (`app.l2nx.gs.adapter.api.kafka.HeartbeatMessage`)
+  in a later minor when the platform-side consumer is built (server-registration R9–R11).
     - SC4. Heartbeat interval = 60s (matches `server-registration` spec R9 / SC4).
 - [todo] R8. Adapter MUST expose a public API `NxAdapter`:
     - `static NxAdapter start()` — fire-and-forget bootstrap (returns immediately, all work
@@ -71,11 +78,26 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
       transition to `CLOSED`, emit a final `onStateChange(CLOSED)` callback. Idempotent.
 - [todo] R9. Adapter MUST register a JVM shutdown hook on `start()` that invokes `shutdown()`
   idempotently for graceful resource cleanup.
-- [todo] R10. Adapter MUST never propagate exceptions to host-JVM threads. Every daemon-thread
-  entry point (connect retry loop, heartbeat scheduler tick, Kafka producer callback) MUST
-  catch `Throwable`, log via the adapter's logging facade, and never re-throw.
+- [todo] R10. Adapter MUST never propagate exceptions to host-JVM threads — including the
+  calling thread of `NxAdapter.start()`. Every entry point (the caller's `start()` thread,
+  connect retry loop, heartbeat scheduler tick, Kafka producer callback) MUST catch
+  `Throwable`, log via the adapter's logging facade, transition to an appropriate state
+  (`FAILED` / `DEGRADED` / etc.), and never re-throw.
     - SC5. Each daemon-thread entry point has a unit test that asserts the runnable does NOT
-      throw when the wrapped logic throws.
+      throw when the wrapped logic throws. `NxAdapter.start()` has a unit test that asserts a
+      config-resolution failure transitions to `FAILED` without throwing.
+- [wip] R14. Adapter MUST resolve an `enabled` flag (boolean) from the same two-source
+  chain (key `l2nx.enabled`), defaulting to `false`. When `enabled=false`:
+    - `start()` logs an INFO message that the adapter is disabled and returns immediately
+      with state `DISABLED`.
+    - No `/connect` call is made; no Kafka producer is initialized; no heartbeat is started;
+      no JVM shutdown hook is registered.
+    - `state()` returns `DISABLED`; `shutdown()` is a no-op.
+    - The pre-registered `onStateChange` callback (if any) MUST receive a single `DISABLED`
+      notification so the host can observe the no-op outcome.
+
+  Default-false enforces explicit operator opt-in — adding the JAR to a classpath alone does
+  NOT produce side effects on the host JVM.
 
 **Should:**
 
@@ -83,12 +105,18 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   host (game core) can register before `start()` to surface lifecycle transitions in operator
   UI / logs. Callback dispatch is fire-and-forget on the state-change thread; host is
   responsible for handing off to its own thread if needed.
+- [todo] R15. Adapter SHOULD emit a multi-line startup banner on `start()` containing the L2NX
+  wordmark in ASCII art and the resolved `adapterVersion`, visually separated (blank-line
+  padded) from surrounding host-JVM log output. Renders as plain text via the logging facade —
+  no ANSI colours (host log sinks vary). Banner is emitted regardless of `enabled` value
+  (even a disabled adapter announces itself once).
 
 **Could:**
 
 - [todo] R12. Adapter COULD log the resolved config source at INFO on startup (e.g.
-  `server-key from system property` / `from env L2NX_GS_KEY` / `from classpath l2nx.properties`),
-  always redacting the key value (e.g. `nx_sk_xxxx...xxxx`).
+  `server-key from config file /etc/l2nx/adapter.properties` /
+  `from classpath l2nx.properties` / `from system property l2nx.gs-key`), always redacting
+  the key value (e.g. `nx_sk_xxxx...xxxx`).
 - [todo] R13. Adapter COULD support an `l2nx.adapter-version` config override for testing;
   default — read from the JAR manifest `Implementation-Version` attribute.
 
@@ -113,11 +141,12 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   of `app.l2nx:nx-gs-adapter-api` via Gradle composite include. Validation annotations
   (`jakarta.validation`) stay out of the api lib — manual validation lives in the nx-tenants
   `AdapterController`. The first published version of the api artifact is **0.1.0**.]
-- [resolved: `HeartbeatMessage` ships in the 0.1.0 release of `nx-gs-adapter-api` under
-  `app.l2nx.gs.adapter.api.kafka` — single source of truth for the wire shape, same as
-  REST DTOs. Adapter is the producer in this slice; the platform-side consumer
-  (`server-registration` R9–R11) will compile against the same type when implemented.
-  Java 8 POJO with hand-written builder, no validation annotations.]
+- [resolved: `HeartbeatMessage` is NOT included in the 0.1.0 release of
+  `nx-gs-adapter-api` — for now the heartbeat payload is defined inline inside
+  `nx-gs-adapter-core` (Gson handles JSON serialization without a typed contract on the
+  api side). It graduates into `app.l2nx.gs.adapter.api.kafka.HeartbeatMessage` in a later
+  minor once the platform-side consumer (`server-registration` R9–R11) lands and both
+  sides need a shared type to compile against.]
 - [resolved: `state()` and `onStateChange` emit `CLOSED` after `shutdown()` — mirrors
   `nx-gs-kafka`'s `NxKafkaState.CLOSED`. Predictable lifecycle for operators reading the state
   machine; architecture v2 §6.4 is silent on `CLOSED` but doesn't forbid it.]
@@ -125,22 +154,33 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   `/connect` (session uptime, resets on reconnect). Platform-side dashboards interpret this
   as "current adapter session lifetime"; on reconnect the counter starts fresh, matching
   the 1:1 heartbeat-lock semantics in `server-registration`.]
-- [assumed: Default `platformUrl` is `https://api.l2nx.app` (bare host). The adapter appends
-  the nx-tenants servlet context-path `/api/tenants` itself when constructing the
-  `/connect` URL. Exact public DNS host is decided at first prod deploy.]
+- [resolved: `platformUrl` is operator-supplied via the three-source chain — full URL
+  including the tenant-slug subdomain (e.g. `https://acme.api.l2nx.app`). No hardcoded
+  fallback. The adapter appends the nx-tenants servlet context-path `/api/tenants` itself
+  when constructing the `/connect` URL. Per-tenant subdomain pins the request to the right
+  tenant routing on the platform side.]
+- [resolved: `enabled` flag default is `false` — adapter requires explicit operator opt-in
+  to do any work. Rationale: drop-in JAR + classpath presence alone must not produce network
+  calls or daemon threads on a host JVM that hasn't been deliberately enabled by the
+  operator. Setting `l2nx.enabled=true` (in the config file or via `-Dl2nx.enabled=true`)
+  flips the switch.]
+- [resolved: Config sources in 0.1.0 are JVM system properties + a single properties file
+  (path from `-Dl2nx.config-file` or classpath `l2nx.properties` fallback). Environment
+  variables intentionally excluded for the first release — file is the preferred medium,
+  and env support can be added later as a non-breaking 4th source if a deployment scenario
+  demands it. Recursive classpath search is also out — predictable single-source semantics
+  win over flexibility.]
 - [assumed: Adapter version is read from the JAR manifest's `Implementation-Version`
   attribute via `getClass().getPackage().getImplementationVersion()`, with fallback to
   `"0.0.0-unknown"` for IDE / test runs.]
-- [assumed: `IllegalStateException` thrown from `start()` during config resolution propagates
-  to the caller (game-core init code). Catching it is the operator's responsibility — adapter
-  logs and re-throws. After `start()` returns successfully, every other failure is
-  internalized.]
-- [NEEDS CLARIFICATION: R7 + the resolved Open Question above commit `HeartbeatMessage` to
-  ship in `nx-gs-adapter-api` 0.1.0 under `app.l2nx.gs.adapter.api.kafka`, but the file is
-  currently missing — the api subproject contains only the REST DTOs (`ConnectRequest`,
-  `ConnectResponse`, `KafkaConfig`, `Topics`). Decide before tagging `api/v0.1.0`:
-  (a) add the `HeartbeatMessage` POJO to api now, or (b) defer the type to a later api
-  version and revise the resolution wording to match.]
+- [resolved: `NxAdapter.start()` NEVER throws into the host JVM. Config-resolution errors
+  surface as `IllegalStateException` from `ConfigResolver` internally, but are caught once
+  at the `start()` boundary, logged via `NxLog` with an operator-actionable message, and
+  the adapter transitions to terminal `FAILED` state. Operators inspect via logs (primary
+  channel) or `state()` / `onStateChange` (programmatic). Rationale: the adapter is an
+  open-core add-on for L2J / Lucera / Essence — host game server must keep running even
+  if the adapter cannot bootstrap. Matches R10's "no exceptions to host" applied to the
+  calling thread, not just daemon threads.]
 
 ## Links
 

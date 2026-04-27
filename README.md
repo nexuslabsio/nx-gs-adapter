@@ -65,11 +65,24 @@ other modules stay at their fallback `<base>` version and are NOT republished by
 
 ## Quick start
 
-Drop the fat JAR into the game-server classpath and configure the server-key via system property,
-environment variable, or a `l2nx.properties` file on the classpath:
+Drop the fat JAR into the game-server classpath and configure the adapter via a properties file —
+either on the classpath as `l2nx.properties` (root), or at any absolute path pointed to by
+`-Dl2nx.config-file=<path>`. JVM system properties (`-Dl2nx.<key>=...`) act as a per-key fallback
+when the file does not provide the key. Environment variables are not supported in 0.1.0.
+
+Required keys: `l2nx.gs-key`, `l2nx.platform-url`, `l2nx.enabled` (default `false`).
 
 ```bash
-java -Dl2nx.gs-key=nx_sk_... -cp "l2j-server.jar:nx-gs-adapter-core-all.jar" org.l2j.server.GameServer
+# Option A: drop l2nx.properties next to the game-server JAR (classpath root)
+java -cp "conf:l2j-server.jar:nx-gs-adapter-core-all.jar" org.l2j.server.GameServer
+# where ./conf/l2nx.properties contains:
+#   l2nx.gs-key=nx_sk_...
+#   l2nx.platform-url=https://acme.api.l2nx.app
+#   l2nx.enabled=true
+
+# Option B: explicit absolute path
+java -Dl2nx.config-file=/etc/l2nx/adapter.properties \
+     -cp "l2j-server.jar:nx-gs-adapter-core-all.jar" org.l2j.server.GameServer
 ```
 
 See [`docs/`](./docs/) for architectural detail.
