@@ -9,10 +9,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
- * Immutable configuration for NxKafka. Created via {@link Builder}
+ * Immutable configuration for {@link NxKafka}. Created via {@link Builder}
  * obtained from {@link NxKafka#configure()}.
  */
-public final class NxKafkaConfig {
+public final class KafkaConfig {
 
     private final String brokers;
     private final String clientId;
@@ -21,9 +21,9 @@ public final class NxKafkaConfig {
     private final long reconnectIntervalMs;
     private final Map<String, Object> properties;
     private final Gson gson;
-    private final Consumer<NxKafkaState> stateChangeListener;
+    private final Consumer<KafkaState> stateChangeListener;
 
-    private NxKafkaConfig(Builder builder) {
+    private KafkaConfig(Builder builder) {
         this.brokers = builder.brokers;
         this.clientId = builder.clientId;
         this.connectTimeoutMs = builder.connectTimeoutMs;
@@ -62,7 +62,7 @@ public final class NxKafkaConfig {
         return gson;
     }
 
-    public Consumer<NxKafkaState> getStateChangeListener() {
+    public Consumer<KafkaState> getStateChangeListener() {
         return stateChangeListener;
     }
 
@@ -91,7 +91,7 @@ public final class NxKafkaConfig {
         private long reconnectIntervalMs = 30000;
         private final Map<String, Object> properties = new HashMap<>();
         private Gson gson = new Gson();
-        private Consumer<NxKafkaState> stateChangeListener;
+        private Consumer<KafkaState> stateChangeListener;
 
         Builder() {
         }
@@ -148,7 +148,7 @@ public final class NxKafkaConfig {
          * Callback invoked when connection state changes (e.g. CONNECTED → DISCONNECTED).
          * Called on the health-check thread — dispatch to game thread if needed.
          */
-        public Builder onStateChange(Consumer<NxKafkaState> listener) {
+        public Builder onStateChange(Consumer<KafkaState> listener) {
             this.stateChangeListener = listener;
             return this;
         }
@@ -167,25 +167,25 @@ public final class NxKafkaConfig {
          * (no exception thrown) and background reconnection starts if enabled.
          *
          * @return the initialized {@link NxKafka} singleton
-         * @throws NxKafkaException if brokers are not set or NxKafka is already configured
+         * @throws KafkaException if brokers are not set or NxKafka is already configured
          */
         public NxKafka build() {
             if (brokers == null || brokers.trim().isEmpty()) {
-                throw new NxKafkaException("Brokers must be specified");
+                throw new KafkaException("Brokers must be specified");
             }
             if (clientId == null || clientId.trim().isEmpty()) {
-                throw new NxKafkaException("Client ID must not be blank");
+                throw new KafkaException("Client ID must not be blank");
             }
             if (connectTimeoutMs <= 0) {
-                throw new NxKafkaException("Connect timeout must be positive");
+                throw new KafkaException("Connect timeout must be positive");
             }
             if (reconnectIntervalMs <= 0) {
-                throw new NxKafkaException("Reconnect interval must be positive");
+                throw new KafkaException("Reconnect interval must be positive");
             }
             if (gson == null) {
-                throw new NxKafkaException("Gson must not be null");
+                throw new KafkaException("Gson must not be null");
             }
-            NxKafkaConfig config = new NxKafkaConfig(this);
+            KafkaConfig config = new KafkaConfig(this);
             return NxKafka.initialize(config);
         }
     }

@@ -43,8 +43,17 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
     - `connect/BackoffSchedule.java` [done] — interface
     - `connect/DefaultBackoffSchedule.java` [done] — canonical 30s → 1m → 2m → 5m capped
       delay generator
-    - `kafka/KafkaInitializer.java` [planned] — composes `NxKafka` builder from
-      `ConnectResponse.kafka`
+    - `kafka/KafkaInitializer.java` [done] — composes `NxKafka` builder properties
+      (`security.protocol`, `sasl.mechanism`, `sasl.jaas.config` templated against
+      `ScramLoginModule`) from `ConnectResponse.kafka` and delegates to a `KafkaFactory`;
+      escapes `\` / `"` in credentials before inlining into the JAAS string
+    - `kafka/KafkaFactory.java` [done] — interface (test seam over the
+      `NxKafka.configure().build()` singleton); contract returns post-build `KafkaState`
+      and forwards a state-change listener
+    - `kafka/DefaultKafkaFactory.java` [done] — default impl bridging to
+      `NxKafka.configure().build()`; shuts down any live `NxKafka` singleton before
+      re-init so a `DEGRADED → ACTIVE` reconnect cycle that re-fetches creds is
+      idempotent
     - `heartbeat/HeartbeatService.java` [planned] — `ScheduledExecutorService`-driven 60s
       loop
     - `heartbeat/HeartbeatPayload.java` [planned] — package-private POJO carrying the
@@ -91,8 +100,10 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   daemon scheduler. Emits a coarse-grained `Outcome` per logical event (`STARTING` /
   `ACTIVE` / `TRANSIENT` / `FAILED` / `REJECTED`) — the orchestrator (`NxAdapter`)
   translates outcomes into state transitions, keeping the flow itself orchestrator-agnostic.
-  Dispatch: 200 → `ACTIVE`; 401 → `FAILED` (terminal); 403 + `code=GAME_SERVER_DEACTIVATED`
-  → `REJECTED` (terminal); 409 + `code=KAFKA_CREDENTIALS_MISSING` / 5xx / IOException →
+  Dispatch: 200 → invoke `onActiveResponse(ConnectResponse)` callback (orchestrator owns
+  post-200 state — see `NxAdapter.initKafka`); if no callback wired, falls back to bare
+  `Outcome.ACTIVE`; 401 → `FAILED` (terminal); 403 + `code=GAME_SERVER_DEACTIVATED` →
+  `REJECTED` (terminal); 409 + `code=KAFKA_CREDENTIALS_MISSING` / 5xx / IOException →
   `TRANSIENT` + reschedule via `BackoffSchedule`; any other status → `FAILED`. Retry
   attempt counter is an `AtomicInteger` (visibility across consecutive scheduler tasks).
   `sanitize()` strips `Bearer\s+\S+` patterns from anything routed to `NxLog` (defense
@@ -107,9 +118,28 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
 - **`BackoffSchedule`** [done] (R5/SC3) — interface; default impl `DefaultBackoffSchedule`
   is stateless and returns `Duration.ofSeconds(30) → ofMinutes(1) → ofMinutes(2) →
   ofMinutes(5)`, capped at 5 minutes for all subsequent attempts.
-- **`KafkaInitializer`** [planned] (R6) — translates `ConnectResponse.kafka` into a
-  `NxKafka.configure().property(...).build()` call. Does NOT block on broker reachability —
-  relies on nx-gs-kafka's graceful start.
+- **`KafkaInitializer`** [done] (R6) — translates `ConnectResponse.kafka` into a property
+  map (`security.protocol`, `sasl.mechanism`, `sasl.jaas.config`) and delegates to a
+  `KafkaFactory`. The `sasl.jaas.config` is templated against
+  `org.apache.kafka.common.security.scram.ScramLoginModule`; `\` and `"` in
+  `saslUsername`/`saslPassword` are escaped before inlining. Returns the post-build
+  `KafkaState`. Does NOT block on broker reachability — relies on nx-gs-kafka's graceful
+  start.
+- **`KafkaFactory` / `DefaultKafkaFactory`** [done] (R6) — `KafkaFactory` is the test
+  seam over the `NxKafka.configure().build()` singleton (so `KafkaInitializer` can be
+  unit-tested without standing up a real Kafka client). `DefaultKafkaFactory` implements
+  it: shuts down any live `NxKafka` instance before re-init (for reconnect cycles), then
+  composes the builder and calls `build()`.
+- **State machine — Kafka coupling** [done] (R5, R6) — `NxAdapter` derives `ACTIVE` /
+  `DEGRADED` from a combination of platform handshake outcome and `KafkaState`:
+    - 200 from `/connect` + `KafkaState.CONNECTED` post-init → `ACTIVE`; latches `wasActive`
+    - 200 + `KafkaState.DISCONNECTED` post-init → `DEGRADED` (Kafka background reconnect)
+    - Subsequent `KafkaState.CONNECTED` (background recovery) → `ACTIVE`
+    - Subsequent `KafkaState.DISCONNECTED` while in `ACTIVE`/`DEGRADED` → `DEGRADED`
+    - `Outcome.TRANSIENT` while `wasActive=false` (initial handshake retry loop) → no-op,
+      state stays `REGISTERING`; while `wasActive=true` → `DEGRADED`
+    - `wasActive` is a permanent JVM-lifetime latch (only cleared in
+      `resetForTesting()`) — terminal `FAILED`/`REJECTED`/`CLOSED` do not reset it
 - **`HeartbeatService`** [planned] (R7) — single-threaded `ScheduledExecutorService` (daemon,
   named `nx-adapter-heartbeat`). Each tick builds a heartbeat payload POJO defined inline
   inside `nx-gs-adapter-core` (`heartbeat/HeartbeatPayload`, package-private — graduates
@@ -139,12 +169,23 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       emitted).
     - Otherwise → `ConnectFlow` schedules POST on the daemon executor → state
       `INIT → REGISTERING`.
-2. **Connect success** — `ConnectClient` parses `ConnectResponse` → `KafkaInitializer`
-   builds the `NxKafka` instance → `HeartbeatService.start(serverId, kafka.topics.heartbeat)`
-   → state `ACTIVE`.
+2. **Connect success** — `ConnectClient` parses `ConnectResponse` → `ConnectFlow` invokes
+   the `onActiveResponse` callback before any `Outcome` is emitted →
+   `NxAdapter.initKafka(...)` composes
+   `clientId = nx-gs-adapter-<tenantSlug>-<serverSlug>`, calls
+   `KafkaInitializer.init(...)` with `NxAdapter::handleKafkaStateChange` as the listener
+   → final adapter state derived from the returned `KafkaState`
+   (`CONNECTED → ACTIVE` + latches `wasActive`; `DISCONNECTED → DEGRADED`). Heartbeat
+   start (M24+) layers on top once R7 lands.
 3. **Connect retry** — non-terminal failure (409/5xx/network) → `BackoffSchedule.next(attempt)`
    → `ScheduledExecutorService.schedule(...)` re-runs the connect attempt → state stays
-   `REGISTERING` on first-time bootstrap or transitions to `DEGRADED` if previously `ACTIVE`.
+   `REGISTERING` on first-time bootstrap (`wasActive=false`); transitions to `DEGRADED`
+   only if the adapter previously reached `ACTIVE` (`wasActive=true`).
+   3a. **Kafka state changes (post-handshake)** — `NxKafka.onStateChange` listener fires
+   `handleKafkaStateChange`: `CONNECTED → ACTIVE` (latches `wasActive`),
+   `DISCONNECTED → DEGRADED` (only when adapter is `ACTIVE`/`DEGRADED`; ignored in
+   terminal states so a late event can't resurrect a CLOSED adapter), `CLOSED` from
+   Kafka is ignored (adapter shutdown drives `CLOSED` itself).
 4. **Heartbeat tick** — every 60s `HeartbeatService` builds a `HeartbeatPayload` →
    `NxKafka.send(heartbeatTopic, serverId, payload)`. nx-gs-kafka handles producer-side
    retries and reconnection; failed sends do not change adapter state.
@@ -239,7 +280,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   ordering on the consumer side).
 - **No reflection-heavy DI / Spring.** Wiring inside `NxAdapter.start()` is plain `new`.
   Constructor injection only — keeps bytecode predictable across host classloaders.
-- **`CLOSED` state shipped in the FSM.** Mirrors `nx-gs-kafka`'s `NxKafkaState.CLOSED` and gives
+- **`CLOSED` state shipped in the FSM.** Mirrors `nx-gs-kafka`'s `KafkaState.CLOSED` and gives
   operators a deterministic terminal state to query / observe via `onStateChange`. Adds one
   enum constant — no behavior cost.
 - **`uptime` = seconds since `/connect`.** Session-scoped, resets on reconnect. Reflects "this

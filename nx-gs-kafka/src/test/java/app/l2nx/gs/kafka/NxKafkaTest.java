@@ -13,13 +13,13 @@ class NxKafkaTest {
     void tearDown() {
         try {
             NxKafka.instance().shutdown();
-        } catch (NxKafkaException ignored) {
+        } catch (KafkaException ignored) {
         }
     }
 
     @Test
     void instance_shouldThrow_whenNotConfigured() {
-        assertThrows(NxKafkaException.class, NxKafka::instance);
+        assertThrows(KafkaException.class, NxKafka::instance);
     }
 
     @Test
@@ -41,7 +41,7 @@ class NxKafkaTest {
                 .reconnect(false)
                 .build();
 
-        NxKafkaException ex = assertThrows(NxKafkaException.class, () ->
+        KafkaException ex = assertThrows(KafkaException.class, () ->
                 NxKafka.configure()
                         .brokers("localhost:19999")
                         .connectTimeout(1, TimeUnit.SECONDS)
@@ -60,7 +60,7 @@ class NxKafkaTest {
                 .build();
 
         first.shutdown();
-        assertEquals(NxKafkaState.CLOSED, first.state());
+        assertEquals(KafkaState.CLOSED, first.state());
 
         NxKafka second = NxKafka.configure()
                 .brokers("localhost:19999")
@@ -81,7 +81,7 @@ class NxKafkaTest {
                 .build();
 
         assertFalse(kafka.isConnected());
-        assertEquals(NxKafkaState.DISCONNECTED, kafka.state());
+        assertEquals(KafkaState.DISCONNECTED, kafka.state());
     }
 
     @Test
@@ -95,7 +95,7 @@ class NxKafkaTest {
         kafka.shutdown();
         kafka.shutdown();
 
-        assertEquals(NxKafkaState.CLOSED, kafka.state());
+        assertEquals(KafkaState.CLOSED, kafka.state());
     }
 
     @Test
@@ -108,6 +108,6 @@ class NxKafkaTest {
 
         kafka.shutdown();
 
-        assertThrows(NxKafkaException.class, NxKafka::instance);
+        assertThrows(KafkaException.class, NxKafka::instance);
     }
 }

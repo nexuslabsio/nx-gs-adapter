@@ -7,32 +7,32 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class NxKafkaConfigTest {
+class KafkaConfigTest {
 
     @AfterEach
     void tearDown() {
         try {
             NxKafka.instance().shutdown();
-        } catch (NxKafkaException ignored) {
+        } catch (KafkaException ignored) {
         }
     }
 
     @Test
     void build_shouldThrow_whenBrokersNotSet() {
-        NxKafkaConfig.Builder builder = NxKafka.configure()
+        KafkaConfig.Builder builder = NxKafka.configure()
                 .clientId("test");
 
-        NxKafkaException ex = assertThrows(NxKafkaException.class, builder::build);
+        KafkaException ex = assertThrows(KafkaException.class, builder::build);
         assertTrue(ex.getMessage().contains("Brokers"));
     }
 
     @Test
     void build_shouldThrow_whenBrokersEmpty() {
-        NxKafkaConfig.Builder builder = NxKafka.configure()
+        KafkaConfig.Builder builder = NxKafka.configure()
                 .brokers("   ")
                 .clientId("test");
 
-        assertThrows(NxKafkaException.class, builder::build);
+        assertThrows(KafkaException.class, builder::build);
     }
 
     @Test
@@ -44,7 +44,7 @@ class NxKafkaConfigTest {
                 .build();
 
         assertNotNull(kafka);
-        assertEquals(NxKafkaState.DISCONNECTED, kafka.state());
+        assertEquals(KafkaState.DISCONNECTED, kafka.state());
     }
 
     @Test

@@ -63,7 +63,7 @@ automatically.
 <!-- @formatter:off -->
 ```java
 NxKafka.instance().isConnected();  // true / false
-NxKafka.instance().state();        // NxKafkaState.CONNECTED
+NxKafka.instance().state();        // KafkaState.CONNECTED
 ```
 <!-- @formatter:on -->
 

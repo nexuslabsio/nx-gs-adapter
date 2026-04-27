@@ -1,6 +1,6 @@
 package app.l2nx.gs.kafka;
 
-public enum NxKafkaState {
+public enum KafkaState {
     CREATED,
     CONNECTED,
     DISCONNECTED,

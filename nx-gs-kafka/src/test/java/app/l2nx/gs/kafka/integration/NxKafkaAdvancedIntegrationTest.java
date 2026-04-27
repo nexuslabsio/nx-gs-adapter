@@ -1,8 +1,8 @@
 package app.l2nx.gs.kafka.integration;
 
+import app.l2nx.gs.kafka.KafkaException;
+import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.gs.kafka.NxKafka;
-import app.l2nx.gs.kafka.NxKafkaException;
-import app.l2nx.gs.kafka.NxKafkaState;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -46,7 +46,7 @@ class NxKafkaAdvancedIntegrationTest {
     void tearDown() {
         try {
             NxKafka.instance().shutdown();
-        } catch (NxKafkaException ignored) {
+        } catch (KafkaException ignored) {
         }
     }
 
@@ -103,7 +103,7 @@ class NxKafkaAdvancedIntegrationTest {
 
     @Test
     void onStateChange_shouldBeInvoked_onConnect() {
-        List<NxKafkaState> states = new CopyOnWriteArrayList<>();
+        List<KafkaState> states = new CopyOnWriteArrayList<>();
 
         NxKafka kafka = NxKafka.configure()
                 .brokers(KAFKA.getBootstrapServers())
@@ -113,12 +113,12 @@ class NxKafkaAdvancedIntegrationTest {
                 .build();
 
         assertTrue(kafka.isConnected());
-        assertTrue(states.contains(NxKafkaState.CONNECTED));
+        assertTrue(states.contains(KafkaState.CONNECTED));
     }
 
     @Test
     void onStateChange_shouldBeInvoked_onShutdown() {
-        List<NxKafkaState> states = new CopyOnWriteArrayList<>();
+        List<KafkaState> states = new CopyOnWriteArrayList<>();
 
         NxKafka kafka = NxKafka.configure()
                 .brokers(KAFKA.getBootstrapServers())
@@ -129,7 +129,7 @@ class NxKafkaAdvancedIntegrationTest {
 
         kafka.shutdown();
 
-        assertTrue(states.contains(NxKafkaState.CLOSED));
+        assertTrue(states.contains(KafkaState.CLOSED));
     }
 
     @Test

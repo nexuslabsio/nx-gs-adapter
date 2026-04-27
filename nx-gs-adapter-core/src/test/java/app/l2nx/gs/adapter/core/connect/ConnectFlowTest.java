@@ -24,9 +24,9 @@ class ConnectFlowTest {
 
     private static final String CONNECT_PATH = "/api/tenants/servers/connect";
 
-    private static final String VALID_CONNECT_RESPONSE = ""
-            + "{"
+    private static final String VALID_CONNECT_RESPONSE = "{"
             + "\"tenantId\":\"00000000-0000-0000-0000-000000000001\","
+            + "\"tenantSlug\":\"acme\","
             + "\"serverId\":\"00000000-0000-0000-0000-000000000002\","
             + "\"serverSlug\":\"acme-x1\","
             + "\"serverName\":\"Acme X1\","

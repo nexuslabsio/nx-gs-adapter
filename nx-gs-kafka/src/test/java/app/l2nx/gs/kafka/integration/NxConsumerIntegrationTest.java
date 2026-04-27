@@ -1,7 +1,7 @@
 package app.l2nx.gs.kafka.integration;
 
+import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
-import app.l2nx.gs.kafka.NxKafkaException;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -35,7 +35,7 @@ class NxConsumerIntegrationTest {
     void tearDown() {
         try {
             NxKafka.instance().shutdown();
-        } catch (NxKafkaException ignored) {
+        } catch (KafkaException ignored) {
         }
     }
 
@@ -84,7 +84,7 @@ class NxConsumerIntegrationTest {
         kafka.subscribe(topic, TestEvent.class, event -> {
         });
 
-        assertThrows(NxKafkaException.class,
+        assertThrows(KafkaException.class,
                 () -> kafka.subscribe(topic, TestEvent.class, event -> {
                 }));
     }

@@ -1,8 +1,8 @@
 package app.l2nx.gs.kafka.integration;
 
+import app.l2nx.gs.kafka.KafkaException;
+import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.gs.kafka.NxKafka;
-import app.l2nx.gs.kafka.NxKafkaException;
-import app.l2nx.gs.kafka.NxKafkaState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -28,7 +28,7 @@ class NxKafkaIntegrationTest {
     void tearDown() {
         try {
             NxKafka.instance().shutdown();
-        } catch (NxKafkaException ignored) {
+        } catch (KafkaException ignored) {
         }
     }
 
@@ -41,7 +41,7 @@ class NxKafkaIntegrationTest {
                 .build();
 
         assertTrue(kafka.isConnected());
-        assertEquals(NxKafkaState.CONNECTED, kafka.state());
+        assertEquals(KafkaState.CONNECTED, kafka.state());
     }
 
     @Test
@@ -54,7 +54,7 @@ class NxKafkaIntegrationTest {
                 .build();
 
         assertFalse(kafka.isConnected());
-        assertEquals(NxKafkaState.DISCONNECTED, kafka.state());
+        assertEquals(KafkaState.DISCONNECTED, kafka.state());
     }
 
     @Test
@@ -69,8 +69,8 @@ class NxKafkaIntegrationTest {
 
         kafka.shutdown();
 
-        assertEquals(NxKafkaState.CLOSED, kafka.state());
-        assertThrows(NxKafkaException.class, NxKafka::instance);
+        assertEquals(KafkaState.CLOSED, kafka.state());
+        assertThrows(KafkaException.class, NxKafka::instance);
     }
 
     @Test
@@ -89,7 +89,7 @@ class NxKafkaIntegrationTest {
                 .pauseContainerCmd(KAFKA.getContainerId()).exec();
 
         try {
-            awaitState(NxKafkaState.DISCONNECTED, 15000);
+            awaitState(KafkaState.DISCONNECTED, 15000);
             assertFalse(kafka.isConnected());
         } finally {
             DockerClientFactory.instance().client()
@@ -97,11 +97,11 @@ class NxKafkaIntegrationTest {
         }
 
         // Wait for reconnection
-        awaitState(NxKafkaState.CONNECTED, 15000);
+        awaitState(KafkaState.CONNECTED, 15000);
         assertTrue(kafka.isConnected());
     }
 
-    private void awaitState(NxKafkaState expected, long timeoutMs) throws InterruptedException {
+    private void awaitState(KafkaState expected, long timeoutMs) throws InterruptedException {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
             if (NxKafka.instance().state() == expected) {

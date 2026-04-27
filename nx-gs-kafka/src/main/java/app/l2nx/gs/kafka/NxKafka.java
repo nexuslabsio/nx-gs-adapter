@@ -52,21 +52,21 @@ public final class NxKafka {
 
     private static volatile NxKafka instance;
 
-    private final NxKafkaConfig config;
+    private final KafkaConfig config;
     private final NxLog log;
     private final NxProducer producer;
     private final Map<String, NxConsumer> consumers = new ConcurrentHashMap<>();
-    private final Consumer<NxKafkaState> stateChangeListener;
+    private final Consumer<KafkaState> stateChangeListener;
     private final ScheduledExecutorService scheduler;
     private final Thread shutdownHook;
 
-    private volatile NxKafkaState state;
+    private volatile KafkaState state;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
-    private NxKafka(NxKafkaConfig config) {
+    private NxKafka(KafkaConfig config) {
         this.config = config;
         this.log = NxLogFactory.getLogger(NxKafka.class);
-        this.state = NxKafkaState.CREATED;
+        this.state = KafkaState.CREATED;
         this.stateChangeListener = config.getStateChangeListener();
 
         // Register JVM shutdown hook BEFORE starting scheduler
@@ -101,34 +101,34 @@ public final class NxKafka {
     }
 
     /**
-     * Creates a new configuration builder. Call {@link NxKafkaConfig.Builder#build()} to
+     * Creates a new configuration builder. Call {@link KafkaConfig.Builder#build()} to
      * initialize the singleton and connect to the Kafka cluster.
      *
      * @return configuration builder
-     * @throws NxKafkaException if already configured and not shut down
+     * @throws KafkaException if already configured and not shut down
      */
-    public static NxKafkaConfig.Builder configure() {
-        return new NxKafkaConfig.Builder();
+    public static KafkaConfig.Builder configure() {
+        return new KafkaConfig.Builder();
     }
 
     /**
      * Returns the singleton instance.
      *
      * @return the configured NxKafka instance
-     * @throws NxKafkaException if {@link #configure()} has not been called yet
+     * @throws KafkaException if {@link #configure()} has not been called yet
      */
     public static NxKafka instance() {
         NxKafka local = instance;
         if (local == null) {
-            throw new NxKafkaException("NxKafka not configured. Call NxKafka.configure().build() first");
+            throw new KafkaException("NxKafka not configured. Call NxKafka.configure().build() first");
         }
         return local;
     }
 
-    static NxKafka initialize(NxKafkaConfig config) {
+    static NxKafka initialize(KafkaConfig config) {
         synchronized (NxKafka.class) {
-            if (instance != null && instance.state() != NxKafkaState.CLOSED) {
-                throw new NxKafkaException("NxKafka already configured. Call shutdown() first");
+            if (instance != null && instance.state() != KafkaState.CLOSED) {
+                throw new KafkaException("NxKafka already configured. Call shutdown() first");
             }
             NxKafka kafka = new NxKafka(config);
             instance = kafka;
@@ -189,7 +189,7 @@ public final class NxKafka {
         if (closed.get()) {
             log.warn("Cannot send to {}: NxKafka is shut down", topic);
             try {
-                callback.onCompletion(null, new NxKafkaException("NxKafka is shut down"));
+                callback.onCompletion(null, new KafkaException("NxKafka is shut down"));
             } catch (Exception e) {
                 log.error("Callback error for topic {}: {}", topic, e.getMessage());
             }
@@ -212,7 +212,7 @@ public final class NxKafka {
         if (closed.get()) {
             log.warn("Cannot send to {}: NxKafka is shut down", topic);
             try {
-                callback.onCompletion(null, new NxKafkaException("NxKafka is shut down"));
+                callback.onCompletion(null, new KafkaException("NxKafka is shut down"));
             } catch (Exception e) {
                 log.error("Callback error for topic {}: {}", topic, e.getMessage());
             }
@@ -235,7 +235,7 @@ public final class NxKafka {
      * @param type    message class for Gson deserialization
      * @param handler invoked for each message on the consumer thread
      * @param <T>     message type
-     * @throws NxKafkaException if already subscribed to this topic or NxKafka is shut down
+     * @throws KafkaException if already subscribed to this topic or NxKafka is shut down
      */
     public <T> void subscribe(String topic, Class<T> type, Consumer<T> handler) {
         subscribe(topic, type, (message, replyTo) -> handler.accept(message));
@@ -257,17 +257,17 @@ public final class NxKafka {
      * @param type    message class for Gson deserialization
      * @param handler invoked for each message with a {@link ReplyContext} on the consumer thread
      * @param <T>     message type
-     * @throws NxKafkaException if already subscribed to this topic or NxKafka is shut down
+     * @throws KafkaException if already subscribed to this topic or NxKafka is shut down
      */
     public <T> void subscribe(String topic, Class<T> type, BiConsumer<T, ReplyContext> handler) {
         if (closed.get()) {
-            throw new NxKafkaException("Cannot subscribe: NxKafka is shut down");
+            throw new KafkaException("Cannot subscribe: NxKafka is shut down");
         }
         Map<String, Object> consumerConfig = createConsumerConfig(topic);
         NxConsumer group = NxConsumer.create(topic, type, handler, producer, config.getGson(), consumerConfig);
         if (consumers.putIfAbsent(topic, group) != null) {
             group.stop();
-            throw new NxKafkaException("Already subscribed to topic: " + topic);
+            throw new KafkaException("Already subscribed to topic: " + topic);
         }
         log.info("Subscribed to topic {}", topic);
     }
@@ -286,10 +286,10 @@ public final class NxKafka {
     }
 
     public boolean isConnected() {
-        return state == NxKafkaState.CONNECTED;
+        return state == KafkaState.CONNECTED;
     }
 
-    public NxKafkaState state() {
+    public KafkaState state() {
         return state;
     }
 
@@ -316,7 +316,7 @@ public final class NxKafka {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        changeState(NxKafkaState.CLOSED);
+        changeState(KafkaState.CLOSED);
 
         if (scheduler != null) {
             scheduler.shutdownNow();
@@ -331,8 +331,8 @@ public final class NxKafka {
         instance = null;
     }
 
-    private void changeState(NxKafkaState newState) {
-        NxKafkaState oldState = this.state;
+    private void changeState(KafkaState newState) {
+        KafkaState oldState = this.state;
         if (oldState == newState) {
             return;
         }
@@ -386,12 +386,12 @@ public final class NxKafka {
             int brokerCount = result.nodes().get(config.getConnectTimeoutMs(), TimeUnit.MILLISECONDS).size();
 
             if (!closed.get()) {
-                changeState(NxKafkaState.CONNECTED);
+                changeState(KafkaState.CONNECTED);
                 log.info("Connected to cluster {}, brokers: {}", clusterId, brokerCount);
             }
         } catch (Exception e) {
             if (!closed.get()) {
-                changeState(NxKafkaState.DISCONNECTED);
+                changeState(KafkaState.DISCONNECTED);
                 log.warn("Failed to connect to Kafka at {}: {}", config.getBrokers(), e.getMessage(), e);
             }
         }
@@ -401,15 +401,15 @@ public final class NxKafka {
         if (closed.get()) {
             return;
         }
-        NxKafkaState previousState = state;
+        KafkaState previousState = state;
         tryConnect();
 
         if (closed.get()) {
             return;
         }
-        if (state == NxKafkaState.CONNECTED && previousState == NxKafkaState.DISCONNECTED) {
+        if (state == KafkaState.CONNECTED && previousState == KafkaState.DISCONNECTED) {
             log.info("Reconnected to Kafka");
-        } else if (state == NxKafkaState.DISCONNECTED && previousState == NxKafkaState.CONNECTED) {
+        } else if (state == KafkaState.DISCONNECTED && previousState == KafkaState.CONNECTED) {
             log.warn("Lost connection to Kafka");
         }
     }

@@ -46,22 +46,33 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   `HttpURLConnection`. JSON serialization via Gson. The `/api/tenants` servlet context-path of
   nx-tenants is owned by the adapter (hardcoded into the request path), not by `platformUrl`.
 - [done] R5. Adapter MUST handle `/connect` HTTP responses per the platform contract:
-    - 200 → state `ACTIVE`, parse `ConnectResponse`, proceed to Kafka init
+    - 200 → parse `ConnectResponse`, proceed to Kafka init (R6); final state is **derived
+      from the post-init Kafka state** — `ACTIVE` iff `KafkaState.CONNECTED`, else `DEGRADED`
+      (Kafka background reconnect drives `ACTIVE ⇄ DEGRADED` thereafter).
     - 401 → state `FAILED`, no retry (key invalid / unknown)
     - 403 (code `GAME_SERVER_DEACTIVATED`) → state `REJECTED`, no retry
-    - 409 (code `KAFKA_CREDENTIALS_MISSING`) → state `DEGRADED`, retry with backoff
-    - 5xx / network / timeout → state `DEGRADED`, retry with backoff
-    - SC3. Backoff schedule for retryable failures: 30s → 1m → 2m → 5m capped (matches
-      architecture v2 §6.4).
-- [todo] R6. Adapter MUST initialize Kafka producer via `nx-gs-kafka` after a successful `/connect`,
+    - 409 (code `KAFKA_CREDENTIALS_MISSING`) / 5xx / network / timeout → retry with backoff;
+      state stays `REGISTERING` between retries until the **first** successful 200.
+      After the first ACTIVE, a follow-up TRANSIENT (e.g. unforeseen re-registration path)
+      drives `DEGRADED`. Pre-first-ACTIVE the adapter is still inside its handshake loop and
+      a transient failure is not yet a "degraded" condition — it's a "not yet up" condition.
+    - SC3. Backoff schedule for retryable failures: 30s → 1m → 2m → 5m capped.
+- [done] R6. Adapter MUST initialize Kafka producer via `nx-gs-kafka` after a successful `/connect`,
   composing builder properties from `ConnectResponse.kafka`:
     - `bootstrap.servers` ← `kafka.bootstrap`
     - `security.protocol` ← `kafka.securityProtocol`
     - `sasl.mechanism` ← `kafka.saslMechanism`
     - `sasl.jaas.config` ← `org.apache.kafka.common.security.scram.ScramLoginModule required
       username="<saslUsername>" password="<saslPassword>";`
-      Kafka init MUST NOT block on broker reachability — `nx-gs-kafka` is graceful when the broker
-      is unreachable.
+    - `client.id` ← `nx-gs-adapter-<tenantSlug>-<serverSlug>` — `tenantSlug` is sourced from
+      `ConnectResponse.tenantSlug` (authoritative; not parsed from `platformUrl`).
+    - Kafka init MUST NOT block on broker reachability — `nx-gs-kafka` is graceful when the
+      broker is unreachable, returning `KafkaState.DISCONNECTED` and reconnecting in the
+      background.
+    - Adapter state coupling: `ACTIVE` requires platform handshake passed AND
+      `KafkaState.CONNECTED`. Kafka transitions (CONNECTED ↔ DISCONNECTED) drive `ACTIVE ↔
+      DEGRADED` post-handshake. Reconnect cycles (re-fetched creds) MUST shut down the
+      existing `NxKafka` singleton before re-init.
 - [todo] R7. Adapter MUST publish a heartbeat message to `kafka.topics.heartbeat` every 60
   seconds (Kafka message key = `serverId`). Payload fields: `serverId`, `adapterVersion`,
   `uptime` (seconds since the most recent successful `/connect` — session uptime, resets
@@ -148,7 +159,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   minor once the platform-side consumer (`server-registration` R9–R11) lands and both
   sides need a shared type to compile against.]
 - [resolved: `state()` and `onStateChange` emit `CLOSED` after `shutdown()` — mirrors
-  `nx-gs-kafka`'s `NxKafkaState.CLOSED`. Predictable lifecycle for operators reading the state
+  `nx-gs-kafka`'s `KafkaState.CLOSED`. Predictable lifecycle for operators reading the state
   machine; architecture v2 §6.4 is silent on `CLOSED` but doesn't forbid it.]
 - [resolved: heartbeat-payload `uptime` is seconds since the most recent successful
   `/connect` (session uptime, resets on reconnect). Platform-side dashboards interpret this

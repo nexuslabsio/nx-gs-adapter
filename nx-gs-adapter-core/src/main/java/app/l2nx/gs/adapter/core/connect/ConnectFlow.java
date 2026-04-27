@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.core.connect;
 
 import app.l2nx.gs.adapter.api.rest.ConnectRequest;
+import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.log.NxLog;
 import app.l2nx.log.NxLogFactory;
@@ -50,6 +51,13 @@ public final class ConnectFlow implements Runnable {
     private final BackoffSchedule backoff;
     private final ScheduledExecutorService scheduler;
     private final Consumer<Outcome> onOutcome;
+    /**
+     * Invoked exactly once, immediately before {@link Outcome#ACTIVE}, with the parsed
+     * {@link ConnectResponse}. Lets the orchestrator (e.g. {@code NxAdapter}) bootstrap
+     * the Kafka client before the {@code ACTIVE} state is observed by registered
+     * state-change callbacks. {@code null} = the response is not needed.
+     */
+    private final Consumer<ConnectResponse> onActiveResponse;
 
     private final AtomicInteger attempt = new AtomicInteger(0);
 
@@ -58,11 +66,21 @@ public final class ConnectFlow implements Runnable {
                        BackoffSchedule backoff,
                        ScheduledExecutorService scheduler,
                        Consumer<Outcome> onOutcome) {
+        this(config, client, backoff, scheduler, onOutcome, null);
+    }
+
+    public ConnectFlow(AdapterConfig config,
+                       ConnectClient client,
+                       BackoffSchedule backoff,
+                       ScheduledExecutorService scheduler,
+                       Consumer<Outcome> onOutcome,
+                       Consumer<ConnectResponse> onActiveResponse) {
         this.config = config;
         this.client = client;
         this.backoff = backoff;
         this.scheduler = scheduler;
         this.onOutcome = onOutcome;
+        this.onActiveResponse = onActiveResponse;
     }
 
     @Override
@@ -97,8 +115,23 @@ public final class ConnectFlow implements Runnable {
 
         int status = result.getStatusCode();
         if (status == HttpURLConnection.HTTP_OK) {
-            log.info("Connect succeeded — adapter ACTIVE");
+            log.info("Connect succeeded — platform handshake passed");
             attempt.set(0);
+            if (onActiveResponse != null) {
+                ConnectResponse response = result.getResponse().orElse(null);
+                if (response != null) {
+                    try {
+                        onActiveResponse.accept(response);
+                    } catch (Throwable t) {
+                        log.error("ConnectFlow onActiveResponse threw: {}", t.getMessage(), t);
+                    }
+                    // Ownership transferred — orchestrator drives the final post-200 state
+                    // (e.g. ACTIVE if Kafka up, DEGRADED if Kafka down). Re-emitting
+                    // Outcome.ACTIVE here would clobber a legitimate DEGRADED.
+                    return;
+                }
+                log.error("ConnectClient returned 200 with no parsed body — falling back to bare ACTIVE outcome");
+            }
             emit(Outcome.ACTIVE);
             return;
         }

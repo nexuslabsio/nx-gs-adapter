@@ -12,7 +12,7 @@ package root `app.l2nx.gs.kafka` makes that explicit.
 
 ## Package layout
 
-- `app.l2nx.gs.kafka` — `NxKafka`, `NxKafkaConfig`, `NxKafkaState`, `NxKafkaException`
+- `app.l2nx.gs.kafka` — `NxKafka`, `KafkaConfig`, `KafkaState`, `KafkaException`
 - `app.l2nx.gs.kafka.producer` — `NxProducer`, `DefaultNxProducer`
 - `app.l2nx.gs.kafka.consumer` — `NxConsumer`, `NxConsumerGroup`, `ReplyContext`
 - `app.l2nx.gs.kafka.serde` — `GsonSerializer`, `GsonDeserializer` (Kafka-side
@@ -41,7 +41,7 @@ Declared via `gradle/libs.versions.toml` at the monorepo root:
 - **No compression libs in transitives** — `snappy-java`, `lz4-java`, `zstd-jni` excluded
   in `build.gradle.kts`.
 - **Public API → Javadoc mandatory** — every type a consumer touches (`NxKafka`,
-  `NxKafkaConfig`, `NxProducer`, `NxConsumer`, `ReplyContext`) carries Javadoc.
+  `KafkaConfig`, `NxProducer`, `NxConsumer`, `ReplyContext`) carries Javadoc.
 
 ## Versioning
 

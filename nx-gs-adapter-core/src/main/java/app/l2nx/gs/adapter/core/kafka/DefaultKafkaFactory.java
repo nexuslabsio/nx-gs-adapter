@@ -1,0 +1,61 @@
+package app.l2nx.gs.adapter.core.kafka;
+
+import app.l2nx.gs.kafka.KafkaConfig;
+import app.l2nx.gs.kafka.KafkaException;
+import app.l2nx.gs.kafka.KafkaState;
+import app.l2nx.gs.kafka.NxKafka;
+import app.l2nx.log.NxLog;
+import app.l2nx.log.NxLogFactory;
+
+import java.util.Map;
+import java.util.function.Consumer;
+
+/**
+ * Default {@link KafkaFactory} that bridges to {@code NxKafka.configure().build()}.
+ *
+ * <p>Shuts down any live singleton before init so a reconnect cycle that re-fetches
+ * Kafka credentials produces a fresh client.</p>
+ */
+public final class DefaultKafkaFactory implements KafkaFactory {
+
+    private static final NxLog log = NxLogFactory.getLogger(DefaultKafkaFactory.class);
+
+    @Override
+    public KafkaState build(String brokers,
+                            String clientId,
+                            Map<String, Object> properties,
+                            Consumer<KafkaState> stateChangeListener) {
+        shutdownExistingIfAlive();
+
+        KafkaConfig.Builder builder = NxKafka.configure()
+                .brokers(brokers)
+                .clientId(clientId)
+                .onStateChange(stateChangeListener);
+        for (Map.Entry<String, Object> e : properties.entrySet()) {
+            builder.property(e.getKey(), e.getValue());
+        }
+        NxKafka kafka = builder.build();
+        return kafka.state();
+    }
+
+    private static void shutdownExistingIfAlive() {
+        NxKafka existing;
+        try {
+            existing = NxKafka.instance();
+        } catch (KafkaException notConfigured) {
+            // First init — nothing to shut down.
+            return;
+        }
+        if (existing.state() != KafkaState.CLOSED) {
+            log.info("Existing NxKafka singleton in state {} — shutting down before re-init",
+                    existing.state());
+            try {
+                existing.shutdown();
+            } catch (Throwable t) {
+                // shutdown() is internally guarded but a faulty consumer/producer close
+                // still must not bubble into the connect-scheduler thread.
+                log.error("NxKafka.shutdown() threw during re-init: {}", t.getMessage(), t);
+            }
+        }
+    }
+}
