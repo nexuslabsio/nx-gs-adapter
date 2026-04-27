@@ -1,6 +1,6 @@
 [versions]
 # runtime deps
-kafka-clients = "3.6.2"
+kafka-clients = "3.9.1"
 gson = "2.13.2"
 slf4j = "2.0.17"
 # tests
