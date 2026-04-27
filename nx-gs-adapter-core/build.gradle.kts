@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
-version = findProperty("${project.name}.version") as String? ?: "0.1.0"
+version = findProperty("${project.name}.version") as String? ?: "0.1.2"
 
 java {
     withSourcesJar()
@@ -56,6 +56,12 @@ tasks.withType<Javadoc>().configureEach {
 // Embed :nx-log compiled classes directly into the published nx-gs-adapter-core.jar
 // so Maven Central consumers don't need a separate nx-log dependency.
 tasks.named<Jar>("jar") {
+    manifest {
+        // Implementation-Version is read at runtime by AdapterVersion / ConfigResolver
+        // (Package.getImplementationVersion). Without this, both the startup banner
+        // and the heartbeat payload report "0.0.0-unknown".
+        attributes("Implementation-Version" to project.version)
+    }
     from(project(":nx-log").sourceSets["main"].output)
 }
 
