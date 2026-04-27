@@ -43,12 +43,12 @@ jobs:
           VERSION="${REF#${MODULE}/v}"     # e.g. "0.1.0"
 
           case "$MODULE" in
-            api)      GRADLE_MODULE="nx-gs-adapter-api" ;;
-            gs-kafka) GRADLE_MODULE="nx-gs-kafka" ;;
-            core)     GRADLE_MODULE="nx-gs-adapter-core" ;;
+            api)   GRADLE_MODULE="nx-gs-adapter-api" ;;
+            kafka) GRADLE_MODULE="nx-gs-kafka" ;;
+            core)  GRADLE_MODULE="nx-gs-adapter-core" ;;
             *)
               echo "Unknown module prefix in tag: $MODULE"
-              echo "Supported prefixes: api, gs-kafka, core"
+              echo "Supported prefixes: api, kafka, core"
               exit 1
               ;;
           esac

@@ -68,13 +68,13 @@ client-proprietary schemas, table names, or column layouts.
 Per-module independent versioning via slash-namespaced git tags:
 
 - `api/vX.Y.Z` → publish `nx-gs-adapter-api`
-- `gs-kafka/vX.Y.Z` → publish `nx-gs-kafka`
+- `kafka/vX.Y.Z` → publish `nx-gs-kafka`
 - `core/vX.Y.Z` → publish `nx-gs-adapter-core`
 - future: `db-l2j/vX.Y.Z`, `dp-l2j/vX.Y.Z`, ...
 
 Each module's `build.gradle.kts` declares
 `version = findProperty("${project.name}.version") as String? ?: "<base>"`. CI parses the tag,
-maps prefix → subproject (api → nx-gs-adapter-api, gs-kafka → nx-gs-kafka, core → nx-gs-adapter-core),
+maps prefix → subproject (api → nx-gs-adapter-api, kafka → nx-gs-kafka, core → nx-gs-adapter-core),
 passes `-P<subproject>.version=X.Y.Z`, and publishes ONLY that module. Other modules stay at
 fallback. `nx-log` is internal-only (no tag namespace, no publication).
 

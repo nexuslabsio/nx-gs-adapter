@@ -45,7 +45,7 @@ Declared via `gradle/libs.versions.toml` at the monorepo root:
 
 ## Versioning
 
-Slash-namespaced tag `gs-kafka/vX.Y.Z` releases this module independently. Fallback when no
+Slash-namespaced tag `kafka/vX.Y.Z` releases this module independently. Fallback when no
 `-Pnx-gs-kafka.version=...` is passed: the literal in this module's `build.gradle.kts`.
 Release flow lives in the monorepo root — see [`../CLAUDE.md`](../CLAUDE.md).
 
