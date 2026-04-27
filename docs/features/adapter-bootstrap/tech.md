@@ -26,8 +26,11 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       file path from `-Dl2nx.config-file` or classpath `l2nx.properties` fallback (with
       multi-match guard); string + boolean resolution variants; UTF-8 reads;
       `resolvePlatformUrl()` enforces `https://`, rejects query/fragment/missing-host
-    - `lifecycle/StartupBanner.java` [planned] — emits the multi-line L2NX ASCII banner +
+    - `lifecycle/StartupBanner.java` [done] — emits the multi-line L2NX ASCII banner +
       adapterVersion via the logging facade
+    - `lifecycle/AdapterVersion.java` [done] — static helper resolving the JAR
+      manifest's `Implementation-Version` (with `0.0.0-unknown` fallback); used
+      by the banner before the config resolver runs
     - `connect/ConnectFlow.java` [done] — POST `/connect` lifecycle, status-code dispatch,
       retry-with-backoff via `AtomicInteger` attempt counter; `sanitize()` redacts
       `Bearer <token>` patterns from log messages
@@ -54,12 +57,22 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       `NxKafka.configure().build()`; shuts down any live `NxKafka` singleton before
       re-init so a `DEGRADED → ACTIVE` reconnect cycle that re-fetches creds is
       idempotent
-    - `heartbeat/HeartbeatService.java` [planned] — `ScheduledExecutorService`-driven 60s
-      loop
-    - `heartbeat/HeartbeatPayload.java` [planned] — package-private POJO carrying the
-      heartbeat fields; graduates to `nx-gs-adapter-api.kafka.HeartbeatMessage` in a
-      later minor
-    - `lifecycle/ShutdownHook.java` [planned] — registers JVM shutdown hook
+    - `heartbeat/HeartbeatService.java` [done] — `ScheduledExecutorService`-driven 60s
+      loop; tick wrapped in `SafeRunnable` so a runaway throwable can't cancel the
+      schedule. `KafkaPublisher` interface is the test seam over
+      `NxKafka.instance().send(topic, key, payload)`. `start(serverId, topic)`
+      captures `connectInstant` fresh each call, so uptime is session-scoped
+      (resets on reconnect)
+    - `concurrent/SafeRunnable.java` [done] — static `wrap(Runnable, NxLog)`
+      helper that swallows `Throwable` from the delegate. Applied at every
+      adapter daemon-thread entry point (connect submit, heartbeat tick,
+      shutdown hook)
+    - heartbeat wire type lives in `nx-gs-adapter-api`
+      (`app.l2nx.gs.adapter.api.kafka.HeartbeatEvent`) — fields `serverId`,
+      `adapterVersion`, `uptime` (no `enabledModules` in 0.1.0)
+    - shutdown hook is registered inline inside `NxAdapter.start()` (no separate
+      `ShutdownHook.java`); a `Thread` named `nx-adapter-shutdown` wrapping
+      `SafeRunnable.wrap(INSTANCE::shutdown)`
     - logging via `app.l2nx.log.NxLog` from sibling `:nx-log` subproject (shadow-included
       into the published jar — see Integration points)
 - `nx-gs-adapter-core/src/test/java/app/l2nx/gs/adapter/core/` — unit tests for
@@ -75,12 +88,14 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   idempotent (an `AtomicBoolean started` guard logs a WARN and returns on duplicate
   invocation), wraps `ConfigResolver.resolve()` in a central `try { ... } catch (Throwable)`
   so config-resolution failures log via `NxLog` and transition to `FAILED` instead of
-  bubbling out into the host JVM. If `config.enabled == false` it returns inert (full
-  `DISABLED`-state semantics — INFO log + state transition + callback — land in M33-M35).
-  Otherwise it kicks off the connect flow on a daemon `nx-adapter-connect`
-  `ScheduledExecutorService`. State transitions go through a `synchronized` block that
-  serializes set + callback dispatch so observers see consistent state when reading from
-  inside the callback. The JVM shutdown hook is M30 territory (deferred).
+  bubbling out into the host JVM. If `config.enabled == false` it logs an INFO message,
+  transitions `INIT → DISABLED`, fires the registered `onStateChange` callback, and
+  returns inert (no daemon threads, no shutdown hook). Otherwise it kicks off the
+  connect flow on a daemon `nx-adapter-connect` `ScheduledExecutorService`, arms the
+  heartbeat scheduler, and registers a JVM shutdown hook (`nx-adapter-shutdown`) that
+  delegates to `shutdown()`. State transitions go through a `synchronized` block that
+  serializes set + callback dispatch so observers see consistent state when reading
+  from inside the callback.
 - **`ConfigResolver`** [done] (R1, R2, R3, R14) — pure JDK; two-source chain per key,
   **file-first**: properties-file lookup → `System.getProperty(key)` (sysprop is only
   consulted when the file does not provide the key, so the file is authoritative). The
@@ -93,7 +108,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   parses `true`/`false` case-insensitively for the `l2nx.enabled` flag and returns
   `false` when no source supplies a value. Environment-variable resolution is intentionally
   absent in 0.1.0 (see Decisions).
-- **`StartupBanner`** [planned] (R15) — emits the L2NX ASCII wordmark and the resolved
+- **`StartupBanner`** [done] (R15) — emits the L2NX ASCII wordmark and the resolved
   adapter version on `start()`, blank-line-padded so it's visually distinct from
   surrounding host-JVM logs. Plain text via the logging facade — no ANSI escape codes.
 - **`ConnectFlow`** [done] (R4, R5) — `Runnable` driving the connect lifecycle on the
@@ -140,16 +155,21 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       state stays `REGISTERING`; while `wasActive=true` → `DEGRADED`
     - `wasActive` is a permanent JVM-lifetime latch (only cleared in
       `resetForTesting()`) — terminal `FAILED`/`REJECTED`/`CLOSED` do not reset it
-- **`HeartbeatService`** [planned] (R7) — single-threaded `ScheduledExecutorService` (daemon,
-  named `nx-adapter-heartbeat`). Each tick builds a heartbeat payload POJO defined inline
-  inside `nx-gs-adapter-core` (`heartbeat/HeartbeatPayload`, package-private — graduates
-  to `nx-gs-adapter-api` in a later minor) carrying `serverId`, `adapterVersion`,
-  `uptime` = seconds since the most recent successful `/connect`, and an empty
-  `enabledModules` list, then calls `NxKafka.send(topic, key, payload)`. The `uptime`
-  clock is captured fresh on every successful `(re)connect`, so platform-side dashboards
-  show session-uptime rather than adapter-uptime. Errors are logged, never propagated.
-- **`ShutdownHook`** [planned] (R9) — `Runtime.getRuntime().addShutdownHook(...)` registered
-  once on `start()`. Calls `shutdown()` idempotently.
+- **`HeartbeatService`** [done] (R7) — single-threaded `ScheduledExecutorService` (daemon,
+  named `nx-adapter-heartbeat`). Each tick builds a
+  `app.l2nx.gs.adapter.api.kafka.HeartbeatEvent` carrying `serverId`,
+  `adapterVersion`, `uptime` = seconds since the most recent successful `/connect`, and
+  publishes it via the injected `KafkaPublisher` test seam (production wraps
+  `NxKafka.instance().send(topic, key, value)`). The `uptime` clock is captured fresh on
+  every successful `(re)connect`, so platform-side dashboards show session-uptime rather
+  than adapter-uptime. The tick runnable is wrapped in `SafeRunnable`; errors are logged,
+  never propagated. `enabledModules` will be added when `adapter-modules` lands.
+- **JVM shutdown hook** [done] (R9) — registered inline in `NxAdapter.start()` via
+  `Runtime.getRuntime().addShutdownHook(new Thread(SafeRunnable.wrap(INSTANCE::shutdown,
+  log), "nx-adapter-shutdown"))`. Skipped on `FAILED` (config error) and on `DISABLED`
+  (R14 short-circuit) so a misconfigured / disabled adapter doesn't leave a hook
+  attached. `shutdown()` itself is idempotent — JVM-exit hook + explicit host call won't
+  double-fire CLOSED.
 - **Logging** — uses `app.l2nx.log.NxLog` from sibling `:nx-log` subproject (auto-detects
   `org.slf4j.LoggerFactory` via reflection; SLF4J on classpath → uses it; otherwise →
   formatted `System.out.println` fallback). Shadow-included into the published
@@ -175,8 +195,9 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
    `clientId = nx-gs-adapter-<tenantSlug>-<serverSlug>`, calls
    `KafkaInitializer.init(...)` with `NxAdapter::handleKafkaStateChange` as the listener
    → final adapter state derived from the returned `KafkaState`
-   (`CONNECTED → ACTIVE` + latches `wasActive`; `DISCONNECTED → DEGRADED`). Heartbeat
-   start (M24+) layers on top once R7 lands.
+   (`CONNECTED → ACTIVE` + latches `wasActive`; `DISCONNECTED → DEGRADED`).
+   `HeartbeatService.start(serverId, heartbeatTopic)` is invoked here too, capturing
+   `connectInstant` fresh so `uptime` is session-scoped.
 3. **Connect retry** — non-terminal failure (409/5xx/network) → `BackoffSchedule.next(attempt)`
    → `ScheduledExecutorService.schedule(...)` re-runs the connect attempt → state stays
    `REGISTERING` on first-time bootstrap (`wasActive=false`); transitions to `DEGRADED`
@@ -186,11 +207,15 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
    `DISCONNECTED → DEGRADED` (only when adapter is `ACTIVE`/`DEGRADED`; ignored in
    terminal states so a late event can't resurrect a CLOSED adapter), `CLOSED` from
    Kafka is ignored (adapter shutdown drives `CLOSED` itself).
-4. **Heartbeat tick** — every 60s `HeartbeatService` builds a `HeartbeatPayload` →
-   `NxKafka.send(heartbeatTopic, serverId, payload)`. nx-gs-kafka handles producer-side
-   retries and reconnection; failed sends do not change adapter state.
-5. **Shutdown** — JVM shutdown hook OR explicit `shutdown()` → cancel heartbeat scheduler →
-   `NxKafka.shutdown()` → state `CLOSED`.
+4. **Heartbeat tick** — every 60s `HeartbeatService` builds a
+   `app.l2nx.gs.adapter.api.kafka.HeartbeatEvent` →
+   `NxKafka.instance().send(heartbeatTopic, serverId, event)` via the injected
+   `KafkaPublisher`. nx-gs-kafka handles producer-side retries and reconnection;
+   failed sends do not change adapter state. The tick runnable is wrapped in
+   `SafeRunnable` so an uncaught throwable can't cancel the schedule.
+5. **Shutdown** — JVM shutdown hook (`nx-adapter-shutdown`) OR explicit `shutdown()` →
+   `closed.compareAndSet` guards idempotency → stop heartbeat → cancel schedulers →
+   `NxKafka.shutdown()` (when alive) → state `CLOSED`.
 
 ## Integration points
 
@@ -202,8 +227,8 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   whole `nx-gs-adapter` repo with a `dependencySubstitution` mapping — single source of
   truth for the wire shape. Validation annotations (`jakarta.validation`) stay on the
   controller side; the api lib has zero runtime deps. First published version is **0.1.0**.
-  Heartbeat-related types are deferred from this release (see R7 in spec.md and the
-  package-split decision below).
+  `app.l2nx.gs.adapter.api.kafka.HeartbeatEvent` ships in 0.1.0 too — it's the wire
+  payload published every 60s; `enabledModules` will be added when `adapter-modules` lands.
 - **`:nx-gs-kafka`** (R6, R7) — sibling subproject. `NxKafka.configure().build()` for the
   producer; `NxKafka.send(topic, key, value)` for heartbeat. `:nx-gs-adapter-core` depends
   on it via `project(":nx-gs-kafka")`.
@@ -296,21 +321,10 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   record syntactic sugar; gain is single source of truth for the contract and the adapter
   side gets the same types it sees on the wire — no parallel definitions to drift.
 - **Package split `api.rest` vs `api.kafka`.** REST request/response DTOs live in
-  `app.l2nx.gs.adapter.api.rest` (current population in 0.1.0: `ConnectRequest`,
-  `ConnectResponse`, `KafkaConfig`, `Topics`). Kafka message payloads will live in
-  `app.l2nx.gs.adapter.api.kafka` once introduced — that package is intentionally absent
-  from 0.1.0 because no Kafka payload yet has a platform-side consumer demanding a
-  shared type. The split (when the kafka package lands) keeps wire-protocol concerns
-  visually separate, mirrors how nx-tenants is structured internally (`api/rest/` vs
-  `infra/kafka/`), and makes it obvious to a consumer where to look for the contract of
-  a given transport.
-- **Heartbeat payload deferred from api lib.** For 0.1.0 the heartbeat payload is
-  defined inline inside `nx-gs-adapter-core` (`heartbeat/HeartbeatPayload`,
-  package-private). It graduates into `app.l2nx.gs.adapter.api.kafka.HeartbeatMessage`
-  only when the platform-side consumer lands (server-registration R9–R11) and both
-  producer and consumer need to compile against the same type. Until then there's
-  nothing to share — the adapter serializes its POJO via Gson, and the platform doesn't
-  read it yet.
+  `app.l2nx.gs.adapter.api.rest` (`ConnectRequest`, `ConnectResponse`, `KafkaConfig`,
+  `Topics`). Kafka message payloads live in `app.l2nx.gs.adapter.api.kafka`
+  (`HeartbeatEvent` in 0.1.0). The split keeps wire-protocol concerns visually separate
+  and mirrors how nx-tenants is structured internally (`api/rest/` vs `infra/kafka/`).
 
 ## Extension points
 
@@ -320,8 +334,8 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
 - **Custom HTTP transport** — `ConnectClient` is an interface; later slices can swap in
   OkHttp or another transport if a non-trivial HTTP feature (proxy, h2, mTLS) is needed.
   MVP ships only the `HttpURLConnection`-backed implementation.
-- **Heartbeat enrichment** — `HeartbeatMessage.enabledModules` currently lands as `[]`. The
-  next slice (`adapter-modules`) wires `ServiceLoader` discovery and populates this field
+- **Heartbeat enrichment** — `HeartbeatEvent` does not yet carry `enabledModules`. The
+  next slice (`adapter-modules`) wires `ServiceLoader` discovery and adds that field
   with discovered module names.
 - **Pluggable backoff strategies** — `BackoffSchedule` is an interface; later slices could
   add jittered exponential or fibonacci variants without touching `ConnectFlow`.

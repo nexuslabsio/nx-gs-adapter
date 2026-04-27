@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.connect;
 
+import app.l2nx.gs.adapter.core.concurrent.CapturingScheduler;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.AdapterConfigFixtures;
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -198,5 +199,28 @@ class ConnectFlowTest {
                 ConnectFlow.sanitize("error talking to Bearer nx_sk_abcdefghijklmnopqrstuvwxyz012345"));
         assertEquals("(no message)", ConnectFlow.sanitize(null));
         assertEquals("plain text unchanged", ConnectFlow.sanitize("plain text unchanged"));
+    }
+
+    @Test
+    void run_shouldNotPropagate_whenAttemptThrows() {
+        AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
+        ConnectFlow flow = new ConnectFlow(cfg,
+                new ThrowingConnectClient(),
+                new DefaultBackoffSchedule(),
+                scheduler,
+                outcomes::add);
+
+        flow.run();
+
+        assertEquals(Arrays.asList(ConnectFlow.Outcome.STARTING, ConnectFlow.Outcome.TRANSIENT), outcomes);
+        assertEquals(1, scheduler.captured.size());
+    }
+
+    private static final class ThrowingConnectClient implements ConnectClient {
+        @Override
+        public ConnectResult connect(String url, String serverKey,
+                                     app.l2nx.gs.adapter.api.rest.ConnectRequest body) {
+            throw new RuntimeException("simulated client bug");
+        }
     }
 }

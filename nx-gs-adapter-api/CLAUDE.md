@@ -19,7 +19,7 @@ by the L2NX game-server adapter and its consumers. Published as
 
 - `app.l2nx.gs.adapter.api.rest` — REST request/response DTOs (`ConnectRequest`,
   `ConnectResponse`, `KafkaConfig`, `Topics`)
-- `app.l2nx.gs.adapter.api.kafka` — Kafka message payloads (`HeartbeatMessage`)
+- `app.l2nx.gs.adapter.api.kafka` — Kafka message payloads (`HeartbeatEvent`)
 
 ## Constraints
 

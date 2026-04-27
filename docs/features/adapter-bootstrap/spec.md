@@ -73,23 +73,24 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
       `KafkaState.CONNECTED`. Kafka transitions (CONNECTED ↔ DISCONNECTED) drive `ACTIVE ↔
       DEGRADED` post-handshake. Reconnect cycles (re-fetched creds) MUST shut down the
       existing `NxKafka` singleton before re-init.
-- [todo] R7. Adapter MUST publish a heartbeat message to `kafka.topics.heartbeat` every 60
+- [done] R7. Adapter MUST publish a heartbeat message to `kafka.topics.heartbeat` every 60
   seconds (Kafka message key = `serverId`). Payload fields: `serverId`, `adapterVersion`,
   `uptime` (seconds since the most recent successful `/connect` — session uptime, resets
-  on reconnect), `enabledModules` (empty list in MVP). For 0.1.0 the payload type is
-  defined inline inside `nx-gs-adapter-core` (Gson serializes the POJO directly to JSON);
-  it will graduate into `nx-gs-adapter-api` (`app.l2nx.gs.adapter.api.kafka.HeartbeatMessage`)
-  in a later minor when the platform-side consumer is built (server-registration R9–R11).
+  on reconnect). The wire type is `app.l2nx.gs.adapter.api.kafka.HeartbeatEvent` in
+  `nx-gs-adapter-api` so the platform-side consumer (server-registration R9–R11) can
+  compile against the same type when it lands. Module discovery (`enabledModules`) is
+  out of scope for this slice — `adapter-modules` will extend the payload when it
+  ships.
     - SC4. Heartbeat interval = 60s (matches `server-registration` spec R9 / SC4).
-- [wip] R8. Adapter MUST expose a public API `NxAdapter`:
+- [done] R8. Adapter MUST expose a public API `NxAdapter`:
     - `static NxAdapter start()` — fire-and-forget bootstrap (returns immediately, all work
       runs on daemon threads)
     - `AdapterState state()` — current FSM state; returns `CLOSED` after `shutdown()` completes
     - `void shutdown()` — graceful stop: cancel heartbeat scheduler, close Kafka producer,
       transition to `CLOSED`, emit a final `onStateChange(CLOSED)` callback. Idempotent.
-- [todo] R9. Adapter MUST register a JVM shutdown hook on `start()` that invokes `shutdown()`
+- [done] R9. Adapter MUST register a JVM shutdown hook on `start()` that invokes `shutdown()`
   idempotently for graceful resource cleanup.
-- [wip] R10. Adapter MUST never propagate exceptions to host-JVM threads — including the
+- [done] R10. Adapter MUST never propagate exceptions to host-JVM threads — including the
   calling thread of `NxAdapter.start()`. Every entry point (the caller's `start()` thread,
   connect retry loop, heartbeat scheduler tick, Kafka producer callback) MUST catch
   `Throwable`, log via the adapter's logging facade, transition to an appropriate state
@@ -97,7 +98,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
     - SC5. Each daemon-thread entry point has a unit test that asserts the runnable does NOT
       throw when the wrapped logic throws. `NxAdapter.start()` has a unit test that asserts a
       config-resolution failure transitions to `FAILED` without throwing.
-- [wip] R14. Adapter MUST resolve an `enabled` flag (boolean) from the same two-source
+- [done] R14. Adapter MUST resolve an `enabled` flag (boolean) from the same two-source
   chain (key `l2nx.enabled`), defaulting to `false`. When `enabled=false`:
     - `start()` logs an INFO message that the adapter is disabled and returns immediately
       with state `DISABLED`.
@@ -116,7 +117,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   host (game core) can register before `start()` to surface lifecycle transitions in operator
   UI / logs. Callback dispatch is fire-and-forget on the state-change thread; host is
   responsible for handing off to its own thread if needed.
-- [todo] R15. Adapter SHOULD emit a multi-line startup banner on `start()` containing the L2NX
+- [done] R15. Adapter SHOULD emit a multi-line startup banner on `start()` containing the L2NX
   wordmark in ASCII art and the resolved `adapterVersion`, visually separated (blank-line
   padded) from surrounding host-JVM log output. Renders as plain text via the logging facade —
   no ANSI colours (host log sinks vary). Banner is emitted regardless of `enabled` value
@@ -152,12 +153,13 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   of `app.l2nx:nx-gs-adapter-api` via Gradle composite include. Validation annotations
   (`jakarta.validation`) stay out of the api lib — manual validation lives in the nx-tenants
   `AdapterController`. The first published version of the api artifact is **0.1.0**.]
-- [resolved: `HeartbeatMessage` is NOT included in the 0.1.0 release of
-  `nx-gs-adapter-api` — for now the heartbeat payload is defined inline inside
-  `nx-gs-adapter-core` (Gson handles JSON serialization without a typed contract on the
-  api side). It graduates into `app.l2nx.gs.adapter.api.kafka.HeartbeatMessage` in a later
-  minor once the platform-side consumer (`server-registration` R9–R11) lands and both
-  sides need a shared type to compile against.]
+- [resolved: `HeartbeatEvent` ships in 0.1.0 of `nx-gs-adapter-api`
+  (`app.l2nx.gs.adapter.api.kafka.HeartbeatEvent`) — fields `serverId`,
+  `adapterVersion`, `uptime`. `enabledModules` is intentionally absent and will
+  be added when `adapter-modules` lands and ServiceLoader discovery is wired.
+  Earlier note about deferring the type to a later minor was reversed once we
+  decided the platform-side consumer (`server-registration` R9–R11) would consume
+  it directly.]
 - [resolved: `state()` and `onStateChange` emit `CLOSED` after `shutdown()` — mirrors
   `nx-gs-kafka`'s `KafkaState.CLOSED`. Predictable lifecycle for operators reading the state
   machine; architecture v2 §6.4 is silent on `CLOSED` but doesn't forbid it.]

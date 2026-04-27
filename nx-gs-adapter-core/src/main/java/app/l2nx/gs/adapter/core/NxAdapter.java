@@ -1,20 +1,28 @@
 package app.l2nx.gs.adapter.core;
 
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
+import app.l2nx.gs.adapter.api.rest.Topics;
+import app.l2nx.gs.adapter.core.concurrent.SafeRunnable;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.ConfigResolver;
 import app.l2nx.gs.adapter.core.connect.ConnectFlow;
 import app.l2nx.gs.adapter.core.connect.DefaultBackoffSchedule;
 import app.l2nx.gs.adapter.core.connect.HttpURLConnectionConnectClient;
+import app.l2nx.gs.adapter.core.heartbeat.HeartbeatService;
 import app.l2nx.gs.adapter.core.kafka.DefaultKafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
+import app.l2nx.gs.adapter.core.lifecycle.AdapterVersion;
+import app.l2nx.gs.adapter.core.lifecycle.StartupBanner;
+import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.KafkaState;
+import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.log.NxLog;
 import app.l2nx.log.NxLogFactory;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -37,16 +45,10 @@ public final class NxAdapter {
     private static final NxLog log = NxLogFactory.getLogger(NxAdapter.class);
     private static final AtomicReference<AdapterState> STATE = new AtomicReference<>(AdapterState.INIT);
     private static final AtomicBoolean started = new AtomicBoolean(false);
+    private static final AtomicBoolean closed = new AtomicBoolean(false);
     /**
-     * Latches once the adapter has reached {@link AdapterState#ACTIVE} for the first time.
-     * Drives {@link ConnectFlow.Outcome#TRANSIENT} dispatch: pre-ACTIVE the adapter is still
-     * inside its initial handshake loop and stays in {@code REGISTERING} between retries;
-     * post-ACTIVE a transient platform fault is a degraded condition.
-     *
-     * <p>Permanent latch for the JVM lifetime — never cleared in production. Reset only
-     * via {@link #resetForTesting()}. Terminal states ({@code FAILED}, {@code REJECTED},
-     * {@code CLOSED}) do not clear the latch; if the adapter is reset and restarted from
-     * a fresh JVM, it re-arms via the new static initialization.</p>
+     * Latches on the first {@link AdapterState#ACTIVE}. Pre-latch a transient connect
+     * failure stays in {@code REGISTERING}; post-latch it drives {@code DEGRADED}.
      */
     private static final AtomicBoolean wasActive = new AtomicBoolean(false);
     private static final Object transitionLock = new Object();
@@ -54,6 +56,9 @@ public final class NxAdapter {
     private static final NxAdapter INSTANCE = new NxAdapter();
 
     private static volatile ScheduledExecutorService connectScheduler;
+    private static volatile ScheduledExecutorService heartbeatScheduler;
+    private static volatile HeartbeatService heartbeatService;
+    private static volatile Thread shutdownHook;
     private static volatile KafkaFactory kafkaFactoryOverride;
 
     private NxAdapter() {
@@ -84,6 +89,10 @@ public final class NxAdapter {
                     STATE.get());
             return INSTANCE;
         }
+        // Banner runs before config resolve so a misconfigured / disabled adapter still
+        // announces itself.
+        StartupBanner.emit(log, AdapterVersion.resolve());
+
         AdapterConfig config;
         try {
             config = new ConfigResolver().resolve();
@@ -94,17 +103,22 @@ public final class NxAdapter {
         }
 
         if (!config.isEnabled()) {
-            // Full DISABLED-state semantics (INFO log + transition + no callbacks elsewhere)
-            // land in M33. For now we simply skip wiring the connect flow so an adapter
-            // configured with l2nx.enabled=false stays inert.
+            log.info("L2NX adapter is disabled (l2nx.enabled=false) — set l2nx.enabled=true to activate");
+            transition(AdapterState.DISABLED);
             return INSTANCE;
         }
 
         ScheduledExecutorService scheduler = createConnectScheduler();
         connectScheduler = scheduler;
-        KafkaFactory factory = kafkaFactoryOverride != null
-                ? kafkaFactoryOverride
-                : new DefaultKafkaFactory();
+        ScheduledExecutorService hbScheduler = createHeartbeatScheduler();
+        heartbeatScheduler = hbScheduler;
+        heartbeatService = new HeartbeatService(
+                defaultPublisher(), hbScheduler, config.getAdapterVersion());
+
+        // Single read of the volatile so a concurrent test-only swap can't split
+        // the null-check from the dereference.
+        KafkaFactory override = kafkaFactoryOverride;
+        KafkaFactory factory = override != null ? override : new DefaultKafkaFactory();
         KafkaInitializer kafkaInit = new KafkaInitializer(factory);
         Consumer<ConnectResponse> onActive = response -> initKafka(kafkaInit, response);
         ConnectFlow flow = new ConnectFlow(
@@ -114,15 +128,57 @@ public final class NxAdapter {
                 scheduler,
                 NxAdapter::handleConnectOutcome,
                 onActive);
-        scheduler.submit(flow);
+        scheduler.submit(SafeRunnable.wrap(flow, log));
+
+        // Hook is registered last so FAILED / DISABLED paths never leave one attached.
+        registerShutdownHook();
         return INSTANCE;
     }
 
     /**
-     * Idempotent shutdown — full implementation lands in M29.
+     * Idempotent shutdown — cancel heartbeat, cancel connect scheduler, shut down the
+     * Kafka client if alive, and transition to {@link AdapterState#CLOSED}. Safe to call
+     * from any thread; safe to call repeatedly.
      */
     public void shutdown() {
-        // M29 will fill this in.
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+
+        HeartbeatService hb = heartbeatService;
+        if (hb != null) {
+            try {
+                hb.stop();
+            } catch (Throwable t) {
+                log.error("HeartbeatService.stop threw: {}", t.getMessage(), t);
+            }
+            heartbeatService = null;
+        }
+        ScheduledExecutorService hbExec = heartbeatScheduler;
+        if (hbExec != null) {
+            // No awaitTermination — a late tick that races past cancel is absorbed by
+            // defaultPublisher's KafkaException catch and HeartbeatService.tick's Throwable catch.
+            hbExec.shutdownNow();
+            heartbeatScheduler = null;
+        }
+        ScheduledExecutorService connect = connectScheduler;
+        if (connect != null) {
+            connect.shutdownNow();
+            connectScheduler = null;
+        }
+
+        try {
+            NxKafka kafka = NxKafka.instance();
+            if (kafka.state() != KafkaState.CLOSED) {
+                kafka.shutdown();
+            }
+        } catch (KafkaException notConfigured) {
+            // Adapter never reached initKafka — nothing to shut down.
+        } catch (Throwable t) {
+            log.error("NxKafka.shutdown threw {}", t.getClass().getName());
+        }
+
+        transition(AdapterState.CLOSED);
     }
 
     private static ScheduledExecutorService createConnectScheduler() {
@@ -133,22 +189,49 @@ public final class NxAdapter {
         });
     }
 
+    private static ScheduledExecutorService createHeartbeatScheduler() {
+        return Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "nx-adapter-heartbeat");
+            t.setDaemon(true);
+            return t;
+        });
+    }
+
+    private static HeartbeatService.KafkaPublisher defaultPublisher() {
+        return (topic, key, payload) -> {
+            try {
+                NxKafka.instance().send(topic, key, payload);
+            } catch (KafkaException notConfigured) {
+                // Should never fire — initKafka arms heartbeat only after build() returns.
+                log.warn("Heartbeat publisher invoked before NxKafka was configured");
+            }
+        };
+    }
+
+    private static void registerShutdownHook() {
+        Thread hook = new Thread(SafeRunnable.wrap(INSTANCE::shutdown, log), "nx-adapter-shutdown");
+        try {
+            Runtime.getRuntime().addShutdownHook(hook);
+            shutdownHook = hook;
+        } catch (Throwable t) {
+            // JVM already shutting down or host SecurityManager disallows hooks; the
+            // adapter still runs, operators just won't get auto-shutdown on JVM exit.
+            log.warn("Failed to register JVM shutdown hook: {}", t.getClass().getName());
+        }
+    }
+
     private static void handleConnectOutcome(ConnectFlow.Outcome outcome) {
         switch (outcome) {
             case STARTING:
                 transition(AdapterState.REGISTERING);
                 break;
             case ACTIVE:
-                // Production path runs Kafka init via onActiveResponse before this fires,
-                // and the Kafka-driven state is ACTIVE/DEGRADED already. This branch only
-                // matters when the orchestrator skips Kafka wiring (e.g. unit-level tests
-                // of ConnectFlow alone) — then we honor the bare platform-side success.
+                // Reached only when Kafka wiring is skipped (test-only); production goes
+                // through initKafka via onActiveResponse and never emits bare ACTIVE here.
                 wasActive.set(true);
                 transition(AdapterState.ACTIVE);
                 break;
             case TRANSIENT:
-                // Pre-first-ACTIVE: stay in REGISTERING — the next attempt will fire STARTING
-                // again and re-enter the same state. Post-ACTIVE: a real degradation.
                 if (wasActive.get()) {
                     transition(AdapterState.DEGRADED);
                 }
@@ -174,13 +257,23 @@ public final class NxAdapter {
             transition(AdapterState.DEGRADED);
             return;
         }
+
+        // Re-arming on a re-handshake recaptures connectInstant, so uptime is session-scoped.
+        HeartbeatService hb = heartbeatService;
+        Topics topics = response.getKafka() != null ? response.getKafka().getTopics() : null;
+        String heartbeatTopic = topics != null ? topics.getHeartbeat() : null;
+        if (hb != null && heartbeatTopic != null && response.getServerId() != null) {
+            try {
+                hb.start(response.getServerId().toString(), heartbeatTopic);
+            } catch (Throwable t) {
+                log.error("HeartbeatService.start threw {}", t.getClass().getName());
+            }
+        }
+
         if (postBuild == KafkaState.CONNECTED) {
             wasActive.set(true);
             transition(AdapterState.ACTIVE);
         } else {
-            // DISCONNECTED (or any non-CONNECTED post-build state) — Kafka has its own
-            // background reconnect loop; the adapter remains usable in DEGRADED mode and
-            // will flip to ACTIVE via handleKafkaStateChange when the cluster comes online.
             transition(AdapterState.DEGRADED);
         }
     }
@@ -196,15 +289,13 @@ public final class NxAdapter {
                 break;
             case DISCONNECTED:
                 AdapterState current = STATE.get();
-                // Only flip to DEGRADED when we're in a "live" state. If we've moved to
-                // CLOSED / FAILED / REJECTED, a late Kafka state event must not resurrect us.
+                // A late event must not resurrect a CLOSED / FAILED / REJECTED adapter.
                 if (current == AdapterState.ACTIVE || current == AdapterState.DEGRADED) {
                     transition(AdapterState.DEGRADED);
                 }
                 break;
             case CLOSED:
-                // The adapter's own shutdown drives CLOSED separately. Ignore — letting it
-                // through here would race with the M29 shutdown path.
+                // Shutdown drives CLOSED itself; honoring this would race with that path.
                 break;
             case CREATED:
             default:
@@ -213,12 +304,8 @@ public final class NxAdapter {
     }
 
     private static void transition(AdapterState target) {
-        // Serialize state-set + callback dispatch so an observer that calls state()
-        // from inside the callback always sees the value that was just emitted —
-        // a concurrent transition cannot interleave between the set and the dispatch.
-        // Callback runs under the lock; hosts that need async observer threads must
-        // hand off inside the callback (per the adapter's "host owns thread-handoff"
-        // contract).
+        // Serializes state-set + callback dispatch so a callback that calls state()
+        // always observes the value just emitted, not a concurrently-set newer one.
         synchronized (transitionLock) {
             STATE.set(target);
             Consumer<AdapterState> cb = stateCallback;
@@ -228,26 +315,45 @@ public final class NxAdapter {
             try {
                 cb.accept(target);
             } catch (Throwable t) {
-                log.error("onStateChange callback threw on transition to {}: {}",
-                        target, t.getMessage(), t);
+                log.error("onStateChange callback threw {} on transition to {}",
+                        t.getClass().getName(), target);
             }
         }
     }
 
-    // Visible for testing — substitutes a captor factory so the connect-flow can be
-    // driven without standing up a real NxKafka singleton.
     static void setKafkaFactoryForTesting(KafkaFactory factory) {
         kafkaFactoryOverride = factory;
     }
 
-    // Visible for testing — clears static state and tears down any scheduler launched
-    // by a previous test run. Safe to call from @BeforeEach / @AfterEach.
     static void resetForTesting() {
+        Thread hook = shutdownHook;
+        if (hook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(hook);
+            } catch (IllegalStateException ignored) {
+            }
+            shutdownHook = null;
+        }
+        HeartbeatService hb = heartbeatService;
+        if (hb != null) {
+            hb.stop();
+            heartbeatService = null;
+        }
+        ScheduledExecutorService hbExec = heartbeatScheduler;
+        if (hbExec != null) {
+            hbExec.shutdownNow();
+            try {
+                hbExec.awaitTermination(1, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            heartbeatScheduler = null;
+        }
         ScheduledExecutorService scheduler = connectScheduler;
         if (scheduler != null) {
             scheduler.shutdownNow();
             try {
-                scheduler.awaitTermination(1, java.util.concurrent.TimeUnit.SECONDS);
+                scheduler.awaitTermination(1, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -256,24 +362,19 @@ public final class NxAdapter {
         STATE.set(AdapterState.INIT);
         stateCallback = null;
         started.set(false);
+        closed.set(false);
         wasActive.set(false);
         kafkaFactoryOverride = null;
     }
 
-    // Visible for testing — drives the Kafka state machine directly without a real
-    // NxKafka instance. Mirrors the path the onStateChange listener takes in production.
     static void simulateKafkaStateChangeForTesting(KafkaState newState) {
         handleKafkaStateChange(newState);
     }
 
-    // Visible for testing — drives connect-outcome dispatch without standing up a
-    // ConnectFlow + scheduler. Used to verify the wasActive-flag-driven TRANSIENT mapping.
     static void simulateConnectOutcomeForTesting(ConnectFlow.Outcome outcome) {
         handleConnectOutcome(outcome);
     }
 
-    // Visible for testing — drives the post-200 Kafka init path with a captor-supplied
-    // KafkaInitializer. Used to verify clientId composition + null/blank slug guards.
     static void simulateInitKafkaForTesting(KafkaInitializer init, ConnectResponse response) {
         initKafka(init, response);
     }

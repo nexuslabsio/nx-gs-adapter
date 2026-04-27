@@ -193,94 +193,97 @@ DEGRADED → REGISTERING on a 5xx then 200.
 
 ### For R7 (heartbeat)
 
-- [ ] M24. `HeartbeatPayload` package-private POJO inside
-  `heartbeat/`: `serverId`, `adapterVersion`, `uptime` (long
-  seconds), `enabledModules` (`Collections.emptyList()` in MVP).
-- [ ] M25. `HeartbeatService.start(serverId, heartbeatTopic, kafka)`:
+- [x] M24. `HeartbeatEvent` POJO in `nx-gs-adapter-api`
+  (`app.l2nx.gs.adapter.api.kafka`) — wire fields `serverId`,
+  `adapterVersion`, `uptime` (long seconds). Hand-written builder +
+  `toBuilder`, equals/hashCode/toString. No `enabledModules` —
+  module discovery lands in a later slice and will extend the
+  payload then.
+- [x] M25. `HeartbeatService.start(serverId, heartbeatTopic, kafka)`:
   capture `connectInstant = Instant.now()`,
   `ScheduledExecutorService` (1 daemon thread, named
   `nx-adapter-heartbeat`) runs at fixed delay 60s, each tick builds a
   `HeartbeatPayload` with `uptime = ChronoUnit.SECONDS.between(
   connectInstant, Instant.now())` and calls `kafka.send(topic,
   serverId, payload)`. Errors caught + logged.
-- [ ] M26. `HeartbeatService.stop()` cancels the scheduler. On
+- [x] M26. `HeartbeatService.stop()` cancels the scheduler. On
   reconnect (DEGRADED → ACTIVE again) `connectInstant` is recaptured
   so `uptime` resets to session-scope.
-- [ ] M27. Test: `HeartbeatService_shouldPublishEvery60s` —
+- [x] M27. Test: `HeartbeatService_shouldPublishEvery60s` —
   fake-scheduler-driven tick capture, asserts payload fields.
-- [ ] M28. Test: `HeartbeatService_shouldNotPropagate_whenSendThrows`
+- [x] M28. Test: `HeartbeatService_shouldNotPropagate_whenSendThrows`
   (covers R10/SC5 for heartbeat tick).
 
 ### For R8, R9 (lifecycle + shutdown hook)
 
-- [ ] M29. `NxAdapter.shutdown()` idempotent: if state is already
+- [x] M29. `NxAdapter.shutdown()` idempotent: if state is already
   `CLOSED` or `DISABLED`, return; otherwise stop heartbeat scheduler,
   stop connect scheduler, `kafka.shutdown()` (when present), set
   state to `CLOSED`, fire final `onStateChange(CLOSED)`.
-- [ ] M30. `ShutdownHook` registration in `NxAdapter.start()` via
+- [x] M30. `ShutdownHook` registration in `NxAdapter.start()` via
   `Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown,
   "nx-adapter-shutdown"))` — only when config resolved successfully
   AND `enabled=true`. Skipped on `FAILED` (config error, M13) and
   on `DISABLED` (R14 short-circuit, M33).
-- [ ] M31. Test: `NxAdapter_shouldBeIdempotent_onShutdown` — call
+- [x] M31. Test: `NxAdapter_shouldBeIdempotent_onShutdown` — call
   twice, only one CLOSED transition emitted.
-- [ ] M32. Test: `NxAdapter_shouldEmitClosedState_onShutdown`.
+- [x] M32. Test: `NxAdapter_shouldEmitClosedState_onShutdown`.
 
 ### For R14 (disabled short-circuit)
 
-- [ ] M33. `NxAdapter.start()` short-circuit: after banner emit and
+- [x] M33. `NxAdapter.start()` short-circuit: after banner emit and
   config resolve, branch on `config.enabled` — if `false`, log INFO
   "L2NX adapter is disabled (l2nx.enabled=false) — set
   l2nx.enabled=true to activate", transition `INIT → DISABLED`
   (which fires `onStateChange(DISABLED)`), and return immediately.
   Skip shutdown-hook registration, skip connect scheduling, skip
   Kafka init, skip heartbeat.
-- [ ] M34. Test: `NxAdapter_shouldShortCircuit_whenEnabledFalse` —
+- [x] M34. Test: `NxAdapter_shouldShortCircuit_whenEnabledFalse` —
   `state()` ends as `DISABLED`, no HTTP call observed (WireMock not
   hit), no daemon threads named `nx-adapter-*` running after
   `start()` returns.
-- [ ] M35. Test:
+- [x] M35. Test:
   `NxAdapter_shouldFireDisabledCallback_whenEnabledFalse` —
   `onStateChange` registered before `start()` receives a single
   `DISABLED` notification.
 
 ### For R10 (no-throw — daemon threads + start() calling thread)
 
-- [ ] M36. Wrap each daemon entry point (connect retry runnable,
+- [x] M36. Wrap each daemon entry point (connect retry runnable,
   heartbeat tick runnable, Kafka producer callback) with a
   `try { runnable.run(); } catch (Throwable t) { log.error(...); }`
   helper (`SafeRunnable.wrap`). The `start()` calling-thread catch
   is already wired in M13 — no separate wrapper needed there.
-- [ ] M37. [P] Test: `SafeRunnable_shouldNotPropagate_whenWrappedThrows`.
-- [ ] M38. [P] Test: `ConnectFlow_runnable_shouldNotPropagate_whenAttemptThrows`.
-- [ ] M39. [P] Test: `HeartbeatService_runnable_shouldNotPropagate`
+- [x] M37. [P] Test: `SafeRunnable_shouldNotPropagate_whenWrappedThrows`.
+- [x] M38. [P] Test: `ConnectFlow_runnable_shouldNotPropagate_whenAttemptThrows`.
+- [x] M39. [P] Test: `HeartbeatService_runnable_shouldNotPropagate`
   (already covered in M28 — verify and don't duplicate). The
   calling-thread `start()` no-throw test is M13a.
 
 ### For R11 (onStateChange callback)
 
-- [ ] M40. `NxAdapter.onStateChange(Consumer<AdapterState>)`
+- [x] M40. `NxAdapter.onStateChange(Consumer<AdapterState>)`
   registration: `volatile Consumer<AdapterState>` slot, must be
   callable BEFORE `start()`.
-- [ ] M41. State-transition helper that performs the
+- [x] M41. State-transition helper that performs the
   `AtomicReference.compareAndSet` and, on success, dispatches the
   callback on the calling thread (fire-and-forget; host owns
   thread-handoff).
-- [ ] M42. Test: `NxAdapter_shouldNotifyOnStateChange_whenTransitioning`
+- [x] M42. Test: `NxAdapter_shouldNotifyOnStateChange_whenTransitioning`
   — register callback, drive a stubbed connect flow through INIT →
   REGISTERING → ACTIVE → CLOSED, capture all transitions in order.
 
 ### For R15 (startup banner)
 
-- [ ] M43. `lifecycle/StartupBanner.emit(NxLog log, String version)`
+- [x] M43. `lifecycle/StartupBanner.emit(NxLog log, String version)`
   — multi-line `L2NX` ASCII wordmark with the version string
   rendered to one side, blank lines top + bottom for visual
   separation. Plain text only, no ANSI. Hardcoded ASCII string in
   the class.
-- [ ] M44. Wire `StartupBanner.emit(...)` as the first statement
+- [x] M44. Wire `StartupBanner.emit(...)` as the first statement
   inside `NxAdapter.start()` — runs before config resolution so
   even a disabled adapter still announces itself.
-- [ ] M45. Test: `StartupBanner_shouldRenderVersionInOutput` —
+- [x] M45. Test: `StartupBanner_shouldRenderVersionInOutput` —
   capture `NxLog` output, assert wordmark and version both present.
 
 ## Notes
