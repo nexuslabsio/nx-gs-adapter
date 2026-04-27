@@ -28,13 +28,13 @@ class HeartbeatServiceTest {
     }
 
     @Test
-    void start_shouldScheduleEvery60Seconds() {
+    void start_shouldFireImmediatelyAndThenEvery60Seconds() {
         HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", clock());
 
         service.start("server-uuid", "nexus.heartbeat");
 
         assertNotNull(scheduler.fixedDelayRunnable);
-        assertEquals(60L, scheduler.fixedInitialDelay);
+        assertEquals(0L, scheduler.fixedInitialDelay);
         assertEquals(60L, scheduler.fixedPeriod);
         assertEquals(TimeUnit.SECONDS, scheduler.fixedUnit);
     }

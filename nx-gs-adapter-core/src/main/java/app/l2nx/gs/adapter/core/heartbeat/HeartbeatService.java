@@ -60,8 +60,10 @@ public final class HeartbeatService {
         // Wrapped on top of tick()'s own try/catch — an uncaught exception inside a
         // ScheduledExecutorService task cancels future invocations of that task.
         Runnable tick = SafeRunnable.wrap(() -> tick(serverId, heartbeatTopic, connectInstant), log);
+        // Initial delay 0 — fire the first heartbeat right after Kafka connect so the
+        // platform sees the server "alive" without a 60s gap; subsequent ticks every PERIOD_SECONDS.
         ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(
-                tick, PERIOD_SECONDS, PERIOD_SECONDS, TimeUnit.SECONDS);
+                tick, 0L, PERIOD_SECONDS, TimeUnit.SECONDS);
         session.set(new Session(connectInstant, future));
     }
 
