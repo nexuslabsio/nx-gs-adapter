@@ -3,6 +3,8 @@ package app.l2nx.gs.adapter.core.config;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -99,7 +101,30 @@ public final class ConfigResolver {
     }
 
     public String resolvePlatformUrl() {
-        return resolveString(KEY_PLATFORM_URL).orElseThrow(() -> missingValueException(KEY_PLATFORM_URL));
+        String raw = resolveString(KEY_PLATFORM_URL).orElseThrow(() -> missingValueException(KEY_PLATFORM_URL));
+        URI uri;
+        try {
+            uri = new URI(raw);
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException(
+                    "Invalid '" + KEY_PLATFORM_URL + "' value '" + raw + "': " + e.getMessage(), e);
+        }
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IllegalStateException(
+                    "Invalid '" + KEY_PLATFORM_URL + "' value '" + raw
+                            + "': scheme must be https (server-key would travel in plaintext otherwise)");
+        }
+        if (uri.getHost() == null || uri.getHost().isEmpty()) {
+            throw new IllegalStateException(
+                    "Invalid '" + KEY_PLATFORM_URL + "' value '" + raw + "': missing host");
+        }
+        if (uri.getRawQuery() != null || uri.getRawFragment() != null) {
+            throw new IllegalStateException(
+                    "Invalid '" + KEY_PLATFORM_URL + "' value '" + raw
+                            + "': must not contain a query string or fragment");
+        }
+        // Normalize: drop trailing slash so callers can append paths without ambiguity.
+        return raw.endsWith("/") ? raw.substring(0, raw.length() - 1) : raw;
     }
 
     public boolean resolveEnabled() {

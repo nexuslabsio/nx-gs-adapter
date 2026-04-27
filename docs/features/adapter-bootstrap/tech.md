@@ -14,23 +14,35 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
 
 ## Structure
 
-- `nx-gs-adapter-core/src/main/java/app/l2nx/gs/adapter/core/` [planned] — runtime root package
-    - `NxAdapter.java` [planned] — public entry point (`start`, `state`, `shutdown`,
-      `onStateChange`)
-    - `AdapterState.java` [planned] — lifecycle enum (`INIT`, `REGISTERING`, `ACTIVE`,
+- `nx-gs-adapter-core/src/main/java/app/l2nx/gs/adapter/core/` — runtime root package
+    - `NxAdapter.java` [done] — public entry point (`start`, `state`, `shutdown`,
+      `onStateChange`); singleton-style facade with idempotent `start()` (AtomicBoolean
+      guard) and `synchronized` transition for atomic set + callback dispatch
+    - `AdapterState.java` [done] — lifecycle enum (`INIT`, `REGISTERING`, `ACTIVE`,
       `DEGRADED`, `FAILED`, `REJECTED`, `DISABLED`, `CLOSED`)
     - `config/AdapterConfig.java` [done] — immutable holder (`serverKey`, `platformUrl`,
       `adapterVersion`, `enabled`)
     - `config/ConfigResolver.java` [done] — file-first chain (properties-file → sysprop):
       file path from `-Dl2nx.config-file` or classpath `l2nx.properties` fallback (with
-      multi-match guard); string + boolean resolution variants; UTF-8 reads
+      multi-match guard); string + boolean resolution variants; UTF-8 reads;
+      `resolvePlatformUrl()` enforces `https://`, rejects query/fragment/missing-host
     - `lifecycle/StartupBanner.java` [planned] — emits the multi-line L2NX ASCII banner +
       adapterVersion via the logging facade
-    - `connect/ConnectFlow.java` [planned] — POST `/connect` lifecycle, status-code dispatch,
-      retry-with-backoff
-    - `connect/ConnectClient.java` [planned] — thin `HttpURLConnection` wrapper with Gson
-      body marshalling
-    - `connect/BackoffSchedule.java` [planned] — 30s → 1m → 2m → 5m capped delay generator
+    - `connect/ConnectFlow.java` [done] — POST `/connect` lifecycle, status-code dispatch,
+      retry-with-backoff via `AtomicInteger` attempt counter; `sanitize()` redacts
+      `Bearer <token>` patterns from log messages
+    - `connect/ConnectClient.java` [done] — interface; implementations encode transport /
+      parse failures as `ConnectResult` rather than throwing
+    - `connect/HttpURLConnectionConnectClient.java` [done] — JDK-only impl: Bearer auth,
+      `Connection: close`, 5s/10s timeouts, `BufferedWriter`-wrapped output, 1 MiB hard
+      cap on response body (host-JVM OOM defense), UTF-8 char-array read
+    - `connect/ConnectResult.java` [done] — typed result envelope (success / httpError /
+      ioFailure)
+    - `connect/ErrorEnvelope.java` [done] — wire-shape `{code, message}` Gson-deserialized
+      from 4xx/5xx response bodies
+    - `connect/BackoffSchedule.java` [done] — interface
+    - `connect/DefaultBackoffSchedule.java` [done] — canonical 30s → 1m → 2m → 5m capped
+      delay generator
     - `kafka/KafkaInitializer.java` [planned] — composes `NxKafka` builder from
       `ConnectResponse.kafka`
     - `heartbeat/HeartbeatService.java` [planned] — `ScheduledExecutorService`-driven 60s
@@ -41,18 +53,25 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
     - `lifecycle/ShutdownHook.java` [planned] — registers JVM shutdown hook
     - logging via `app.l2nx.log.NxLog` from sibling `:nx-log` subproject (shadow-included
       into the published jar — see Integration points)
-- `nx-gs-adapter-core/src/test/java/app/l2nx/gs/adapter/core/` [planned] — unit tests for
-  `ConfigResolver`, `BackoffSchedule`, `ConnectFlow` (with WireMock), `HeartbeatService`
-  (with mocked `NxKafka`).
+- `nx-gs-adapter-core/src/test/java/app/l2nx/gs/adapter/core/` — unit tests for
+  `ConfigResolver`, `NxAdapter`, `ConnectFlow` (WireMock-backed, status dispatch via
+  `@ParameterizedTest`), `DefaultBackoffSchedule`. `CapturingScheduler` is a hand-rolled
+  `ScheduledExecutorService` test double (Mockito 5.x / Byte Buddy doesn't support Java
+  25+, so we don't mock the JDK interface). Future: `HeartbeatService` (with mocked
+  `NxKafka`) once heartbeat lands.
 
 ## Key components
 
-- **`NxAdapter`** [planned] (R8, R14) — singleton-style facade. `start()` always emits the
-  startup banner (R15), then resolves config; if `enabled=false` (R14) it logs an INFO
-  "adapter disabled" line, transitions state `INIT → DISABLED`, and returns immediately —
-  no shutdown hook, no daemon threads, no network calls. Otherwise it registers the JVM
-  shutdown hook and kicks off the connect flow on a daemon `ExecutorService`. State
-  transitions are atomic via `AtomicReference<AdapterState>`.
+- **`NxAdapter`** [done] (R8, R10, R11, R14) — singleton-style facade. `start()` is
+  idempotent (an `AtomicBoolean started` guard logs a WARN and returns on duplicate
+  invocation), wraps `ConfigResolver.resolve()` in a central `try { ... } catch (Throwable)`
+  so config-resolution failures log via `NxLog` and transition to `FAILED` instead of
+  bubbling out into the host JVM. If `config.enabled == false` it returns inert (full
+  `DISABLED`-state semantics — INFO log + state transition + callback — land in M33-M35).
+  Otherwise it kicks off the connect flow on a daemon `nx-adapter-connect`
+  `ScheduledExecutorService`. State transitions go through a `synchronized` block that
+  serializes set + callback dispatch so observers see consistent state when reading from
+  inside the callback. The JVM shutdown hook is M30 territory (deferred).
 - **`ConfigResolver`** [done] (R1, R2, R3, R14) — pure JDK; two-source chain per key,
   **file-first**: properties-file lookup → `System.getProperty(key)` (sysprop is only
   consulted when the file does not provide the key, so the file is authoritative). The
@@ -68,14 +87,26 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
 - **`StartupBanner`** [planned] (R15) — emits the L2NX ASCII wordmark and the resolved
   adapter version on `start()`, blank-line-padded so it's visually distinct from
   surrounding host-JVM logs. Plain text via the logging facade — no ANSI escape codes.
-- **`ConnectFlow`** [planned] (R4, R5) — drives the connect lifecycle. On 200 → state `ACTIVE`,
-  triggers `KafkaInitializer` + `HeartbeatService.start`. On 401/403 → terminal failure
-  (`FAILED` / `REJECTED`). On 409/5xx/network → schedules a retry via `BackoffSchedule`.
-- **`ConnectClient`** [planned] (R4) — opens `HttpURLConnection`, writes JSON body via Gson,
-  reads response, surfaces status code + parsed body. Sets `Connection: close` (avoid
-  host-JVM connection-pool leaks). Reasonable timeouts: connect 5s, read 10s.
-- **`BackoffSchedule`** [planned] (R5/SC3) — stateless `next(attempt)` returning a `Duration`
-  from the canonical schedule, capped at 5 minutes.
+- **`ConnectFlow`** [done] (R4, R5) — `Runnable` driving the connect lifecycle on the
+  daemon scheduler. Emits a coarse-grained `Outcome` per logical event (`STARTING` /
+  `ACTIVE` / `TRANSIENT` / `FAILED` / `REJECTED`) — the orchestrator (`NxAdapter`)
+  translates outcomes into state transitions, keeping the flow itself orchestrator-agnostic.
+  Dispatch: 200 → `ACTIVE`; 401 → `FAILED` (terminal); 403 + `code=GAME_SERVER_DEACTIVATED`
+  → `REJECTED` (terminal); 409 + `code=KAFKA_CREDENTIALS_MISSING` / 5xx / IOException →
+  `TRANSIENT` + reschedule via `BackoffSchedule`; any other status → `FAILED`. Retry
+  attempt counter is an `AtomicInteger` (visibility across consecutive scheduler tasks).
+  `sanitize()` strips `Bearer\s+\S+` patterns from anything routed to `NxLog` (defense
+  against server-key leakage via JDK exception messages).
+- **`ConnectClient`** [done] (R4) — interface contract: never throws; transport / parsing
+  failures are encoded in the returned `ConnectResult` (sum-type: `success(ConnectResponse)`
+  / `httpError(int, ErrorEnvelope)` / `ioFailure(IOException)`). Default impl
+  `HttpURLConnectionConnectClient` opens `HttpURLConnection`, writes JSON via Gson through
+  a `BufferedWriter`, reads response with a 1 MiB hard cap (host-JVM OOM defense) and
+  UTF-8 char-array reads (preserves payload bytes verbatim). Sets `Connection: close`,
+  5s connect / 10s read timeouts.
+- **`BackoffSchedule`** [done] (R5/SC3) — interface; default impl `DefaultBackoffSchedule`
+  is stateless and returns `Duration.ofSeconds(30) → ofMinutes(1) → ofMinutes(2) →
+  ofMinutes(5)`, capped at 5 minutes for all subsequent attempts.
 - **`KafkaInitializer`** [planned] (R6) — translates `ConnectResponse.kafka` into a
   `NxKafka.configure().property(...).build()` call. Does NOT block on broker reachability —
   relies on nx-gs-kafka's graceful start.

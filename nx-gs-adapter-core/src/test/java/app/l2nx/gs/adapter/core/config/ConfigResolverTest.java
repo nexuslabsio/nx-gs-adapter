@@ -2,6 +2,8 @@ package app.l2nx.gs.adapter.core.config;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.net.URL;
@@ -133,6 +135,30 @@ class ConfigResolverTest {
         ConfigResolver resolver = withSysprop("l2nx.platform-url", VALID_PLATFORM_URL);
 
         assertEquals(VALID_PLATFORM_URL, resolver.resolvePlatformUrl());
+    }
+
+    @Test
+    void resolvePlatformUrl_shouldStripTrailingSlash() {
+        ConfigResolver resolver = withSysprop("l2nx.platform-url", VALID_PLATFORM_URL + "/");
+
+        assertEquals(VALID_PLATFORM_URL, resolver.resolvePlatformUrl());
+    }
+
+    @ParameterizedTest(name = "rejects {0}")
+    @ValueSource(strings = {
+            "http://acme.api.l2nx.app",                // wrong scheme — bearer would travel plaintext
+            "ftp://acme.api.l2nx.app",                 // non-http(s) scheme
+            "https:///path",                           // missing host
+            "https://acme.api.l2nx.app?route=evil",    // query string
+            "https://acme.api.l2nx.app#frag",          // fragment
+            "https://acme api.l2nx.app"                // malformed URI (space in authority)
+    })
+    void resolvePlatformUrl_shouldRejectInvalidValues(String value) {
+        ConfigResolver resolver = withSysprop("l2nx.platform-url", value);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, resolver::resolvePlatformUrl);
+        assertTrue(ex.getMessage().contains("l2nx.platform-url"),
+                "rejection message must reference key, got: " + ex.getMessage());
     }
 
     @Test

@@ -41,11 +41,11 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   embedded (e.g. `https://acme.api.l2nx.app`), NOT a full base URL with context-path. There is
   no fallback — if missing → adapter logs an actionable ERROR (listing both options) and
   transitions to `FAILED` (per R10).
-- [todo] R4. Adapter MUST POST to `{platformUrl}/api/tenants/servers/connect` with header
+- [done] R4. Adapter MUST POST to `{platformUrl}/api/tenants/servers/connect` with header
   `Authorization: Bearer <serverKey>` and JSON body `{"adapterVersion": "<version>"}`, using JDK
   `HttpURLConnection`. JSON serialization via Gson. The `/api/tenants` servlet context-path of
   nx-tenants is owned by the adapter (hardcoded into the request path), not by `platformUrl`.
-- [todo] R5. Adapter MUST handle `/connect` HTTP responses per the platform contract:
+- [done] R5. Adapter MUST handle `/connect` HTTP responses per the platform contract:
     - 200 → state `ACTIVE`, parse `ConnectResponse`, proceed to Kafka init
     - 401 → state `FAILED`, no retry (key invalid / unknown)
     - 403 (code `GAME_SERVER_DEACTIVATED`) → state `REJECTED`, no retry
@@ -70,7 +70,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   it will graduate into `nx-gs-adapter-api` (`app.l2nx.gs.adapter.api.kafka.HeartbeatMessage`)
   in a later minor when the platform-side consumer is built (server-registration R9–R11).
     - SC4. Heartbeat interval = 60s (matches `server-registration` spec R9 / SC4).
-- [todo] R8. Adapter MUST expose a public API `NxAdapter`:
+- [wip] R8. Adapter MUST expose a public API `NxAdapter`:
     - `static NxAdapter start()` — fire-and-forget bootstrap (returns immediately, all work
       runs on daemon threads)
     - `AdapterState state()` — current FSM state; returns `CLOSED` after `shutdown()` completes
@@ -78,7 +78,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
       transition to `CLOSED`, emit a final `onStateChange(CLOSED)` callback. Idempotent.
 - [todo] R9. Adapter MUST register a JVM shutdown hook on `start()` that invokes `shutdown()`
   idempotently for graceful resource cleanup.
-- [todo] R10. Adapter MUST never propagate exceptions to host-JVM threads — including the
+- [wip] R10. Adapter MUST never propagate exceptions to host-JVM threads — including the
   calling thread of `NxAdapter.start()`. Every entry point (the caller's `start()` thread,
   connect retry loop, heartbeat scheduler tick, Kafka producer callback) MUST catch
   `Throwable`, log via the adapter's logging facade, transition to an appropriate state
@@ -101,7 +101,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
 
 **Should:**
 
-- [todo] R11. Adapter SHOULD expose an `onStateChange(Consumer<AdapterState>)` callback that the
+- [done] R11. Adapter SHOULD expose an `onStateChange(Consumer<AdapterState>)` callback that the
   host (game core) can register before `start()` to surface lifecycle transitions in operator
   UI / logs. Callback dispatch is fire-and-forget on the state-change thread; host is
   responsible for handing off to its own thread if needed.
@@ -181,6 +181,23 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   open-core add-on for L2J / Lucera / Essence — host game server must keep running even
   if the adapter cannot bootstrap. Matches R10's "no exceptions to host" applied to the
   calling thread, not just daemon threads.]
+- [NEEDS CLARIFICATION: `ConfigResolver.resolvePlatformUrl()` rejects non-`https://`
+  schemes, URLs with query strings or fragments, missing host, and malformed URIs
+  (security tightening from M12-M20 review — bearer would travel plaintext over `http://`,
+  query/fragment can poison URL composition). Codify these as MUST under R3, or remove the
+  validation from code? ref: `nx-gs-adapter-core/src/main/java/app/l2nx/gs/adapter/core/config/ConfigResolver.java`]
+- [NEEDS CLARIFICATION: `HttpURLConnectionConnectClient.readBody` caps response body at
+  1 MiB to defend the host JVM from OOM on a hostile / runaway server response. The cap
+  is not in R4 / SC. Add as an SC under R4, or document elsewhere? ref:
+  `nx-gs-adapter-core/src/main/java/app/l2nx/gs/adapter/core/connect/HttpURLConnectionConnectClient.java`]
+- [NEEDS CLARIFICATION: `NxAdapter.start()` is idempotent — duplicate invocations log a
+  WARN and return without re-running. Not specified in R8. Add to R8 contract or treat as
+  internal hardening? ref: `nx-gs-adapter-core/src/main/java/app/l2nx/gs/adapter/core/NxAdapter.java`]
+- [NEEDS CLARIFICATION: 4xx responses without the spec'd error code (e.g. `403` without
+  `code=GAME_SERVER_DEACTIVATED`, `409` without `code=KAFKA_CREDENTIALS_MISSING`, `404`,
+  `400`, etc.) currently route to terminal `FAILED`. R5 only specifies the codes-with-body
+  scenarios. Lock the fall-through as terminal in R5, or specify transient-retry for some
+  (e.g. `404` could be platform deployment misroute, transient)?]
 
 ## Links
 
