@@ -1,0 +1,29 @@
+[versions]
+# runtime deps
+kafka-clients = "3.6.2"
+gson = "2.13.2"
+slf4j = "2.0.17"
+# tests
+junit = "5.14.3"
+mockito = "5.14.2"
+wiremock = "3.9.1"
+# integ tests
+testcontainers = "1.21.4"
+
+[libraries]
+kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka-clients" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+# tests
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
+wiremock = { module = "org.wiremock:wiremock", version.ref = "wiremock" }
+# integ tests (nx-gs-kafka)
+testcontainers-kafka = { module = "org.testcontainers:kafka", version.ref = "testcontainers" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+
+[plugins]
+shadow = { id = "com.gradleup.shadow", version = "9.4.1" }

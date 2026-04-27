@@ -1,0 +1,113 @@
+name: Publish to Maven Central
+
+on:
+  push:
+    tags:
+      - '*/v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on master
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "Tag must be on master branch"
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Parse tag → module + version
+        id: parsed
+        run: |
+          REF="$GITHUB_REF_NAME"           # e.g. "api/v0.1.0"
+          MODULE="${REF%/v*}"              # e.g. "api"
+          VERSION="${REF#${MODULE}/v}"     # e.g. "0.1.0"
+
+          case "$MODULE" in
+            api)      GRADLE_MODULE="nx-gs-adapter-api" ;;
+            gs-kafka) GRADLE_MODULE="nx-gs-kafka" ;;
+            core)     GRADLE_MODULE="nx-gs-adapter-core" ;;
+            *)
+              echo "Unknown module prefix in tag: $MODULE"
+              echo "Supported prefixes: api, gs-kafka, core"
+              exit 1
+              ;;
+          esac
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "Invalid version format: $VERSION"
+            exit 1
+          fi
+
+          echo "module=$GRADLE_MODULE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests for target module
+        env:
+          MODULE: ${{ steps.parsed.outputs.module }}
+        run: |
+          chmod +x gradlew
+          ./gradlew ":${MODULE}:test" -PexcludeTags=integration
+
+      # Secrets are passed via ORG_GRADLE_PROJECT_* env vars (Gradle reads these as
+      # `findProperty("signingKey")` / `findProperty("signingPassword")`) so they
+      # never appear on the command line where Gradle stack traces or `ps` output
+      # could leak them.
+      - name: Publish target module to staging
+        env:
+          MODULE: ${{ steps.parsed.outputs.module }}
+          VERSION: ${{ steps.parsed.outputs.version }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          ./gradlew ":${MODULE}:publishMavenPublicationToStagingRepository" \
+            "-P${MODULE}.version=${VERSION}"
+
+      - name: Create bundle
+        env:
+          MODULE: ${{ steps.parsed.outputs.module }}
+        run: |
+          cd "${MODULE}/build/staging-deploy"
+          zip -r "$GITHUB_WORKSPACE/bundle.zip" .
+
+      - name: Upload to Central Portal
+        env:
+          CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
+        run: |
+          STATUS=$(curl --silent --output response.json --write-out "%{http_code}" \
+            --request POST \
+            --header "Authorization: Bearer ${CENTRAL_TOKEN}" \
+            --form bundle=@bundle.zip \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" -ne 201 ]; then
+            echo "Upload failed."
+            # Print body sanitized — strip any field that could echo auth back.
+            jq 'del(.token, .authorization, .secret, .access_token)' response.json 2>/dev/null \
+              || echo "(response body suppressed; install jq to inspect)"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes --title "${{ steps.parsed.outputs.module }} ${{ steps.parsed.outputs.version }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
