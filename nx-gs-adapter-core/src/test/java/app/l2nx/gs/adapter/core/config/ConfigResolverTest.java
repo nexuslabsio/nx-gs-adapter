@@ -6,8 +6,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -253,54 +251,77 @@ class ConfigResolverTest {
     }
 
     @Test
-    void loadFileProperties_shouldThrow_whenExplicitPathDoesNotExist() {
-        Map<String, String> sys = singletonMap("l2nx.config-file", "/nonexistent/path/adapter.properties");
+    void loadFileProperties_shouldThrow_whenExplicitPathDoesNotExist(@TempDir Path tempDir) {
+        Path missing = tempDir.resolve("nonexistent-adapter.properties");
+        Map<String, String> sys = singletonMap("l2nx.config-file", missing.toString());
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> ConfigResolver.loadFileProperties(sys::get));
         assertTrue(ex.getMessage().contains("l2nx.config-file"));
-        assertTrue(ex.getMessage().contains("/nonexistent/path/adapter.properties"));
+        assertTrue(ex.getMessage().contains(missing.toString()));
     }
 
     @Test
-    void loadFileProperties_shouldFallbackToClasspath_whenConfigFileSyspropAbsent() {
-        Properties loaded = ConfigResolver.loadFileProperties(empty());
+    void loadFileProperties_shouldReturnEmpty_whenConfigFileSyspropAbsentAndDefaultFileMissing(@TempDir Path tempDir) {
+        Path missing = tempDir.resolve("l2nx.properties");
 
-        // No -Dl2nx.config-file set; project test resources do not contain l2nx.properties → empty
+        Properties loaded = ConfigResolver.loadFileProperties(empty(), missing);
+
+        // No -Dl2nx.config-file, default file does not exist → graceful empty (sysprop fallback may fill keys)
         assertTrue(loaded.isEmpty());
     }
 
     @Test
-    void loadFromClassLoader_shouldLoad_whenSingleResourceFound(@TempDir Path tempDir) throws IOException {
-        Files.write(tempDir.resolve("test-l2nx.properties"), "k=v\n".getBytes(StandardCharsets.UTF_8));
-        try (URLClassLoader loader = new URLClassLoader(new URL[]{tempDir.toUri().toURL()}, null)) {
-            Properties loaded = ConfigResolver.loadFromClassLoader(loader, "test-l2nx.properties");
-            assertEquals("v", loaded.getProperty("k"));
-        }
+    void loadFileProperties_shouldReadDefaultFile_whenConfigFileSyspropAbsentAndDefaultFileExists(@TempDir Path tempDir)
+            throws IOException {
+        Path defaultFile = tempDir.resolve("l2nx.properties");
+        Files.write(defaultFile,
+                ("l2nx.gs-key=" + VALID_KEY + "\nl2nx.enabled=true\n").getBytes(StandardCharsets.UTF_8));
+
+        Properties loaded = ConfigResolver.loadFileProperties(empty(), defaultFile);
+
+        assertEquals(VALID_KEY, loaded.getProperty("l2nx.gs-key"));
+        assertEquals("true", loaded.getProperty("l2nx.enabled"));
     }
 
     @Test
-    void loadFromClassLoader_shouldFail_whenMultipleResourcesFound(@TempDir Path tempDir) throws IOException {
-        Path dir1 = Files.createDirectory(tempDir.resolve("cp1"));
-        Path dir2 = Files.createDirectory(tempDir.resolve("cp2"));
-        Files.write(dir1.resolve("test-l2nx.properties"), "k=v1\n".getBytes(StandardCharsets.UTF_8));
-        Files.write(dir2.resolve("test-l2nx.properties"), "k=v2\n".getBytes(StandardCharsets.UTF_8));
+    void loadFileProperties_shouldThrow_whenDefaultFileExistsButUnreadable(@TempDir Path tempDir) throws IOException {
+        // Directory at the expected file path — Files.newBufferedReader fails with IOException
+        Path defaultPath = tempDir.resolve("l2nx.properties");
+        Files.createDirectory(defaultPath);
 
-        try (URLClassLoader loader = new URLClassLoader(
-                new URL[]{dir1.toUri().toURL(), dir2.toUri().toURL()}, null)) {
-            IllegalStateException ex = assertThrows(IllegalStateException.class,
-                    () -> ConfigResolver.loadFromClassLoader(loader, "test-l2nx.properties"));
-            assertTrue(ex.getMessage().contains("Multiple"));
-            assertTrue(ex.getMessage().contains("test-l2nx.properties"));
-        }
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> ConfigResolver.loadFileProperties(empty(), defaultPath));
+        assertTrue(ex.getMessage().contains("l2nx.properties"));
+        // Differentiated wording — must NOT claim the operator set -Dl2nx.config-file
+        assertTrue(ex.getMessage().contains("default config file"),
+                "expected default-file wording, got: " + ex.getMessage());
     }
 
     @Test
-    void loadFromClassLoader_shouldReturnEmpty_whenNoResourceFound(@TempDir Path tempDir) throws IOException {
-        try (URLClassLoader loader = new URLClassLoader(new URL[]{tempDir.toUri().toURL()}, null)) {
-            Properties loaded = ConfigResolver.loadFromClassLoader(loader, "nonexistent.properties");
-            assertTrue(loaded.isEmpty());
-        }
+    void loadFileProperties_shouldFallbackToDefault_whenConfigFileSyspropIsBlank(@TempDir Path tempDir)
+            throws IOException {
+        Path defaultFile = tempDir.resolve("l2nx.properties");
+        Files.write(defaultFile, ("k=from-default\n").getBytes(StandardCharsets.UTF_8));
+        Map<String, String> sys = singletonMap("l2nx.config-file", "   ");
+
+        Properties loaded = ConfigResolver.loadFileProperties(sys::get, defaultFile);
+
+        // Blank explicit path is treated as absent → falls through to default file
+        assertEquals("from-default", loaded.getProperty("k"));
+    }
+
+    @Test
+    void loadFileProperties_shouldThrow_whenExplicitPathIsMalformed() {
+        // NUL char is illegal in paths on every platform — Paths.get throws InvalidPathException
+        Map<String, String> sys = singletonMap("l2nx.config-file", "bad\u0000path");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> ConfigResolver.loadFileProperties(sys::get));
+        assertTrue(ex.getMessage().contains("l2nx.config-file"),
+                "expected config-file key in error, got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("invalid path"),
+                "expected invalid-path wording, got: " + ex.getMessage());
     }
 
     private static ConfigResolver withSysprop(String key, String value) {

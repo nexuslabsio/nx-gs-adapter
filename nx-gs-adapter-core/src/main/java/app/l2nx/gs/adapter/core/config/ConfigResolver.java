@@ -1,16 +1,11 @@
 package app.l2nx.gs.adapter.core.config;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Enumeration;
+import java.nio.file.*;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Function;
@@ -18,19 +13,30 @@ import java.util.function.Function;
 /**
  * Resolves adapter configuration from a two-source chain (per key), file-first:
  * <ol>
- *   <li>Properties file — either the absolute path given by
- *       {@code -Dl2nx.config-file=<path>} (operator-preferred), or the classpath resource
- *       {@code l2nx.properties} as a fallback when {@code l2nx.config-file} is unset.</li>
+ *   <li>Properties file — either the path given by {@code -Dl2nx.config-file=<path>}
+ *       (operator-preferred; absolute or relative to the JVM working directory), or
+ *       {@code l2nx.properties} in the JVM working directory of the host application
+ *       as a fallback when {@code l2nx.config-file} is unset.</li>
  *   <li>JVM system property (e.g. {@code -Dl2nx.gs-key=...}) — consulted only when the
  *       file does not provide the key.</li>
  * </ol>
  * Pure JDK — no Spring, no SnakeYAML, no third-party config library. Environment-variable
- * resolution is intentionally absent in 0.1.0; file is the preferred medium and is
- * authoritative when present. Both file and classpath sources are read as UTF-8.
+ * resolution is intentionally absent; file is the preferred medium and is authoritative
+ * when present. The file is read as UTF-8.
+ *
+ * <p>Missing-file semantics:</p>
+ * <ul>
+ *   <li>{@code -Dl2nx.config-file} explicitly set but missing / unreadable / malformed
+ *       path → fail loud with {@link IllegalStateException}; the operator's intent is
+ *       clear.</li>
+ *   <li>{@code -Dl2nx.config-file} unset and {@code l2nx.properties} not present in the
+ *       JVM working directory → empty {@link Properties} (graceful — sysprop fallback
+ *       may still provide the keys).</li>
+ * </ul>
  */
 public final class ConfigResolver {
 
-    private static final String CLASSPATH_FILE = "l2nx.properties";
+    private static final String DEFAULT_FILE_NAME = "l2nx.properties";
     private static final String CONFIG_FILE_KEY = "l2nx.config-file";
 
     static final String KEY_SERVER_KEY = "l2nx.gs-key";
@@ -140,8 +146,9 @@ public final class ConfigResolver {
         return new IllegalStateException(
                 "Missing required configuration '" + key + "'. Provide it via one of: "
                         + "(1) properties file with key " + key + "=<value> "
-                        + "(file path from -D" + CONFIG_FILE_KEY + "=<path>, "
-                        + "or classpath resource '" + CLASSPATH_FILE + "' when -D" + CONFIG_FILE_KEY + " is not set), "
+                        + "(path from -D" + CONFIG_FILE_KEY + "=<path>, "
+                        + "or '" + DEFAULT_FILE_NAME + "' in the JVM working directory "
+                        + "when -D" + CONFIG_FILE_KEY + " is not set), "
                         + "(2) JVM system property -D" + key + "=<value> as fallback");
     }
 
@@ -150,58 +157,52 @@ public final class ConfigResolver {
     }
 
     static Properties loadFileProperties(Function<String, String> sysprops) {
+        return loadFileProperties(sysprops, Paths.get(DEFAULT_FILE_NAME));
+    }
+
+    /**
+     * Test seam — lets {@code ConfigResolverTest} aim the cwd-default branch at a
+     * temp-directory file without mutating the JVM's {@code user.dir}.
+     */
+    static Properties loadFileProperties(Function<String, String> sysprops, Path defaultPath) {
         String explicitPath = sysprops.apply(CONFIG_FILE_KEY);
         if (isPresent(explicitPath)) {
-            return loadFromPath(explicitPath.trim());
+            String trimmed = explicitPath.trim();
+            Path resolved;
+            try {
+                resolved = Paths.get(trimmed);
+            } catch (InvalidPathException e) {
+                throw new IllegalStateException(
+                        explicitErrorPrefix(trimmed) + ": invalid path: " + e.getMessage(), e);
+            }
+            return loadFromPath(resolved, /* required = */ true);
         }
-        return loadFromClasspath();
+        return loadFromPath(defaultPath, /* required = */ false);
     }
 
-    private static Properties loadFromPath(String path) {
+    private static Properties loadFromPath(Path filePath, boolean required) {
         Properties props = new Properties();
-        Path filePath = Paths.get(path);
         try (Reader reader = Files.newBufferedReader(filePath, StandardCharsets.UTF_8)) {
             props.load(reader);
+            return props;
+        } catch (NoSuchFileException e) {
+            if (required) {
+                throw new IllegalStateException(
+                        errorPrefix(required, filePath) + ": file does not exist", e);
+            }
+            return props;
         } catch (IOException e) {
             throw new IllegalStateException(
-                    "Unable to read config file specified by -D" + CONFIG_FILE_KEY + "='" + path + "': " + e.getMessage(), e);
+                    errorPrefix(required, filePath) + ": " + e.getMessage(), e);
         }
-        return props;
     }
 
-    private static Properties loadFromClasspath() {
-        ClassLoader loader = ConfigResolver.class.getClassLoader();
-        if (loader == null) {
-            loader = ClassLoader.getSystemClassLoader();
-        }
-        return loadFromClassLoader(loader, CLASSPATH_FILE);
+    private static String errorPrefix(boolean required, Path filePath) {
+        return required ? explicitErrorPrefix(filePath.toString())
+                : "Unable to read default config file '" + filePath + "'";
     }
 
-    static Properties loadFromClassLoader(ClassLoader loader, String resource) {
-        Properties props = new Properties();
-        try {
-            Enumeration<URL> urls = loader.getResources(resource);
-            if (!urls.hasMoreElements()) {
-                return props;
-            }
-            URL first = urls.nextElement();
-            if (urls.hasMoreElements()) {
-                StringBuilder all = new StringBuilder("[").append(first);
-                while (urls.hasMoreElements()) {
-                    all.append(", ").append(urls.nextElement());
-                }
-                all.append("]");
-                throw new IllegalStateException(
-                        "Multiple '" + resource + "' resources found on the classpath: " + all
-                                + ". Remove the duplicate or set -D" + CONFIG_FILE_KEY
-                                + "=<absolute path> to the canonical file.");
-            }
-            try (Reader reader = new InputStreamReader(first.openStream(), StandardCharsets.UTF_8)) {
-                props.load(reader);
-            }
-        } catch (IOException ignored) {
-            // unreadable classpath entries — treat as empty source, file may still come from sysprop
-        }
-        return props;
+    private static String explicitErrorPrefix(String path) {
+        return "Unable to read config file specified by -D" + CONFIG_FILE_KEY + "='" + path + "'";
     }
 }

@@ -65,22 +65,36 @@ other modules stay at their fallback `<base>` version and are NOT republished by
 
 ## Quick start
 
-Drop the fat JAR into the game-server classpath and configure the adapter via a properties file —
-either on the classpath as `l2nx.properties` (root), or at any absolute path pointed to by
-`-Dl2nx.config-file=<path>`. JVM system properties (`-Dl2nx.<key>=...`) act as a per-key fallback
-when the file does not provide the key. Environment variables are not supported in 0.1.0.
+Drop the fat JAR into the game-server classpath and configure the adapter via a properties file.
+The resolution chain (file-first, sysprop-fallback per key):
 
-Required keys: `l2nx.gs-key`, `l2nx.platform-url`, `l2nx.enabled` (default `false`).
+1. **`-Dl2nx.config-file=<path>`** — explicit path (absolute or relative to the JVM working
+   directory). If set but unreadable, the adapter fails loud with `IllegalStateException` so
+   operator typos do not silently fall through.
+2. **`l2nx.properties` next to the JVM working directory** — implicit fallback when
+   `-Dl2nx.config-file` is unset. Missing file is OK — the adapter then relies on JVM system
+   properties.
+3. **`-Dl2nx.<key>=<value>`** — per-key override consulted only when the file does not provide
+   the key.
+
+Environment variables are not supported.
+
+A starter file with placeholder values lives at the repo root: [`l2nx.properties`](./l2nx.properties) —
+copy it next to your game-server working directory (or to any path you point `-Dl2nx.config-file`
+at) and fill in the real `gs-key` + `platform-url`.
+
+Required: `l2nx.gs-key`, `l2nx.platform-url`. Optional: `l2nx.enabled` (default `false` — must be
+`true` for the adapter to actually run; otherwise it transitions to `DISABLED` at startup).
 
 ```bash
-# Option A: drop l2nx.properties next to the game-server JAR (classpath root)
-java -cp "conf:l2j-server.jar:nx-gs-adapter-core-all.jar" org.l2j.server.GameServer
-# where ./conf/l2nx.properties contains:
+# Option A: l2nx.properties in the JVM working directory (implicit fallback)
+java -cp "l2j-server.jar:nx-gs-adapter-core-all.jar" org.l2j.server.GameServer
+# where ./l2nx.properties (relative to where you launch java) contains:
 #   l2nx.gs-key=nx_sk_...
 #   l2nx.platform-url=https://acme.api.l2nx.app
 #   l2nx.enabled=true
 
-# Option B: explicit absolute path
+# Option B: explicit path (recommended for prod — keeps the secret outside the binary)
 java -Dl2nx.config-file=/etc/l2nx/adapter.properties \
      -cp "l2j-server.jar:nx-gs-adapter-core-all.jar" org.l2j.server.GameServer
 ```
