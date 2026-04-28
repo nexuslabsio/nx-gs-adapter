@@ -220,8 +220,8 @@ class ConfigResolverTest {
         assertEquals(VALID_KEY, config.getServerKey());
         assertEquals(VALID_PLATFORM_URL, config.getPlatformUrl());
         assertTrue(config.isEnabled());
-        // adapterVersion comes from manifest — null in unit test, falls back to "0.0.0-unknown"
-        assertEquals("0.0.0-unknown", config.getAdapterVersion());
+        // adapterVersion comes from manifest — null in unit test, falls back to "unknown"
+        assertEquals("unknown", config.getAdapterVersion());
     }
 
     @Test

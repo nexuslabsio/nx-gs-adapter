@@ -12,48 +12,51 @@ Essence game server core and connects it to the L2NX platform.
 
 ## Modules
 
-| Module               | Artifact                      | Published            | Purpose                                                                            |
-|----------------------|-------------------------------|----------------------|------------------------------------------------------------------------------------|
-| `nx-gs-adapter-api`  | `app.l2nx:nx-gs-adapter-api`  | yes                  | Wire contracts (REST + Kafka DTOs) shared with the platform                        |
-| `nx-gs-kafka`        | `app.l2nx:nx-gs-kafka`        | yes                  | Lightweight Kafka client facade for Java 8+ host JVMs                              |
-| `nx-gs-adapter-core` | `app.l2nx:nx-gs-adapter-core` | yes                  | Adapter runtime — connect, heartbeat, lifecycle                                    |
-| `nx-log`             | —                             | no (shadow-included) | Internal logging facade — bundled into `nx-gs-kafka` and `nx-gs-adapter-core` jars |
+| Module                | Artifact                       | Published            | Purpose                                                                            |
+|-----------------------|--------------------------------|----------------------|------------------------------------------------------------------------------------|
+| `nx-gs-adapter-api`   | `app.l2nx:nx-gs-adapter-api`   | yes                  | Wire contracts (REST + Kafka DTOs) + Tier-1/Tier-3 SPI shared with the platform    |
+| `nx-gs-kafka`         | `app.l2nx:nx-gs-kafka`         | yes                  | Lightweight Kafka client facade for Java 8+ host JVMs                              |
+| `nx-gs-adapter-core`  | `app.l2nx:nx-gs-adapter-core`  | yes                  | Adapter runtime — connect, heartbeat, ServiceLoader-based module discovery         |
+| `nx-gs-db-sync-core`  | `app.l2nx:nx-gs-db-sync-core`  | yes                  | DB-sync `AdapterModule` — Phase 1 SPI smoke-check; Phase 2 adds CRC32 CDC engine   |
+| `nx-log`              | —                              | no (shadow-included) | Internal logging facade — bundled into `nx-gs-kafka` and `nx-gs-adapter-core` jars |
 
-Future modules (per architecture v2):
+Future modules:
 
-- `nx-gs-adapter-db-l2j` — DB sync for vanilla L2J schema
-- `nx-gs-adapter-db-lucera` — DB sync for vanilla Lucera schema
-- `nx-gs-adapter-dp-l2j` — Datapack sync for vanilla L2J
-- `nx-gs-adapter-dp-lucera` — Datapack sync for vanilla Lucera
+- `nx-gs-db-l2j` — DB sync for vanilla L2J schema
+- `nx-gs-db-lucera` — DB sync for vanilla Lucera schema
+- `nx-gs-dp-l2j` — Datapack sync for vanilla L2J
+- `nx-gs-dp-lucera` — Datapack sync for vanilla Lucera
 
 Per-client overrides (private repos) extend vanilla via the template-method pattern (e.g.
-`nx-gs-adapter-db-l2j-bohpts`).
+`nx-gs-db-l2j-bohpts`).
 
 ## Distribution & licensing
 
 Open-core model — Apache 2.0, published to Maven Central:
 
-- `nx-gs-adapter-api` (contracts)
+- `nx-gs-adapter-api` (contracts + SPI)
 - `nx-gs-kafka` (Kafka facade)
 - `nx-gs-adapter-core` (runtime)
-- `nx-gs-adapter-db-l2j`, `nx-gs-adapter-db-lucera`, `nx-gs-adapter-dp-l2j`,
-  `nx-gs-adapter-dp-lucera` (vanilla sync modules — community schemas, future)
+- `nx-gs-db-sync-core` (DB-sync engine + Tier-2 SPI host)
+- `nx-gs-db-l2j`, `nx-gs-db-lucera`, `nx-gs-dp-l2j`, `nx-gs-dp-lucera` (vanilla sync
+  modules — community schemas, future)
 
 Operators can audit every artifact that loads into their host JVM and drop in via Maven
 Central without a private-repo handshake.
 
-Per-client modules (`nx-gs-adapter-db-l2j-<client>`, `nx-gs-adapter-dp-<core>-<client>`)
-that encode a client-proprietary DB schema or datapack layout are shipped privately to
-that client only — never published to Maven Central — to avoid leaking their schema
-internals. They extend the vanilla module via the template-method pattern.
+Per-client modules (`nx-gs-db-l2j-<client>`, `nx-gs-dp-<core>-<client>`) that encode a
+client-proprietary DB schema or datapack layout are shipped privately to that client
+only — never published to Maven Central — to avoid leaking their schema internals.
+They extend the vanilla module via the template-method pattern.
 
 ## Versioning
 
 Per-module independent versioning via slash-namespaced git tags:
 
-- `api/v0.1.0` → release `nx-gs-adapter-api` 0.1.0
-- `gs-kafka/v0.0.1` → release `nx-gs-kafka` 0.0.1
-- `core/v0.1.0` → release `nx-gs-adapter-core` 0.1.0
+- `api/vX.Y.Z` → release `nx-gs-adapter-api`
+- `kafka/vX.Y.Z` → release `nx-gs-kafka`
+- `core/vX.Y.Z` → release `nx-gs-adapter-core`
+- `db-sync/vX.Y.Z` → release `nx-gs-db-sync-core`
 - `db-l2j/v…`, `dp-l2j/v…`, `db-lucera/v…`, `dp-lucera/v…` (future)
 
 Each module's `build.gradle.kts` declares
@@ -85,6 +88,13 @@ at) and fill in the real `gs-key` + `platform-url`.
 
 Required: `l2nx.gs-key`, `l2nx.platform-url`. Optional: `l2nx.enabled` (default `false` — must be
 `true` for the adapter to actually run; otherwise it transitions to `DISABLED` at startup).
+
+**DB credentials (only when DB-sync modules ship and host JVM doesn't register a
+`JdbcConnectionSource` via SPI):** `l2nx.db.url`, `l2nx.db.username`, `l2nx.db.password` —
+operator-local fallback for the bundled-Hikari pool. Creds NEVER travel through the
+platform; they live only on the operator's machine. If the host (e.g. bohpts-core)
+already exposes a `JdbcConnectionSource` via `META-INF/services`, leave the `l2nx.db.*`
+keys unset — the adapter will reuse the host's existing pool.
 
 ```bash
 # Option A: l2nx.properties in the JVM working directory (implicit fallback)

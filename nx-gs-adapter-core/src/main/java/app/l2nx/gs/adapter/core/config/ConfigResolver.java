@@ -139,7 +139,7 @@ public final class ConfigResolver {
 
     public String resolveAdapterVersion() {
         String version = getClass().getPackage().getImplementationVersion();
-        return version != null ? version : "0.0.0-unknown";
+        return version != null ? version : "unknown";
     }
 
     private static IllegalStateException missingValueException(String key) {

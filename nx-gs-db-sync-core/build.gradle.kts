@@ -2,10 +2,9 @@ plugins {
     `java-library`
     `maven-publish`
     signing
-    alias(libs.plugins.shadow)
 }
 
-version = findProperty("${project.name}.version") as String? ?: "0.3.0"
+version = findProperty("${project.name}.version") as String? ?: "0.1.0"
 
 java {
     withSourcesJar()
@@ -14,8 +13,6 @@ java {
 
 tasks.withType<JavaCompile> {
     options.release.set(8)
-    // Suppress "source/target value 8 is obsolete" — Java 8 target is intentional
-    // (host JVMs span Java 8 to 25+); JDK recommends this exact flag.
     options.compilerArgs.addAll(listOf("-Xlint:deprecation", "-Xlint:-options"))
 }
 
@@ -25,8 +22,6 @@ repositories {
 
 dependencies {
     api(project(":nx-gs-adapter-api"))
-    api(project(":nx-gs-kafka"))
-    api(libs.gson)
     compileOnly(libs.slf4j.api)
 
     // :nx-log is shadow-included into the published jar — not exposed as a Maven dep.
@@ -37,7 +32,6 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.mockito.core)
     testImplementation(libs.mockito.junit.jupiter)
-    testImplementation(libs.wiremock)
     testImplementation(libs.slf4j.simple)
 }
 
@@ -47,19 +41,12 @@ tasks.test {
     }
 }
 
-// Silence "missing comment" javadoc warnings on getters / builder methods.
-// Keeps other doclint categories active (broken @link, syntax errors, etc.).
 tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:-missing", "-quiet")
 }
 
-// Embed :nx-log compiled classes directly into the published nx-gs-adapter-core.jar
-// so Maven Central consumers don't need a separate nx-log dependency.
 tasks.named<Jar>("jar") {
     manifest {
-        // Implementation-Version is read at runtime by AdapterVersion / ConfigResolver
-        // (Package.getImplementationVersion). Without this, both the startup banner
-        // and the heartbeat payload report "unknown".
         attributes("Implementation-Version" to project.version)
     }
     from(project(":nx-log").sourceSets["main"].output)
@@ -67,13 +54,6 @@ tasks.named<Jar>("jar") {
 
 tasks.named<Jar>("sourcesJar") {
     from(project(":nx-log").sourceSets["main"].allSource)
-}
-
-tasks.shadowJar {
-    archiveClassifier.set("all")
-    dependencies {
-        exclude(dependency("org.slf4j:slf4j-api"))
-    }
 }
 
 publishing {
@@ -86,11 +66,11 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
-            artifactId = "nx-gs-adapter-core"
+            artifactId = "nx-gs-db-sync-core"
 
             pom {
-                name.set("nx-gs-adapter-core")
-                description.set("L2NX game-server adapter runtime — POST /connect, heartbeat, ServiceLoader-based module discovery")
+                name.set("nx-gs-db-sync-core")
+                description.set("L2NX game-server adapter — DB sync module (Tier-1 AdapterModule, CRC32 CDC engine in Phase 2)")
                 url.set("https://github.com/nexuslabsio/nx-gs-adapter")
 
                 licenses {

@@ -7,7 +7,7 @@ package app.l2nx.gs.adapter.core.lifecycle;
  */
 public final class AdapterVersion {
 
-    private static final String FALLBACK = "0.0.0-unknown";
+    private static final String FALLBACK = "unknown";
 
     private AdapterVersion() {
     }

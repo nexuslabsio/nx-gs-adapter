@@ -69,7 +69,7 @@ transitions атомарны через `AtomicReference`,
   sources (R3).
 - [x] M6. [P] Adapter version resolver:
   `getClass().getPackage().getImplementationVersion()` with fallback
-  `"0.0.0-unknown"` (assumed in spec; underpins R4 body).
+  `"unknown"` (assumed in spec; underpins R4 body).
 - [x] M7. `ConfigResolver.resolveBoolean(String key, boolean
   defaultValue)` — same source chain, parses `true`/`false`
   case-insensitively; returns `defaultValue` when no source supplies
@@ -290,7 +290,7 @@ DEGRADED → REGISTERING on a 5xx then 200.
 
 - `AdapterConfig.adapterVersion` source: JAR manifest's
   `Implementation-Version` (assumed in spec). Test runs / IDE → falls
-  back to `"0.0.0-unknown"`. R13 (`l2nx.adapter-version` override) is
+  back to `"unknown"`. R13 (`l2nx.adapter-version` override) is
   out of scope — pin a TODO at `AdapterConfig.from(...)` for the
   later slice.
 - `nx-gs-kafka` is graceful when broker is unreachable — no

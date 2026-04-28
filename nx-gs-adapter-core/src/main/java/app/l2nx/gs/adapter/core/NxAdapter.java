@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.core;
 
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.rest.Topics;
+import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.core.concurrent.SafeRunnable;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.ConfigResolver;
@@ -14,6 +15,7 @@ import app.l2nx.gs.adapter.core.kafka.KafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
 import app.l2nx.gs.adapter.core.lifecycle.AdapterVersion;
 import app.l2nx.gs.adapter.core.lifecycle.StartupBanner;
+import app.l2nx.gs.adapter.core.modules.ModuleRegistry;
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.gs.kafka.NxKafka;
@@ -58,6 +60,8 @@ public final class NxAdapter {
     private static volatile ScheduledExecutorService connectScheduler;
     private static volatile ScheduledExecutorService heartbeatScheduler;
     private static volatile HeartbeatService heartbeatService;
+    private static volatile ModuleRegistry moduleRegistry;
+    private static volatile String adapterVersion;
     private static volatile Thread shutdownHook;
     private static volatile KafkaFactory kafkaFactoryOverride;
 
@@ -112,8 +116,11 @@ public final class NxAdapter {
         connectScheduler = scheduler;
         ScheduledExecutorService hbScheduler = createHeartbeatScheduler();
         heartbeatScheduler = hbScheduler;
+        adapterVersion = config.getAdapterVersion();
+        ModuleRegistry registry = new ModuleRegistry();
+        moduleRegistry = registry;
         heartbeatService = new HeartbeatService(
-                defaultPublisher(), hbScheduler, config.getAdapterVersion());
+                defaultPublisher(), hbScheduler, config.getAdapterVersion(), registry::currentStatuses);
 
         // Single read of the volatile so a concurrent test-only swap can't split
         // the null-check from the dereference.
@@ -165,6 +172,16 @@ public final class NxAdapter {
         if (connect != null) {
             connect.shutdownNow();
             connectScheduler = null;
+        }
+
+        ModuleRegistry registry = moduleRegistry;
+        if (registry != null) {
+            try {
+                registry.shutdown();
+            } catch (Throwable t) {
+                log.error("ModuleRegistry.shutdown threw {}", t.getClass().getName());
+            }
+            moduleRegistry = null;
         }
 
         try {
@@ -264,9 +281,34 @@ public final class NxAdapter {
         String heartbeatTopic = topics != null ? topics.getHeartbeat() : null;
         if (hb != null && heartbeatTopic != null && response.getServerId() != null) {
             try {
-                hb.start(response.getServerId().toString(), heartbeatTopic);
+                String tenantId = response.getTenantId() != null ? response.getTenantId().toString() : null;
+                hb.start(
+                        tenantId,
+                        response.getTenantSlug(),
+                        response.getServerId().toString(),
+                        response.getServerSlug(),
+                        response.getServerName(),
+                        heartbeatTopic);
             } catch (Throwable t) {
                 log.error("HeartbeatService.start threw {}", t.getClass().getName());
+            }
+        }
+
+        ModuleRegistry registry = moduleRegistry;
+        if (registry != null) {
+            try {
+                registry.discover();
+                ConnectContext ctx = ConnectContext.builder()
+                        .tenantId(response.getTenantId())
+                        .tenantSlug(response.getTenantSlug())
+                        .serverId(response.getServerId())
+                        .serverSlug(response.getServerSlug())
+                        .serverName(response.getServerName())
+                        .adapterVersion(adapterVersion)
+                        .build();
+                registry.connect(ctx);
+            } catch (Throwable t) {
+                log.error("ModuleRegistry connect threw {}", t.getClass().getName());
             }
         }
 
@@ -359,6 +401,8 @@ public final class NxAdapter {
             }
             connectScheduler = null;
         }
+        moduleRegistry = null;
+        adapterVersion = null;
         STATE.set(AdapterState.INIT);
         stateCallback = null;
         started.set(false);

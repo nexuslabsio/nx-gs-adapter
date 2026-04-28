@@ -1,12 +1,14 @@
 package app.l2nx.gs.adapter.core.heartbeat;
 
-import app.l2nx.gs.adapter.api.kafka.HeartbeatEvent;
+import app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent;
+import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.core.concurrent.CapturingScheduler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -19,19 +21,21 @@ class HeartbeatServiceTest {
     private CapturingScheduler scheduler;
     private RecordingPublisher publisher;
     private AtomicReference<Instant> now;
+    private AtomicReference<List<ModuleStatus>> moduleStatuses;
 
     @BeforeEach
     void setUp() {
         scheduler = new CapturingScheduler();
         publisher = new RecordingPublisher();
         now = new AtomicReference<Instant>(Instant.parse("2026-01-01T00:00:00Z"));
+        moduleStatuses = new AtomicReference<List<ModuleStatus>>(Collections.emptyList());
     }
 
     @Test
     void start_shouldFireImmediatelyAndThenEvery60Seconds() {
-        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", clock());
+        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", () -> moduleStatuses.get(), clock());
 
-        service.start("server-uuid", "nexus.heartbeat");
+        service.start("tenant-uuid", "acme", "server-uuid", "primary", "Acme Primary", "nexus.heartbeat");
 
         assertNotNull(scheduler.fixedDelayRunnable);
         assertEquals(0L, scheduler.fixedInitialDelay);
@@ -41,8 +45,8 @@ class HeartbeatServiceTest {
 
     @Test
     void start_shouldPublishPayload_onTick() {
-        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", clock());
-        service.start("server-uuid", "nexus.heartbeat");
+        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", () -> moduleStatuses.get(), clock());
+        service.start("tenant-uuid", "acme", "server-uuid", "primary", "Acme Primary", "nexus.heartbeat");
 
         now.set(now.get().plusSeconds(60));
         scheduler.runFixedDelayOnce();
@@ -52,20 +56,51 @@ class HeartbeatServiceTest {
         assertEquals("nexus.heartbeat", call.topic);
         assertEquals("server-uuid", call.key);
         HeartbeatEvent event = (HeartbeatEvent) call.payload;
+        assertEquals("tenant-uuid", event.getTenantId());
+        assertEquals("acme", event.getTenantSlug());
         assertEquals("server-uuid", event.getServerId());
+        assertEquals("primary", event.getServerSlug());
+        assertEquals("Acme Primary", event.getServerName());
         assertEquals("1.2.3", event.getAdapterVersion());
         assertEquals(60L, event.getUptime());
     }
 
     @Test
-    void start_shouldResetUptime_whenCalledTwice() {
-        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", clock());
+    void tick_shouldIncludeModuleStatuses_inPayload() {
+        ModuleStatus dbSync = ModuleStatus.builder().name("db-sync").state("ACTIVE").build();
+        moduleStatuses.set(Collections.singletonList(dbSync));
+        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", () -> moduleStatuses.get(), clock());
+        service.start("tenant-uuid", "acme", "server-uuid", "primary", "Acme Primary", "nexus.heartbeat");
 
-        service.start("server-uuid", "nexus.heartbeat");
+        scheduler.runFixedDelayOnce();
+
+        HeartbeatEvent event = (HeartbeatEvent) publisher.calls.get(0).payload;
+        assertEquals(Collections.singletonList(dbSync), event.getEnabledModules());
+    }
+
+    @Test
+    void tick_shouldDegradeToEmptyList_whenStatusSupplierThrows() {
+        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3",
+                () -> {
+                    throw new RuntimeException("simulated");
+                }, clock());
+        service.start("tenant-uuid", "acme", "server-uuid", "primary", "Acme Primary", "nexus.heartbeat");
+
+        scheduler.runFixedDelayOnce();
+
+        HeartbeatEvent event = (HeartbeatEvent) publisher.calls.get(0).payload;
+        assertEquals(Collections.emptyList(), event.getEnabledModules());
+    }
+
+    @Test
+    void start_shouldResetUptime_whenCalledTwice() {
+        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", () -> moduleStatuses.get(), clock());
+
+        service.start("tenant-uuid", "acme", "server-uuid", "primary", "Acme Primary", "nexus.heartbeat");
         CapturingScheduler.CancellableFuture firstFuture = scheduler.fixedFuture;
         now.set(now.get().plusSeconds(300));
 
-        service.start("server-uuid", "nexus.heartbeat");
+        service.start("tenant-uuid", "acme", "server-uuid", "primary", "Acme Primary", "nexus.heartbeat");
         assertTrue(firstFuture.cancelled);
 
         now.set(now.get().plusSeconds(30));
@@ -78,8 +113,8 @@ class HeartbeatServiceTest {
 
     @Test
     void stop_shouldCancelInFlightSchedule() {
-        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", clock());
-        service.start("server-uuid", "nexus.heartbeat");
+        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", () -> moduleStatuses.get(), clock());
+        service.start("tenant-uuid", "acme", "server-uuid", "primary", "Acme Primary", "nexus.heartbeat");
 
         service.stop();
 
@@ -88,7 +123,7 @@ class HeartbeatServiceTest {
 
     @Test
     void stop_shouldBeIdempotent_whenNeverStarted() {
-        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", clock());
+        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3", () -> moduleStatuses.get(), clock());
 
         service.stop();
         service.stop();
@@ -97,9 +132,9 @@ class HeartbeatServiceTest {
     @Test
     void tick_shouldNotPropagate_whenPublisherThrows() {
         ThrowingPublisher throwing = new ThrowingPublisher();
-        HeartbeatService service = new HeartbeatService(throwing, scheduler, "1.2.3", clock());
+        HeartbeatService service = new HeartbeatService(throwing, scheduler, "1.2.3", () -> moduleStatuses.get(), clock());
 
-        service.start("server-uuid", "nexus.heartbeat");
+        service.start("tenant-uuid", "acme", "server-uuid", "primary", "Acme Primary", "nexus.heartbeat");
         scheduler.runFixedDelayOnce();
 
         // A propagated tick would cancel the scheduled task.
@@ -110,9 +145,9 @@ class HeartbeatServiceTest {
     @Test
     void tick_shouldKeepRunning_afterPublisherThrows() {
         ToggleablePublisher toggleable = new ToggleablePublisher();
-        HeartbeatService service = new HeartbeatService(toggleable, scheduler, "1.2.3", clock());
+        HeartbeatService service = new HeartbeatService(toggleable, scheduler, "1.2.3", () -> moduleStatuses.get(), clock());
 
-        service.start("server-uuid", "nexus.heartbeat");
+        service.start("tenant-uuid", "acme", "server-uuid", "primary", "Acme Primary", "nexus.heartbeat");
         toggleable.shouldThrow = true;
         scheduler.runFixedDelayOnce();
         toggleable.shouldThrow = false;

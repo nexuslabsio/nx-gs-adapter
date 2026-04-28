@@ -29,7 +29,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
     - `lifecycle/StartupBanner.java` [done] — emits the multi-line L2NX ASCII banner +
       adapterVersion via the logging facade
     - `lifecycle/AdapterVersion.java` [done] — static helper resolving the JAR
-      manifest's `Implementation-Version` (with `0.0.0-unknown` fallback); used
+      manifest's `Implementation-Version` (with `unknown` fallback); used
       by the banner before the config resolver runs
     - `connect/ConnectFlow.java` [done] — POST `/connect` lifecycle, status-code dispatch,
       retry-with-backoff via `AtomicInteger` attempt counter; `sanitize()` redacts
@@ -68,7 +68,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       adapter daemon-thread entry point (connect submit, heartbeat tick,
       shutdown hook)
     - heartbeat wire type lives in `nx-gs-adapter-api`
-      (`app.l2nx.gs.adapter.api.kafka.HeartbeatEvent`) — fields `serverId`,
+      (`app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent`) — fields `serverId`,
       `adapterVersion`, `uptime` (no `enabledModules` in 0.1.0)
     - shutdown hook is registered inline inside `NxAdapter.start()` (no separate
       `ShutdownHook.java`); a `Thread` named `nx-adapter-shutdown` wrapping
@@ -157,7 +157,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       `resetForTesting()`) — terminal `FAILED`/`REJECTED`/`CLOSED` do not reset it
 - **`HeartbeatService`** [done] (R7) — single-threaded `ScheduledExecutorService` (daemon,
   named `nx-adapter-heartbeat`). Each tick builds a
-  `app.l2nx.gs.adapter.api.kafka.HeartbeatEvent` carrying `serverId`,
+  `app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent` carrying `serverId`,
   `adapterVersion`, `uptime` = seconds since the most recent successful `/connect`, and
   publishes it via the injected `KafkaPublisher` test seam (production wraps
   `NxKafka.instance().send(topic, key, value)`). The `uptime` clock is captured fresh on
@@ -208,7 +208,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
    terminal states so a late event can't resurrect a CLOSED adapter), `CLOSED` from
    Kafka is ignored (adapter shutdown drives `CLOSED` itself).
 4. **Heartbeat tick** — every 60s `HeartbeatService` builds a
-   `app.l2nx.gs.adapter.api.kafka.HeartbeatEvent` →
+   `app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent` →
    `NxKafka.instance().send(heartbeatTopic, serverId, event)` via the injected
    `KafkaPublisher`. nx-gs-kafka handles producer-side retries and reconnection;
    failed sends do not change adapter state. The tick runnable is wrapped in
@@ -227,7 +227,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   whole `nx-gs-adapter` repo with a `dependencySubstitution` mapping — single source of
   truth for the wire shape. Validation annotations (`jakarta.validation`) stay on the
   controller side; the api lib has zero runtime deps. First published version is **0.1.0**.
-  `app.l2nx.gs.adapter.api.kafka.HeartbeatEvent` ships in 0.1.0 too — it's the wire
+  `app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent` ships in 0.1.0 too — it's the wire
   payload published every 60s; `enabledModules` will be added when `adapter-modules` lands.
 - **`:nx-gs-kafka`** (R6, R7) — sibling subproject. `NxKafka.configure().build()` for the
   producer; `NxKafka.send(topic, key, value)` for heartbeat. `:nx-gs-adapter-core` depends
@@ -298,9 +298,9 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   `state()` / `onStateChange` (programmatic). This extends R10's "no exceptions to host"
   philosophy from daemon threads to the calling thread, so consumers truly never need
   a `try/catch` around `NxAdapter.start()`.
-- **Backoff cap = 5 minutes.** Matches architecture v2 §6.4. After 5m the adapter keeps
-  retrying at the cap (no give-up); operator intervention (revoke / fix tenant) is signalled
-  via terminal `FAILED` / `REJECTED` states instead.
+- **Backoff cap = 5 minutes.** After 5m the adapter keeps retrying at the cap (no
+  give-up); operator intervention (revoke / fix tenant) is signalled via terminal
+  `FAILED` / `REJECTED` states instead.
 - **Heartbeat key = `serverId`.** Matches `server-registration` spec R9 (per-server message
   ordering on the consumer side).
 - **No reflection-heavy DI / Spring.** Wiring inside `NxAdapter.start()` is plain `new`.
@@ -322,7 +322,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   side gets the same types it sees on the wire — no parallel definitions to drift.
 - **Package split `api.rest` vs `api.kafka`.** REST request/response DTOs live in
   `app.l2nx.gs.adapter.api.rest` (`ConnectRequest`, `ConnectResponse`, `KafkaConfig`,
-  `Topics`). Kafka message payloads live in `app.l2nx.gs.adapter.api.kafka`
+  `Topics`). Kafka message payloads live in `app.l2nx.gs.adapter.api.kafka.ops`
   (`HeartbeatEvent` in 0.1.0). The split keeps wire-protocol concerns visually separate
   and mirrors how nx-tenants is structured internally (`api/rest/` vs `infra/kafka/`).
 

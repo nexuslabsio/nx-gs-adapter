@@ -76,7 +76,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
 - [done] R7. Adapter MUST publish a heartbeat message to `kafka.topics.heartbeat` every 60
   seconds (Kafka message key = `serverId`). Payload fields: `serverId`, `adapterVersion`,
   `uptime` (seconds since the most recent successful `/connect` — session uptime, resets
-  on reconnect). The wire type is `app.l2nx.gs.adapter.api.kafka.HeartbeatEvent` in
+  on reconnect). The wire type is `app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent` in
   `nx-gs-adapter-api` so the platform-side consumer (server-registration R9–R11) can
   compile against the same type when it lands. Module discovery (`enabledModules`) is
   out of scope for this slice — `adapter-modules` will extend the payload when it
@@ -141,8 +141,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
 - `MetricsPusher` (Pushgateway) — deferred.
 - Adapter-side handling of `RECONNECT_REQUIRED` commands (R18 in `server-registration`) —
   deferred.
-- DB and datapack sync modules (`nx-gs-adapter-db-*`, `nx-gs-adapter-dp-*`) — separate
-  features per architecture v2 §3.
+- DB and datapack sync modules (`nx-gs-db-*`, `nx-gs-dp-*`) — separate features.
 
 ## Open questions
 
@@ -154,15 +153,15 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   (`jakarta.validation`) stay out of the api lib — manual validation lives in the nx-tenants
   `AdapterController`. The first published version of the api artifact is **0.1.0**.]
 - [resolved: `HeartbeatEvent` ships in 0.1.0 of `nx-gs-adapter-api`
-  (`app.l2nx.gs.adapter.api.kafka.HeartbeatEvent`) — fields `serverId`,
+  (`app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent`) — fields `serverId`,
   `adapterVersion`, `uptime`. `enabledModules` is intentionally absent and will
   be added when `adapter-modules` lands and ServiceLoader discovery is wired.
   Earlier note about deferring the type to a later minor was reversed once we
   decided the platform-side consumer (`server-registration` R9–R11) would consume
   it directly.]
 - [resolved: `state()` and `onStateChange` emit `CLOSED` after `shutdown()` — mirrors
-  `nx-gs-kafka`'s `KafkaState.CLOSED`. Predictable lifecycle for operators reading the state
-  machine; architecture v2 §6.4 is silent on `CLOSED` but doesn't forbid it.]
+  `nx-gs-kafka`'s `KafkaState.CLOSED`. Predictable lifecycle for operators reading the
+  state machine.]
 - [resolved: heartbeat-payload `uptime` is seconds since the most recent successful
   `/connect` (session uptime, resets on reconnect). Platform-side dashboards interpret this
   as "current adapter session lifetime"; on reconnect the counter starts fresh, matching
@@ -185,7 +184,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   win over flexibility.]
 - [assumed: Adapter version is read from the JAR manifest's `Implementation-Version`
   attribute via `getClass().getPackage().getImplementationVersion()`, with fallback to
-  `"0.0.0-unknown"` for IDE / test runs.]
+  `"unknown"` for IDE / test runs.]
 - [resolved: `NxAdapter.start()` NEVER throws into the host JVM. Config-resolution errors
   surface as `IllegalStateException` from `ConfigResolver` internally, but are caught once
   at the `start()` boundary, logged via `NxLog` with an operator-actionable message, and
@@ -214,8 +213,6 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
 
 ## Links
 
-- Architecture: `nx-gs-adapter-architecture-v2.md` (working copy at repo root —
-  will move to `docs/architecture.md`)
 - Server-side `/connect`:
   [
   `nx-tenants/docs/features/server-registration/spec.md`](../../../../nx-tenants/docs/features/server-registration/spec.md)
