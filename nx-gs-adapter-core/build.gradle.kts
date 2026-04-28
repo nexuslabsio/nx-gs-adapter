@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
-version = findProperty("${project.name}.version") as String? ?: "0.3.0"
+version = findProperty("${project.name}.version") as String? ?: "0.3.1"
 
 java {
     withSourcesJar()
@@ -57,13 +57,27 @@ tasks.withType<Javadoc>().configureEach {
 // so Maven Central consumers don't need a separate nx-log dependency.
 tasks.named<Jar>("jar") {
     manifest {
-        // Implementation-Version is read at runtime by AdapterVersion / ConfigResolver
-        // (Package.getImplementationVersion). Without this, both the startup banner
-        // and the heartbeat payload report "unknown".
         attributes("Implementation-Version" to project.version)
     }
     from(project(":nx-log").sourceSets["main"].output)
 }
+
+// Ship the version as a classpath resource so it survives shadow/fat-JAR repacks
+// (host JVM's manifest replaces ours; Package.getImplementationVersion then returns
+// null). AdapterVersion.resolve() reads this file first, manifest as fallback.
+val generateVersionResource = tasks.register("generateVersionResource") {
+    val outputDir = layout.buildDirectory.dir("generated/resources/version")
+    outputs.dir(outputDir)
+    val versionString = project.version.toString()
+    inputs.property("version", versionString)
+    doLast {
+        val file = outputDir.get().file("META-INF/nx-gs-adapter-core.version").asFile
+        file.parentFile.mkdirs()
+        file.writeText(versionString)
+    }
+}
+
+sourceSets["main"].resources.srcDir(generateVersionResource)
 
 tasks.named<Jar>("sourcesJar") {
     from(project(":nx-log").sourceSets["main"].allSource)

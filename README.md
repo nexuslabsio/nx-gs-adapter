@@ -12,13 +12,13 @@ Essence game server core and connects it to the L2NX platform.
 
 ## Modules
 
-| Module                | Artifact                       | Published            | Purpose                                                                            |
-|-----------------------|--------------------------------|----------------------|------------------------------------------------------------------------------------|
-| `nx-gs-adapter-api`   | `app.l2nx:nx-gs-adapter-api`   | yes                  | Wire contracts (REST + Kafka DTOs) + Tier-1/Tier-3 SPI shared with the platform    |
-| `nx-gs-kafka`         | `app.l2nx:nx-gs-kafka`         | yes                  | Lightweight Kafka client facade for Java 8+ host JVMs                              |
-| `nx-gs-adapter-core`  | `app.l2nx:nx-gs-adapter-core`  | yes                  | Adapter runtime — connect, heartbeat, ServiceLoader-based module discovery         |
-| `nx-gs-db-sync-core`  | `app.l2nx:nx-gs-db-sync-core`  | yes                  | DB-sync `AdapterModule` — Phase 1 SPI smoke-check; Phase 2 adds CRC32 CDC engine   |
-| `nx-log`              | —                              | no (shadow-included) | Internal logging facade — bundled into `nx-gs-kafka` and `nx-gs-adapter-core` jars |
+| Module               | Artifact                      | Published            | Purpose                                                                            |
+|----------------------|-------------------------------|----------------------|------------------------------------------------------------------------------------|
+| `nx-gs-adapter-api`  | `app.l2nx:nx-gs-adapter-api`  | yes                  | Wire contracts (REST + Kafka DTOs) + Tier-1/Tier-3 SPI shared with the platform    |
+| `nx-gs-kafka`        | `app.l2nx:nx-gs-kafka`        | yes                  | Lightweight Kafka client facade for Java 8+ host JVMs                              |
+| `nx-gs-adapter-core` | `app.l2nx:nx-gs-adapter-core` | yes                  | Adapter runtime — connect, heartbeat, ServiceLoader-based module discovery         |
+| `nx-gs-db-sync-core` | `app.l2nx:nx-gs-db-sync-core` | yes                  | DB-sync `AdapterModule` — Phase 1 SPI smoke-check; Phase 2 adds CRC32 CDC engine   |
+| `nx-log`             | —                             | no (shadow-included) | Internal logging facade — bundled into `nx-gs-kafka` and `nx-gs-adapter-core` jars |
 
 Future modules:
 

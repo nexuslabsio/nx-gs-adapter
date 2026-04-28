@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.core.config;
 
+import app.l2nx.gs.adapter.core.lifecycle.AdapterVersion;
+
 import java.io.IOException;
 import java.io.Reader;
 import java.net.URI;
@@ -138,8 +140,7 @@ public final class ConfigResolver {
     }
 
     public String resolveAdapterVersion() {
-        String version = getClass().getPackage().getImplementationVersion();
-        return version != null ? version : "unknown";
+        return AdapterVersion.resolve();
     }
 
     private static IllegalStateException missingValueException(String key) {
