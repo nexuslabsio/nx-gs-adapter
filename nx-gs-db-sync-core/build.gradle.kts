@@ -36,6 +36,11 @@ dependencies {
     testImplementation(libs.mockito.core)
     testImplementation(libs.mockito.junit.jupiter)
     testImplementation(libs.slf4j.simple)
+    testImplementation(libs.testcontainers.junit.jupiter)
+    testImplementation(libs.testcontainers.mysql)
+    testImplementation(libs.testcontainers.kafka)
+    testImplementation(libs.kafka.clients)
+    testRuntimeOnly(libs.mysql.connector)
 }
 
 tasks.test {

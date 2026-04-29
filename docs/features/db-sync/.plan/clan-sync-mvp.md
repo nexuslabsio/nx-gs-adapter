@@ -279,8 +279,8 @@ mode. End-to-end test deferred to M36.
 
 ### Bohpts impl — external repo `E:/bohpts/code/bohpts-core` (db-sync R10)
 
-34. **`BohptsDbSchemaProvider`** (operator-chosen package, recommend
-    `l2e.gameserver.nx.db`): `schemaName() = "bohpts"`, `mappings()` returns
+34. [x] **`BohptsDbSchemaProvider`** (operator-chosen package
+    `l2e.gameserver.l2nx`): `schemaName() = "bohpts"`, `mappings()` returns
     `Collections.singletonList(new ClanMapping())`. Bohpts-core build only needs
     `app.l2nx:nx-gs-adapter-api:0.6.0` at compile-time — Tier-2 SPI lives in
     api. `nx-gs-db-sync-core` lands on the same host JVM classpath (alongside
@@ -288,7 +288,7 @@ mode. End-to-end test deferred to M36.
     provider, but bohpts-core's own source code does NOT import anything from
     `nx-gs-db-sync-core`.
 
-35. **`ClanMapping implements EntityMapping<ClanDto>`**:
+35. [x] **`ClanMapping implements EntityMapping<ClanDto>`**:
     - `entityName() = "clan"`
     - `tableName() = "clan_data"`
     - `pkColumn() = "clan_id"`
@@ -306,13 +306,13 @@ mode. End-to-end test deferred to M36.
       ```
       Helper `Long nullIfZero(long v) { return v == 0L ? null : v; }`.
 
-36. **Service descriptor**
+36. [x] **Service descriptor**
     `META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider` pointing to
-    `l2e.gameserver.nx.db.BohptsDbSchemaProvider`.
+    `l2e.gameserver.l2nx.BohptsDbSchemaProvider`.
 
 ### End-to-end smoke + publish
 
-37. **Integration test in `:nx-gs-db-sync-core`**: `CdcEngineE2ETest`.
+37. [x] **Integration test in `:nx-gs-db-sync-core`**: `CdcEngineE2ETest`.
     Testcontainers MySQL + `clan_data` fixture (3 rows), Testcontainers Kafka,
     WireMock platform delivering `syncTopics["clan"]="bohpts.gs.sync.clans"`. A
     test-scope `FakeBohptsDbSchemaProvider` registered via test
@@ -328,7 +328,8 @@ mode. End-to-end test deferred to M36.
       [{name: "clan", state: "HEALTHY", rowCount: 3, ...}]}}`
     - `consecutiveErrors = 0` after a clean cycle
 
-38. **Manual smoke in bohpts-core dev environment.**
+38. [pending — manual operator step, blocked on M39 publish + bohpts dev-branch
+    `MailService` fix] **Manual smoke in bohpts-core dev environment.**
     - Drop `nx-gs-db-sync-core-0.1.0.jar` + `nx-gs-adapter-api-0.6.0.jar` into
       bohpts-core build (already pulls the SPI deps via Gradle).
     - Configure `l2nx.gs-key` + `l2nx.platform-url` pointing at staging.
@@ -346,13 +347,15 @@ mode. End-to-end test deferred to M36.
 
 ### Versions and publishing (db-sync R11; adapter-modules R8)
 
-39. **Tag and publish.**
+39. [pending — manual git-tag step] **Tag and publish.**
     - Tag `api/v0.6.0` → CI publishes `nx-gs-adapter-api-0.6.0` to Maven Central.
+    - Tag `core/v0.3.1` → CI publishes `nx-gs-adapter-core-0.3.1` to Maven Central
+      (bumped from 0.3.0 to carry the M11-M13 `syncTopics` plumbing through
+      `ConnectResponse` / `ConnectContext`).
     - Tag `db-sync/v0.1.0` → CI publishes `nx-gs-db-sync-core-0.1.0` to Maven Central.
-    - Verify both artifacts resolve from Maven Central before bohpts-core
-      depends on them.
-    - `:nx-gs-adapter-core` and `:nx-gs-kafka` versions stay (no wire change to
-      either; they consume the bumped api transitively).
+    - Verify all three artifacts resolve from Maven Central before bohpts-core
+      switches its `mavenLocal()` fallback off.
+    - `:nx-gs-kafka` version stays at 0.2.0 (no wire change).
 
 ## Notes
 

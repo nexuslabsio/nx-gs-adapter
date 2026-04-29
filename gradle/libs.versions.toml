@@ -26,6 +26,8 @@ wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wir
 # integ tests (nx-gs-kafka)
 testcontainers-kafka = { module = "org.testcontainers:kafka", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+testcontainers-mysql = { module = "org.testcontainers:mysql", version.ref = "testcontainers" }
+mysql-connector = { module = "com.mysql:mysql-connector-j", version = "8.4.0" }
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version = "9.4.1" }
