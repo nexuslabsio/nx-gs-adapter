@@ -50,7 +50,7 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
 
 **Must:**
 
-- [todo] R1. `nx-gs-adapter-api` MUST expose a Tier-3 SPI `JdbcConnectionSource` in
+- [done] R1. `nx-gs-adapter-api` MUST expose a Tier-3 SPI `JdbcConnectionSource` in
   package `app.l2nx.gs.adapter.api.spi` (alongside Tier-1 SPI types — single api
   artifact for every SPI tier; no separate `nx-gs-jdbc-connection-source-api`
   artifact):
@@ -59,7 +59,7 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
     - `Connection getConnection() throws SQLException` — borrow a connection. Caller
       closes via `try-with-resources` to return it to the host's pool.
 
-- [todo] R2. `nx-gs-db-sync-core` MUST resolve a `JdbcConnectionSource` instance during
+- [wip] R2. `nx-gs-db-sync-core` MUST resolve a `JdbcConnectionSource` instance during
   `DbSyncModule.onConnect(...)` via the following priority chain — host SPI wins over
   fallback, fallback wins over failure:
     1. **[Phase 1]** `ServiceLoader.load(JdbcConnectionSource.class)` finds **exactly
@@ -82,7 +82,7 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
   The host's explicit registration is a stronger signal than fallback config — easier
   to reason about than "config wins, SPI wins" tie-breaking.
 
-- [todo] R3. Every consumer of `JdbcConnectionSource.getConnection()` MUST call
+- [done] R3. Every consumer of `JdbcConnectionSource.getConnection()` MUST call
   `connection.setReadOnly(true)` immediately after borrow, **before** any
   `Statement` / `PreparedStatement` is created. Per-borrow enforcement is required because
   the pool is host-owned — the adapter cannot impose pool-level configuration. A buggy
@@ -90,11 +90,11 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
   operator granted `SELECT` only at the MySQL user level (recommended), so this is
   belt-and-suspenders, not the only safety net.
 
-- [todo] R4. Consumers MUST close the borrowed `Connection` via `try-with-resources` (or
+- [done] R4. Consumers MUST close the borrowed `Connection` via `try-with-resources` (or
   equivalent finally-close) at the end of every query. Provider impls do NOT need to
   track per-borrow lifecycle — the host's pool reclaims connections on close.
 
-- [todo] R5. **[Phase 1]** Bohpts reference impl (Path 1) — `bohpts-core` (private
+- [done] R5. **[Phase 1]** Bohpts reference impl (Path 1) — `bohpts-core` (private
   repo; `E:/bohpts/code/bohpts-core`) hosts a `BohptsJdbcConnectionSource` class
   implementing `JdbcConnectionSource`, returning
   `DatabaseFactory.getInstance().getConnection()`, plus a
@@ -129,18 +129,24 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
 
 **Should:**
 
-- [todo] R7. **[Phase 1]** `JdbcConnectionSource` SHOULD expose a default
+- [wip] R7. **[Phase 1]** `JdbcConnectionSource` SHOULD expose a default
   `Optional<PoolStats> stats()` method (default impl returns `Optional.empty()`) so
-  `db-sync`'s heartbeat enrichment (R12 in db-sync spec) can carry pool busy / idle /
-  total counts when the host's pool exposes them. Bohpts impl reads
-  `DatabaseFactory.getBusyConnectionCount` / `getIdleConnectionCount`. Vanilla impls
-  without stats just return `Optional.empty()`. Default method preserves backward
-  compat — existing impls don't break when the method is added. `PoolStats` lives in
+  `db-sync`'s heartbeat enrichment (R12 in db-sync spec) can carry pool active / idle /
+  total / waiting counts when the host's pool exposes them. Bohpts impl reads
+  `DatabaseFactory.getBusyConnectionCount` (mapped to `PoolStats.active`) /
+  `getIdleConnectionCount` (mapped to `PoolStats.idle`); `total` and `waiting` left null
+  because bohpts `DatabaseFactory` does not expose those. Vanilla impls without any
+  stats just return `Optional.empty()`. Default method preserves backward compat —
+  existing impls don't break when the method is added. `PoolStats` lives in
   `app.l2nx.gs.adapter.api.kafka.ops` (shared with `ModuleStatus.Stats.pool`).
+  **api/0.6.0 wire-shape change**: field `busy` renamed to `active` (HikariCP / Tomcat
+  JDBC / DBCP2 convention); new `waiting` field added for pool-backpressure
+  diagnostics. All `PoolStats` fields are nullable (`Integer`, not `int`) so providers
+  expose only the counters they have.
 
 **Could:**
 
-- [todo] R8. `JdbcConnectionSource` COULD expose a default `boolean isHealthy()` method
+- [done] R8. `JdbcConnectionSource` COULD expose a default `boolean isHealthy()` method
   (default `true`) so consumers can skip a tick when the pool is known to be down,
   avoiding spew of `SQLException` on broken connections. Useful when the host has a more
   detailed view of pool health than "next getConnection succeeds or fails".

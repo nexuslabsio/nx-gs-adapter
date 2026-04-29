@@ -98,6 +98,32 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
     - SC5. Each daemon-thread entry point has a unit test that asserts the runnable does NOT
       throw when the wrapped logic throws. `NxAdapter.start()` has a unit test that asserts a
       config-resolution failure transitions to `FAILED` without throwing.
+- [wip] R16. **`ConnectResponse.syncTopics` — per-entity Kafka topics delivered by
+  the platform.** The `/connect` response MUST carry a `Map<String, String>
+  syncTopics` field where the key is an entity name (`"clan"`, `"character"`,
+  `"item"`, …) and the value is the fully-qualified Kafka topic the adapter is
+  authorized to publish that entity's `SyncEvent`s into (e.g.
+  `"bohpts.gs.sync.clans"`). Adapter behavior:
+    - On 200 from `/connect`, the parsed `syncTopics` map is stored on
+      `ConnectContext` (see [`adapter-modules` R2](../adapter-modules/spec.md)) and
+      surfaced to modules via `ctx.syncTopics()` at `onConnect`.
+    - The map is treated as immutable for the lifetime of the connect session;
+      reconnect re-fetches.
+    - `null` or empty map is a valid wire value — modules that consume it (notably
+      `db-sync` per its R-resolution-of-topics behavior) decide their own response
+      (db-sync transitions to `DISABLED` with a defensive WARN).
+    - Adapter does NOT validate topic names, does NOT pre-flight existence on the
+      Kafka cluster, does NOT create topics. It treats values as opaque strings
+      passed through to the producer.
+    - DB credentials remain absent from the wire (see `jdbc-connection-source`
+      Non-goals).
+    - Wire shape lives on `app.l2nx.gs.adapter.api.rest.ConnectResponse` alongside
+      existing fields (`tenantSlug`, `serverSlug`, `kafka`, …).
+
+  Platform-side (`nx-tenants`) builds `syncTopics` from per-server entity-sync
+  configuration; coordinated atomic upgrade with the adapter — no production
+  consumers yet so wire-shape extension is safe.
+
 - [done] R14. Adapter MUST resolve an `enabled` flag (boolean) from the same two-source
   chain (key `l2nx.enabled`), defaulting to `false`. When `enabled=false`:
     - `start()` logs an INFO message that the adapter is disabled and returns immediately
@@ -219,3 +245,8 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
 - Server-side Kafka creds delivery:
   [
   `nx-tenants/docs/features/tenant-registration/spec.md`](../../../../nx-tenants/docs/features/tenant-registration/spec.md)
+- Sibling feature consumers of `ConnectResponse.syncTopics`:
+  [`docs/features/cdc-engine/spec.md`](../cdc-engine/spec.md) R17 (engine reads
+  topics via `TopicResolver`),
+  [`docs/features/db-sync/spec.md`](../db-sync/spec.md) (`DbSyncModule.onConnect`
+  reads `ctx.syncTopics()`)

@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.ops;
 
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Per-module health snapshot embedded into {@link HeartbeatEvent#getEnabledModules()}.
@@ -93,18 +92,30 @@ public final class ModuleStatus {
     }
 
     /**
-     * Typed-slot bag of module-specific extras. Phase 1 carries {@link #getPool()};
-     * additional slots (e.g. {@code tables} for sync modules) ship as future fields
-     * without breaking existing consumers — unknown JSON keys are ignored.
+     * Typed-slot bag of module-specific extras.
+     * <ul>
+     *     <li>{@link #getPool()} — JDBC pool counters from DB-reading modules
+     *     (db-sync surfaces {@code JdbcConnectionSource.stats()}).</li>
+     *     <li>{@link #getEntities()} — per-entity operational state for sync
+     *     modules; populated by the CDC engine on every cycle. Replaces the
+     *     earlier placeholder names-only {@code tables} list (entity-centric
+     *     vocabulary; {@code "clan"}, not {@code "clan_data"}).</li>
+     * </ul>
+     * <p>Future slots ship as additional optional fields without breaking
+     * existing consumers — unknown JSON keys are ignored.</p>
      */
     public static final class Stats {
 
-        private static final Stats EMPTY = new Stats(null);
+        private static final Stats EMPTY = new Stats(null, null);
 
         private final PoolStats pool;
+        private final List<EntityStats> entities;
 
-        public Stats(PoolStats pool) {
+        public Stats(PoolStats pool, List<EntityStats> entities) {
             this.pool = pool;
+            this.entities = entities == null
+                    ? null
+                    : Collections.unmodifiableList(new ArrayList<EntityStats>(entities));
         }
 
         public static Stats empty() {
@@ -115,8 +126,12 @@ public final class ModuleStatus {
             return Optional.ofNullable(pool);
         }
 
+        public Optional<List<EntityStats>> getEntities() {
+            return Optional.ofNullable(entities);
+        }
+
         public Builder toBuilder() {
-            return new Builder().pool(pool);
+            return new Builder().pool(pool).entities(entities);
         }
 
         public static Builder builder() {
@@ -128,29 +143,35 @@ public final class ModuleStatus {
             if (this == o) return true;
             if (!(o instanceof Stats)) return false;
             Stats that = (Stats) o;
-            return Objects.equals(pool, that.pool);
+            return Objects.equals(pool, that.pool) && Objects.equals(entities, that.entities);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hashCode(pool);
+            return Objects.hash(pool, entities);
         }
 
         @Override
         public String toString() {
-            return "Stats[pool=" + pool + "]";
+            return "Stats[pool=" + pool + ", entities=" + entities + "]";
         }
 
         public static final class Builder {
             private PoolStats pool;
+            private List<EntityStats> entities;
 
             public Builder pool(PoolStats pool) {
                 this.pool = pool;
                 return this;
             }
 
+            public Builder entities(List<EntityStats> entities) {
+                this.entities = entities;
+                return this;
+            }
+
             public Stats build() {
-                return new Stats(pool);
+                return new Stats(pool, entities);
             }
         }
     }

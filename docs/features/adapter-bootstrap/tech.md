@@ -68,8 +68,12 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       adapter daemon-thread entry point (connect submit, heartbeat tick,
       shutdown hook)
     - heartbeat wire type lives in `nx-gs-adapter-api`
-      (`app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent`) — fields `serverId`,
-      `adapterVersion`, `uptime` (no `enabledModules` in 0.1.0)
+      (`app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent`) — adapter-bootstrap
+      `0.1.0` shipped fields `serverId`, `adapterVersion`, `uptime` only;
+      `tenantId` / `tenantSlug` / `serverSlug` / `serverName` / `enabledModules`
+      added by `adapter-modules` slice (api `0.5.0`); `uptime` renamed to
+      `uptimeMs` (millisecond unit) in api/0.6.0 for consistency with
+      `EntityStats.lastSyncEpochMs` and `SyncEvent.timestampEpochMs`
     - shutdown hook is registered inline inside `NxAdapter.start()` (no separate
       `ShutdownHook.java`); a `Thread` named `nx-adapter-shutdown` wrapping
       `SafeRunnable.wrap(INSTANCE::shutdown)`
@@ -157,13 +161,16 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       `resetForTesting()`) — terminal `FAILED`/`REJECTED`/`CLOSED` do not reset it
 - **`HeartbeatService`** [done] (R7) — single-threaded `ScheduledExecutorService` (daemon,
   named `nx-adapter-heartbeat`). Each tick builds a
-  `app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent` carrying `serverId`,
-  `adapterVersion`, `uptime` = seconds since the most recent successful `/connect`, and
-  publishes it via the injected `KafkaPublisher` test seam (production wraps
-  `NxKafka.instance().send(topic, key, value)`). The `uptime` clock is captured fresh on
-  every successful `(re)connect`, so platform-side dashboards show session-uptime rather
-  than adapter-uptime. The tick runnable is wrapped in `SafeRunnable`; errors are logged,
-  never propagated. `enabledModules` will be added when `adapter-modules` lands.
+  `app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent` carrying `serverId` (+
+  `tenantId` / `tenantSlug` / `serverSlug` / `serverName` added by
+  `adapter-modules`), `adapterVersion`, `uptimeMs` = milliseconds since the most
+  recent successful `/connect`, and `enabledModules` from a
+  `Supplier<List<ModuleStatus>>` (`ModuleRegistry::currentStatuses` in
+  production), and publishes it via the injected `KafkaPublisher` test seam
+  (production wraps `NxKafka.instance().send(topic, key, value)`). The `uptime`
+  clock is captured fresh on every successful `(re)connect`, so platform-side
+  dashboards show session-uptime rather than adapter-uptime. The tick runnable
+  is wrapped in `SafeRunnable`; errors are logged, never propagated.
 - **JVM shutdown hook** [done] (R9) — registered inline in `NxAdapter.start()` via
   `Runtime.getRuntime().addShutdownHook(new Thread(SafeRunnable.wrap(INSTANCE::shutdown,
   log), "nx-adapter-shutdown"))`. Skipped on `FAILED` (config error) and on `DISABLED`
@@ -219,16 +226,21 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
 
 ## Integration points
 
-- **`:nx-gs-adapter-api`** (R4) — sibling subproject in this monorepo. Provides
+- **`:nx-gs-adapter-api`** (R4, R16) — sibling subproject in this monorepo. Provides
   `ConnectRequest`, `ConnectResponse`, `KafkaConfig`, `Topics` (migrated from
-  `nx-tenants/api/rest/dto/` as Java 8 POJOs in this slice — they were Lombok-`@Builder`
-  records there) under `app.l2nx.gs.adapter.api.rest`. `nx-tenants` consumes the same
-  published artifact (`app.l2nx:nx-gs-adapter-api`) via Gradle composite include of the
-  whole `nx-gs-adapter` repo with a `dependencySubstitution` mapping — single source of
-  truth for the wire shape. Validation annotations (`jakarta.validation`) stay on the
-  controller side; the api lib has zero runtime deps. First published version is **0.1.0**.
-  `app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent` ships in 0.1.0 too — it's the wire
-  payload published every 60s; `enabledModules` will be added when `adapter-modules` lands.
+  `nx-tenants/api/rest/dto/` as Java 8 POJOs in this slice — they were
+  Lombok-`@Builder` records there) under `app.l2nx.gs.adapter.api.rest`.
+  `nx-tenants` consumes the same published artifact (`app.l2nx:nx-gs-adapter-api`)
+  via Gradle composite include of the whole `nx-gs-adapter` repo with a
+  `dependencySubstitution` mapping — single source of truth for the wire shape.
+  Validation annotations (`jakarta.validation`) stay on the controller side; the api
+  lib has zero runtime deps. First published version is **0.1.0**.
+  `app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent` ships in 0.1.0 too — it's the
+  wire payload published every 60s; `enabledModules` (and tenant/server identity
+  fields) were added by the `adapter-modules` slice in api `0.5.0`. **api/0.6.0
+  pending** adds `ConnectResponse.syncTopics: Map<String, String>` (R16) carrying
+  per-entity Kafka topic names from the platform — consumed by `cdc-engine` via
+  `TopicResolver` and by `db-sync` for DISABLED/DEGRADED triage.
 - **`:nx-gs-kafka`** (R6, R7) — sibling subproject. `NxKafka.configure().build()` for the
   producer; `NxKafka.send(topic, key, value)` for heartbeat. `:nx-gs-adapter-core` depends
   on it via `project(":nx-gs-kafka")`.
@@ -308,10 +320,11 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
 - **`CLOSED` state shipped in the FSM.** Mirrors `nx-gs-kafka`'s `KafkaState.CLOSED` and gives
   operators a deterministic terminal state to query / observe via `onStateChange`. Adds one
   enum constant — no behavior cost.
-- **`uptime` = seconds since `/connect`.** Session-scoped, resets on reconnect. Reflects "this
-  adapter session has been online for X" rather than "this JVM has been booted for X" —
-  matches the 1:1 heartbeat-lock semantics in `server-registration` (a new connect = a new
-  session = a new lock).
+- **`uptimeMs` = milliseconds since `/connect`.** Session-scoped, resets on reconnect.
+  Reflects "this adapter session has been online for X" rather than "this JVM has been
+  booted for X" — matches the 1:1 heartbeat-lock semantics in `server-registration`
+  (a new connect = a new session = a new lock). Unit changed from seconds (api/0.5.0)
+  to milliseconds (api/0.6.0) so every duration / instant on the wire shares one unit.
 - **DTO migration `nx-tenants` → `nx-gs-adapter-api`.** `ConnectRequest` / `ConnectResponse`
   / `KafkaConfig` / `Topics` were defined as Lombok-`@Builder` Java records in
   `nx-tenants/api/rest/dto/`; this slice converts them to Java 8 POJOs (hand-written

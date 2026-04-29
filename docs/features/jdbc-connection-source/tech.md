@@ -28,32 +28,34 @@ field at all.
 
 ## Structure
 
-- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/jdbc/` [planned] — Tier-3 SPI
-  package
-    - `JdbcConnectionSource.java` [planned] — the SPI interface (R1, R7, R8); imports
+- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/` — Tier-3 SPI
+  alongside Tier-1 SPI types (single api package for every SPI tier)
+    - `JdbcConnectionSource.java` — the SPI interface (R1, R7, R8); imports
       `app.l2nx.gs.adapter.api.kafka.ops.PoolStats` for the optional `stats()` method
-- `nx-gs-db-sync-core/src/main/java/app/l2nx/gs/db/sync/spi/` [planned] — consumer-side
-  resolver + Path-2 fallback (Phase 3)
-    - `JdbcConnectionSourceResolver.java` [planned, Phase 1] — internal helper running
-      the R2 priority chain: ServiceLoader → (Phase 3) bundled-Hikari fallback →
-      fail-loud
+- `nx-gs-db-sync-core/src/main/java/app/l2nx/gs/db/sync/`
+    - `DbSyncModule.java` — Phase 1 owns the R2 resolution chain inline in
+      `onConnect()` (ServiceLoader load + 0/>1 → fail-loud); a separate
+      `JdbcConnectionSourceResolver` class is not needed for Phase 1 (logic is ~20
+      lines and lives next to its only consumer). Refactor candidate when Path 2 /
+      Phase 3 lands.
     - `BundledHikariConnectionSource.java` [planned, Phase 3] — Path-2 fallback impl
       (R6); uses shadowed Hikari, reads `l2nx.db.*` via ConfigResolver
 - `nx-gs-db-sync-core/build.gradle.kts` [planned, Phase 3] — Hikari 3.4.5 added as
   `implementation` dep; shadowJar relocates `com.zaxxer.hikari.*` →
   `app.l2nx.shaded.hikari.*`
-- `bohpts-core/` [planned, Phase 1, **lives in private bohpts-core repo, NOT this
-  monorepo**]
-    - depends on `app.l2nx:nx-gs-adapter-api:X.Y.Z` (Maven Central)
-    - `<bohpts-package>/BohptsJdbcConnectionSource.java` [planned] — wraps
-      `DatabaseFactory.getInstance().getConnection()`; package up to bohpts-core owner
-      (see spec Open questions)
-    - `src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.JdbcConnectionSource`
-      [planned] — service descriptor
+- `bohpts-core/` (**private repo, NOT this monorepo**)
+    - depends on `app.l2nx:nx-gs-adapter-core:0.3.1` + `nx-gs-db-sync-core:0.1.0`
+      (Maven Central)
+    - `core/src/main/java/l2e/gameserver/l2nx/BohptsJdbcConnectionSource.java` —
+      wraps `DatabaseFactory.getInstance().getConnection()`, sets `readOnly=true`
+      per-borrow as defense-in-depth; package follows bohpts convention
+      (`l2e.gameserver.l2nx` houses all l2nx-related plumbing)
+    - `core/src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.JdbcConnectionSource`
+      — service descriptor pointing to `BohptsJdbcConnectionSource`
 
 ## Key components
 
-- **`JdbcConnectionSource`** [planned] (R1, R7, R8) — the SPI interface. Two methods:
+- **`JdbcConnectionSource`** (R1, R7, R8) — the SPI interface. Two methods:
   ```java
   public interface JdbcConnectionSource {
       String name();
@@ -66,12 +68,12 @@ field at all.
   artifact carries every SPI tier (Tier-1 `AdapterModule`, Tier-3
   `JdbcConnectionSource`). Hosts implementing the SPI depend only on
   `nx-gs-adapter-api`.
-- **`JdbcConnectionSourceResolver`** [planned] (R2) — implements the R2 priority chain:
-  runs `ServiceLoader.load`, falls through to `BundledHikariConnectionSource` on zero
-  impls when `l2nx.db.*` is set, fails loud otherwise. Caches the resolved instance.
-  Throws `IllegalStateException` with an actionable message on the failure paths;
-  caught one level up by `DbSyncModule` and translated into module state `FAILED` (no
-  propagation to host JVM).
+- **R2 resolution** (R2) — Phase 1 lives inline in `DbSyncModule.onConnect()`:
+  runs `ServiceLoader.load(JdbcConnectionSource.class)` with TCCL save/restore,
+  applies the 0 / 1 / >1 rule, logs an actionable ERROR and transitions the module
+  to `FAILED` on the failure paths. A separate `JdbcConnectionSourceResolver`
+  class will be extracted in Phase 3 when the bundled-Hikari fallback joins the
+  chain (`ServiceLoader → l2nx.db.* fallback → fail-loud`).
 - **`BundledHikariConnectionSource`** [planned] (R6) — Path-2 fallback, hidden inside
   `nx-gs-db-sync-core` (NOT registered via `META-INF/services` — instantiated only by
   the resolver). Constructor reads `l2nx.db.url` / `l2nx.db.username` / `l2nx.db.password`
@@ -80,47 +82,51 @@ field at all.
   `setMaximumPoolSize(N)`, `setConnectionTimeout(5000)`, `setValidationTimeout(5000)`,
   `setLeakDetectionThreshold(30000)`, `setPoolName("nx-adapter-db")`. Pool opened in
   constructor; closed in `close()` invoked from `DbSyncModule.onDisconnect`.
-- **`PoolStats`** [planned] (R7) — value type for the optional stats path. Lives in
+- **`PoolStats`** (R7) — value type for the optional stats path. Lives in
   `app.l2nx.gs.adapter.api.kafka.ops` (shared with `ModuleStatus.Stats.pool`). Fields:
-  `int busy`, `int idle`, `Integer total` (nullable). Backward-compatible default
-  `stats() = Optional.empty()` so existing impls don't break when the type ships.
-- **`BohptsJdbcConnectionSource`** [planned] (R5) — bohpts reference impl, lives in
-  bohpts-core source tree. Body of `getConnection()`:
-  ```java
-  return DatabaseFactory.getInstance().getConnection();
-  ```
-  Optional `stats()`:
-  ```java
-  return Optional.of(new PoolStats(
-      DatabaseFactory.getInstance().getBusyConnectionCount(),
-      DatabaseFactory.getInstance().getIdleConnectionCount()));
-  ```
+  `Integer active`, `Integer idle`, `Integer total`, `Integer waiting` — all nullable so
+  providers expose only the subset their pool API gives them. **api/0.6.0 (in source,
+  tag pending)**: field `busy` (api/0.5.0) renamed to `active` (HikariCP / Tomcat JDBC
+  / DBCP2 convention); new `waiting` slot added for diagnosing pool backpressure
+  (HikariCP's `getThreadsAwaitingConnection`, equivalent in other pools). Backward-
+  compatible default `stats() = Optional.empty()` so existing impls don't break when
+  the type ships.
+- **`BohptsJdbcConnectionSource`** (R5) — bohpts reference impl, lives in
+  bohpts-core source tree under `l2e.gameserver.l2nx`. Body of `getConnection()`
+  borrows from `DatabaseFactory.getInstance()` and calls `setReadOnly(true)` on the
+  borrowed connection (provider-side belt-and-suspenders; closes on failure to avoid
+  leak). `stats()` overrides the default with `PoolStats.builder()
+  .active(DatabaseFactory.getBusyConnectionCount())
+  .idle(DatabaseFactory.getIdleConnectionCount()).build()` — `total` and `waiting`
+  left null because `DatabaseFactory` does not expose
+  `HikariPoolMXBean.getTotalConnections()` / `getThreadsAwaitingConnection()` directly
+  (per `PoolStats` contract: every field is nullable).
 
 ## Data flows
 
 ### 1. SPI resolution (one-shot at module init)
 
+Phase 1 (current):
+
 ```
 DbSyncModule.onConnect(ctx)
-  → JdbcConnectionSourceResolver.resolve(configResolver)
-  → ServiceLoader.load(JdbcConnectionSource.class)
+  → ServiceLoader.load(JdbcConnectionSource.class) with TCCL save/restore
   → providers.size():
-       1 → use providers.get(0)              [Path 1 — host explicit registration]
-       0:
-         l2nx.db.url + username + password all present →
+       1 → cache as `this.source`; smoke-check (setReadOnly + isValid(5)) →
+           ACTIVE on success / DEGRADED on failure (source kept so stats() still surfaces)
+       0 → log ERROR ("no JdbcConnectionSource SPI registered — register one via
+           META-INF/services/... — see jdbc-connection-source feature docs"); state = FAILED
+       >1 → log ERROR listing impl FQCNs; state = FAILED
+  → on success log INFO: "JdbcConnectionSource resolved: <source.name()>"
+    (e.g. "bohpts-hikari")
+```
+
+Phase 3 will add the bundled-Hikari fallback:
+
+```
+       0 AND l2nx.db.url + username + password all present →
               new BundledHikariConnectionSource(configResolver)   [Path 2 — fallback]
-         else →
-              throw IllegalStateException(
-                  "no JdbcConnectionSource SPI registered AND no l2nx.db.* config;
-                   pick Path 1 (host SPI impl) or Path 2 (l2nx.db.* fallback) — see
-                   jdbc-connection-source feature docs")
-              → caught by DbSyncModule → state = FAILED
-       >1 →
-              throw IllegalStateException("multiple sources: [fqcn1, fqcn2]; ...")
-              → caught by DbSyncModule → state = FAILED
-  → DbSyncModule caches the source on `this.connectionSource`
-  → log INFO: "JdbcConnectionSource: <source.name()>" (e.g. "bohpts-hikari" or
-    "nx-adapter-bundled-hikari")
+       0 AND no l2nx.db.* → fail-loud (current Phase 1 behavior)
 ```
 
 ### 2. Per-borrow lifecycle (every Phase 1 / Phase 2 query)
@@ -150,23 +156,24 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
 
 ## Integration points
 
-- **`nx-gs-adapter-api`** (R1) — hosts the Tier-3 SPI interface. Single api artifact
-  for Tier-1 + Tier-3 SPI types; consumers (hosts, db-sync-core) all depend on this
-  one artifact for SPI contracts.
-- **`nx-gs-db-sync-core`** (R2, R6) — consumer of the Tier-3 SPI; hosts the
-  `JdbcConnectionSourceResolver` (Phase 1) and `BundledHikariConnectionSource`
-  (Phase 3). Does NOT define the SPI interface itself.
-- **`bohpts-core`** (R5) — private repo, hosts `BohptsJdbcConnectionSource` and the
-  service descriptor. Depends on `app.l2nx:nx-gs-adapter-api:X.Y.Z`. NOT a separately
-  published artifact.
+- **`nx-gs-adapter-api`** (R1) — hosts the Tier-3 SPI interface (released in
+  `0.5.0`). Single api artifact for Tier-1 + Tier-3 SPI types; consumers
+  (hosts, db-sync-core) all depend on this one artifact for SPI contracts.
+- **`nx-gs-db-sync-core`** (R2, R6) — consumer of the Tier-3 SPI; Phase 1 inlines
+  resolution in `DbSyncModule.onConnect`; `BundledHikariConnectionSource` arrives
+  in Phase 3. Does NOT define the SPI interface itself.
+- **`bohpts-core`** (R5) — private repo, hosts `BohptsJdbcConnectionSource` and
+  the service descriptor. Depends on `app.l2nx:nx-gs-adapter-core:0.3.1` +
+  `nx-gs-db-sync-core:0.1.0`. NOT a separately published artifact.
 - **`db-sync` feature** — first consumer. R2 of db-sync invokes
   `JdbcConnectionSourceLoader.load()` at `onConnect`; per-borrow `setReadOnly(true)` is
   R3 of db-sync (cross-referenced) plus R3 here (the SPI-level contract that consumers
   MUST satisfy).
-- **Bohpts `l2e.gameserver.database.DatabaseFactory`** (R5) — the singleton bohpts uses
-  internally; bohpts' `JdbcConnectionSource` impl wraps it. We do NOT touch
+- **Bohpts `l2e.gameserver.database.DatabaseFactory`** (R5) — the singleton bohpts
+  uses internally; bohpts' `JdbcConnectionSource` impl wraps it. We do NOT touch
   `DatabaseFactory` itself — only call its public `getConnection()` /
-  `getBusyConnectionCount()` / `getIdleConnectionCount()` methods.
+  `getBusyConnectionCount()` (→ `PoolStats.active`) / `getIdleConnectionCount()`
+  (→ `PoolStats.idle`) methods.
 - **`nx-gs-adapter-api`** — no change required. The SPI is internal to host↔adapter (not
   platform-facing), so it stays out of the wire-contracts module.
 
@@ -242,9 +249,11 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
   it, ensure exactly one descriptor on classpath. No code change in
   `nx-gs-db-sync-core`. Works for HikariCP, DBCP2, c3p0, Tomcat JDBC, custom singletons,
   even raw `DriverManager` for tests.
-- **Pool stats** — host overrides the `stats()` default if its pool exposes busy / idle
-  counts (Hikari `getHikariPoolMXBean()`, DBCP2 `getNumActive()`, etc.). Default
-  `Optional.empty()` is safe for pools that don't expose stats.
+- **Pool stats** — host overrides the `stats()` default if its pool exposes any of
+  `active` / `idle` / `total` / `waiting` counts (Hikari `getHikariPoolMXBean`, DBCP2
+  `getNumActive` / `getNumIdle`, Tomcat JDBC `getActive` / `getIdle`, etc.). Default
+  `Optional.empty()` is safe for pools that don't expose stats; partial coverage is
+  fine — every `PoolStats` field is nullable.
 - **Health probing** — host overrides `isHealthy()` (R8) when it has a richer view of
   pool health than "next `getConnection` succeeds". Useful for circuits where the pool
   knows it's down (e.g. a circuit-breaker around the underlying DataSource).

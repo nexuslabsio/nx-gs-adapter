@@ -96,7 +96,7 @@ public final class HeartbeatService {
                       String heartbeatTopic,
                       Instant connectInstant) {
         try {
-            long uptime = ChronoUnit.SECONDS.between(connectInstant, clock.get());
+            long uptimeMs = ChronoUnit.MILLIS.between(connectInstant, clock.get());
             List<ModuleStatus> modules;
             try {
                 List<ModuleStatus> reported = moduleStatuses.get();
@@ -113,7 +113,7 @@ public final class HeartbeatService {
                     .serverSlug(serverSlug)
                     .serverName(serverName)
                     .adapterVersion(adapterVersion)
-                    .uptime(uptime)
+                    .uptimeMs(uptimeMs)
                     .enabledModules(modules)
                     .build();
             publisher.send(heartbeatTopic, serverId, event);

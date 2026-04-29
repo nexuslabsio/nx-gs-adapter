@@ -26,6 +26,11 @@ import java.util.Optional;
  * immediately after every borrow — the SPI does not impose pool-level configuration
  * because the pool is host-owned. Connections are returned via
  * {@code try-with-resources}.</p>
+ *
+ * <p>Providers MAY pre-set {@code readOnly=true} on the borrowed connection inside
+ * {@link #getConnection()} as defense-in-depth (close the borrowed connection on
+ * failure so it doesn't leak). The host pool resets connection state on return,
+ * so this does not affect non-adapter consumers of the same pool.</p>
  */
 public interface JdbcConnectionSource {
 

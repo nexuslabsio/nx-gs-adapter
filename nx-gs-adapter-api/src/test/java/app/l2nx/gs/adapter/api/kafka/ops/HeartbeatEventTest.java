@@ -15,7 +15,7 @@ class HeartbeatEventTest {
         ModuleStatus dbSync = ModuleStatus.builder()
                 .name("db-sync")
                 .state("ACTIVE")
-                .stats(ModuleStatus.Stats.builder().pool(new PoolStats(1, 3, 4)).build())
+                .stats(ModuleStatus.Stats.builder().pool(new PoolStats(1, 3, 4, null)).build())
                 .build();
 
         HeartbeatEvent original = HeartbeatEvent.builder()
@@ -25,7 +25,7 @@ class HeartbeatEventTest {
                 .serverSlug("primary")
                 .serverName("Acme Primary")
                 .adapterVersion("1.2.3")
-                .uptime(42L)
+                .uptimeMs(42L)
                 .enabledModules(Collections.singletonList(dbSync))
                 .build();
 
@@ -46,7 +46,7 @@ class HeartbeatEventTest {
                 .serverSlug("server-slug")
                 .serverName("Server Name")
                 .adapterVersion("0.1.0")
-                .uptime(123L)
+                .uptimeMs(123L)
                 .enabledModules(Arrays.asList(a, b))
                 .build();
 
@@ -56,7 +56,7 @@ class HeartbeatEventTest {
         assertEquals("server-slug", event.getServerSlug());
         assertEquals("Server Name", event.getServerName());
         assertEquals("0.1.0", event.getAdapterVersion());
-        assertEquals(123L, event.getUptime());
+        assertEquals(123L, event.getUptimeMs());
         assertEquals(Arrays.asList(a, b), event.getEnabledModules());
     }
 
@@ -65,7 +65,7 @@ class HeartbeatEventTest {
         HeartbeatEvent event = HeartbeatEvent.builder()
                 .tenantId("t").tenantSlug("ts")
                 .serverId("s").serverSlug("ss").serverName("sn")
-                .adapterVersion("v").uptime(0L)
+                .adapterVersion("v").uptimeMs(0L)
                 .build();
 
         assertEquals(Collections.emptyList(), event.getEnabledModules());

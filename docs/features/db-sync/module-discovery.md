@@ -77,7 +77,7 @@ runs.
 package app.l2nx.gs.db.sync.spi;
 
 public interface DbSchemaProvider {
-    String schemaName();                 // "l2j", "l2j-bohpts", "lucera"
+    String schemaName();                 // "l2j", "bohpts", "lucera"
 
     List<TableMapping<?>> mappings();    // tables this provider knows about
 }
@@ -380,7 +380,7 @@ exist:
 
 #### Strategy (a) — config selector
 
-Operator sets `l2nx.db-sync.schema=l2j-bohpts` in `l2nx.properties`. Engine compares
+Operator sets `l2nx.db-sync.schema=bohpts` in `l2nx.properties`. Engine compares
 `schemaName()` of every discovered provider; picks the matching one.
 
 - Pro: no build-time gymnastics required of client modules
@@ -393,7 +393,7 @@ Client modules use the shadow plugin to exclude vanilla's descriptor and ship th
 own:
 
 ```kotlin
-// nx-gs-db-l2j-bohpts/build.gradle.kts
+// nx-gs-db-bohpts/build.gradle.kts
 shadowJar {
     exclude("META-INF/services/app.l2nx.gs.db.sync.spi.DbSchemaProvider")
     // own descriptor lives in src/main/resources/META-INF/services/...
@@ -410,7 +410,7 @@ tiny `nx-gs-db-l2j-default` JAR carries the descriptor pointing to
 `L2jSchemaProvider`. Operators pick:
 
 - Vanilla deployment → `nx-gs-db-l2j` + `nx-gs-db-l2j-default`
-- Client deployment → `nx-gs-db-l2j-bohpts` (which pulls `nx-gs-db-l2j` for classes only)
+- Client deployment → `nx-gs-db-bohpts` (which pulls `nx-gs-db-l2j` for classes only)
 
 - Pro: no build-time gymnastics in client modules; no config knob
 - Con: extra published artifact per vanilla module

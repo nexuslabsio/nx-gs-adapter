@@ -28,7 +28,7 @@ Future modules:
 - `nx-gs-dp-lucera` — Datapack sync for vanilla Lucera
 
 Per-client overrides (private repos) extend vanilla via the template-method pattern (e.g.
-`nx-gs-db-l2j-bohpts`).
+`nx-gs-db-bohpts`).
 
 ## Distribution & licensing
 

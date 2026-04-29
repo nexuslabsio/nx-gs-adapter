@@ -5,107 +5,109 @@
 
 ## Overview
 
-Two-tier SPI architecture sitting on top of `adapter-bootstrap`. `nx-gs-db-sync-core` registers
-itself as an `AdapterModule` (Tier 1, discovered by `nx-gs-adapter-core`) and uses ServiceLoader
-internally to discover one `DbSchemaProvider` (Tier 2) on the host classpath. The provider
-returns a list of `TableMapping`s — table name, PK column, hashed columns, row-DTO mapper,
-strategy, cadence. The engine runs the CRC32 two-phase CDC protocol on a daemon scheduler per
-table and publishes change events to Kafka via the producer initialized in `adapter-bootstrap`.
+Two-tier SPI architecture sitting on top of `adapter-bootstrap`. `nx-gs-db-sync-core`
+registers itself as an `AdapterModule` (Tier 1, discovered by `nx-gs-adapter-core`) and uses
+ServiceLoader internally to discover one `DbSchemaProvider` (Tier 2) on the host classpath.
+The provider returns a list of `EntityMapping`s — table name, PK column, hashed columns,
+row-DTO mapper, strategy, cadence. The CDC algorithm itself (CRC32 two-phase protocol,
+scheduler, in-memory snapshot, per-table stats) lives in the
+[`cdc-engine`](../cdc-engine/spec.md) feature; `DbSyncModule` instantiates the engine after
+`DbSchemaProvider` is resolved and feeds it the provider's `EntityMapping`s.
 MVP target: bohpts client implements `DbSchemaProvider` directly inside its own `bohpts-core`
-repo (no separate published artifact, no template-method indirection — vanilla L2J extraction
-deferred to second-customer time per spec Non-goals). One `TableMapping` for `clan_data` (4
-hashed columns: clan_name, clan_level, leader_id, ally_id) validates the design end-to-end.
+repo (no separate published artifact, no template-method indirection — vanilla L2J
+extraction deferred to second-customer time per spec Non-goals). One `EntityMapping` for
+`clan_data` (4 hashed columns: clan_name, clan_level, leader_id, ally_id) validates the
+design end-to-end.
 
 ## Structure
 
-- `nx-gs-db-sync-core/src/main/java/app/l2nx/gs/db/sync/` [planned]
-    - `DbSyncModule.java` [planned] — implements `app.l2nx.gs.adapter.api.spi.AdapterModule`;
-      Tier-1 SPI entry point
+- `nx-gs-db-sync-core/src/main/java/app/l2nx/gs/db/sync/`
+    - `DbSyncModule.java` — implements `app.l2nx.gs.adapter.api.spi.AdapterModule`;
+      Phase 1 owns SPI smoke check + heartbeat enrichment. Phase 2 wires `CdcEngine`
+      (defined in [`cdc-engine`](../cdc-engine/tech.md)) with the resolved
+      `DbSchemaProvider`'s mappings.
     - `spi/DbSchemaProvider.java` [planned] — Tier-2 SPI interface
-    - `spi/TableMapping.java` [planned] — Tier-2 SPI; one per table
-    - `spi/SyncStrategy.java` [planned] — enum `FULL_SCAN | SLIDING_WINDOW`
-    - `engine/CdcEngine.java` [planned] — orchestrator: schedules table ticks, dispatches
-      Phase 1 → diff → Phase 2 → publish
-    - `engine/Phase1Hasher.java` [planned] — runs the CRC32 hash query, returns `Map<Long, Long>`
-    - `engine/Phase2Fetcher.java` [planned] — fetches changed rows by PK list (chunked at 1000),
-      calls `mapping.mapRow`
-    - `engine/SnapshotStore.java` [planned] — in-memory `Map<PK, CRC32>` per table;
-      thread-confined to the per-table scheduler thread
-    - `engine/ChangeSet.java` [planned] — `{ created, updated, deleted }` PK sets
-    - `kafka/SyncEventPublisher.java` [planned] — translates `(mapping, pk, op, dto)` →
-      `SyncEvent` + Kafka key + topic; calls `NxKafka.instance().send(...)`
-    - `META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule` [planned] — service descriptor
+    - `spi/EntityMapping.java` [planned] — Tier-2 SPI; one per synced entity
+    - `engine/` [planned] — CDC algorithm; structure documented in
+      [`cdc-engine/tech.md`](../cdc-engine/tech.md). Engine code physically ships in
+      `nx-gs-db-sync-core` JAR; the `cdc-engine` feature is a design-doc slice, not a
+      separate Gradle module.
+    - `kafka/` [planned] — `SyncEventPublisher` and friends; documented in cdc-engine
+      tech.md.
+    - `META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule` — service descriptor
       with `app.l2nx.gs.db.sync.DbSyncModule`
 - `bohpts-core/` [planned, **lives in the private bohpts-core repo, NOT this monorepo**]
     - depends on `app.l2nx:nx-gs-db-sync-core:0.1.0` (Maven Central)
     - `<bohpts-package>/BohptsDbSchemaProvider.java` [planned] — implements
       `DbSchemaProvider` directly (no `extends` — vanilla L2J doesn't exist yet);
       `schemaName="bohpts"`. Package up to bohpts-core owner — see spec Open question.
-    - `<bohpts-package>/mapping/ClanMapping.java` [planned] — only `TableMapping` in MVP;
-      handles Long-to-String conversion for `leader_id` / `ally_id` in `mapRow`
-    - `src/main/resources/META-INF/services/app.l2nx.gs.db.sync.spi.DbSchemaProvider`
+    - `<bohpts-package>/mapping/ClanMapping.java` [planned] — only `EntityMapping`
+      in MVP; `entityName="clan"`, `tableName="clan_data"`. Applies the
+      zero-as-null convention to `leader_id` / `ally_id` (`0L` → `null`) in `mapRow`
+    - `src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider`
       [planned] — service descriptor pointing to `BohptsDbSchemaProvider`
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/`
     - `AdapterModule.java` [planned] — Tier-1 SPI (lands as part of `adapter-bootstrap`
       extension; listed here for completeness because db-sync depends on it)
     - `ConnectContext.java` [planned] — context object passed to `AdapterModule.onConnect`;
       carries DB creds, Kafka producer ref, serverId, tenantSlug
-    - `kafka/SyncEvent.java` [planned] — wire shape (final form decided per spec Open
-      questions); `pk` field declared as `String`
-    - `dto/ClanDto.java` [planned] — clan row DTO (Java 8 POJO, hand-written builder); ID
-      fields (`clanId`, `leaderId`, `allyId`) declared as `String`
+    - `kafka/sync/db/SyncEvent.java` — typed wire envelope `SyncEvent<T>` with
+      `String entityName`, `long pk`, `String op`, `T payload`, `long timestampEpochMs`
+      (api/0.6.0)
+    - `kafka/sync/db/ClanDto.java` — clan row DTO (Java 8 POJO, hand-written builder);
+      `long clanId` / `int clanLevel` (NOT NULL columns); `Long leaderId` / `Long allyId`
+      (nullable per L2J `0`-sentinel convention). Co-located with `SyncEvent<T>` under
+      `kafka.sync.db` — DB-sync wire types share one sub-package.
 
 ## Key components
 
-- **`DbSyncModule`** [planned] (R1, R2, R3) — Tier-1 SPI entry point. Lifecycle:
-    - `onConnect(ctx)` — discovers the Tier-3 `JdbcConnectionSource` via ServiceLoader
-      (designed in `jdbc-connection-source` feature; fail to `FAILED` if zero or >1 found),
-      captures Kafka producer reference; nothing schedule-related happens yet
-    - `start()` — runs `ServiceLoader.load(DbSchemaProvider.class)`, applies the selection rule
-      (zero / one / many — see R3), instantiates `CdcEngine` for the chosen provider, kicks off
-      one scheduler per `TableMapping`
-    - `stop()` — cancels schedulers (5s `awaitTermination`), drains in-flight Kafka sends
-    - `onDisconnect()` — clears `SnapshotStore`. The Tier-3 `JdbcConnectionSource` is owned
-      by the host; nothing for db-sync to close.
+- **`DbSyncModule`** (R1, R2, R12, R16) — Tier-1 SPI entry point. Lifecycle:
+    - `onConnect(ctx)` — Phase 1: discovers Tier-3 `JdbcConnectionSource` via
+      ServiceLoader (0 / >1 → `FAILED`), runs the smoke check
+      (`setReadOnly(true)` + `isValid(5)`); pass → state `ACTIVE`, fail →
+      `DEGRADED` (source kept so `stats()` still surfaces in heartbeat). No Kafka
+      producer capture in Phase 1. **Phase 2** additionally:
+        - discovers `DbSchemaProvider` (0 → `DISABLED`, >1 → `FAILED`, 1 → cache);
+        - reads `ctx.syncTopics()` — null/empty → log actionable WARN, transition
+          to `DISABLED`, no engine instantiated (R16). Defensive path; not expected
+          in steady-state operation.
+    - `start()` — Phase 1: no-op. **Phase 2**: instantiates `CdcEngine` (see
+      cdc-engine/tech.md) with `provider.mappings()` + `JdbcConnectionSource` +
+      Kafka producer + `TopicResolver` (built from `ctx.syncTopics()`); calls
+      `engine.start()` which schedules per-entity daemon ticks. Per-entity
+      missing-topic situations are handled inside the engine (R17 — entity →
+      `DEGRADED`, no scheduler) without affecting the module's overall state.
+    - `stop()` — Phase 1: no-op. **Phase 2**: `engine.stop()` — cancels schedulers,
+      drains in-flight Kafka sends.
+    - `onDisconnect()` — clears the cached `JdbcConnectionSource` reference. The
+      source itself is host-owned; db-sync does not close it. **Phase 2**: also
+      drops engine reference (snapshots are GC'd).
+    - `currentStatus()` — overrides the default to surface
+      `JdbcConnectionSource.stats()` in `ModuleStatus.Stats.pool` (Phase 1) and
+      `CdcEngine.currentEntityStats()` in `Stats.entities` (Phase 2). Tolerates a
+      throwing `stats()` impl by logging and falling back to empty stats.
 - **`DbSchemaProvider`** [planned] (R3, R4) — Tier-2 SPI. Single source of truth for "what tables
   look like in this schema". Vanilla impls expose `protected` template-method hooks for column
   / table names so client overrides change one thing without re-implementing the whole provider.
-- **`TableMapping<T>`** [planned] (R5) — describes one table generically. CDC engine consumes
+- **`EntityMapping<T>`** [planned] (R5) — describes one table generically. CDC engine consumes
   uniformly without knowing the DTO type. Generic `T` carried for compile-time `mapRow` safety.
-- **`CdcEngine`** [planned] (R6, R7, R8) — per-provider orchestrator. Owns one
-  `ScheduledExecutorService` (single-threaded per `TableMapping` so per-table state never
-  needs synchronization), hosts per-table `SnapshotStore`, dispatches Phase 1 → diff → Phase 2
-  → publish on every tick.
-- **`Phase1Hasher`** [planned] (R6) — issues `SELECT pk, CRC32(CONCAT_WS(',', cols...)) FROM tbl`
-  through the Tier-3 `JdbcConnectionSource`. Reads PK via `rs.getString(1)` (ID stringification —
-  see Decisions). Returns `Map<String, Long>` (PK → CRC32). Always closes
-  `ResultSet` / `Statement` / `Connection` via `try-with-resources` so the connection
-  returns to the host's pool promptly.
-- **`Phase2Fetcher`** [planned] (R6) — given `Set<PK> changedPks`, builds
-  `SELECT * FROM tbl WHERE pk IN (?, ?, ...)`. Chunks at 1000 PKs per query (keeps prepared-
-  statement bind size safe + works around per-DB `max_allowed_packet`). Calls
-  `mapping.mapRow(rs)` for each row.
-- **`SnapshotStore`** [planned] — `Map<Long, Long>` per `TableMapping`, thread-confined to
-  the scheduler thread. Wiped on `onDisconnect`. RAM cap (R13) enforced — log + skip if Phase 1
-  exceeds the cap. Replacement is "all-or-nothing" — only swapped in after a successful publish
-  cycle so a mid-cycle failure replays the same diff next tick.
-- **`SyncEventPublisher`** [planned] (R6) — translates `(tableMapping, pk, op, dto)` →
-  `SyncEvent` payload + Kafka key + topic name; calls `NxKafka.instance().send(...)`. Kafka
-  send is async; the engine does not block waiting for ACKs.
-- **JDBC connection borrowing** [planned] (R2) — engine consumes `Connection`s from a
-  Tier-3 `JdbcConnectionSource` SPI (designed in the `jdbc-connection-source` feature —
-  see Links in spec.md). No pool wrapping in db-sync-core: pool implementation, sizing,
-  read-only-user vs shared-pool decisions, JDBC driver bundling are all the host's
-  responsibility, exposed through the SPI. Engine's contract per query: borrow
-  Connection → `setReadOnly(true)` → execute → close (returns to host pool).
+- **CDC engine** [planned] — `CdcEngine`, `TableSyncTask`, `Phase1Hasher`,
+  `Phase2Fetcher`, `SnapshotStore`, `WindowPlanner`, `SyncEventPublisher` are designed
+  in [`cdc-engine/tech.md`](../cdc-engine/tech.md). `DbSyncModule.start()` (Phase 2)
+  instantiates `new CdcEngine(provider.mappings(), jdbcConnectionSource, kafkaProducer)`
+  and calls `engine.start()`; `currentStatus()` calls `engine.currentTableStats()` to
+  populate `ModuleStatus.Stats.entities[]`. Engine code physically lives in the
+  `nx-gs-db-sync-core` JAR but db-sync's design surface stops at "wire the engine with
+  the resolved provider's mappings".
 - **`BohptsDbSchemaProvider`** [planned] (R10) — implements `DbSchemaProvider` directly
   (no template-method base class in MVP — vanilla L2J extraction deferred to
   second-customer time per spec Non-goals). Lives in bohpts-core repo. Returns one
   `ClanMapping` from `mappings()`. `schemaName="bohpts"`.
-- **`ClanMapping`** [planned] (R10) — only `TableMapping` in MVP. Lives in bohpts-core.
-  4 hashed cols (clan_name, clan_level, leader_id, ally_id). `mapRow` converts BIGINT
-  `leader_id` / `ally_id` to `String` (zero-as-null convention applied here so the wire
-  payload's `leaderId`/`allyId` is `null` for "no value", not `"0"`).
+- **`ClanMapping`** [planned] (R10) — only `EntityMapping` in MVP. Lives in
+  bohpts-core. `entityName = "clan"`, `tableName = "clan_data"`. 4 hashed cols
+  (`clan_name`, `clan_level`, `leader_id`, `ally_id`). `mapRow` keeps BIGINT
+  `leader_id` / `ally_id` as `Long`, applying the zero-as-null convention so the
+  wire payload's `leaderId` / `allyId` is `null` for "no value" rather than `0L`.
 
 ## Data flows
 
@@ -127,39 +129,32 @@ NxAdapter.start()
 ### 2. Module discovery (Tier 2) inside db-sync-core
 
 ```
-DbSyncModule.start()
+DbSyncModule.onConnect(ctx)                           [Phase 2]
   → ServiceLoader.load(DbSchemaProvider.class)
   → providers.size():
        0 → log WARN "no DbSchemaProvider on classpath"; state = DISABLED; return
        >1 → log ERROR listing fqcns; state = FAILED; return
-       1 → engine = new CdcEngine(provider, jdbcConnectionSource, kafkaProducer, kafkaTopicResolver)
-  → for each TableMapping:
-        scheduler.scheduleWithFixedDelay(SafeRunnable.wrap(tick), 0, mapping.tickInterval(), ...)
+       1 → cache provider
+  → if (ctx.syncTopics() == null || ctx.syncTopics().isEmpty()) {
+        log WARN "no entity topics in ConnectResponse — db-sync has nothing to sync"
+        state = DISABLED; return    -- R16: defensive, not expected in steady state
+    }
+  → cache topicResolver = TopicResolver.from(ctx.syncTopics())
+
+DbSyncModule.start()                                  [Phase 2]
+  → engine = new CdcEngine(provider.mappings(), jdbcConnectionSource, kafkaProducer,
+                            topicResolver, configResolver)
+  → engine.start()                                    -- per-entity daemon ticks
+                                                         (cdc-engine R5)
 ```
 
-### 3. CDC tick (per `TableMapping`)
+### 3. CDC tick + initial sync
 
-```
-Tick fires
-  → current = Phase1Hasher.hash(mapping)              -- Map<PK, CRC32>
-  → changeSet = SnapshotStore.diff(mapping, current)  -- created / updated / deleted
-  → if changeSet is empty: return                     -- no work, no Phase 2
-  → fetched = Phase2Fetcher.fetch(mapping, changeSet.created ∪ changeSet.updated)
-                                                      -- List<T> mapped via mapping.mapRow
-  → for each row in fetched:
-        SyncEventPublisher.publish(mapping, op = CREATED|UPDATED, pk, dto)
-  → for each pk in changeSet.deleted:
-        SyncEventPublisher.publish(mapping, op = DELETED, pk, null)
-  → SnapshotStore.replace(mapping, current)           -- atomic swap; only on success
-```
+Documented in [`cdc-engine/tech.md`](../cdc-engine/tech.md) data flows. Initial sync is
+the first tick after `engine.start()` with empty `SnapshotStore` — same code path,
+diff yields every PK as `created` (cdc-engine R7).
 
-### 4. Initial sync
-
-Same path as (3) — first tick after `onConnect`. `SnapshotStore` is empty for this mapping →
-diff yields all PKs as `created`. For `clan_data` (~1k rows) Phase 2 is a single chunked
-`IN (...)` query.
-
-### 5. Module shutdown
+### 4. Module shutdown
 
 ```
 NxAdapter.shutdown()
@@ -185,34 +180,43 @@ NxAdapter.shutdown()
       clan_level, leader_id, ally_id) — see spec Non-goals.
     - Hibernate `@Formula` `membersCount` — computed via subquery, not a real column. NOT
       synced in MVP. Member counts are derivable from a future `characters` table sync.
-- **Wire types** (in `nx-gs-adapter-api`) — all ID fields are `String`:
-    - `SyncEvent` [planned] — final wire shape decided per spec Open questions; candidate
-      fields: `tableName`, `op (CREATED|UPDATED|DELETED)`, `pk: String`, `payload`, `timestamp`
+- **Wire types** (in `nx-gs-adapter-api`) — IDs are `long`/`Long` end-to-end
+  (engine `long`, JSON number, Kafka key via `LongSerializer`). DTO field types
+  mirror DB nullability: primitives for `NOT NULL` columns, boxed for nullable —
+  Gson serializes both identically, but the type carries the nullability contract:
+    - `SyncEvent` [planned] — final wire shape decided per spec Open questions;
+      candidate fields: `entityName`, `op (CREATED|UPDATED|DELETED)`, `pk: long`,
+      `payload`, `timestamp`
     - `ClanDto` [planned]:
-        - `String clanId`
-        - `String clanName`
-        - `Integer clanLevel`
-        - `String leaderId` (null when source `leader_id = 0` per L2J convention)
-        - `String allyId` (null when source `ally_id = 0`)
+        - `long clanId` (PK, `NOT NULL`)
+        - `String clanName` (`NOT NULL`)
+        - `int clanLevel` (`NOT NULL`, source default `0`)
+        - `Long leaderId` (null when source `leader_id = 0` per L2J convention)
+        - `Long allyId` (null when source `ally_id = 0`)
 
 ## Integration points
 
-- **`:nx-gs-adapter-api`** [planned] (R10, R11) — adds `AdapterModule`, `ConnectContext`,
-  `SyncEvent`, `ClanDto`. Bumped to next minor release. Lands in two slices: `AdapterModule` +
-  `ConnectContext` arrive with the `adapter-bootstrap` extension; `SyncEvent` + `ClanDto`
-  arrive with this feature.
+- **`:nx-gs-adapter-api`** [planned] (R10, R11) — adds `AdapterModule`,
+  `ConnectContext`, `SyncEvent`, `ClanDto`. Bumped to next minor release. Lands in
+  two slices: `AdapterModule` + `ConnectContext` arrive with the `adapter-bootstrap`
+  / `adapter-modules` extension; `SyncEvent` (with `entityName`, `pk: long`) +
+  `ClanDto` (Long ID fields) arrive with this feature in api/0.6.0 alongside
+  `EntityStats` / `EntityState` / `ChangesSummary` and
+  `ConnectResponse.syncTopics`.
 - **`:nx-gs-adapter-core`** (R1) — extends `NxAdapter.start()` with
   `ServiceLoader.load(AdapterModule.class)` invocation; populates
   `HeartbeatEvent.enabledModules`. Lands as part of the `adapter-bootstrap` extension.
-- **`:nx-gs-kafka`** (R6) — sync events published via `NxKafka.instance().send(topic, key,
-  syncEvent)`. No change to `nx-gs-kafka` API.
-- **`:nx-gs-db-sync-core`** [planned] (R1–R9) — new module in this monorepo, published to
-  Maven Central as `app.l2nx:nx-gs-db-sync-core`.
+- **`:nx-gs-kafka`** — sync events published via `NxKafka.instance().send(topic, key,
+  syncEvent)` from `cdc-engine`'s `SyncEventPublisher`. No change to `nx-gs-kafka` API.
+- **`:nx-gs-db-sync-core`** (R1–R9) — new module in this monorepo, published to
+  Maven Central as `app.l2nx:nx-gs-db-sync-core`. Phase 1 released as `0.1.0`
+  with `DbSyncModule` only (no engine, no `DbSchemaProvider` SPI yet).
 - **`bohpts-core`** [planned] (R10) — bohpts-core repo (private) declares
-  `implementation 'app.l2nx:nx-gs-db-sync-core:0.1.0'`, hosts `BohptsDbSchemaProvider` +
-  `ClanMapping` classes inline in its source tree, and ships
-  `META-INF/services/app.l2nx.gs.db.sync.spi.DbSchemaProvider` in its resources. NO
-  separate `nx-gs-db-bohpts` artifact is published.
+  `implementation 'app.l2nx:nx-gs-adapter-api:0.6.0'` (Tier-2 SPI lives in api;
+  bohpts-core does NOT need a runtime dep on `nx-gs-db-sync-core`), hosts
+  `BohptsDbSchemaProvider` + `ClanMapping` classes inline in its source tree, and
+  ships `META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider` in its
+  resources. NO separate `nx-gs-db-bohpts` artifact is published.
 - **`jdbc-connection-source` feature** [planned] (R2) — Tier-3 SPI feature delivering
   `JdbcConnectionSource` + the bundled-Hikari fallback. `nx-gs-db-sync-core` consumes
   the resolved instance via `JdbcConnectionSourceResolver`. Pool implementation choice
@@ -222,8 +226,16 @@ NxAdapter.shutdown()
   `nx-gs-db-sync-core`, relocated to `app.l2nx.shaded.hikari.*` so it cannot collide
   with whatever pool the host JVM already ships. Adds ~150 KB to the
   `nx-gs-db-sync-core.jar`.
-- **`nx-tenants` `nexus.adapter.sync-config` Kafka topic** — out of scope for MVP. Future
-  feature for platform-driven cadence / strategy overrides.
+- **`fastutil-core`** [planned] (cdc-engine R4) — added as `implementation` dep on
+  `nx-gs-db-sync-core` (~3 MB). Used by the engine's `Long2IntOpenHashMap` snapshots.
+- **`cdc-engine` feature** — engine code physically lives in `nx-gs-db-sync-core` JAR;
+  design surface (algorithm, scheduler, RAM cap, query timeout, per-table heartbeat
+  stats) lives in [`cdc-engine/spec.md`](../cdc-engine/spec.md) +
+  [`cdc-engine/tech.md`](../cdc-engine/tech.md). `DbSyncModule` instantiates `CdcEngine`
+  in Phase 2 `start()`.
+- **`nx-tenants` `nexus.adapter.sync-config` Kafka topic** — out of scope for MVP.
+  Future feature for platform-driven cadence / strategy overrides; tracked under
+  cdc-engine R14.
 
 ## Decisions
 
@@ -256,75 +268,69 @@ NxAdapter.shutdown()
   bohpts is refactored to extend it via template method, and the multi-impl
   resolution rules (config selector / shadow exclusion / activator JAR — see spec Open
   questions) are decided.
-- **All IDs serialized as `String` on the wire.** PK + FK columns in DTOs +
-  `SyncEvent.pk` — uniformly `String`. Engine reads PK via `rs.getString(pkColumn)`
-  regardless of source SQL type; Phase 2 binds via `setString(...)` and lets the JDBC driver
-  coerce (verified for MariaDB BIGINT — driver pushes the conversion to the index, no
-  full-table scan). Rationale:
-  (1) **Cross-schema invariance** — bohpts uses BIGINT, future customers may use UUID
-  (VARCHAR), composite (string-encoded), INT. Wire format stays stable across all.
-  (2) **Kafka key is naturally `String`** — no extra conversion at publish time.
-  (3) **Platform consumers treat IDs as opaque tokens** — no code path needs the source SQL
-  type. Range-queries on IDs (rare and bad practice anyway) work the same lexically.
-  (4) **Wire overhead is negligible** — 5–10 bytes per ID per row × 12M rows full-sync ≈
-  60–120 MB total bursty cost vs row payloads themselves (~10 KB/row).
-  Schema providers handle the **zero-as-null convention** in `mapRow` (L2J FK columns use
-  `0` to mean "no value" — bohpts emits `null` in the DTO instead of `"0"` for cleaner
-  platform-side semantics).
+- **All IDs serialized as `Long` end-to-end.** PK + FK columns in DTOs +
+  `SyncEvent.pk` — uniformly `Long`. Engine reads PK via `rs.getLong(pkColumn)`,
+  Phase 2 binds via `setLong(...)`, Kafka key uses `LongSerializer` (8 bytes
+  big-endian). Platform stores PK as `long` and reads it back as `long`.
+  Rationale:
+  (1) **Numeric PK is the bohpts (and the dominant L2J family) reality** — BIGINT
+  surrogate keys; cross-schema variance (UUID/composite) is an explicit Non-goal in
+  MVP and would arrive as a separate wire-shape variant.
+  (2) **No client-side stringification** — engine internals already use `long`
+  (fastutil `Long2IntOpenHashMap`); stringifying at the wire boundary added
+  conversion cost without buying anything for the long-PK happy path.
+  (3) **Kafka key is 8 bytes** — `LongSerializer` is binary, smaller than UTF-8
+  string PK. Same partition affinity guarantee.
+  (4) Earlier "all IDs as String for cross-schema invariance" stance reversed —
+  cross-schema is Non-goal in MVP; deferring to a parallel String-PK / composite-PK
+  wire variant when a non-numeric customer arrives is cleaner than a premature
+  stringification.
+  Schema providers still handle the **zero-as-null convention** in `mapRow` (L2J FK
+  columns use `0` to mean "no value" — bohpts emits `null` in the DTO instead of
+  `0L` for cleaner platform-side semantics).
 - **Single-impl assumption for `DbSchemaProvider` discovery.** In MVP, only one provider
   exists on the classpath (the bohpts one, inside bohpts-core). The fail-loud behaviour for
   > 1 providers (R3) surfaces classpath ambiguity to the operator instead of silently picking
   one. The full multi-impl resolution story (config selector / shadow exclusion / activator
   JAR) is open and resolved when vanilla `nx-gs-db-l2j` ships AND a customer ends up with
   both vanilla and bohpts on classpath — see spec Open questions.
-- **CRC32 over MD5 / SHA.** CRC32 is computed server-side by MySQL (zero adapter CPU),
-  32-bit fits a Java `int`/`long`, collision probability is acceptable for
-  change-detection (a missed change is corrected on the next cycle). MD5 / SHA-2 require
-  client-side computation, which means transferring all column bytes over the wire — defeats
-  the purpose of the lightweight Phase 1.
-- **In-memory snapshot only, no persistence.** Cold start replays the whole table as initial
-  sync. Persisting snapshots to a sidecar DB would require schema management on the host side
-  and create a write-path on a strict-read-only adapter. Rebooting and resyncing 1k clans is
-  cheap. Larger tables (items, ~12M rows = ~96 MB initial Kafka burst) re-sync — acceptable
-  bursty cost on rare reboots.
-- **No transactional consistency between Phase 1 and Phase 2.** Eventual consistency. A row
-  deleted between phases simply does not appear in Phase 2 results — engine treats it as "no
-  work for this PK"; the deletion is detected on the NEXT cycle via Phase 1 diff. Acceptable
-  trade-off; the alternative (REPEATABLE READ for the whole cycle) would hold a long-running
-  transaction on the host DB — operator-hostile.
+- **Per-entity Kafka topics delivered by the platform via `ConnectResponse.syncTopics`.**
+  Topic names arrive at handshake time (`adapter-bootstrap` R16), are surfaced through
+  `ConnectContext.syncTopics()` (`adapter-modules` R2), and feed into
+  `cdc-engine`'s `TopicResolver` (`cdc-engine` R17). Schema providers do NOT declare
+  topic names — they only declare `entityName`, which the platform uses as the
+  lookup key into `syncTopics`. Empty / missing map at module level → `DISABLED`
+  (R16); per-entity missing topic → engine marks the entity `DEGRADED` (R17).
+  Rationale: topic naming is a platform concern (per-tenant ACLs, retention, naming
+  conventions); decoupling it from the schema provider lets the platform rename
+  / reorganize topics without coordinated provider releases. Defensive paths are
+  guarded but not expected to fire in steady-state production.
 - **Read-only is set per-borrow on every Connection, not at the pool level.** The pool is
   owned by the host (via the Tier-3 `JdbcConnectionSource` SPI — see
-  `jdbc-connection-source` feature), so we cannot impose pool-level config. Engine calls
-  `connection.setReadOnly(true)` immediately after borrow and before any
+  `jdbc-connection-source` feature), so we cannot impose pool-level config. The engine
+  calls `connection.setReadOnly(true)` immediately after borrow and before any
   Statement/PreparedStatement is created. Rationale: a `GRANT SELECT`-only MySQL user
   is recommended at the operator side; the read-only flag is belt-and-suspenders
   and a meaningful hint for replication routers (ProxySQL, MaxScale) that route read-only
   connections to replicas — adapter traffic doesn't compete with the game core's writes
   on the primary. Engine NEVER issues DDL or DML — Phase 1 + Phase 2 are pure `SELECT`.
-- **Daemon threads, never propagate exceptions.** Same philosophy as `adapter-bootstrap`. Each
-  scheduler tick wrapped in `SafeRunnable`; exception → log + per-table `DEGRADED`, never
-  bubble out.
-- **One scheduler thread per `TableMapping`.** Simplifies state management — `SnapshotStore`
-  for a given table is read/written only by its own scheduler thread. Cost: N daemon threads
-  for N tables. With ~5 tables per provider this is negligible. A single shared scheduler
-  with a thread pool would force defensive synchronization on every snapshot access.
-- **Strategy selector in `TableMapping` itself.** `mapping.strategy()` returns
-  `FULL_SCAN | SLIDING_WINDOW`. The vanilla module author picks the right strategy per row
-  count (clans 1k = FULL_SCAN, items 12M = SLIDING_WINDOW). This is operator-static for MVP;
-  platform-driven override is a future capability — see Open questions.
+- **Engine-algorithm decisions (CRC32 sufficiency, fastutil RAM model, per-query consistent
+  snapshot, MIN/MAX recompute, one scheduler thread per mapping, strategy selection in
+  `EntityMapping`, all-or-nothing snapshot swap) live in
+  [`cdc-engine/tech.md`](../cdc-engine/tech.md) Decisions** to keep db-sync's design
+  surface focused on module wiring + Tier-2 SPI shape.
 
 ## Extension points
 
 - **New table support (vanilla)** — vanilla `L2jSchemaProvider.mappings()` adds new
-  `TableMapping` entries. No engine change.
+  `EntityMapping` entries. No engine change.
 - **New schema variant (client)** — implement `DbSchemaProvider` directly (MVP path,
   bohpts-style) OR extend an existing vanilla provider via template method
   (post-vanilla path). Either way, ship a `META-INF/services/...DbSchemaProvider`
   descriptor pointing to the client class. Engine treats both identically.
-- **New sync strategy** — add an enum constant + a `Strategy` impl in `CdcEngine` (e.g.
-  `SLIDING_WINDOW`, `BINLOG_TAIL`). `TableMapping.strategy()` selects it.
 - **New module type** — implement `AdapterModule` in a sibling module (e.g.
-  `nx-gs-dp-sync-core` for datapack sync). adapter-core ServiceLoader picks it up alongside
-  db-sync. Independent lifecycle, independent failure isolation.
-- **Custom CDC algorithm** — replace CRC32 with binlog-tail or trigger-based for ops who want
-  realtime. Re-implements the engine but reuses `TableMapping` as the schema description.
+  `nx-gs-dp-sync-core` for datapack sync). adapter-core ServiceLoader picks it up
+  alongside db-sync. Independent lifecycle, independent failure isolation.
+- **Engine algorithm extensions** (new strategy, alternate hash function, composite/
+  non-numeric PK, dynamic config consumer) — see
+  [`cdc-engine/tech.md`](../cdc-engine/tech.md) Extension points.

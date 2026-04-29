@@ -62,7 +62,7 @@ class HeartbeatServiceTest {
         assertEquals("primary", event.getServerSlug());
         assertEquals("Acme Primary", event.getServerName());
         assertEquals("1.2.3", event.getAdapterVersion());
-        assertEquals(60L, event.getUptime());
+        assertEquals(60_000L, event.getUptimeMs());
     }
 
     @Test
@@ -107,8 +107,8 @@ class HeartbeatServiceTest {
         scheduler.runFixedDelayOnce();
 
         HeartbeatEvent event = (HeartbeatEvent) publisher.calls.get(0).payload;
-        // 30, not 330 — connectInstant was recaptured at the second start().
-        assertEquals(30L, event.getUptime());
+        // 30_000, not 330_000 — connectInstant was recaptured at the second start().
+        assertEquals(30_000L, event.getUptimeMs());
     }
 
     @Test

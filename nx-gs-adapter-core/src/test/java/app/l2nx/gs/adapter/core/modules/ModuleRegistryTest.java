@@ -107,7 +107,7 @@ class ModuleRegistryTest {
     void currentStatuses_shouldForwardModuleReport_whenHealthy() {
         ModuleStatus reported = ModuleStatus.builder()
                 .name("db-sync").state("ACTIVE")
-                .stats(ModuleStatus.Stats.builder().pool(new PoolStats(1, 3, 4)).build())
+                .stats(ModuleStatus.Stats.builder().pool(new PoolStats(1, 3, 4, null)).build())
                 .build();
         FixedStatusModule mod = new FixedStatusModule("db-sync", reported);
         ModuleRegistry registry = new ModuleRegistry();

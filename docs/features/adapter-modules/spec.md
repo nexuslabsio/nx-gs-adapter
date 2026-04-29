@@ -22,7 +22,7 @@ heartbeat consumers (read enriched `enabledModules`).
 
 **Must:**
 
-- [todo] R1. `nx-gs-adapter-api` MUST define `app.l2nx.gs.adapter.api.spi.AdapterModule` —
+- [done] R1. `nx-gs-adapter-api` MUST define `app.l2nx.gs.adapter.api.spi.AdapterModule` —
   Tier-1 SPI interface with five methods:
     - `String name()` — unique identifier (e.g. `"db-sync"`, `"dp-sync"`); surfaced in
       `enabledModules`
@@ -35,7 +35,7 @@ heartbeat consumers (read enriched `enabledModules`).
     - `void onDisconnect()` — called after `stop`; releases resources (pools,
       connections, in-memory state)
 
-- [todo] R2. `nx-gs-adapter-api` MUST define
+- [wip] R2. `nx-gs-adapter-api` MUST define
   `app.l2nx.gs.adapter.api.spi.ConnectContext` — immutable identity bundle passed to
   `AdapterModule.onConnect(ctx)`. **Phase 1** fields:
     - `UUID tenantId()`
@@ -46,13 +46,24 @@ heartbeat consumers (read enriched `enabledModules`).
     - `String adapterVersion()`
       Java 8 POJO with hand-written builder; immutable once constructed.
 
-  **Phase 2** extends with operator config access (read-only `AdapterConfig` view —
-  same `l2nx.*` chain as adapter-bootstrap) and Kafka publish capability (narrow
-  `EventPublisher` SAM — keeps `nx-gs-adapter-api` free of `nx-gs-kafka` dependency).
-  Phase 1 modules MUST NOT publish events or consult config — those capabilities ship
-  intentionally later.
+  **Phase 2** extends with:
+    - `Map<String, String> syncTopics()` — per-entity Kafka topic names delivered by
+      the platform via `ConnectResponse.syncTopics` (see
+      [`adapter-bootstrap` R16](../adapter-bootstrap/spec.md)). Keyed by
+      `entityName` (`"clan"`, `"character"`, …); value is the fully-qualified topic
+      (`"bohpts.gs.sync.clans"`). Returns an immutable map view; modules treat it
+      as read-only. Empty map (or absent field on legacy responses) is a valid
+      value — modules decide their own response (`db-sync` transitions to
+      `DISABLED`).
+    - operator config access (read-only `AdapterConfig` view — same `l2nx.*` chain
+      as adapter-bootstrap) and Kafka publish capability (narrow `EventPublisher`
+      SAM — keeps `nx-gs-adapter-api` free of `nx-gs-kafka` dependency).
 
-- [todo] R3. `nx-gs-adapter-api` MUST define
+  Phase 1 modules MUST NOT publish events or consult config — those capabilities
+  ship intentionally later. `syncTopics` arrives in api/0.6.0 alongside the
+  `EntityStats` types.
+
+- [wip] R3. `nx-gs-adapter-api` MUST define
   `app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus` — value type for heartbeat enrichment:
     - `String name()` — matches `AdapterModule.name()`
     - `String state()` — one of `ACTIVE` | `DEGRADED` | `DISABLED` | `FAILED` (string,
@@ -65,17 +76,40 @@ heartbeat consumers (read enriched `enabledModules`).
   only the slots they own):
     - **Phase 1**: `Optional<PoolStats> pool()` — pool stats from the module's
       underlying data source (db-sync surfaces `JdbcConnectionSource.stats()`).
-    - **Phase 2**: `Optional<List<String>> tables()` — names of tables a sync module
-      is configured to handle; deferred until db-sync's `TableProvider` SPI lands.
+    - **Phase 2**: `Optional<List<EntityStats>> entities()` — per-entity operational
+      state for sync modules (one entry per synced entity: clan, character, item, …);
+      populated by the CDC engine on every cycle (see
+      [`cdc-engine` R10](../cdc-engine/spec.md)). Replaces the earlier placeholder
+      `Optional<List<String>>` (names only) shape — the upgrade is driven by the
+      cdc-engine slice. Entity-centric vocabulary (vs table-centric) reflects the
+      adapter's domain: operators and platform consumers think in entities; the
+      source table is an internal implementation detail of the schema provider.
 
-  Plus `app.l2nx.gs.adapter.api.kafka.ops.PoolStats` with `int busy`, `int idle`,
-  `Integer total` (nullable if pool doesn't expose totals).
+  Plus three value types, all in `app.l2nx.gs.adapter.api.kafka.ops`:
+    - `PoolStats { Integer active, Integer idle, Integer total, Integer waiting }` —
+      JDBC pool stats. Fields are `Integer` (nullable) so providers that expose only a
+      subset of HikariCP-style metrics can leave the rest `null`. **Renamed from the
+      earlier `int busy` to `Integer active`** to match HikariCP / Tomcat JDBC / DBCP2
+      naming conventions; `waiting` is added for consumers diagnosing pool backpressure.
+    - `EntityStats { String name, EntityState state, Long rowCount, Long lastSyncEpochMs,
+      Long lastCycleDurationMs, ChangesSummary lastCycleChanges, Integer
+      consecutiveErrors }` — populated by `cdc-engine` per cycle; surfaced through the
+      `Stats.entities` slot. `name` is the entity name (`"clan"`, `"character"`,
+      `"item"`), not the source table name.
+    - `EntityState` enum with two constants on the wire as uppercase strings:
+        - `HEALTHY` — last cycle completed without error
+        - `DEGRADED` — last cycle threw / Kafka publish failed / query timeout
+        - (Earlier `SKIPPED` constant — for the per-entity RAM cap path — was
+          removed when `cdc-engine` R8 stripped the cap. Engine no longer enforces
+          a snapshot row-count limit; operators size the host JVM heap.)
+    - `ChangesSummary { long created, long updated, long deleted }` — change counts
+      from the last cycle.
 
-- [todo] R4. `NxAdapter.start()` MUST invoke `ServiceLoader.load(AdapterModule.class)`
+- [done] R4. `NxAdapter.start()` MUST invoke `ServiceLoader.load(AdapterModule.class)`
   AFTER Kafka producer init success (after R6 of adapter-bootstrap). Result is cached
   in adapter-core for the JVM lifetime. Discovery is one-shot per JVM.
 
-- [todo] R5. After discovery, `NxAdapter` MUST run lifecycle dispatch:
+- [done] R5. After discovery, `NxAdapter` MUST run lifecycle dispatch:
     - **on connect:** for each discovered module: `module.onConnect(ctx)`. After all
       `onConnect` calls complete (in order), iterate again and call `module.start()` on
       each. Two-phase so modules that need cross-module references (rare) can resolve
@@ -85,14 +119,14 @@ heartbeat consumers (read enriched `enabledModules`).
       `module.onDisconnect()`. Reverse order matches resource-acquisition ordering for
       future cross-module deps.
 
-- [todo] R6. `HeartbeatEvent` MUST carry `List<ModuleStatus> enabledModules`.
+- [done] R6. `HeartbeatEvent` MUST carry `List<ModuleStatus> enabledModules`.
   `AdapterModule` defines a `default ModuleStatus currentStatus()` method returning
   `{name, registry-managed-state, empty Stats}`; modules override to surface module-
   specific stats (e.g. db-sync injects `pool` from `JdbcConnectionSource`). Adapter-
   core invokes `currentStatus()` per heartbeat tick, wraps the call in `SafeRunnable`,
   and falls back to `{name, FAILED, empty Stats}` if it throws (R7).
 
-- [todo] R7. Every entry into a module hook (`onConnect`, `start`, `stop`,
+- [done] R7. Every entry into a module hook (`onConnect`, `start`, `stop`,
   `onDisconnect`, plus the per-tick `currentStatus()` if R6 lands as a module method)
   MUST be wrapped in `SafeRunnable` (existing helper from adapter-bootstrap). Throwable
   from any hook is caught at adapter-core level, logged via `NxLog`, the module is
@@ -100,11 +134,17 @@ heartbeat consumers (read enriched `enabledModules`).
   `ModuleStatus.state`), and the host JVM thread is never affected. Other modules keep
   running normally.
 
-- [todo] R8. First versions:
-    - `nx-gs-adapter-api` bumped to next minor (adds `AdapterModule`, `ConnectContext`,
-      `ModuleStatus`, `PoolStats`)
-    - `nx-gs-adapter-core` bumped to next minor (adds ServiceLoader call,
-      lifecycle dispatch, heartbeat enrichment)
+- [wip] R8. Released versions:
+    - `nx-gs-adapter-api` `0.5.0` — initial Tier-1 SPI (`AdapterModule`,
+      `ConnectContext`, `ModuleStatus`, `PoolStats { busy, idle, total }`).
+    - `nx-gs-adapter-core` `0.3.0` (then `0.3.1`) — ServiceLoader call, lifecycle
+      dispatch, heartbeat enrichment, resource-based version reporting.
+    - **Pending `0.6.0`** for `nx-gs-adapter-api` — wire-shape break: `PoolStats.busy`
+      → `PoolStats.active` rename, `PoolStats.waiting` added, `Stats.tables` upgrades
+      to `Stats.entities` (`Optional<List<String>>` → `Optional<List<EntityStats>>`);
+      new types `EntityStats`, `EntityState`, `ChangesSummary`. Entity-centric
+      vocabulary throughout. No production heartbeat consumer yet — the `nx-tenants`
+      consumer ships in lockstep, coordinated atomic upgrade is fine.
 
 **Should:**
 
@@ -173,3 +213,7 @@ heartbeat consumers (read enriched `enabledModules`).
 - Sibling feature (Tier-3 SPI):
   [`docs/features/jdbc-connection-source/spec.md`](../jdbc-connection-source/spec.md)
   — `DbSyncModule.onConnect` consumes `ConnectContext` defined here
+- Sibling feature (CDC engine):
+  [`docs/features/cdc-engine/spec.md`](../cdc-engine/spec.md) — populates
+  `Stats.entities[]` per cycle via `EntityStats` + `EntityState` + `ChangesSummary`
+  defined in this feature's R3

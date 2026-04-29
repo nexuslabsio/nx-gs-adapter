@@ -70,7 +70,7 @@ class DbSyncModuleTest {
 
     @Test
     void onConnect_shouldBecomeDegraded_whenSmokeCheckFails() {
-        JdbcConnectionSource src = stub("stub", new PoolStats(0, 4, 4));
+        JdbcConnectionSource src = stub("stub", new PoolStats(0, 4, 4, null));
         DbSyncModule module = new DbSyncModule(singleton(src), failSmoke());
 
         module.onConnect(ctx);
@@ -78,12 +78,12 @@ class DbSyncModuleTest {
         ModuleStatus status = module.currentStatus();
         assertEquals("DEGRADED", status.getState());
         // Source ref retained so pool stats still bubble up while smoke is degraded.
-        assertEquals(Optional.of(new PoolStats(0, 4, 4)), status.getStats().getPool());
+        assertEquals(Optional.of(new PoolStats(0, 4, 4, null)), status.getStats().getPool());
     }
 
     @Test
     void currentStatus_shouldSurfacePoolStats_whenSourceProvidesThem() {
-        PoolStats pool = new PoolStats(2, 6, 8);
+        PoolStats pool = new PoolStats(2, 6, 8, null);
         JdbcConnectionSource src = stub("stub", pool);
         DbSyncModule module = new DbSyncModule(singleton(src), passSmoke());
 
@@ -119,7 +119,7 @@ class DbSyncModuleTest {
 
     @Test
     void onDisconnect_shouldClearSourceReference() {
-        JdbcConnectionSource src = stub("stub", new PoolStats(1, 1, 2));
+        JdbcConnectionSource src = stub("stub", new PoolStats(1, 1, 2, null));
         DbSyncModule module = new DbSyncModule(singleton(src), passSmoke());
 
         module.onConnect(ctx);
