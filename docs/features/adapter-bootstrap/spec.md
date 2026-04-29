@@ -98,7 +98,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
     - SC5. Each daemon-thread entry point has a unit test that asserts the runnable does NOT
       throw when the wrapped logic throws. `NxAdapter.start()` has a unit test that asserts a
       config-resolution failure transitions to `FAILED` without throwing.
-- [wip] R16. **`ConnectResponse.syncTopics` — per-entity Kafka topics delivered by
+- [done] R16. **`ConnectResponse.syncTopics` — per-entity Kafka topics delivered by
   the platform.** The `/connect` response MUST carry a `Map<String, String>
   syncTopics` field where the key is an entity name (`"clan"`, `"character"`,
   `"item"`, …) and the value is the fully-qualified Kafka topic the adapter is

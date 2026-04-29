@@ -222,6 +222,31 @@ public final class NxKafka {
     }
 
     /**
+     * Sends a byte-array-keyed message with a delivery callback. Used when the
+     * partition key is raw bytes rather than a UTF-8 string — primitive-PK
+     * CDC keying, binary correlation IDs, etc. Same partition guarantee as the
+     * String-keyed overload (partitioning is on the raw key bytes either way).
+     *
+     * @param topic    Kafka topic name
+     * @param key      raw partition key bytes; may be null for round-robin
+     * @param message  object to serialize as JSON; null for log-compaction tombstones
+     * @param callback invoked with {@link org.apache.kafka.clients.producer.RecordMetadata}
+     *                 on success, or with an exception on failure; never null
+     */
+    public void send(String topic, byte[] key, Object message, Callback callback) {
+        if (closed.get()) {
+            log.warn("Cannot send to {}: NxKafka is shut down", topic);
+            try {
+                callback.onCompletion(null, new KafkaException("NxKafka is shut down"));
+            } catch (Exception e) {
+                log.error("Callback error for topic {}: {}", topic, e.getMessage());
+            }
+            return;
+        }
+        producer.send(topic, key, message, callback);
+    }
+
+    /**
      * Subscribes to a topic with a typed message handler (fire-and-forget messages).
      * Creates a dedicated daemon thread with a poll loop for this topic.
      *

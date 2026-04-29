@@ -19,44 +19,74 @@ read by `HeartbeatService` per heartbeat tick.
 ## Structure
 
 - `nx-gs-db-sync-core/src/main/java/app/l2nx/gs/db/sync/engine/`
-    - `CdcEngine.java` [planned] — orchestrator: holds the `ScheduledExecutorService`,
-      owns one `EntitySyncTask` per `EntityMapping`, exposes `currentEntityStats()` for
-      heartbeat enrichment (R10)
-    - `EngineConfig.java` [planned] — value bag holding the resolved per-engine and
-      per-mapping parameters (R15); built by `CdcEngine` constructor from
-      `ConfigResolver` + `provider.mappings()`; immutable thereafter
-    - `ConfigResolutionLogger.java` [planned] — emits the structured startup log
-      block (R16); single static helper called once at `CdcEngine.start()`
-    - `EntitySyncTask.java` [planned] — per-entity `Runnable` invoked by the
-      scheduler; on each tick walks every PK window back-to-back, running the
-      Phase 1 → diff → Phase 2 → publish → window-swap protocol per window (R1, R2)
-    - `TopicResolver.java` [planned] — SAM `String resolveTopic(String entityName)`
-      backed by `ConnectResponse.syncTopics`; injected at engine construction; used
-      by `SyncEventPublisher` (R17)
-    - `Phase1Hasher.java` [planned] — issues the CRC32 query, reads PK as `long`,
-      returns `Long2IntOpenHashMap` (R1, R11)
-    - `Phase2Fetcher.java` [planned] — given `LongSet changedPks`, builds chunked
-      `IN (...)` queries, calls `mapping.mapRow(rs)`, returns mapped DTOs (R1, R11)
-    - `SnapshotStore.java` [planned] — per-entity `Long2IntOpenHashMap` holder;
-      thread-confined to its `EntitySyncTask` thread (R4); `swapWindow(from, to,
-      windowMap)` updates only the `[from, to]` PK range
-    - `ChangeSet.java` [planned] — value bag `{ LongSet created, LongSet updated,
-      LongSet deleted }` returned by diff (R1)
-    - `WindowPlanner.java` [planned] — runs `MIN(pk), MAX(pk)` recompute at start of
-      cycle and computes `windowCount = max(1, ceil(pkRange / rowsPerWindow))`;
-      returns ordered list of `[fromPk, toPk]` boundaries (R2)
-    - `EntityStatsTracker.java` [planned] — assembles `EntityStats` snapshots;
-      published via a `volatile List<EntityStats>` for cross-thread heartbeat reads
-      (R10)
-- `nx-gs-db-sync-core/src/main/java/app/l2nx/gs/db/sync/kafka/`
-    - `SyncEventPublisher.java` [planned] — translates `(mapping, op, pk, dto|null)` to
-      `SyncEvent`, builds Kafka key, calls `NxKafka.instance().send(...)` (R12, R13)
-- `nx-gs-db-sync-core/build.gradle.kts` [planned] — adds `implementation
-  'it.unimi.dsi:fastutil-core:8.5.x'` (primitive maps only — full `fastutil` not pulled)
+    - `CdcEngine.java` — orchestrator: spawns one
+      `Executors.newSingleThreadScheduledExecutor` per entity, schedules
+      `EntitySyncTask` ticks, surfaces `EntityStats` via
+      `EntityStatsTracker` (R5, R6, R10, R15, R16)
+    - `EngineConfig.java` — immutable value bag
+      `{tickIntervalSeconds, rowsPerWindow, queryTimeoutSeconds,
+      publishFlushSeconds}`; `productionChain()` resolves file (path from
+      `-Dl2nx.config-file` or cwd `l2nx.properties`) + sysprop fallback (R15)
+    - `ConfigResolutionLogger.java` — single static helper invoked once at
+      `CdcEngine.start()`; emits engine globals + per-entity topic resolution
+      with `[operator-override | default]` source tags (R16)
+    - `EntitySyncTask.java` — per-entity `Runnable`. One cycle = borrow → plan
+      → for-each-window {Phase1 → diff → Phase2 → publish per PK} →
+      end-of-cycle walk of `Long2ObjectMap<pk, Future>` advancing only
+      successful publishes (R1, R2, R5, R7, R9)
+    - `SnapshotStore.java` — `Long2IntAVLTreeMap` per entity. AVL chosen over
+      open-hash so `keysInRange` runs `O(log N + k)` via `subMap`; critical
+      for items at 12M (R4)
+    - `EntityStatsTracker.java` — `ConcurrentHashMap<String, EntityStats>` +
+      per-entity `AtomicInteger` consecutiveErrors. `recordCycleResult`
+      writes `entityOrder` first then `latest` so a heartbeat reader between
+      the two writes never drops the entity (R10)
+    - `CycleResult.java` — outcome of one `EntitySyncTask.runCycle()`
+      surfaced to `EntityStatsTracker`. Counters reflect post-publish-walk
+      successful operations only
+    - `SafeRunnable.java` — local copy of the same-named utility in
+      `:nx-gs-adapter-core`. Duplicated here because db-sync depends only on
+      api (cross-module dep avoidance)
+    - `phase/`
+        - `Phase1Hasher.java` — `SELECT pk, CRC32(CONCAT_WS(...))` inside
+          `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`. Manual
+          autocommit save/restore + rollback-on-throw (R1, R11)
+        - `Phase2Fetcher.java` — `SELECT * WHERE pk IN (?,...,?)` chunked at
+            1000. Single `PreparedStatement` reused across chunks; last
+                  (smaller) chunk pads by repeating its final PK so the SQL string
+                  stays stable across chunks (server-side prep cache hit) (R1, R11)
+        - `ChangeSet.java` — diff stage: walks `currentScan` against
+          `SnapshotStore` + `prevKeysInRange`, partitions PKs into
+          `created/updated/deleted` `LongSet`s. Static `diff(...)` factory
+          uses `LongIterator` everywhere — no boxing (R1)
+    - `publish/`
+        - `SyncEventPublisher.java` — builds `SyncEvent<T>`, encodes Kafka key
+          as 8-byte big-endian via `ByteBuffer.allocate(8).putLong(pk)` (matches
+          `LongSerializer.serialize` byte-for-byte). Returns
+          `CompletableFuture<RecordMetadata>` per publish via the
+          `KafkaSender` SAM callback (R12, R13)
+        - `KafkaSender.java` — narrow byte[]-keyed SAM. Production impl in
+          `DbSyncModule.sendViaNxKafka` bridges to
+          `NxKafka.instance().send(topic, byte[], value, callback)`; tests
+          substitute a recording fake
+        - `TopicResolver.java` — `String resolveTopic(String entityName)` SAM
+          bound to `ctx.syncTopics()` snapshot at engine start; cached for
+          engine lifetime (R17)
+    - `window/`
+        - `WindowPlanner.java` — `SELECT MIN(pk), MAX(pk) FROM <table>` →
+          ceil-divides into half-open windows. Overflow-guarded against
+          full-BIGINT spans; `MAX_WINDOWS_PER_PLAN = 1_000_000` cap protects
+          host JVM from pathological PK ranges (R2)
+        - `Window.java` — closed-interval `[fromPk, toPk]` value class
+          produced by `WindowPlanner` and consumed by `Phase1Hasher`
+- `nx-gs-db-sync-core/build.gradle.kts` — declares `implementation
+  it.unimi.dsi:fastutil-core:8.5.15` (primitive maps only — full
+  `fastutil` ~21MB NOT pulled) plus `implementation` on `:nx-gs-kafka`
+  and `gson`
 
 ## Key components
 
-- **`CdcEngine`** [planned] (R5, R6, R10, R15, R16) — orchestrator owned by
+- **`CdcEngine`** (R5, R6, R10, R15, R16) — orchestrator owned by
   `DbSyncModule`. Constructor receives `provider.mappings()` + `JdbcConnectionSource` +
   Kafka producer + `ConfigResolver`. Builds an immutable `EngineConfig` once (resolves
   the R15 chain for every mapping). Holds a `Map<EntityMapping<?>, EntitySyncTask>`
@@ -67,7 +97,7 @@ read by `HeartbeatService` per heartbeat tick.
   schedulers and drains in-flight ticks. Exposes `List<EntityStats> currentEntityStats()`
   for heartbeat enrichment — reads from a single `volatile` reference rebuilt at the
   end of every cycle by each task.
-- **`EngineConfig`** [planned] (R15) — immutable value bag carrying ONLY engine-
+- **`EngineConfig`** (R15) — immutable value bag carrying ONLY engine-
   level globals from `l2nx.properties`:
   ```java
   Duration tickInterval;        // l2nx.cdc-engine.tick-interval-seconds | default 60s
@@ -81,18 +111,18 @@ read by `HeartbeatService` per heartbeat tick.
   `CdcEngine` constructor from `ConfigResolver`; passed by reference to every
   `EntitySyncTask`.
 
-- **Entity → topic map** [planned] (R17) — separate immutable
+- **Entity → topic map** (R17) — separate immutable
   `Map<String, String> entityTopics` snapshot taken from
   `ConnectResponse.syncTopics` at engine construction (entries the platform
   delivered). Built alongside `EngineConfig` but tracked separately because its
   source is the connect-response, not l2nx.properties. An entity whose
   `entityTopics.get(entityName)` returns `null` is recorded as `null` and
   permanently `DEGRADED` per R17.
-- **`ConfigResolutionLogger`** [planned] (R16) — static helper invoked once at
+- **`ConfigResolutionLogger`** (R16) — static helper invoked once at
   `CdcEngine.start()`. Reads `EngineConfig`, formats the structured log block, emits
   via `NxLog` at `INFO` level on logger `app.l2nx.gs.db.sync.engine.CdcEngine`. Single
   call site; no state.
-- **`EntitySyncTask`** [planned] (R1, R2, R5, R7, R9) — per-entity `Runnable`. On
+- **`EntitySyncTask`** (R1, R2, R5, R7, R9) — per-entity `Runnable`. On
   each tick:
     1. `WindowPlanner.recomputeBoundaries(mapping, rowsPerWindow)` — runs
        `SELECT MIN(<pk>), MAX(<pk>) FROM <tableName>`, computes `windowCount =
@@ -107,7 +137,7 @@ read by `HeartbeatService` per heartbeat tick.
        Wrapped in `SafeRunnable` so any throwable is caught, the entity state transitions
        to `DEGRADED`, and the schedule continues. Small entities (rowCount ≤
        rowsPerWindow) yield exactly 1 window — no separate code path.
-- **`Phase1Hasher`** [planned] (R1, R11) — opens
+- **`Phase1Hasher`** (R1, R11) — opens
   `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`. Always issues a windowed
   query: `SELECT <pk>, CRC32(CONCAT_WS(',', <hashedColumns>)) FROM <tableName>
   WHERE <pk> BETWEEN ? AND ?`. Reads PK via `rs.getLong(1)` and CRC32 via
@@ -115,33 +145,33 @@ read by `HeartbeatService` per heartbeat tick.
   comparison is bit-exact). Result: `Long2IntOpenHashMap`. Calls
   `Statement.setQueryTimeout` from `l2nx.cdc-engine.query-timeout-seconds`. Closes
   resultset / statement / connection in try-with-resources.
-- **`Phase2Fetcher`** [planned] (R1, R11) — given a `LongSet`, builds `SELECT
+- **`Phase2Fetcher`** (R1, R11) — given a `LongSet`, builds `SELECT
   <fetchColumns> FROM <tableName> WHERE <pk> IN (?, ?, ...)` chunked at 1000 PKs.
   Per-chunk transaction = `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`.
   PKs bound via `setLong(...)`. Calls `mapping.mapRow(rs)` per row.
-- **`SnapshotStore`** [planned] (R4) — wraps a `Long2IntOpenHashMap` per
+- **`SnapshotStore`** (R4) — wraps a `Long2IntOpenHashMap` per
   `EntityMapping`. Thread-confined to the task thread (no synchronization needed).
   Provides `diffWindow(from, to, currentWindow) → ChangeSet` (evaluates only PKs in
   the `[from, to]` range), `swapWindow(from, to, currentWindow)` (replaces only the
   window's PK range, keeps entries outside `[from, to]` untouched). Wiped on
   `DbSyncModule.onDisconnect`. NO RAM cap enforcement — operator sizes the host JVM
   to fit the configured entities.
-- **`ChangeSet`** [planned] (R1) — value bag with three `LongSet` (fastutil
+- **`ChangeSet`** (R1) — value bag with three `LongSet` (fastutil
   `LongOpenHashSet`). Computed in one pass over the previous-window PKs ∪ current-
   window PKs.
-- **`WindowPlanner`** [planned] (R2) — runs
+- **`WindowPlanner`** (R2) — runs
   `SELECT MIN(<pk>), MAX(<pk>) FROM <tableName>` at the start of each cycle
   (recompute, NOT cached at connect — auto-extends to capture inserts above the
   prior MAX). Computes `windowCount = max(1, ceil((MAX - MIN + 1) / rowsPerWindow))`,
   divides `[MIN, MAX]` into evenly-sized half-open intervals, returns
   `List<long[]>` of `{from, to}` pairs.
-- **`TopicResolver`** [planned] (R17) — SAM `String resolveTopic(String entityName)`
+- **`TopicResolver`** (R17) — SAM `String resolveTopic(String entityName)`
   backed by an immutable `Map<String, String>` snapshot taken from
   `ConnectResponse.syncTopics` at engine construction. Returns `null` for entities
   the platform did not deliver a topic for. Engine resolves once per entity at
   start; result stored in `ResolvedEntityConfig.topic`. Null-topic entities are
   permanently `DEGRADED`.
-- **`EntityStatsTracker`** [planned] (R10) — assembles an `EntityStats` per cycle:
+- **`EntityStatsTracker`** (R10) — assembles an `EntityStats` per cycle:
   `name = mapping.entityName()` (the domain identifier — `"clan"`, NOT the source
   table `"clan_data"`), `state` (`HEALTHY` / `DEGRADED`), `rowCount` (cumulative
   Phase 1 size across all windows of the cycle), `lastSyncEpochMs`
@@ -151,7 +181,7 @@ read by `HeartbeatService` per heartbeat tick.
   `consecutiveErrors` (counter reset on HEALTHY). Published into a
   `volatile List<EntityStats>` field on `CdcEngine` — heartbeat thread reads it via
   `currentEntityStats()`.
-- **`SyncEventPublisher`** [planned] (R12, R13) — owns `SyncEvent` envelope
+- **`SyncEventPublisher`** (R12, R13) — owns `SyncEvent` envelope
   construction. Kafka key is the row's `long` PK (8 bytes via `LongSerializer`);
   topic is resolved once per entity at engine start via `TopicResolver` (delivered
   via `ConnectResponse.syncTopics`) and stored in the entity's `ResolvedEntityConfig`;

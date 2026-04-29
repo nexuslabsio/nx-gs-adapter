@@ -305,6 +305,7 @@ public final class NxAdapter {
                         .serverSlug(response.getServerSlug())
                         .serverName(response.getServerName())
                         .adapterVersion(adapterVersion)
+                        .syncTopics(response.getSyncTopics())
                         .build();
                 registry.connect(ctx);
             } catch (Throwable t) {
@@ -421,5 +422,15 @@ public final class NxAdapter {
 
     static void simulateInitKafkaForTesting(KafkaInitializer init, ConnectResponse response) {
         initKafka(init, response);
+    }
+
+    /**
+     * Test seam — primes the module-registry slot without going through
+     * {@link #start()}. Required by tests that drive {@link #simulateInitKafkaForTesting}
+     * directly and want the ServiceLoader-based module discovery to actually
+     * happen (otherwise initKafka skips the {@code registry != null} branch).
+     */
+    static void primeModuleRegistryForTesting() {
+        moduleRegistry = new ModuleRegistry();
     }
 }

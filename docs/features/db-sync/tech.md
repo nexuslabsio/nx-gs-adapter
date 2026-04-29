@@ -26,14 +26,11 @@ design end-to-end.
       Phase 1 owns SPI smoke check + heartbeat enrichment. Phase 2 wires `CdcEngine`
       (defined in [`cdc-engine`](../cdc-engine/tech.md)) with the resolved
       `DbSchemaProvider`'s mappings.
-    - `spi/DbSchemaProvider.java` [planned] — Tier-2 SPI interface
-    - `spi/EntityMapping.java` [planned] — Tier-2 SPI; one per synced entity
-    - `engine/` [planned] — CDC algorithm; structure documented in
+    - `engine/` — CDC algorithm; structure documented in
       [`cdc-engine/tech.md`](../cdc-engine/tech.md). Engine code physically ships in
       `nx-gs-db-sync-core` JAR; the `cdc-engine` feature is a design-doc slice, not a
-      separate Gradle module.
-    - `kafka/` [planned] — `SyncEventPublisher` and friends; documented in cdc-engine
-      tech.md.
+      separate Gradle module. `SyncEventPublisher` lives under this `engine/` package
+      (not a separate `kafka/`).
     - `META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule` — service descriptor
       with `app.l2nx.gs.db.sync.DbSyncModule`
 - `bohpts-core/` [planned, **lives in the private bohpts-core repo, NOT this monorepo**]
@@ -47,10 +44,13 @@ design end-to-end.
     - `src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider`
       [planned] — service descriptor pointing to `BohptsDbSchemaProvider`
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/`
-    - `AdapterModule.java` [planned] — Tier-1 SPI (lands as part of `adapter-bootstrap`
-      extension; listed here for completeness because db-sync depends on it)
-    - `ConnectContext.java` [planned] — context object passed to `AdapterModule.onConnect`;
-      carries DB creds, Kafka producer ref, serverId, tenantSlug
+    - `spi/AdapterModule.java` — Tier-1 SPI (declared by `adapter-modules`; listed
+      here for completeness because db-sync implements it)
+    - `spi/ConnectContext.java` — context object passed to
+      `AdapterModule.onConnect`; carries identity bundle + per-entity Kafka topic
+      map (`syncTopics`)
+    - `spi/DbSchemaProvider.java` — Tier-2 SPI interface (api/0.6.0)
+    - `spi/EntityMapping.java` — Tier-2 SPI; one per synced entity (api/0.6.0)
     - `kafka/sync/db/SyncEvent.java` — typed wire envelope `SyncEvent<T>` with
       `String entityName`, `long pk`, `String op`, `T payload`, `long timestampEpochMs`
       (api/0.6.0)
@@ -61,44 +61,47 @@ design end-to-end.
 
 ## Key components
 
-- **`DbSyncModule`** (R1, R2, R12, R16) — Tier-1 SPI entry point. Lifecycle:
-    - `onConnect(ctx)` — Phase 1: discovers Tier-3 `JdbcConnectionSource` via
-      ServiceLoader (0 / >1 → `FAILED`), runs the smoke check
-      (`setReadOnly(true)` + `isValid(5)`); pass → state `ACTIVE`, fail →
-      `DEGRADED` (source kept so `stats()` still surfaces in heartbeat). No Kafka
-      producer capture in Phase 1. **Phase 2** additionally:
-        - discovers `DbSchemaProvider` (0 → `DISABLED`, >1 → `FAILED`, 1 → cache);
-        - reads `ctx.syncTopics()` — null/empty → log actionable WARN, transition
-          to `DISABLED`, no engine instantiated (R16). Defensive path; not expected
-          in steady-state operation.
-    - `start()` — Phase 1: no-op. **Phase 2**: instantiates `CdcEngine` (see
-      cdc-engine/tech.md) with `provider.mappings()` + `JdbcConnectionSource` +
-      Kafka producer + `TopicResolver` (built from `ctx.syncTopics()`); calls
-      `engine.start()` which schedules per-entity daemon ticks. Per-entity
-      missing-topic situations are handled inside the engine (R17 — entity →
-      `DEGRADED`, no scheduler) without affecting the module's overall state.
-    - `stop()` — Phase 1: no-op. **Phase 2**: `engine.stop()` — cancels schedulers,
-      drains in-flight Kafka sends.
-    - `onDisconnect()` — clears the cached `JdbcConnectionSource` reference. The
-      source itself is host-owned; db-sync does not close it. **Phase 2**: also
-      drops engine reference (snapshots are GC'd).
-    - `currentStatus()` — overrides the default to surface
-      `JdbcConnectionSource.stats()` in `ModuleStatus.Stats.pool` (Phase 1) and
-      `CdcEngine.currentEntityStats()` in `Stats.entities` (Phase 2). Tolerates a
-      throwing `stats()` impl by logging and falling back to empty stats.
-- **`DbSchemaProvider`** [planned] (R3, R4) — Tier-2 SPI. Single source of truth for "what tables
+- **`DbSyncModule`** (R1, R2, R3, R9, R12, R16) — Tier-1 SPI entry point. Lifecycle:
+    - `onConnect(ctx)` — gates on `ctx.syncTopics()` first (null/empty →
+      `DISABLED` + WARN, no SPI lookups). Then resolves Tier-3
+      `JdbcConnectionSource` (0 / >1 → `FAILED`) and runs the smoke check
+      (`setReadOnly(true)` + `isValid(5)`); pass → on track for `ACTIVE`,
+      fail → on track for `DEGRADED`. Then resolves Tier-2 `DbSchemaProvider`
+      (0 → `DISABLED`, >1 → `FAILED`, 1 → cache). On the happy path: state
+      becomes `ACTIVE` if smoke passed, else `DEGRADED` (engine still runs
+      so the next cycle retries borrow).
+    - `start()` — short-circuits on `DISABLED`/`FAILED`/`INIT`. Otherwise
+      validates cached `(provider, source, ctx, tracker)`, then if
+      `provider.mappings()` empty → `DISABLED`, else builds `EngineConfig`
+      from `EngineConfig.productionChain()`, `TopicResolver.fromContext(ctx)`,
+      `SyncEventPublisher(kafkaSender)`, and instantiates `CdcEngine` with the
+      whole bundle. `engine.start()` schedules one daemon thread per entity
+      with first-tick delay 0 (initial sync). On `Throwable` from
+      `engine.start` → `FAILED`.
+    - `stop()` — `engine.stop()`; cancels schedulers, awaits brief in-flight
+      drain (2 s), clears all snapshots. Idempotent.
+    - `onDisconnect()` — clears every cached ref (`source`, `provider`, `ctx`,
+      `statsTracker`, `engine`). Source itself is host-owned; module does not
+      close it.
+    - `currentStatus()` — surfaces both
+      `JdbcConnectionSource.stats() → Stats.pool` and
+      `EntityStatsTracker.currentStatuses() → Stats.entities`. Returns
+      `Stats.empty()` (singleton EMPTY) when both slots are absent so the
+      INIT-state heartbeat carries the canonical empty stats. Tolerates a
+      throwing `stats()` / `currentStatuses()` impl by logging and falling back.
+- **`DbSchemaProvider`** (R3, R4) — Tier-2 SPI. Single source of truth for "what tables
   look like in this schema". Vanilla impls expose `protected` template-method hooks for column
   / table names so client overrides change one thing without re-implementing the whole provider.
-- **`EntityMapping<T>`** [planned] (R5) — describes one table generically. CDC engine consumes
+- **`EntityMapping<T>`** (R5) — describes one table generically. CDC engine consumes
   uniformly without knowing the DTO type. Generic `T` carried for compile-time `mapRow` safety.
-- **CDC engine** [planned] — `CdcEngine`, `TableSyncTask`, `Phase1Hasher`,
-  `Phase2Fetcher`, `SnapshotStore`, `WindowPlanner`, `SyncEventPublisher` are designed
-  in [`cdc-engine/tech.md`](../cdc-engine/tech.md). `DbSyncModule.start()` (Phase 2)
-  instantiates `new CdcEngine(provider.mappings(), jdbcConnectionSource, kafkaProducer)`
-  and calls `engine.start()`; `currentStatus()` calls `engine.currentTableStats()` to
-  populate `ModuleStatus.Stats.entities[]`. Engine code physically lives in the
-  `nx-gs-db-sync-core` JAR but db-sync's design surface stops at "wire the engine with
-  the resolved provider's mappings".
+- **CDC engine** — `CdcEngine`, `EntitySyncTask`, `Phase1Hasher`,
+  `Phase2Fetcher`, `SnapshotStore`, `WindowPlanner`, `SyncEventPublisher`,
+  `TopicResolver`, `EntityStatsTracker`, `EngineConfig`,
+  `ConfigResolutionLogger` are designed in
+  [`cdc-engine/tech.md`](../cdc-engine/tech.md). The module assembles the
+  graph in `start()` and reads from it in `currentStatus()`. Engine code
+  physically lives in the `nx-gs-db-sync-core` JAR — db-sync's design
+  surface stops at "wire the engine with the resolved provider's mappings".
 - **`BohptsDbSchemaProvider`** [planned] (R10) — implements `DbSchemaProvider` directly
   (no template-method base class in MVP — vanilla L2J extraction deferred to
   second-customer time per spec Non-goals). Lives in bohpts-core repo. Returns one
@@ -184,10 +187,10 @@ NxAdapter.shutdown()
   (engine `long`, JSON number, Kafka key via `LongSerializer`). DTO field types
   mirror DB nullability: primitives for `NOT NULL` columns, boxed for nullable —
   Gson serializes both identically, but the type carries the nullability contract:
-    - `SyncEvent` [planned] — final wire shape decided per spec Open questions;
+    - `SyncEvent` — final wire shape:
       candidate fields: `entityName`, `op (CREATED|UPDATED|DELETED)`, `pk: long`,
       `payload`, `timestamp`
-    - `ClanDto` [planned]:
+    - `ClanDto`:
         - `long clanId` (PK, `NOT NULL`)
         - `String clanName` (`NOT NULL`)
         - `int clanLevel` (`NOT NULL`, source default `0`)
@@ -196,7 +199,7 @@ NxAdapter.shutdown()
 
 ## Integration points
 
-- **`:nx-gs-adapter-api`** [planned] (R10, R11) — adds `AdapterModule`,
+- **`:nx-gs-adapter-api`** (R10, R11) — adds `AdapterModule`,
   `ConnectContext`, `SyncEvent`, `ClanDto`. Bumped to next minor release. Lands in
   two slices: `AdapterModule` + `ConnectContext` arrive with the `adapter-bootstrap`
   / `adapter-modules` extension; `SyncEvent` (with `entityName`, `pk: long`) +
@@ -217,7 +220,7 @@ NxAdapter.shutdown()
   `BohptsDbSchemaProvider` + `ClanMapping` classes inline in its source tree, and
   ships `META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider` in its
   resources. NO separate `nx-gs-db-bohpts` artifact is published.
-- **`jdbc-connection-source` feature** [planned] (R2) — Tier-3 SPI feature delivering
+- **`jdbc-connection-source` feature** (R2) — Tier-3 SPI feature delivering
   `JdbcConnectionSource` + the bundled-Hikari fallback. `nx-gs-db-sync-core` consumes
   the resolved instance via `JdbcConnectionSourceResolver`. Pool implementation choice
   (host Path 1 — bohpts `DatabaseFactory`, vanilla L2J pool, etc. / Path 2 — bundled
@@ -226,7 +229,7 @@ NxAdapter.shutdown()
   `nx-gs-db-sync-core`, relocated to `app.l2nx.shaded.hikari.*` so it cannot collide
   with whatever pool the host JVM already ships. Adds ~150 KB to the
   `nx-gs-db-sync-core.jar`.
-- **`fastutil-core`** [planned] (cdc-engine R4) — added as `implementation` dep on
+- **`fastutil-core`** (cdc-engine R4) — declared as `implementation` dep on
   `nx-gs-db-sync-core` (~3 MB). Used by the engine's `Long2IntOpenHashMap` snapshots.
 - **`cdc-engine` feature** — engine code physically lives in `nx-gs-db-sync-core` JAR;
   design surface (algorithm, scheduler, RAM cap, query timeout, per-table heartbeat

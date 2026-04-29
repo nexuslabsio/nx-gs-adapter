@@ -17,7 +17,7 @@ Essence game server core and connects it to the L2NX platform.
 | `nx-gs-adapter-api`  | `app.l2nx:nx-gs-adapter-api`  | yes                  | Wire contracts (REST + Kafka DTOs) + Tier-1/Tier-3 SPI shared with the platform    |
 | `nx-gs-kafka`        | `app.l2nx:nx-gs-kafka`        | yes                  | Lightweight Kafka client facade for Java 8+ host JVMs                              |
 | `nx-gs-adapter-core` | `app.l2nx:nx-gs-adapter-core` | yes                  | Adapter runtime — connect, heartbeat, ServiceLoader-based module discovery         |
-| `nx-gs-db-sync-core` | `app.l2nx:nx-gs-db-sync-core` | yes                  | DB-sync `AdapterModule` — Phase 1 SPI smoke-check; Phase 2 adds CRC32 CDC engine   |
+| `nx-gs-db-sync-core` | `app.l2nx:nx-gs-db-sync-core` | yes                  | DB-sync `AdapterModule` — CRC32 CDC engine, Tier-2 SPI host, per-entity stats      |
 | `nx-log`             | —                             | no (shadow-included) | Internal logging facade — bundled into `nx-gs-kafka` and `nx-gs-adapter-core` jars |
 
 Future modules:
@@ -95,6 +95,17 @@ operator-local fallback for the bundled-Hikari pool. Creds NEVER travel through 
 platform; they live only on the operator's machine. If the host (e.g. bohpts-core)
 already exposes a `JdbcConnectionSource` via `META-INF/services`, leave the `l2nx.db.*`
 keys unset — the adapter will reuse the host's existing pool.
+
+**CDC engine tuning (`nx-gs-db-sync-core`):** the engine reads `l2nx.cdc-engine.*`
+keys from the same source chain (file-first, sysprop fallback). All have sane defaults
+sized for a 12M-row items table:
+
+| Key                                     | Default  | Purpose                                                    |
+|-----------------------------------------|----------|------------------------------------------------------------|
+| `l2nx.cdc-engine.tick-interval-seconds` | `60`     | Cycle period per entity                                    |
+| `l2nx.cdc-engine.rows-per-window`       | `500000` | PK-window size; large entities split into multiple windows |
+| `l2nx.cdc-engine.query-timeout-seconds` | `10`     | Per-statement JDBC timeout                                 |
+| `l2nx.cdc-engine.publish-flush-seconds` | `5`      | End-of-cycle Kafka-ack wait budget; failed PKs replay      |
 
 ```bash
 # Option A: l2nx.properties in the JVM working directory (implicit fallback)

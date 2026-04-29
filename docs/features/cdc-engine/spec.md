@@ -40,7 +40,7 @@ per-entity state via heartbeat enrichment).
 
 **Must:**
 
-- [todo] R1. The engine MUST execute the CRC32 two-phase protocol per `EntityMapping`
+- [wip] R1. The engine MUST execute the CRC32 two-phase protocol per `EntityMapping`
   on every scheduled tick. The protocol always runs in PK-windowed mode (R2) — there
   is no separate "full scan" code path; small entities collapse to a single window
   naturally:
@@ -75,7 +75,7 @@ per-entity state via heartbeat enrichment).
       snapshot, so the next cycle's diff re-detects them and replays the publish.
       PKs outside the current window's `[fromPk, toPk]` are never touched.
 
-- [todo] R2. **Single windowed sync strategy with `rows-per-window` config.** There is
+- [wip] R2. **Single windowed sync strategy with `rows-per-window` config.** There is
   one strategy: PK-range windowed scan. The engine partitions the entity's PK range
   into windows and walks them sequentially within one cycle, back-to-back, no pause:
     - At the start of every cycle the engine runs `SELECT MIN(<pk>), MAX(<pk>) FROM
@@ -107,7 +107,7 @@ per-entity state via heartbeat enrichment).
 > rowsPerWindow math without a per-entity strategy switch. Number R3 is intentionally
 > left as a gap.
 
-- [todo] R4. The engine MUST hold each entity's previous-snapshot in a fastutil
+- [wip] R4. The engine MUST hold each entity's previous-snapshot in a fastutil
   `it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap` (PK → CRC32). One map per
   `EntityMapping`, lifetime = adapter lifetime. Wiped on `DbSyncModule.onDisconnect`. RAM
   cost: ~24 bytes/entry → ~240 MB at 12M entries with default load factor 0.75.
@@ -116,7 +116,7 @@ per-entity state via heartbeat enrichment).
     - SC2. For 12M entries, RAM occupancy of one snapshot stays under 320 MB measured via
       `Runtime.totalMemory() - Runtime.freeMemory()` delta around the snapshot population.
 
-- [todo] R5. The engine MUST run each `EntityMapping` on a daemon
+- [wip] R5. The engine MUST run each `EntityMapping` on a daemon
   `ScheduledExecutorService` with **one thread per entity**:
     - Thread name: `nx-cdc-{schemaName}-{entityName}`
     - First tick fires immediately after `DbSyncModule.start` (initial sync — see R7);
@@ -126,7 +126,7 @@ per-entity state via heartbeat enrichment).
     - Tick wrapped in `SafeRunnable` (reused from adapter-bootstrap) so an uncaught
       throwable does not cancel the schedule
 
-- [todo] R6. **Cycle order — provider list.** When `DbSyncModule` configures the
+- [wip] R6. **Cycle order — provider list.** When `DbSyncModule` configures the
   engine with `provider.mappings()`, the engine launches one scheduler thread per
   entity in the ORDER returned by the provider. Within a single thread, ticks happen
   at the mapping's `tickInterval()`; entities on different threads run independently
@@ -134,7 +134,7 @@ per-entity state via heartbeat enrichment).
   if cross-entity cycle ordering matters (informational guideline — engine does not
   enforce or sort by row count).
 
-- [todo] R7. **Initial sync** — first tick after `DbSyncModule.start()` MUST replay
+- [wip] R7. **Initial sync** — first tick after `DbSyncModule.start()` MUST replay
   every existing row as `CREATED` events. Previous snapshot is empty → diff for each
   window returns all PKs in that window as created → Phase 2 fetches all rows →
   publishes one `SyncEvent { op: CREATED }` per row. No special bootstrap mode; the
@@ -148,7 +148,7 @@ per-entity state via heartbeat enrichment).
 > R8 left as a gap. `EntityState.SKIPPED` is therefore also removed (its sole
 > producer was the cap path) — `EntityState` enum carries only `HEALTHY | DEGRADED`.
 
-- [todo] R9. The engine MUST apply a global query timeout via
+- [wip] R9. The engine MUST apply a global query timeout via
   `Statement.setQueryTimeout(int seconds)` to every Phase 1 and Phase 2 query. Default
   10s, configurable via `l2nx.cdc-engine.query-timeout-seconds`. On
   `SQLTimeoutException`, the current window is aborted, the per-entity state
@@ -156,7 +156,7 @@ per-entity state via heartbeat enrichment).
   (or, if it was the last window, the next tick), and the snapshot for the affected
   window is NOT advanced.
 
-- [todo] R10. The engine MUST publish per-entity operational state on every cycle into
+- [done] R10. The engine MUST publish per-entity operational state on every cycle into
   `ModuleStatus.Stats.entities[]` (defined in `adapter-modules`). Each `EntityStats`
   entry carries:
     - `name` — entity name (e.g. `"clan"`, NOT source table `"clan_data"`)
@@ -175,7 +175,7 @@ per-entity state via heartbeat enrichment).
       every `currentStatuses()` invocation returns a fully populated, consistent
       `entities` list.
 
-- [todo] R11. **Per-query InnoDB consistent snapshot** — every Phase 1 query (full scan
+- [wip] R11. **Per-query InnoDB consistent snapshot** — every Phase 1 query (full scan
   or window) and every Phase 2 chunk MUST execute inside its own transaction opened with
   `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY` (or equivalent
   `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ` + first SELECT semantics on
@@ -184,7 +184,7 @@ per-entity state via heartbeat enrichment).
   take 20–40s; without a consistent snapshot, the scan mixes pre/post-update versions
   of rows and produces false-positive diffs.
 
-- [todo] R15. **Engine config from `l2nx.properties` only — no provider-side
+- [wip] R15. **Engine config from `l2nx.properties` only — no provider-side
   declarations.** All engine runtime parameters (cadence, window size, timeouts)
   are sourced exclusively from `l2nx.properties` (read via `ConfigResolver` from
   `adapter-bootstrap`); the schema provider does NOT declare any of them.
@@ -199,7 +199,7 @@ per-entity state via heartbeat enrichment).
   **All global engine config keys (MVP):**
 
   | Key                                          | Type           | Default   |
-            |----------------------------------------------|----------------|-----------|
+                |----------------------------------------------|----------------|-----------|
   | `l2nx.cdc-engine.tick-interval-seconds`      | long, seconds  | 60        |
   | `l2nx.cdc-engine.rows-per-window`            | int            | 500_000   |
   | `l2nx.cdc-engine.query-timeout-seconds`      | int, seconds   | 10        |
@@ -215,7 +215,7 @@ per-entity state via heartbeat enrichment).
   adapter restart. Dynamic per-entity reload is post-MVP via R14's inbound Kafka
   consumer.
 
-- [todo] R16. **Rich startup log** — at `CdcEngine.start()`, after R15 resolution
+- [wip] R16. **Rich startup log** — at `CdcEngine.start()`, after R15 resolution
   completes, the engine MUST emit a structured INFO log block listing the resolved
   configuration. Format:
 
@@ -249,7 +249,7 @@ per-entity state via heartbeat enrichment).
       default]` source tag per parameter — operators can audit "what is actually
       running" without reading code.
 
-- [todo] R17. **Per-entity Kafka topic resolution from `ConnectResponse`.** Topic
+- [done] R17. **Per-entity Kafka topic resolution from `ConnectResponse`.** Topic
   names are NOT constructed by the engine and are NOT declared by the schema provider
   — they arrive from the platform during the bootstrap handshake (see
   [`adapter-bootstrap` R16](../adapter-bootstrap/spec.md), `ConnectResponse.syncTopics:
@@ -273,7 +273,7 @@ per-entity state via heartbeat enrichment).
 
 **Should:**
 
-- [todo] R12. The engine SHOULD send `SyncEvent`s with idempotent producer semantics —
+- [done] R12. The engine SHOULD send `SyncEvent`s with idempotent producer semantics —
   `enable.idempotence=true` configured in `nx-gs-kafka` defaults. Wire shape per row:
     - **Key:** `long` PK — serialized via Kafka `LongSerializer` (8 bytes,
       big-endian). Same row → same partition → ordering guarantee per row. Topic name
@@ -288,7 +288,7 @@ per-entity state via heartbeat enrichment).
       non-null JSON envelope but the payload-slot is null. Compaction-friendly because
       the key uniquely identifies the row.
 
-- [todo] R13. The engine SHOULD NOT block waiting for Kafka acks per row. `NxKafka.send`
+- [wip] R13. The engine SHOULD NOT block waiting for Kafka acks per row. `NxKafka.send`
   returns immediately; the engine moves to the next row/window. A per-cycle
   `Long2ObjectMap<Future<RecordMetadata>>` keyed by PK tracks every in-flight send.
   At the end of a cycle the engine walks the map with a short flush budget
@@ -409,6 +409,35 @@ per-entity state via heartbeat enrichment).
   with a default method returning 10. Confirm that the SPI shape exposes this — currently
   `db-sync` R5 mentions it implicitly under `SLIDING_WINDOW` strategy but doesn't list
   `windowCount` as a method. Cross-spec sync needed once cdc-engine R3 is finalized.]
+- [NEEDS CLARIFICATION: code uses `Long2IntAVLTreeMap` (sorted, AVL-balanced) for
+  `SnapshotStore`, not `Long2IntOpenHashMap` as R4 prescribes. Switch was driven by
+  the per-window `keysInRange` cost: open-hash is O(N) full-walk per window (12M ×
+  N windows = quadratic at items scale); AVL-tree subMap is O(log N + k). RAM cost
+  goes up ~3-4× over open-hash. Should R4 be amended to mandate sorted storage, or
+  is a different structure (e.g. open-hash + sorted-keys side index) preferred?
+  ref: `nx-gs-db-sync-core/.../engine/SnapshotStore.java`]
+- [NEEDS CLARIFICATION: code defines `WindowPlanner.MAX_WINDOWS_PER_PLAN = 1_000_000`
+  as a sanity cap — protects host JVM from OOM when MIN/MAX span the full BIGINT
+  range and `rowsPerWindow` is misconfigured. Plan size > cap throws
+  `IllegalStateException` (engine catches and marks the entity DEGRADED). No R
+  describes this safety net; should be promoted to a Must (sized constraint on
+  the planning step) or left as an internal guard?
+  ref: `nx-gs-db-sync-core/.../engine/window/WindowPlanner.java`]
+- [NEEDS CLARIFICATION: R15 says config is "read via `ConfigResolver` from
+  `adapter-bootstrap`", but `:nx-gs-db-sync-core` cannot depend on
+  `:nx-gs-adapter-core` (api-only contract). Code instead has a tiny
+  `EngineConfig.productionChain()` replica with the same file-first /
+  sysprop-fallback shape. Functionally equivalent; should R15 be amended to
+  "same source chain as `ConfigResolver`" rather than literally use the class?
+  ref: `nx-gs-db-sync-core/.../engine/EngineConfig.java:88-100`]
+- [NEEDS CLARIFICATION: R1 Phase 2 spec says
+  `SELECT <fetchColumns> FROM <table> WHERE <pk> IN (...)`, but
+  `EntityMapping` has no `fetchColumns()` method — the SPI was deliberately
+  trimmed to `entityName / tableName / pkColumn / hashedColumns / mapRow /
+  dtoType`. Code uses `SELECT *` and lets `mapRow(rs)` pull only the columns
+  it needs. Should R1 be amended to `SELECT *` (matches code), or should
+  `fetchColumns()` be added to the SPI for narrower transfer over the wire?
+  ref: `nx-gs-db-sync-core/.../engine/phase/Phase2Fetcher.java:90`]
 
 ## Links
 

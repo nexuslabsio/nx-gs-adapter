@@ -35,7 +35,7 @@ heartbeat consumers (read enriched `enabledModules`).
     - `void onDisconnect()` — called after `stop`; releases resources (pools,
       connections, in-memory state)
 
-- [wip] R2. `nx-gs-adapter-api` MUST define
+- [done] R2. `nx-gs-adapter-api` MUST define
   `app.l2nx.gs.adapter.api.spi.ConnectContext` — immutable identity bundle passed to
   `AdapterModule.onConnect(ctx)`. **Phase 1** fields:
     - `UUID tenantId()`
@@ -63,7 +63,7 @@ heartbeat consumers (read enriched `enabledModules`).
   ship intentionally later. `syncTopics` arrives in api/0.6.0 alongside the
   `EntityStats` types.
 
-- [wip] R3. `nx-gs-adapter-api` MUST define
+- [done] R3. `nx-gs-adapter-api` MUST define
   `app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus` — value type for heartbeat enrichment:
     - `String name()` — matches `AdapterModule.name()`
     - `String state()` — one of `ACTIVE` | `DEGRADED` | `DISABLED` | `FAILED` (string,

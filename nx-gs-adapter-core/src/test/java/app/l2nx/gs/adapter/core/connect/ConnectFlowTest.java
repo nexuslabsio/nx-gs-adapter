@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.connect;
 
+import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.core.concurrent.CapturingScheduler;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.AdapterConfigFixtures;
@@ -11,15 +12,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class ConnectFlowTest {
 
@@ -199,6 +198,96 @@ class ConnectFlowTest {
                 ConnectFlow.sanitize("error talking to Bearer nx_sk_abcdefghijklmnopqrstuvwxyz012345"));
         assertEquals("(no message)", ConnectFlow.sanitize(null));
         assertEquals("plain text unchanged", ConnectFlow.sanitize("plain text unchanged"));
+    }
+
+    @Test
+    void run_shouldParseSyncTopics_whenResponseCarriesThem() {
+        String body = "{"
+                + "\"tenantId\":\"00000000-0000-0000-0000-000000000001\","
+                + "\"tenantSlug\":\"acme\","
+                + "\"serverId\":\"00000000-0000-0000-0000-000000000002\","
+                + "\"serverSlug\":\"acme-x1\","
+                + "\"serverName\":\"Acme X1\","
+                + "\"kafka\":{\"bootstrap\":\"k:9092\",\"topics\":{\"heartbeat\":\"hb\"}},"
+                + "\"syncTopics\":{"
+                + "\"clan\":\"bohpts.gs.sync.clans\","
+                + "\"character\":\"bohpts.gs.sync.characters\""
+                + "}}";
+        wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+
+        AtomicReference<ConnectResponse> captured = new AtomicReference<ConnectResponse>();
+        AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
+        ConnectFlow flow = new ConnectFlow(cfg,
+                new HttpURLConnectionConnectClient(),
+                new DefaultBackoffSchedule(),
+                scheduler,
+                outcomes::add,
+                captured::set);
+        flow.run();
+
+        assertEquals(Collections.singletonList(ConnectFlow.Outcome.STARTING), outcomes);
+        ConnectResponse response = captured.get();
+        assertNotNull(response);
+        Map<String, String> expected = new HashMap<String, String>();
+        expected.put("clan", "bohpts.gs.sync.clans");
+        expected.put("character", "bohpts.gs.sync.characters");
+        assertEquals(expected, response.getSyncTopics());
+    }
+
+    @Test
+    void run_shouldExposeNullSyncTopics_whenFieldAbsent() {
+        wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(VALID_CONNECT_RESPONSE)));
+
+        AtomicReference<ConnectResponse> captured = new AtomicReference<ConnectResponse>();
+        AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
+        ConnectFlow flow = new ConnectFlow(cfg,
+                new HttpURLConnectionConnectClient(),
+                new DefaultBackoffSchedule(),
+                scheduler,
+                outcomes::add,
+                captured::set);
+        flow.run();
+
+        ConnectResponse response = captured.get();
+        assertNotNull(response);
+        assertNull(response.getSyncTopics());
+    }
+
+    @Test
+    void run_shouldExposeEmptySyncTopics_whenFieldEmpty() {
+        String body = "{"
+                + "\"tenantId\":\"00000000-0000-0000-0000-000000000001\","
+                + "\"tenantSlug\":\"acme\","
+                + "\"serverId\":\"00000000-0000-0000-0000-000000000002\","
+                + "\"serverSlug\":\"acme-x1\","
+                + "\"serverName\":\"Acme X1\","
+                + "\"kafka\":{\"bootstrap\":\"k:9092\",\"topics\":{\"heartbeat\":\"hb\"}},"
+                + "\"syncTopics\":{}}";
+        wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+
+        AtomicReference<ConnectResponse> captured = new AtomicReference<ConnectResponse>();
+        AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
+        ConnectFlow flow = new ConnectFlow(cfg,
+                new HttpURLConnectionConnectClient(),
+                new DefaultBackoffSchedule(),
+                scheduler,
+                outcomes::add,
+                captured::set);
+        flow.run();
+
+        ConnectResponse response = captured.get();
+        assertNotNull(response);
+        assertNotNull(response.getSyncTopics());
+        assertTrue(response.getSyncTopics().isEmpty());
     }
 
     @Test

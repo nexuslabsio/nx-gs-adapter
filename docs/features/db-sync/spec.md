@@ -72,7 +72,7 @@ module authors (datapack sync, metrics).
       configuration — works identically across Path 1 (host pool, may or may not be
       pool-level read-only) and Path 2 (bundled pool, pool-level read-only is set).
 
-- [wip] R3. **[Phase 2]** `nx-gs-db-sync-core` MUST consume the Tier-2 SPI
+- [done] R3. **[Phase 2]** `nx-gs-db-sync-core` MUST consume the Tier-2 SPI
   `DbSchemaProvider` (defined in `nx-gs-adapter-api` package
   `app.l2nx.gs.adapter.api.spi`, alongside Tier-1 `AdapterModule` and Tier-3
   `JdbcConnectionSource` — provider authors depend only on `nx-gs-adapter-api`,
@@ -136,7 +136,7 @@ module authors (datapack sync, metrics).
 > resolved `DbSchemaProvider` at Phase 2 start. Numbers R6 / R7 / R8 are intentionally
 > left as gaps here — not reused per the SpecKit "deleted numbers stay deleted" rule.
 
-- [wip] R9. **[Phase 1: module-level only / Phase 2: per-table]** db-sync engine MUST NOT
+- [done] R9. **[Phase 1: module-level only / Phase 2: per-table]** db-sync engine MUST NOT
   propagate exceptions to host-JVM threads. **Phase 1**: only module-level handling —
   `onConnect` failures (SPI not resolved / smoke check throws) are caught and surface as
   `FAILED` / `DEGRADED` per R2. **Phase 2**: every CDC entry point (scheduler tick, Kafka
@@ -196,7 +196,7 @@ module authors (datapack sync, metrics).
 
 **Should:**
 
-- [wip] R12. **[Phase 1: pool only / Phase 2: + entities]** db-sync SHOULD surface
+- [done] R12. **[Phase 1: pool only / Phase 2: + entities]** db-sync SHOULD surface
   per-module health on `HeartbeatEvent.enabledModules` via `ModuleStatus` (defined
   in `adapter-modules`). **Phase 1**: `{name: "db-sync", state: "ACTIVE", stats:
   {pool: {active, idle, total, waiting}}}` — pool stats forwarded from
@@ -228,7 +228,7 @@ module authors (datapack sync, metrics).
 > `SLIDING_WINDOW` enum, no `mapping.strategy()`. See
 > [`cdc-engine` R2](../cdc-engine/spec.md).
 
-- [todo] R16. **[Phase 2]** `DbSyncModule.onConnect` MUST consult
+- [done] R16. **[Phase 2]** `DbSyncModule.onConnect` MUST consult
   `ctx.syncTopics()` (per [`adapter-modules` R2](../adapter-modules/spec.md) and
   [`adapter-bootstrap` R16](../adapter-bootstrap/spec.md)) before instantiating the
   CDC engine. Behavior:

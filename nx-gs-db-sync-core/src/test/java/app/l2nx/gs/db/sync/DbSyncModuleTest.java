@@ -2,14 +2,19 @@ package app.l2nx.gs.db.sync;
 
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
+import app.l2nx.gs.adapter.api.kafka.sync.db.ClanDto;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
+import app.l2nx.gs.adapter.api.spi.DbSchemaProvider;
+import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -17,11 +22,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class DbSyncModuleTest {
 
-    private final ConnectContext ctx = ConnectContext.builder()
-            .tenantId(UUID.randomUUID()).tenantSlug("acme")
-            .serverId(UUID.randomUUID()).serverSlug("primary").serverName("Acme Primary")
-            .adapterVersion("0.1.0")
-            .build();
+    private static final Map<String, String> CLAN_TOPIC =
+            Collections.singletonMap("clan", "bohpts.gs.sync.clans");
+
+    private static final ConnectContext CTX_WITH_TOPICS = ctx(CLAN_TOPIC);
+    private static final ConnectContext CTX_NO_TOPICS = ctx(null);
+
+    private static final KafkaSender NEVER_CALLED = (topic, key, value, callback) -> {
+        throw new AssertionError("KafkaSender must not be called from constructor-only paths");
+    };
 
     @Test
     void name_shouldBe_dbSync() {
@@ -30,7 +39,7 @@ class DbSyncModuleTest {
 
     @Test
     void currentStatus_beforeOnConnect_shouldReportInitWithEmptyStats() {
-        DbSyncModule module = new DbSyncModule(emptyDiscoverer(), passSmoke());
+        DbSyncModule module = build(emptyJdbc(), emptySchema(), passSmoke());
 
         ModuleStatus status = module.currentStatus();
 
@@ -39,61 +48,88 @@ class DbSyncModuleTest {
     }
 
     @Test
-    void onConnect_shouldFail_whenNoSourceFound() {
-        DbSyncModule module = new DbSyncModule(emptyDiscoverer(), passSmoke());
+    void onConnect_shouldDisable_whenSyncTopicsEmpty() {
+        DbSyncModule module = build(singleJdbc(stub("a", null)), singleSchema(clanProvider()), passSmoke());
 
-        module.onConnect(ctx);
+        module.onConnect(CTX_NO_TOPICS);
+
+        assertEquals("DISABLED", module.currentStatus().getState());
+    }
+
+    @Test
+    void onConnect_shouldFail_whenNoJdbcSource() {
+        DbSyncModule module = build(emptyJdbc(), singleSchema(clanProvider()), passSmoke());
+
+        module.onConnect(CTX_WITH_TOPICS);
 
         assertEquals("FAILED", module.currentStatus().getState());
     }
 
     @Test
-    void onConnect_shouldFail_whenMultipleSourcesFound() {
-        JdbcConnectionSource a = stub("a", null);
-        JdbcConnectionSource b = stub("b", null);
-        DbSyncModule module = new DbSyncModule(() -> Arrays.asList(a, b), passSmoke());
+    void onConnect_shouldFail_whenMultipleJdbcSources() {
+        DbSyncModule module = build(
+                () -> Arrays.asList(stub("a", null), stub("b", null)),
+                singleSchema(clanProvider()),
+                passSmoke());
 
-        module.onConnect(ctx);
+        module.onConnect(CTX_WITH_TOPICS);
 
         assertEquals("FAILED", module.currentStatus().getState());
     }
 
     @Test
-    void onConnect_shouldBecomeActive_whenSmokeCheckPasses() {
-        JdbcConnectionSource src = stub("stub", null);
-        DbSyncModule module = new DbSyncModule(singleton(src), passSmoke());
+    void onConnect_shouldDisable_whenNoSchemaProvider() {
+        DbSyncModule module = build(singleJdbc(stub("a", null)), emptySchema(), passSmoke());
 
-        module.onConnect(ctx);
+        module.onConnect(CTX_WITH_TOPICS);
+
+        assertEquals("DISABLED", module.currentStatus().getState());
+    }
+
+    @Test
+    void onConnect_shouldFail_whenMultipleSchemaProviders() {
+        DbSyncModule module = build(singleJdbc(stub("a", null)),
+                () -> Arrays.asList(clanProvider(), clanProvider()),
+                passSmoke());
+
+        module.onConnect(CTX_WITH_TOPICS);
+
+        assertEquals("FAILED", module.currentStatus().getState());
+    }
+
+    @Test
+    void onConnect_shouldBecomeActive_whenAllResolvedAndSmokePasses() {
+        DbSyncModule module = build(singleJdbc(stub("a", null)), singleSchema(clanProvider()), passSmoke());
+
+        module.onConnect(CTX_WITH_TOPICS);
 
         assertEquals("ACTIVE", module.currentStatus().getState());
     }
 
     @Test
     void onConnect_shouldBecomeDegraded_whenSmokeCheckFails() {
-        JdbcConnectionSource src = stub("stub", new PoolStats(0, 4, 4, null));
-        DbSyncModule module = new DbSyncModule(singleton(src), failSmoke());
+        PoolStats pool = new PoolStats(0, 4, 4, null);
+        DbSyncModule module = build(singleJdbc(stub("a", pool)), singleSchema(clanProvider()), failSmoke());
 
-        module.onConnect(ctx);
+        module.onConnect(CTX_WITH_TOPICS);
 
         ModuleStatus status = module.currentStatus();
         assertEquals("DEGRADED", status.getState());
-        // Source ref retained so pool stats still bubble up while smoke is degraded.
-        assertEquals(Optional.of(new PoolStats(0, 4, 4, null)), status.getStats().getPool());
+        assertEquals(Optional.of(pool), status.getStats().getPool());
     }
 
     @Test
     void currentStatus_shouldSurfacePoolStats_whenSourceProvidesThem() {
         PoolStats pool = new PoolStats(2, 6, 8, null);
-        JdbcConnectionSource src = stub("stub", pool);
-        DbSyncModule module = new DbSyncModule(singleton(src), passSmoke());
+        DbSyncModule module = build(singleJdbc(stub("a", pool)), singleSchema(clanProvider()), passSmoke());
 
-        module.onConnect(ctx);
+        module.onConnect(CTX_WITH_TOPICS);
 
         assertEquals(Optional.of(pool), module.currentStatus().getStats().getPool());
     }
 
     @Test
-    void currentStatus_shouldDegradeStatsToEmpty_whenSrcStatsThrows() {
+    void currentStatus_shouldNotPropagate_whenSrcStatsThrows() {
         JdbcConnectionSource src = new JdbcConnectionSource() {
             @Override
             public String name() {
@@ -110,19 +146,19 @@ class DbSyncModuleTest {
                 throw new RuntimeException("buggy spi");
             }
         };
-        DbSyncModule module = new DbSyncModule(singleton(src), passSmoke());
+        DbSyncModule module = build(singleJdbc(src), singleSchema(clanProvider()), passSmoke());
 
-        module.onConnect(ctx);
+        module.onConnect(CTX_WITH_TOPICS);
 
         assertFalse(module.currentStatus().getStats().getPool().isPresent());
     }
 
     @Test
     void onDisconnect_shouldClearSourceReference() {
-        JdbcConnectionSource src = stub("stub", new PoolStats(1, 1, 2, null));
-        DbSyncModule module = new DbSyncModule(singleton(src), passSmoke());
+        PoolStats pool = new PoolStats(1, 1, 2, null);
+        DbSyncModule module = build(singleJdbc(stub("a", pool)), singleSchema(clanProvider()), passSmoke());
 
-        module.onConnect(ctx);
+        module.onConnect(CTX_WITH_TOPICS);
         assertTrue(module.currentStatus().getStats().getPool().isPresent());
 
         module.onDisconnect();
@@ -133,36 +169,72 @@ class DbSyncModuleTest {
     @Test
     void smokeChecker_shouldReceiveResolvedSource() {
         JdbcConnectionSource src = stub("seen", null);
-        AtomicReference<JdbcConnectionSource> seen = new AtomicReference<JdbcConnectionSource>();
+        java.util.concurrent.atomic.AtomicReference<JdbcConnectionSource> seen =
+                new java.util.concurrent.atomic.AtomicReference<JdbcConnectionSource>();
         Predicate<JdbcConnectionSource> spy = s -> {
             seen.set(s);
             return true;
         };
-        DbSyncModule module = new DbSyncModule(singleton(src), spy);
+        DbSyncModule module = build(singleJdbc(src), singleSchema(clanProvider()), spy);
 
-        module.onConnect(ctx);
+        module.onConnect(CTX_WITH_TOPICS);
 
         assertSame(src, seen.get());
     }
 
     @Test
-    void start_stop_onDisconnect_shouldBeNoOpsInPhase1() {
-        DbSyncModule module = new DbSyncModule(emptyDiscoverer(), passSmoke());
+    void stop_shouldBeNoOp_whenEngineNeverStarted() {
+        DbSyncModule module = build(emptyJdbc(), emptySchema(), passSmoke());
 
-        // None of these throw; nothing observable changes besides onDisconnect clearing source.
-        module.start();
-        module.stop();
+        module.stop(); // no engine yet
         module.onDisconnect();
 
         assertEquals("INIT", module.currentStatus().getState());
     }
 
-    private static Supplier<List<JdbcConnectionSource>> emptyDiscoverer() {
+    @Test
+    void start_shouldBeNoOp_whenStateDisabled() {
+        DbSyncModule module = build(singleJdbc(stub("a", null)), singleSchema(clanProvider()), passSmoke());
+
+        module.onConnect(CTX_NO_TOPICS); // → DISABLED
+        module.start();
+
+        // Engine never started — stays DISABLED, currentStatus carries no entities.
+        ModuleStatus status = module.currentStatus();
+        assertEquals("DISABLED", status.getState());
+        assertFalse(status.getStats().getEntities().isPresent());
+    }
+
+    private static DbSyncModule build(Supplier<List<JdbcConnectionSource>> jdbc,
+                                      Supplier<List<DbSchemaProvider>> schema,
+                                      Predicate<JdbcConnectionSource> smoke) {
+        Function<String, String> noSysprops = k -> null;
+        return new DbSyncModule(jdbc, schema, smoke, noSysprops, NEVER_CALLED);
+    }
+
+    private static ConnectContext ctx(Map<String, String> syncTopics) {
+        return ConnectContext.builder()
+                .tenantId(UUID.randomUUID()).tenantSlug("acme")
+                .serverId(UUID.randomUUID()).serverSlug("primary").serverName("Acme Primary")
+                .adapterVersion("0.1.0")
+                .syncTopics(syncTopics)
+                .build();
+    }
+
+    private static Supplier<List<JdbcConnectionSource>> emptyJdbc() {
         return Collections::emptyList;
     }
 
-    private static Supplier<List<JdbcConnectionSource>> singleton(JdbcConnectionSource src) {
+    private static Supplier<List<JdbcConnectionSource>> singleJdbc(JdbcConnectionSource src) {
         return () -> Collections.singletonList(src);
+    }
+
+    private static Supplier<List<DbSchemaProvider>> emptySchema() {
+        return Collections::emptyList;
+    }
+
+    private static Supplier<List<DbSchemaProvider>> singleSchema(DbSchemaProvider p) {
+        return () -> Collections.singletonList(p);
     }
 
     private static Predicate<JdbcConnectionSource> passSmoke() {
@@ -190,5 +262,58 @@ class DbSyncModuleTest {
                 return pool != null ? Optional.of(pool) : Optional.<PoolStats>empty();
             }
         };
+    }
+
+    private static DbSchemaProvider clanProvider() {
+        return new DbSchemaProvider() {
+            @Override
+            public String schemaName() {
+                return "test";
+            }
+
+            @Override
+            public List<EntityMapping<?>> mappings() {
+                return Collections.singletonList(clanMapping());
+            }
+        };
+    }
+
+    private static EntityMapping<ClanDto> clanMapping() {
+        return new EntityMapping<ClanDto>() {
+            @Override
+            public String entityName() {
+                return "clan";
+            }
+
+            @Override
+            public String tableName() {
+                return "clan_data";
+            }
+
+            @Override
+            public String pkColumn() {
+                return "clan_id";
+            }
+
+            @Override
+            public List<String> hashedColumns() {
+                return Arrays.asList("clan_name", "clan_level");
+            }
+
+            @Override
+            public ClanDto mapRow(ResultSet rs) {
+                return null;
+            }
+
+            @Override
+            public Class<ClanDto> dtoType() {
+                return ClanDto.class;
+            }
+        };
+    }
+
+    @SuppressWarnings("unused")
+    private static void unusedNotNull() {
+        assertNotNull(new Object());
     }
 }

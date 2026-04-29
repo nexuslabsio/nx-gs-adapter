@@ -22,6 +22,9 @@ repositories {
 
 dependencies {
     api(project(":nx-gs-adapter-api"))
+    implementation(project(":nx-gs-kafka"))
+    implementation(libs.fastutil.core)
+    implementation(libs.gson)
     compileOnly(libs.slf4j.api)
 
     // :nx-log is shadow-included into the published jar — not exposed as a Maven dep.

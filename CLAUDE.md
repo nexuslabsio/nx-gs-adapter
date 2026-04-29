@@ -27,10 +27,14 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
 - `:nx-gs-adapter-core` — runtime: config resolution, POST `/connect`, heartbeat, ServiceLoader-based
   module discovery, lifecycle. Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` + `gson`.
   Package root `app.l2nx.gs.adapter.core`. `:nx-log` shadow-included.
-- `:nx-gs-db-sync-core` — DB-sync `AdapterModule` shipped to Maven Central. Phase 1 ships
-  the SPI smoke-check (resolves `JdbcConnectionSource` via Tier-3 SPI, surfaces pool stats
-  in heartbeat). Phase 2 adds the CRC32 CDC engine + Tier-2 `DbSchemaProvider` SPI.
-  Depends on `:nx-gs-adapter-api`. Package root `app.l2nx.gs.db.sync`. `:nx-log`
+- `:nx-gs-db-sync-core` — DB-sync `AdapterModule` shipped to Maven Central. Owns the
+  CRC32 two-phase CDC engine (one daemon thread per entity, server-side CRC32 hashing,
+  per-row snapshot swap on Kafka ack) and resolves the Tier-2 `DbSchemaProvider` SPI
+  (defined in `nx-gs-adapter-api` so client providers depend only on the api artifact).
+  Surfaces both `pool` (from `JdbcConnectionSource.stats()`) and `entities` (per-entity
+  `EntityStats`) slots in the heartbeat. Engine config lives under `l2nx.cdc-engine.*`
+  (file-first source chain). Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +
+  `fastutil-core` + `gson`. Package root `app.l2nx.gs.db.sync`. `:nx-log`
   shadow-included.
 - `:nx-log` — internal logging facade (`app.l2nx.log`). NOT published; classes are bundled
   into `:nx-gs-kafka`, `:nx-gs-adapter-core`, and `:nx-gs-db-sync-core` jars at build time.

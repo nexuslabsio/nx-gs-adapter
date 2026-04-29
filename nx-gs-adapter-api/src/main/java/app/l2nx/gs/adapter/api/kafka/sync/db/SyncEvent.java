@@ -27,8 +27,11 @@ import java.util.Objects;
  *     {@code EntityMapping.entityName()} on the producer side. NOT the source
  *     SQL table name.</li>
  *     <li>{@code pk} — primary key as {@code long}. Engine reads via
- *     {@code rs.getLong(pkColumn)}; Kafka message key is the same value
- *     serialized with {@code LongSerializer} (8 bytes).</li>
+ *     {@code rs.getLong(pkColumn)}. The Kafka message key is the same value
+ *     encoded as 8 bytes big-endian (identical to
+ *     {@code LongSerializer.serialize(topic, pk)}); consumers can decode with
+ *     {@code LongDeserializer} for byte-equal partition + compaction-key parity
+ *     across any future external writer.</li>
  *     <li>{@code op} — string enum on the wire: {@code "CREATED"},
  *     {@code "UPDATED"}, {@code "DELETED"}. String (not enum) keeps the platform
  *     consumer decoupled from JVM enum ordinals; consumers SHOULD treat unknown

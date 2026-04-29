@@ -123,73 +123,73 @@ the rest of the plan.
 
 ### Bootstrap plumbing — `:nx-gs-adapter-core`
 
-11. **Parse `ConnectResponse.syncTopics`** in adapter-core's `/connect` response
+11. [x] **Parse `ConnectResponse.syncTopics`** in adapter-core's `/connect` response
     handler. Treat null/absent as empty map (defensive). Existing
     `ConnectResponse` Gson type-adapter handles `Map<String, String>` natively; verify
     a unit test covers null + empty + populated cases.
 
-12. **Thread `syncTopics` through `ConnectContext`** built before module dispatch in
+12. [x] **Thread `syncTopics` through `ConnectContext`** built before module dispatch in
     `NxAdapter.start()`. Construct an `unmodifiableMap` copy at boundary; modules see
     the immutable view.
 
-13. **Wire smoke test in :nx-gs-adapter-core** — WireMock `/connect` returning a
+13. [x] **Wire smoke test in :nx-gs-adapter-core** — WireMock `/connect` returning a
     `syncTopics` map with one entry, assert downstream `ConnectContext.syncTopics()`
     reflects it identically.
 
 ### CDC engine — `:nx-gs-db-sync-core` package `app.l2nx.gs.db.sync.engine`
 
-14. **Add `fastutil-core` runtime dep** to `:nx-gs-db-sync-core` (`it.unimi.dsi:fastutil-core:8.5.x`,
+14. [x] **Add `fastutil-core` runtime dep** to `:nx-gs-db-sync-core` (`it.unimi.dsi:fastutil-core:8.5.x`,
     ~3 MB). Verify shadowJar still bundles only `:nx-log` and does NOT relocate
     fastutil packages (consumers can use the same fastutil JAR if they want;
     classpath collision risk is low since fastutil-core is read-only data
     structures with no version-coupled API).
 
-15. **`EngineConfig`** value class + `EngineConfig.from(ConfigResolver)` static
+15. [x] **`EngineConfig`** value class + `EngineConfig.from(ConfigResolver)` static
     factory reading `l2nx.cdc-engine.tick-interval-seconds` (default 60),
     `rows-per-window` (default 500_000), `query-timeout-seconds` (default 10),
     `publish-flush-seconds` (default 5). One-shot read at engine start; cached for
     engine lifetime.
 
-16. **`SnapshotStore`** wrapping `Long2IntOpenHashMap` per entity, keyed by
+16. [x] **`SnapshotStore`** wrapping `Long2IntOpenHashMap` per entity, keyed by
     `entityName`. API: `getCrc(entity, pk)`, `putCrc(entity, pk, crc)`,
     `removeCrc(entity, pk)`, `keysInRange(entity, fromPk, toPk)` returning a `LongSet`,
     `clearEntity(entity)`. Wiped on `CdcEngine.stop()`.
 
-17. **`WindowPlanner`**. Method
+17. [x] **`WindowPlanner`**. Method
     `plan(EntityMapping mapping, Connection conn, int rowsPerWindow)` runs `SELECT
     MIN(<pk>), MAX(<pk>) FROM <table>` (50ms target per cdc-engine SC1), returns
     `List<Window { fromPk, toPk }>`. Single-window degenerate case when
     `MAX - MIN + 1 <= rowsPerWindow`. Half-open intervals partitioning `[MIN, MAX]`.
 
-18. **`Phase1Hasher`**. Method `hash(Window window, EntityMapping mapping, Connection
+18. [x] **`Phase1Hasher`**. Method `hash(Window window, EntityMapping mapping, Connection
     conn)` runs `SELECT <pk>, CRC32(CONCAT_WS(',', col1, col2, ...)) FROM <table>
     WHERE <pk> BETWEEN ? AND ?` inside `START TRANSACTION WITH CONSISTENT SNAPSHOT,
     READ ONLY`, returns `Long2IntMap` (current scan for window).
     `Statement.setQueryTimeout(engineConfig.queryTimeoutSeconds())`.
     Commit and close transaction immediately after result drained.
 
-19. **Diff (inline in `EntitySyncTask`).** Given `Long2IntMap currentScan` + `LongSet
+19. [x] **Diff (inline in `EntitySyncTask`).** Given `Long2IntMap currentScan` + `LongSet
     prevKeysInRange` + `SnapshotStore.getCrc` lookups, produce
     `ChangeSet { LongSet created, LongSet updated, LongSet deleted }`.
 
-20. **`Phase2Fetcher`**. Method `fetch(EntityMapping mapping, LongList pks,
+20. [x] **`Phase2Fetcher`**. Method `fetch(EntityMapping mapping, LongList pks,
     Connection conn)` chunks PK list at 1000 entries, runs `SELECT <fetchColumns>
     FROM <table> WHERE <pk> IN (?,?,...)` inside `START TRANSACTION WITH CONSISTENT
     SNAPSHOT, READ ONLY` per chunk, calls `mapping.mapRow(rs)` per row, returns
     `Long2ObjectMap<T>` (PK → DTO). Phase-2 missing rows: silent no-op (next cycle
     catches via Phase 1 diff per resolved decision).
 
-21. **`SyncEventPublisher`**. Method `publish(EntityMapping mapping, String op, long
+21. [x] **`SyncEventPublisher`**. Method `publish(EntityMapping mapping, String op, long
     pk, T dto, String topic)` builds `SyncEvent<T>`, sends via
     `NxKafka.send(topic, key=longSerialize(pk), value=Gson(syncEvent))`. Tombstone for
     DELETED (`payload=null`). Returns `Future<RecordMetadata>` for end-of-cycle flush
     walk. Engine-side: idempotent producer enabled in nx-gs-kafka defaults.
 
-22. **`TopicResolver` SAM** + concrete impl bound to `ctx.syncTopics()`.
+22. [x] **`TopicResolver` SAM** + concrete impl bound to `ctx.syncTopics()`.
     `String resolveTopic(String entityName)` returns the platform-supplied topic name
     or null. Cached map snapshot at engine start; no re-resolution per cycle.
 
-23. **`EntitySyncTask`** orchestrating one cycle for a single entity. Sequence:
+23. [x] **`EntitySyncTask`** orchestrating one cycle for a single entity. Sequence:
     - Borrow `Connection` from `JdbcConnectionSource`, `setReadOnly(true)`
     - `WindowPlanner.plan(mapping, conn, rowsPerWindow)` → list of windows
     - For each window:
@@ -205,12 +205,12 @@ the rest of the plan.
         - failed/timed-out → leave snapshot untouched; PK replayed on next cycle
     - Close connection (try-with-resources)
 
-24. **`EntityStatsTracker`** holding volatile `Map<String, EntityStats>`. Per cycle:
+24. [x] **`EntityStatsTracker`** holding volatile `Map<String, EntityStats>`. Per cycle:
     `recordCycleResult(entityName, EntityStats {...})`. Reader path
     (`currentStatuses()`) returns immutable `List<EntityStats>` snapshot. `volatile`
     reference assignment on rebuild; reader sees fully-formed list.
 
-25. **`CdcEngine`** top-level. `start(provider, topicResolver, kafkaSender, jdbcSource,
+25. [x] **`CdcEngine`** top-level. `start(provider, topicResolver, kafkaSender, jdbcSource,
     engineConfig, statsTracker)`:
     - Resolve topics for every mapping (warn + entity-DEGRADED for missing)
     - Spin up `ScheduledExecutorService` with one daemon thread per entity (thread
@@ -220,14 +220,14 @@ the rest of the plan.
     - Each tick wrapped in `SafeRunnable` (reuse from adapter-bootstrap)
     - `stop()` cancels schedulers, awaits brief in-flight wait, clears all snapshots
 
-26. **`ConfigResolutionLogger`** emitting cdc-engine R16 startup log block on
+26. [x] **`ConfigResolutionLogger`** emitting cdc-engine R16 startup log block on
     `CdcEngine.start()` (after EngineConfig resolution + topic resolution):
     one engine-globals line listing `tickInterval`, `rowsPerWindow`,
     `queryTimeout`, `publishFlush` with `[operator-override | default]` source tags
     + one per-entity line listing `entityName → topic` (or `topic=<missing —
     entity DEGRADED>` if platform did not deliver).
 
-27. **DEGRADED triage** in `EntitySyncTask`:
+27. [x] **DEGRADED triage** in `EntitySyncTask`:
     - Borrow failure / connection lost → entity DEGRADED, snapshot untouched
     - `SQLTimeoutException` mid-window → window skipped, transition entity
       DEGRADED for the cycle, continue to next window
@@ -235,7 +235,7 @@ the rest of the plan.
       retries from start
     - Missing topic for entity → entity DEGRADED every cycle, no Kafka publishes
 
-28. **Per-entity `consecutiveErrors`** counter. Increment on DEGRADED, reset to 0 on
+28. [x] **Per-entity `consecutiveErrors`** counter. Increment on DEGRADED, reset to 0 on
     HEALTHY. Surfaces in `EntityStats`.
 
 #### Checkpoint — engine compiles + diff/publish unit tests pass
@@ -245,7 +245,7 @@ mode. End-to-end test deferred to M36.
 
 ### DbSyncModule wiring — `:nx-gs-db-sync-core`
 
-29. **`DbSyncModule.onConnect(ctx)`** body:
+29. [x] **`DbSyncModule.onConnect(ctx)`** body:
     - Read `ctx.syncTopics()`. If null/empty → log WARN ("no entity topics in
       ConnectResponse — db-sync has nothing to sync"), set internal state
       `DISABLED`, return. No engine, no scheduler, no SPI resolution attempted.
@@ -257,21 +257,21 @@ mode. End-to-end test deferred to M36.
     - Cache `ConnectContext` ref for later `currentStatus()` calls (heartbeat
       thread).
 
-30. **`DbSyncModule.start()`** instantiates `CdcEngine` with cached
+30. [x] **`DbSyncModule.start()`** instantiates `CdcEngine` with cached
     `JdbcConnectionSource`, resolved provider's `mappings()`, `TopicResolver`
     bound to `ctx.syncTopics()`, `EngineConfig.from(configResolver)`,
     `EntityStatsTracker`, Kafka sender. `engine.start()`.
 
-31. **`DbSyncModule.currentStatus()`** override surfaces:
+31. [x] **`DbSyncModule.currentStatus()`** override surfaces:
     - `pool()` from `JdbcConnectionSource.stats()` (Optional)
     - `entities()` from `EntityStatsTracker.currentStatuses()` (Optional)
     - `state` from internal module state (DISABLED / DEGRADED / FAILED / ACTIVE)
 
-32. **`DbSyncModule.stop()`**: `engine.stop()` (cancels schedulers, awaits brief
+32. [x] **`DbSyncModule.stop()`**: `engine.stop()` (cancels schedulers, awaits brief
     in-flight wait). `onDisconnect()`: clear cached refs, snapshots already wiped
     by `engine.stop()`. Idempotent.
 
-33. **Module-level exception isolation** (db-sync R9 Phase 2). Verify every entry
+33. [x] **Module-level exception isolation** (db-sync R9 Phase 2). Verify every entry
     point (scheduler tick, Kafka producer callback, JdbcConnectionSource borrow
     failure) catches `Throwable`, logs via NxLog, transitions affected entity to
     DEGRADED — other entities continue. Module-level FAILED reserved for the >1

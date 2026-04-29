@@ -7,6 +7,7 @@ import com.google.gson.Gson;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.util.Map;
@@ -14,11 +15,15 @@ import java.util.Map;
 class DefaultNxProducer implements NxProducer {
 
     private final KafkaProducer<String, Object> producer;
+    private final KafkaProducer<byte[], Object> bytesKeyProducer;
     private final NxLog log;
 
     DefaultNxProducer(Map<String, Object> config, Gson gson) {
         this.log = NxLogFactory.getLogger(DefaultNxProducer.class);
         this.producer = new KafkaProducer<>(config, new StringSerializer(), new GsonSerializer(gson));
+        // Second producer dedicated to byte[]-keyed sends (e.g. CDC primitive-PK keying).
+        // Shares the same broker config; only the key serializer differs.
+        this.bytesKeyProducer = new KafkaProducer<>(config, new ByteArraySerializer(), new GsonSerializer(gson));
         log.debug("Producer created");
     }
 
@@ -89,6 +94,26 @@ class DefaultNxProducer implements NxProducer {
     }
 
     @Override
+    public void send(String topic, byte[] key, Object message, Callback callback) {
+        try {
+            bytesKeyProducer.send(new ProducerRecord<>(topic, key, message), (metadata, exception) -> {
+                try {
+                    callback.onCompletion(metadata, exception);
+                } catch (Exception e) {
+                    log.error("Callback error for topic {}: {}", topic, e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            log.error("Failed to send message to {}: {}", topic, e.getMessage());
+            try {
+                callback.onCompletion(null, e);
+            } catch (Exception callbackError) {
+                log.error("Callback error for topic {}: {}", topic, callbackError.getMessage());
+            }
+        }
+    }
+
+    @Override
     public void sendRecord(ProducerRecord<String, Object> record) {
         try {
             producer.send(record, (metadata, exception) -> {
@@ -105,9 +130,14 @@ class DefaultNxProducer implements NxProducer {
     public void close() {
         try {
             producer.close();
-            log.debug("Producer closed");
         } catch (Exception e) {
-            log.warn("Error closing producer: {}", e.getMessage());
+            log.warn("Error closing string-key producer: {}", e.getMessage());
         }
+        try {
+            bytesKeyProducer.close();
+        } catch (Exception e) {
+            log.warn("Error closing bytes-key producer: {}", e.getMessage());
+        }
+        log.debug("Producers closed");
     }
 }

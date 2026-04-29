@@ -51,6 +51,19 @@ public interface NxProducer {
     void send(String topic, String key, Object message, Callback callback);
 
     /**
+     * Sends a byte-array-keyed message to the topic with a delivery callback.
+     * Used by binary-key consumers (CDC tombstones, primitive-PK keying) where
+     * the key is not a UTF-8 string. Same partition guarantee as the
+     * String-keyed overload — partitioning is on the raw key bytes.
+     *
+     * @param topic    Kafka topic name
+     * @param key      raw partition key bytes; may be null for round-robin
+     * @param message  object to serialize as JSON; null for log-compaction tombstones
+     * @param callback invoked on the Kafka I/O thread when the broker acknowledges or rejects the record
+     */
+    void send(String topic, byte[] key, Object message, Callback callback);
+
+    /**
      * Sends a pre-built producer record (fire-and-forget). Used internally
      * for reply messages that need custom headers.
      *

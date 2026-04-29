@@ -238,9 +238,9 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   `app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent` ships in 0.1.0 too — it's the
   wire payload published every 60s; `enabledModules` (and tenant/server identity
   fields) were added by the `adapter-modules` slice in api `0.5.0`. **api/0.6.0
-  pending** adds `ConnectResponse.syncTopics: Map<String, String>` (R16) carrying
-  per-entity Kafka topic names from the platform — consumed by `cdc-engine` via
-  `TopicResolver` and by `db-sync` for DISABLED/DEGRADED triage.
+  in source (tag pending)** adds `ConnectResponse.syncTopics: Map<String, String>`
+  (R16) carrying per-entity Kafka topic names from the platform — consumed by
+  `cdc-engine` via `TopicResolver` and by `db-sync` for DISABLED/DEGRADED triage.
 - **`:nx-gs-kafka`** (R6, R7) — sibling subproject. `NxKafka.configure().build()` for the
   producer; `NxKafka.send(topic, key, value)` for heartbeat. `:nx-gs-adapter-core` depends
   on it via `project(":nx-gs-kafka")`.
