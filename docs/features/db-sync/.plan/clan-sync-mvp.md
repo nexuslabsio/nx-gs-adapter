@@ -349,10 +349,13 @@ mode. End-to-end test deferred to M36.
 
 39. [pending — manual git-tag step] **Tag and publish.**
     - Tag `api/v0.6.0` → CI publishes `nx-gs-adapter-api-0.6.0` to Maven Central.
-    - Tag `core/v0.3.1` → CI publishes `nx-gs-adapter-core-0.3.1` to Maven Central
-      (bumped from 0.3.0 to carry the M11-M13 `syncTopics` plumbing through
-      `ConnectResponse` / `ConnectContext`).
-    - Tag `db-sync/v0.1.0` → CI publishes `nx-gs-db-sync-core-0.1.0` to Maven Central.
+    - Tag `core/v0.3.2` → CI publishes `nx-gs-adapter-core-0.3.2` to Maven Central
+      (carries the M11-M13 `syncTopics` plumbing through `ConnectResponse` /
+      `ConnectContext`; pre-existing `core/v0.3.1` was tagged before that work
+      and cannot be reused).
+    - Tag `db-sync/v0.1.1` → CI publishes `nx-gs-db-sync-core-0.1.1` to Maven
+      Central (carries the full M11-M37 CDC engine + e2e; pre-existing
+      `db-sync/v0.1.0` was tagged at the M5-M10 boundary and cannot be reused).
     - Verify all three artifacts resolve from Maven Central before bohpts-core
       switches its `mavenLocal()` fallback off.
     - `:nx-gs-kafka` version stays at 0.2.0 (no wire change).
