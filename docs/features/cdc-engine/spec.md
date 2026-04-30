@@ -41,64 +41,109 @@ per-entity state via heartbeat enrichment).
 **Must:**
 
 - [wip] R1. The engine MUST execute the CRC32 two-phase protocol per `EntityMapping`
-  on every scheduled tick. The protocol always runs in PK-windowed mode (R2) — there
+  on every scheduled tick. The protocol runs in PK-windowed mode (R2) — there
   is no separate "full scan" code path; small entities collapse to a single window
-  naturally:
-    - **Phase 1 (detect):** `SELECT <pk>, CRC32(CONCAT_WS(',', col1, col2, ...)) FROM
-      <table> WHERE <pk> BETWEEN ? AND ?` — MySQL computes hashes server-side; adapter
-      reads PK as `long` and CRC32 as `int` into a fastutil `Long2IntOpenHashMap`. The
-      `WHERE <pk> BETWEEN ? AND ?` clause is always present, bounded by the current
-      window's `[fromPk, toPk]` (R2).
-    - **Diff:** previous-snapshot vs current-snapshot for the window's PK range →
-      `{ created: LongSet, updated: LongSet, deleted: LongSet }`. Created = present in
-      current, absent in previous; deleted = inverse; updated = present in both with
-      different CRC32. Only PKs in `[fromPk, toPk]` are evaluated — PKs outside the
-      window stay untouched in the persistent snapshot.
-    - **Phase 2 (fetch):** `SELECT <fetchColumns> FROM <table> WHERE <pk> IN (?, ?,
-      ...)` for `created ∪ updated`, chunked at 1000 PKs per query. PKs bound via
-      `setLong(...)`. Rows mapped via `mapping.mapRow(rs)`.
-    - **Publish:** `(mapping, op, pk, dto|null)` translated to a `SyncEvent` and pushed
-      via the Kafka producer initialized by `adapter-bootstrap`. PK is `long`
-      end-to-end — engine internals (fastutil maps, JDBC `setLong`/`getLong`), wire
-      payload (`SyncEvent.pk: long`, JSON number on the wire), and Kafka key (binary
-      `LongSerializer`, 8 bytes) all carry the raw long. No stringification anywhere —
-      platform stores the PK as `long` and reads it back as `long`. Topic name comes
-      from `ConnectResponse.syncTopics[entityName]` (per
+  naturally. An entity is composed of one **primary source** (drives windowing +
+  identity) and zero-or-more **child sources** (each carries an FK back to the
+  primary's PK). Per cycle, per window:
+    - **Phase 1 (detect) — primary:** `SELECT <pkColumn>, CRC32(CONCAT_WS(',',
+      col1, col2, ...)) FROM <primary.tableName> WHERE <pkColumn> BETWEEN ? AND ?`.
+      MySQL computes hashes server-side; engine reads PK as `long` and CRC32 as
+      `int` into a fastutil `Long2IntOpenHashMap` (`primaryHash`).
+    - **Phase 1 (detect) — each child source:** `SELECT <fkColumn>,
+      BIT_XOR(CRC32(CONCAT_WS(',', col1, col2, ...))) FROM <child.tableName>
+      WHERE <fkColumn> BETWEEN ? AND ? GROUP BY <fkColumn>` (R20). Returns
+      FK → XOR-aggregated CRC32 of every child row that belongs to the parent
+      PK. `BIT_XOR` is order-insensitive and associative — child row order
+      does not affect the aggregate.
+    - **Aggregate:** for every PK present in `primaryHash`, fold its primary CRC
+      with each child's XOR-CRC for the same PK via XOR:
+      `entityCrc[pk] = primaryHash[pk] ^ child1Hash.getOrDefault(pk, 0) ^
+      child2Hash.getOrDefault(pk, 0) ^ ...`. PKs that appear in a child but
+      have no matching primary row (orphan FKs) are dropped silently — the
+      entity does not exist without a primary row.
+    - **Diff:** the aggregated `entityCrc` for the window vs the snapshot for the
+      same PK range → `{ created: LongSet, updated: LongSet, deleted: LongSet }`.
+      Created = present in current, absent in previous; deleted = inverse;
+      updated = present in both with different aggregate CRC32. Only PKs in
+      `[fromPk, toPk]` are evaluated — PKs outside the window stay untouched in
+      the persistent snapshot.
+    - **Phase 2 (fetch) — primary:** `SELECT * FROM <primary.tableName> WHERE
+      <pkColumn> IN (?, ?, ...)` for `created ∪ updated`, chunked at 1000 PKs per
+      query. PKs bound via `setLong(...)`. Each row mapped via
+      `primary.mapRow(rs)` to an opaque per-source row object.
+    - **Phase 2 (fetch) — each child source:** `SELECT * FROM <child.tableName>
+      WHERE <fkColumn> IN (?, ?, ...)` for the same `created ∪ updated` PKs,
+      chunked identically. Rows mapped via `child.mapRow(rs)`; engine groups
+      results by FK so each parent PK gets a (possibly empty) list of child
+      row objects per child source.
+    - **Assemble:** for every PK in `created ∪ updated`, the engine calls
+      `mapping.mapEntity(primaryRow, childRowsByTable)` where
+      `childRowsByTable: Map<String, List<Object>>` is keyed by
+      `child.tableName()`. The mapping casts the opaque rows back to its
+      impl-private types and returns the typed entity DTO `T`.
+    - **Publish:** `(mapping, op, pk, dto|null)` translated to a `SyncEvent` and
+      pushed via the Kafka producer initialized by `adapter-bootstrap`. PK is
+      `long` end-to-end — engine internals (fastutil maps, JDBC
+      `setLong`/`getLong`), wire payload (`SyncEvent.pk: long`, JSON number on
+      the wire), and Kafka key (binary `LongSerializer`, 8 bytes) all carry the
+      raw long. No stringification anywhere — platform stores the PK as `long`
+      and reads it back as `long`. Topic name comes from
+      `ConnectResponse.syncTopics[entityName]` (per
       [`adapter-bootstrap` R16](../adapter-bootstrap/spec.md)).
-    - **Per-row snapshot swap:** the in-memory `Long2IntOpenHashMap` for the entity
-      is advanced **per PK**, not per window. Each Phase-2 publish records its
-      `Future<RecordMetadata>` keyed by PK in a per-cycle in-flight map. At
-      end-of-cycle (within `publish-flush-seconds`) the engine walks the map and
-      advances `SnapshotStore` only for PKs whose publish succeeded
-      (created/updated → put new CRC32 from current scan; deleted → remove). PKs
-      whose publish failed (or timed out) are left untouched in the previous
-      snapshot, so the next cycle's diff re-detects them and replays the publish.
-      PKs outside the current window's `[fromPk, toPk]` are never touched.
+    - **Per-row snapshot swap:** the in-memory `Long2IntAVLTreeMap` for the
+      entity is advanced **per PK**, not per window. Each Phase-2 publish
+      records its `Future<RecordMetadata>` keyed by PK in a per-cycle
+      in-flight map. At end-of-cycle (within `publish-flush-seconds`) the
+      engine walks the map and advances `SnapshotStore` only for PKs whose
+      publish succeeded (created/updated → put aggregated CRC32 from current
+      scan; deleted → remove). PKs whose publish failed (or timed out) are
+      left untouched in the previous snapshot, so the next cycle's diff
+      re-detects them and replays the publish. PKs outside the current
+      window's `[fromPk, toPk]` are never touched.
 
-- [wip] R2. **Single windowed sync strategy with `rows-per-window` config.** There is
+- [wip] R2. **Single windowed sync strategy with envelope-based windowing.** There is
   one strategy: PK-range windowed scan. The engine partitions the entity's PK range
   into windows and walks them sequentially within one cycle, back-to-back, no pause:
     - At the start of every cycle the engine runs `SELECT MIN(<pk>), MAX(<pk>) FROM
-      <table>` (recompute, NOT cached at connect — auto-extends to capture inserts
-      above prior MAX).
-    - PK range size = `MAX - MIN + 1`. Window count = `max(1, ceil(pkRange /
-      rowsPerWindow))`. Window boundaries = even subdivision of `[MIN, MAX]` into that
-      many half-open intervals.
+      <primary.tableName>` (recompute, NOT cached at connect — auto-extends to
+      capture inserts above prior MAX).
+    - **Envelope rule (DELETE-correctness)** — the windowed range covers the union
+      of the live DB range AND the snapshot's PK range:
+        - `minDb` / `maxDb` from the `SELECT MIN/MAX` query (both empty when the
+          primary table is empty).
+        - `minSnap` / `maxSnap` from `SnapshotStore.minPk(entityName)` /
+          `maxPk(entityName)` (both empty on initial cold cycle).
+        - Both empty → no windows this cycle, return early.
+        - One side empty → use the other.
+        - Both populated → `minEnv = min(minDb, minSnap)`, `maxEnv = max(maxDb,
+          maxSnap)`. Partition `[minEnv, maxEnv]` (NOT `[minDb, maxDb]`).
+          Rationale: when an extreme PK is deleted (e.g. the row at current `MAX(pk)`),
+          `maxDb` shrinks below the deleted PK; without the envelope, that PK falls
+          outside every window of the next cycle and its DELETE never fires. The
+          envelope keeps every PK ever seen in the snapshot in scope until its
+          tombstone is published and its CRC removed.
+    - PK range size = `maxEnv - minEnv + 1`. Window count = `max(1, ceil(pkRange /
+      rowsPerWindow))`. Window boundaries = even subdivision of `[minEnv, maxEnv]`
+      into that many half-open intervals.
     - `rowsPerWindow` comes from `l2nx.cdc-engine.rows-per-window` (default 500_000)
       per R15. One global value applied uniformly to every entity.
     - Small entities (rowCount <= rowsPerWindow): yield exactly 1 window covering the
-      entire PK range — operationally identical to a "full scan" without a separate
-      code path.
+      entire enveloped PK range — operationally identical to a "full scan" without a
+      separate code path.
     - Large entities (e.g. 12M items, 500k rows-per-window default → 24 windows):
       sequential walk through every window inside one cycle.
     - Sparse-PK entities (auto-increment + many deletions, large gaps in PK range):
       window count over-estimates relative to actual row count — windows simply contain
       fewer rows than `rowsPerWindow`. Operationally fine; predictable.
-    - The single in-memory `Long2IntOpenHashMap` per entity covers all windows of that
+    - The single in-memory `Long2IntAVLTreeMap` per entity covers all windows of that
       entity (per R4) — only the window currently being scanned is touched per
-      iteration.
+      iteration. AVL-tree storage gives O(log N) `minPk` / `maxPk` lookup for the
+      envelope rule.
     - SC1. MIN/MAX recompute query completes in < 50ms even on the largest target
-      entity (~12M items) on a host with PK index intact.
+      entity (~12M items) on a host with PK index intact. `SnapshotStore.minPk` /
+      `maxPk` are O(log N) AVL-tree key access — sub-millisecond regardless of
+      snapshot size.
 
 > **R3 (formerly `SLIDING_WINDOW` strategy as a separate mode) — folded into R2.**
 > Single-strategy decision: removed the `SyncStrategy { FULL_SCAN | SLIDING_WINDOW }`
@@ -108,11 +153,17 @@ per-entity state via heartbeat enrichment).
 > left as a gap.
 
 - [wip] R4. The engine MUST hold each entity's previous-snapshot in a fastutil
-  `it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap` (PK → CRC32). One map per
-  `EntityMapping`, lifetime = adapter lifetime. Wiped on `DbSyncModule.onDisconnect`. RAM
-  cost: ~24 bytes/entry → ~240 MB at 12M entries with default load factor 0.75.
-  `fastutil-core` (~3 MB JAR; primitive maps only — full `fastutil` ~21 MB is NOT pulled)
-  is added as a runtime dep on `nx-gs-db-sync-core`.
+  `it.unimi.dsi.fastutil.longs.Long2IntAVLTreeMap` (PK → aggregate CRC32). One
+  map per `EntityMapping`, lifetime = adapter lifetime. Wiped on
+  `DbSyncModule.onDisconnect`. AVL-tree (rather than open-hash) is required so
+  the per-window `keysInRange(from, to)` lookup runs in `O(log N + k)` via
+  `subMap`, and so the R2 envelope rule reads `firstLongKey` / `lastLongKey`
+  in `O(log N)` — open-hash would force a full-map walk per window, going
+  quadratic at items scale (12M × N windows). RAM cost is ~3–4× the open-hash
+  baseline; operators size the host JVM accordingly per the no-cap policy
+  (no `EntityState.SKIPPED`). `fastutil-core` (~3 MB JAR; primitive maps only
+  — full `fastutil` ~21 MB is NOT pulled) is added as a runtime dep on
+  `nx-gs-db-sync-core`.
     - SC2. For 12M entries, RAM occupancy of one snapshot stays under 320 MB measured via
       `Runtime.totalMemory() - Runtime.freeMemory()` delta around the snapshot population.
 
@@ -135,12 +186,13 @@ per-entity state via heartbeat enrichment).
   enforce or sort by row count).
 
 - [wip] R7. **Initial sync** — first tick after `DbSyncModule.start()` MUST replay
-  every existing row as `CREATED` events. Previous snapshot is empty → diff for each
-  window returns all PKs in that window as created → Phase 2 fetches all rows →
-  publishes one `SyncEvent { op: CREATED }` per row. No special bootstrap mode; the
-  engine's normal windowed Phase 1 + Phase 2 path handles initial sync naturally —
-  every window's PKs come back as created on the first cycle, then nothing on
-  subsequent cycles unless data actually changes.
+  every existing row as `CREATED` events. Previous snapshot is empty → envelope
+  collapses to `[minDb, maxDb]` → diff for each window returns all PKs in that
+  window as created → Phase 2 fetches primary + child rows → `mapEntity` assembles
+  each entity → publishes one `SyncEvent { op: CREATED }` per row. No special
+  bootstrap mode; the engine's normal windowed Phase 1 + Phase 2 path handles
+  initial sync naturally — every window's PKs come back as created on the first
+  cycle, then nothing on subsequent cycles unless data actually changes.
 
 > **R8 (per-entity snapshot RAM cap) — removed.** The engine does NOT enforce a
 > snapshot row-count cap. Operators size the host JVM heap to fit the configured
@@ -199,7 +251,7 @@ per-entity state via heartbeat enrichment).
   **All global engine config keys (MVP):**
 
   | Key                                          | Type           | Default   |
-                |----------------------------------------------|----------------|-----------|
+                    |----------------------------------------------|----------------|-----------|
   | `l2nx.cdc-engine.tick-interval-seconds`      | long, seconds  | 60        |
   | `l2nx.cdc-engine.rows-per-window`            | int            | 500_000   |
   | `l2nx.cdc-engine.query-timeout-seconds`      | int, seconds   | 10        |
@@ -248,6 +300,25 @@ per-entity state via heartbeat enrichment).
     - SC5. Engine-level config line carries an explicit `[operator-override |
       default]` source tag per parameter — operators can audit "what is actually
       running" without reading code.
+
+- [wip] R20. **Multi-source entity assembly.** An `EntityMapping<T>` declares one
+  `PrimarySource` and zero-or-more `ChildSource`s; each source is a separate
+  SQL statement. The engine never emits cross-source `JOIN`s. Per child source:
+    - Phase 1 SQL: `SELECT <fkColumn>, BIT_XOR(CRC32(CONCAT_WS(',', col1, col2,
+      ...))) FROM <child.tableName> WHERE <fkColumn> BETWEEN ? AND ? GROUP BY
+      <fkColumn>`.
+    - Phase 2 SQL: `SELECT * FROM <child.tableName> WHERE <fkColumn> IN (?, ?,
+      ...)` — same chunked-IN strategy as primary fetch.
+    - Each child's Phase-1 contribution is XOR-folded into the per-PK aggregate
+      CRC; orphan FKs (no matching primary row) are dropped.
+    - Each child's Phase-2 rows are grouped by FK and passed to
+      `mapping.mapEntity(primaryRow, childRowsByTable)` keyed by `tableName()`.
+    - `BIT_XOR` collision risk: two child rows with identical CRC32 inside the
+      same FK group cancel out in XOR. Per-child-row collision probability is
+      `1/2^32`; for an entity with N child rows the per-cycle change-miss
+      probability is bounded by `N(N-1)/2 × 1/2^32` (pairwise CRC collision)
+      and is acceptable for game-data eventual consistency. Mitigation
+      (`XOR COUNT(*)` row-count guard) is deferred — see Decisions.
 
 - [done] R17. **Per-entity Kafka topic resolution from `ConnectResponse`.** Topic
   names are NOT constructed by the engine and are NOT declared by the schema provider
@@ -321,6 +392,21 @@ per-entity state via heartbeat enrichment).
 
 **Non-goals:**
 
+- **Cross-source SQL JOINs.** Each source (primary + each child) is one isolated
+  SQL statement bounded by its own `BETWEEN ? AND ?` (or `IN (...)`) clause; the
+  engine never composes a JOIN across primary + child. JOIN-based hashing would
+  couple sources to a tenant-specific schema layout (column aliases, ON
+  conditions) and prevent the per-source SPI from being agnostic. Aggregation
+  happens in-engine via XOR.
+- **Orphan child rows surface as entities.** Child rows whose FK has no matching
+  primary row are silently dropped from the aggregate CRC and never reach
+  `mapEntity`. The entity does not exist without a primary row. Cleanup of
+  orphans is the host DB's responsibility, not the adapter's.
+- **1 source table → N entities (fan-out).** The current SPI is N tables → 1
+  entity (each `EntityMapping` collapses 1 primary + K children into one DTO).
+  The reverse direction (one shared source table feeding multiple entities)
+  would require a different SPI shape and is out of scope until a real customer
+  ships it.
 - **Cross-phase transactional consistency** — Phase 1 and Phase 2 run in SEPARATE
   consistent-snapshot transactions. Between them, a row may be deleted or further
   updated. The engine treats Phase-2 absence of a previously-detected PK as "no work for
@@ -405,17 +491,42 @@ per-entity state via heartbeat enrichment).
   (no real-time SLA on clan/character/item state). Same-cycle fabrication would
   require comparing requested vs returned PK lists and synthesizing a payload-less
   event; the next-cycle path uses the existing diff machinery and is simpler.]
-- [NEEDS CLARIFICATION: `windowCount()` lives on `EntityMapping` (Tier-2 SPI in `db-sync`)
-  with a default method returning 10. Confirm that the SPI shape exposes this — currently
-  `db-sync` R5 mentions it implicitly under `SLIDING_WINDOW` strategy but doesn't list
-  `windowCount` as a method. Cross-spec sync needed once cdc-engine R3 is finalized.]
-- [NEEDS CLARIFICATION: code uses `Long2IntAVLTreeMap` (sorted, AVL-balanced) for
-  `SnapshotStore`, not `Long2IntOpenHashMap` as R4 prescribes. Switch was driven by
-  the per-window `keysInRange` cost: open-hash is O(N) full-walk per window (12M ×
-  N windows = quadratic at items scale); AVL-tree subMap is O(log N + k). RAM cost
-  goes up ~3-4× over open-hash. Should R4 be amended to mandate sorted storage, or
-  is a different structure (e.g. open-hash + sorted-keys side index) preferred?
-  ref: `nx-gs-db-sync-core/.../engine/SnapshotStore.java`]
+- [resolved: **Multi-source entity assembly via PrimarySource + ChildSource.** Each
+  `EntityMapping<T>` declares one `PrimarySource` (drives windowing + identity) and
+  zero-or-more `ChildSource`s (each with FK back to primary's PK). DTO is built by
+  `T mapEntity(Object primaryRow, Map<String, List<Object>> childRowsByTable)` —
+  single hook, no per-shape (ONE/MANY/KV) enum. Per-source rows are opaque
+  `Object`s in the engine; impl casts inside `mapEntity` to its private row
+  types. Fan-out (1 source → N entities) explicitly out of scope.]
+- [resolved: **Phase-1 child hashing via `BIT_XOR(CRC32(...))` aggregate.** Per
+  child source: `SELECT fk, BIT_XOR(CRC32(CONCAT_WS(',', cols))) FROM child WHERE
+  fk BETWEEN ? AND ? GROUP BY fk`. Per entity PK: `entityCrc = primaryCrc XOR
+  child1Crc XOR child2Crc XOR ...`. Order-insensitive; child row order has no
+  semantic meaning. Collision risk for two child rows with identical CRC32 inside
+  the same FK group is `~1/2^32` per pair — acceptable for eventual-consistency
+  game data; row-count guard (`XOR COUNT(*)`) is documented but deferred until
+  a real collision surfaces. Engine drops orphan child FKs (no matching primary
+  row) silently.]
+- [resolved: **DELETE detection via snapshot envelope.** `WindowPlanner` partitions
+  `[min(MIN_db, MIN_snapshot), max(MAX_db, MAX_snapshot)]` instead of `[MIN_db,
+  MAX_db]`. Closes the boundary bug where deleting the row at current
+  `MIN(pk)` / `MAX(pk)` shrinks the DB range, leaves the deleted PK outside every
+  next-cycle window, and never emits its tombstone. AVL-tree-backed `SnapshotStore`
+  exposes `minPk(entity)` / `maxPk(entity)` in O(log N) via `firstLongKey` /
+  `lastLongKey` — no measurable Phase-0 overhead.]
+- [resolved: `windowCount()` does NOT live on `EntityMapping`. Engine uses a
+  single global `l2nx.cdc-engine.rows-per-window` knob (R15) to derive window
+  count per-cycle from `MIN/MAX(pk)`; R3's `SLIDING_WINDOW`-as-a-mode was
+  folded into R2 along with `mapping.strategy()` / `mapping.windowCount()`.
+  Tier-2 SPI in `db-sync` R5 carries no engine-config fields.]
+- [resolved: `SnapshotStore` is backed by `Long2IntAVLTreeMap`, NOT
+  `Long2IntOpenHashMap`. AVL-tree chosen for two reasons: (1) `keysInRange`
+  via `subMap` is O(log N + k) — open-hash would force O(N) full-walks per
+  window (12M items × N windows ⇒ quadratic at items scale); (2) the R2
+  envelope rule needs `firstLongKey` / `lastLongKey` in O(log N), which
+  open-hash cannot provide. RAM cost is ~3–4× higher than open-hash but
+  acceptable per R4's "operator sizes the heap to fit configured entities"
+  clause. R4's wording above is updated accordingly.]
 - [NEEDS CLARIFICATION: code defines `WindowPlanner.MAX_WINDOWS_PER_PLAN = 1_000_000`
   as a sanity cap — protects host JVM from OOM when MIN/MAX span the full BIGINT
   range and `rowsPerWindow` is misconfigured. Plan size > cap throws

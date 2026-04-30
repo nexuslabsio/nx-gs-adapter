@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.longs.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.OptionalLong;
 
 /**
  * In-memory primitive-keyed CRC32 snapshot, one {@link Long2IntAVLTreeMap} per
@@ -87,6 +88,41 @@ public final class SnapshotStore {
     public int sizeOf(String entityName) {
         Long2IntAVLTreeMap map = byEntity.get(entityName);
         return map == null ? 0 : map.size();
+    }
+
+    /**
+     * Smallest PK currently held in the snapshot for the entity, or empty if
+     * the entity has no entries (initial cold cycle, or every previously-seen
+     * PK has been published as a tombstone). Backed by AVL-tree
+     * {@code firstLongKey} — O(log N), no full scan.
+     *
+     * <p>Used by {@code WindowPlanner} to compute the cycle's window envelope
+     * (per cdc-engine R2): the partitioned range covers the union of the
+     * live DB range AND the snapshot's range, so deletion of the row at the
+     * current {@code MIN(pk)} still falls inside some next-cycle window.</p>
+     */
+    public OptionalLong minPk(String entityName) {
+        Long2IntAVLTreeMap map = byEntity.get(entityName);
+        if (map == null || map.isEmpty()) {
+            return OptionalLong.empty();
+        }
+        return OptionalLong.of(map.firstLongKey());
+    }
+
+    /**
+     * Largest PK currently held in the snapshot for the entity, or empty if
+     * the entity has no entries. Backed by AVL-tree {@code lastLongKey} —
+     * O(log N), no full scan.
+     *
+     * <p>Symmetric to {@link #minPk}; together they bound the snapshot's PK
+     * envelope for the {@code WindowPlanner} (cdc-engine R2).</p>
+     */
+    public OptionalLong maxPk(String entityName) {
+        Long2IntAVLTreeMap map = byEntity.get(entityName);
+        if (map == null || map.isEmpty()) {
+            return OptionalLong.empty();
+        }
+        return OptionalLong.of(map.lastLongKey());
     }
 
     public void clearEntity(String entityName) {

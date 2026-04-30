@@ -1,6 +1,7 @@
 package app.l2nx.gs.db.sync.engine.phase;
 
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.ChildSource;
+import app.l2nx.gs.adapter.api.spi.PrimarySource;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import org.junit.jupiter.api.Test;
@@ -17,44 +18,61 @@ import static org.mockito.Mockito.*;
 class Phase1HasherTest {
 
     @Test
-    void buildSql_shouldEmitCrc32ConcatWs_inDeclaredColumnOrder() {
-        EntityMapping<Object> mapping = mappingOf("clan", "clan_data", "clan_id",
+    void buildPrimarySql_shouldEmitCrc32ConcatWs_inDeclaredColumnOrder() {
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
                 Arrays.asList("clan_name", "clan_level", "leader_id"));
 
-        String sql = Phase1Hasher.buildSql(mapping);
+        String sql = Phase1Hasher.buildPrimarySql(primary);
 
         assertEquals("SELECT clan_id, CRC32(CONCAT_WS(',', clan_name, clan_level, leader_id)) "
                 + "FROM clan_data WHERE clan_id BETWEEN ? AND ?", sql);
     }
 
     @Test
-    void buildSql_shouldHandleSingleHashedColumn() {
-        EntityMapping<Object> mapping = mappingOf("foo", "foo_t", "id",
+    void buildPrimarySql_shouldHandleSingleHashedColumn() {
+        PrimarySource<?> primary = stubPrimary("foo_t", "id",
                 Collections.singletonList("name"));
 
-        String sql = Phase1Hasher.buildSql(mapping);
-
-        assertTrue(sql.contains("CRC32(CONCAT_WS(',', name))"));
+        assertTrue(Phase1Hasher.buildPrimarySql(primary).contains("CRC32(CONCAT_WS(',', name))"));
     }
 
     @Test
-    void buildSql_shouldThrow_whenHashedColumnsEmpty() {
-        EntityMapping<Object> mapping = mappingOf("foo", "foo_t", "id",
-                Collections.emptyList());
+    void buildPrimarySql_shouldThrow_whenHashedColumnsEmpty() {
+        PrimarySource<?> primary = stubPrimary("foo_t", "id", Collections.emptyList());
 
-        assertThrows(IllegalArgumentException.class, () -> Phase1Hasher.buildSql(mapping));
+        assertThrows(IllegalArgumentException.class, () -> Phase1Hasher.buildPrimarySql(primary));
     }
 
     @Test
-    void buildSql_shouldThrow_whenHashedColumnsNull() {
-        EntityMapping<Object> mapping = mappingOf("foo", "foo_t", "id", null);
+    void buildPrimarySql_shouldThrow_whenHashedColumnsNull() {
+        PrimarySource<?> primary = stubPrimary("foo_t", "id", null);
 
-        assertThrows(IllegalArgumentException.class, () -> Phase1Hasher.buildSql(mapping));
+        assertThrows(IllegalArgumentException.class, () -> Phase1Hasher.buildPrimarySql(primary));
     }
 
     @Test
-    void hash_shouldRunInsideConsistentSnapshotTxn_andRestoreAutoCommit() throws SQLException {
-        EntityMapping<Object> mapping = clanMapping();
+    void buildChildSql_shouldEmitBitXorOverCrc32_groupedByFk() {
+        ChildSource<?> child = stubChild("clan_skills", "clan_id",
+                Arrays.asList("skill_id", "skill_level"));
+
+        String sql = Phase1Hasher.buildChildSql(child);
+
+        assertEquals("SELECT clan_id, BIT_XOR(CRC32(CONCAT_WS(',', skill_id, skill_level))) "
+                + "FROM clan_skills WHERE clan_id BETWEEN ? AND ? "
+                + "GROUP BY clan_id", sql);
+    }
+
+    @Test
+    void buildChildSql_shouldThrow_whenHashedColumnsEmpty() {
+        ChildSource<?> child = stubChild("clan_skills", "clan_id", Collections.emptyList());
+
+        assertThrows(IllegalArgumentException.class, () -> Phase1Hasher.buildChildSql(child));
+    }
+
+    @Test
+    void hashPrimary_shouldRunInsideConsistentSnapshotTxn_andRestoreAutoCommit() throws SQLException {
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
+                Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
         Statement init = mock(Statement.class);
         PreparedStatement ps = mock(PreparedStatement.class);
@@ -68,8 +86,8 @@ class Phase1HasherTest {
         when(rs.getLong(1)).thenReturn(10L, 20L);
         when(rs.getLong(2)).thenReturn(111L, 222L);
 
-        Long2IntMap result = new Phase1Hasher().hash(
-                new Window(0L, 100L), mapping, conn, 5);
+        Long2IntMap result = new Phase1Hasher().hashPrimary(
+                new Window(0L, 100L), primary, conn, 5);
 
         assertEquals(2, result.size());
         assertEquals(111, result.get(10L));
@@ -86,8 +104,37 @@ class Phase1HasherTest {
     }
 
     @Test
-    void hash_shouldRollbackAndRestoreAutoCommit_whenQueryThrows() throws SQLException {
-        EntityMapping<Object> mapping = clanMapping();
+    void hashChild_shouldRunInsideConsistentSnapshotTxn_andReturnXorAggregatePerFk() throws SQLException {
+        ChildSource<?> child = stubChild("clan_skills", "clan_id",
+                Arrays.asList("skill_id", "skill_level"));
+        Connection conn = mock(Connection.class);
+        Statement init = mock(Statement.class);
+        PreparedStatement ps = mock(PreparedStatement.class);
+        ResultSet rs = mock(ResultSet.class);
+
+        when(conn.getAutoCommit()).thenReturn(true);
+        when(conn.createStatement()).thenReturn(init);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        // GROUP BY fk: 2 rows, FK=1 has aggregate 0xAAAA, FK=2 has 0xBBBB
+        when(rs.next()).thenReturn(true, true, false);
+        when(rs.getLong(1)).thenReturn(1L, 2L);
+        when(rs.getLong(2)).thenReturn(0xAAAAL, 0xBBBBL);
+
+        Long2IntMap result = new Phase1Hasher().hashChild(
+                new Window(0L, 100L), child, conn, 5);
+
+        assertEquals(2, result.size());
+        assertEquals(0xAAAA, result.get(1L));
+        assertEquals(0xBBBB, result.get(2L));
+        verify(init).execute("START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY");
+        verify(conn).commit();
+    }
+
+    @Test
+    void hashPrimary_shouldRollbackAndRestoreAutoCommit_whenQueryThrows() throws SQLException {
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
+                Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
         Statement init = mock(Statement.class);
         PreparedStatement ps = mock(PreparedStatement.class);
@@ -98,7 +145,7 @@ class Phase1HasherTest {
         when(ps.executeQuery()).thenThrow(new SQLException("query failed"));
 
         SQLException thrown = assertThrows(SQLException.class,
-                () -> new Phase1Hasher().hash(new Window(0L, 100L), mapping, conn, 5));
+                () -> new Phase1Hasher().hashPrimary(new Window(0L, 100L), primary, conn, 5));
         assertEquals("query failed", thrown.getMessage());
 
         verify(conn).rollback();
@@ -107,8 +154,9 @@ class Phase1HasherTest {
     }
 
     @Test
-    void hash_shouldPropagateSQLTimeoutException_distinctFromGenericSQLException() throws SQLException {
-        EntityMapping<Object> mapping = clanMapping();
+    void hashPrimary_shouldPropagateSQLTimeoutException_distinctFromGenericSQLException() throws SQLException {
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
+                Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
         Statement init = mock(Statement.class);
         PreparedStatement ps = mock(PreparedStatement.class);
@@ -119,7 +167,7 @@ class Phase1HasherTest {
         when(ps.executeQuery()).thenThrow(new SQLTimeoutException("timeout"));
 
         assertThrows(SQLTimeoutException.class,
-                () -> new Phase1Hasher().hash(new Window(0L, 100L), mapping, conn, 5));
+                () -> new Phase1Hasher().hashPrimary(new Window(0L, 100L), primary, conn, 5));
 
         // Engine relies on SQLTimeoutException being a separate type so EntitySyncTask
         // can branch on it (skip-this-window) vs generic SQLException (abort cycle).
@@ -129,11 +177,12 @@ class Phase1HasherTest {
     }
 
     @Test
-    void hash_shouldNarrowCrc_forValuesAboveIntegerMaxValue() throws SQLException {
+    void hashPrimary_shouldNarrowCrc_forValuesAboveIntegerMaxValue() throws SQLException {
         // MySQL's CRC32 returns BIGINT UNSIGNED (0..2^32-1); the engine narrows
         // via (int) which preserves all 32 bits even when the long value exceeds
         // Integer.MAX_VALUE. Without the cast the diff would mis-classify rows.
-        EntityMapping<Object> mapping = clanMapping();
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
+                Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
         Statement init = mock(Statement.class);
         PreparedStatement ps = mock(PreparedStatement.class);
@@ -149,26 +198,15 @@ class Phase1HasherTest {
         long crc32Unsigned = 3_735_928_559L;
         when(rs.getLong(2)).thenReturn(crc32Unsigned);
 
-        Long2IntMap result = new Phase1Hasher().hash(
-                new Window(0L, 100L), mapping, conn, 5);
+        Long2IntMap result = new Phase1Hasher().hashPrimary(
+                new Window(0L, 100L), primary, conn, 5);
 
         assertEquals((int) crc32Unsigned, result.get(42L),
                 "CRC32 narrowing must preserve all 32 bits");
     }
 
-    private static EntityMapping<Object> clanMapping() {
-        return mappingOf("clan", "clan_data", "clan_id",
-                Arrays.asList("clan_name", "clan_level"));
-    }
-
-    private static EntityMapping<Object> mappingOf(String entity, String table, String pk,
-                                                   List<String> hashed) {
-        return new EntityMapping<Object>() {
-            @Override
-            public String entityName() {
-                return entity;
-            }
-
+    private static PrimarySource<Object> stubPrimary(String table, String pk, List<String> hashed) {
+        return new PrimarySource<Object>() {
             @Override
             public String tableName() {
                 return table;
@@ -185,13 +223,32 @@ class Phase1HasherTest {
             }
 
             @Override
-            public Object mapRow(ResultSet rs) throws SQLException {
+            public Object mapRow(ResultSet rs) {
                 return null;
+            }
+        };
+    }
+
+    private static ChildSource<Object> stubChild(String table, String fk, List<String> hashed) {
+        return new ChildSource<Object>() {
+            @Override
+            public String tableName() {
+                return table;
             }
 
             @Override
-            public Class<Object> dtoType() {
-                return Object.class;
+            public String fkColumn() {
+                return fk;
+            }
+
+            @Override
+            public List<String> hashedColumns() {
+                return hashed;
+            }
+
+            @Override
+            public Object mapRow(ResultSet rs) {
+                return null;
             }
         };
     }

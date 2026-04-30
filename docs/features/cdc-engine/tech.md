@@ -31,12 +31,14 @@ read by `HeartbeatService` per heartbeat tick.
       `CdcEngine.start()`; emits engine globals + per-entity topic resolution
       with `[operator-override | default]` source tags (R16)
     - `EntitySyncTask.java` — per-entity `Runnable`. One cycle = borrow → plan
-      → for-each-window {Phase1 → diff → Phase2 → publish per PK} →
-      end-of-cycle walk of `Long2ObjectMap<pk, Future>` advancing only
-      successful publishes (R1, R2, R5, R7, R9)
+      (with snapshot envelope) → for-each-window {Phase1 primary + per-child
+      hash, XOR-fold, diff → Phase2 primary + per-child fetch, mapEntity assemble
+      → publish per PK} → end-of-cycle walk of `Long2ObjectMap<pk, Future>`
+      advancing only successful publishes (R1, R2, R5, R7, R9, R20)
     - `SnapshotStore.java` — `Long2IntAVLTreeMap` per entity. AVL chosen over
       open-hash so `keysInRange` runs `O(log N + k)` via `subMap`; critical
-      for items at 12M (R4)
+      for items at 12M. Also exposes `minPk` / `maxPk` in O(log N) for the
+      envelope rule (R2, R4)
     - `EntityStatsTracker.java` — `ConcurrentHashMap<String, EntityStats>` +
       per-entity `AtomicInteger` consecutiveErrors. `recordCycleResult`
       writes `entityOrder` first then `latest` so a heartbeat reader between
@@ -48,17 +50,30 @@ read by `HeartbeatService` per heartbeat tick.
       `:nx-gs-adapter-core`. Duplicated here because db-sync depends only on
       api (cross-module dep avoidance)
     - `phase/`
-        - `Phase1Hasher.java` — `SELECT pk, CRC32(CONCAT_WS(...))` inside
+        - `Phase1Hasher.java` — two methods:
+          `hashPrimary(window, primarySource, conn, ...)` runs `SELECT pk,
+          CRC32(CONCAT_WS(...)) FROM primary WHERE pk BETWEEN ? AND ?` →
+          `Long2IntMap`; `hashChild(window, childSource, conn, ...)` runs
+          `SELECT fk, BIT_XOR(CRC32(CONCAT_WS(...))) FROM child WHERE fk
+          BETWEEN ? AND ? GROUP BY fk` → `Long2IntMap`. Both inside
           `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`. Manual
-          autocommit save/restore + rollback-on-throw (R1, R11)
-        - `Phase2Fetcher.java` — `SELECT * WHERE pk IN (?,...,?)` chunked at
-            1000. Single `PreparedStatement` reused across chunks; last
-                  (smaller) chunk pads by repeating its final PK so the SQL string
-                  stays stable across chunks (server-side prep cache hit) (R1, R11)
-        - `ChangeSet.java` — diff stage: walks `currentScan` against
-          `SnapshotStore` + `prevKeysInRange`, partitions PKs into
-          `created/updated/deleted` `LongSet`s. Static `diff(...)` factory
-          uses `LongIterator` everywhere — no boxing (R1)
+          autocommit save/restore + rollback-on-throw. Engine
+          ({@link EntitySyncTask}) XOR-folds per-source contributions into
+          a per-window aggregate `currentScan` (R1, R11, R20)
+        - `Phase2Fetcher.java` — two methods: `fetchPrimary(primarySource,
+          pks, conn, ...)` runs `SELECT * FROM primary WHERE pk IN (...)`
+          chunked at 1000 → `Long2ObjectMap<Object>` (PK → opaque primary
+          row); `fetchChild(childSource, fks, conn, ...)` runs
+          `SELECT * FROM child WHERE fk IN (...)` chunked at 1000 →
+          `Long2ObjectMap<List<Object>>` (FK → child rows). Single
+          `PreparedStatement` per call reused across chunks; last
+          (smaller) chunk pads by repeating its final PK so the SQL string
+          stays stable across chunks (server-side prep cache hit) (R1, R11, R20)
+        - `ChangeSet.java` — diff stage: walks `currentScan` (aggregate CRC
+          across primary + children) against `SnapshotStore` +
+          `prevKeysInRange`, partitions PKs into `created/updated/deleted`
+          `LongSet`s. Static `diff(...)` factory uses `LongIterator`
+          everywhere — no boxing (R1)
     - `publish/`
         - `SyncEventPublisher.java` — builds `SyncEvent<T>`, encodes Kafka key
           as 8-byte big-endian via `ByteBuffer.allocate(8).putLong(pk)` (matches
@@ -73,10 +88,13 @@ read by `HeartbeatService` per heartbeat tick.
           bound to `ctx.syncTopics()` snapshot at engine start; cached for
           engine lifetime (R17)
     - `window/`
-        - `WindowPlanner.java` — `SELECT MIN(pk), MAX(pk) FROM <table>` →
-          ceil-divides into half-open windows. Overflow-guarded against
-          full-BIGINT spans; `MAX_WINDOWS_PER_PLAN = 1_000_000` cap protects
-          host JVM from pathological PK ranges (R2)
+        - `WindowPlanner.java` — `SELECT MIN(pk), MAX(pk) FROM
+          <primary.tableName>` + `SnapshotStore.minPk(entity)` /
+          `maxPk(entity)`; partitions the **envelope**
+          `[min(minDb, minSnap), max(maxDb, maxSnap)]` into half-open
+          windows. Closes the DELETE-at-boundary bug. Overflow-guarded
+          against full-BIGINT spans; `MAX_WINDOWS_PER_PLAN = 1_000_000`
+          cap protects host JVM from pathological PK ranges (R2)
         - `Window.java` — closed-interval `[fromPk, toPk]` value class
           produced by `WindowPlanner` and consumed by `Phase1Hasher`
 - `nx-gs-db-sync-core/build.gradle.kts` — declares `implementation
@@ -137,34 +155,66 @@ read by `HeartbeatService` per heartbeat tick.
        Wrapped in `SafeRunnable` so any throwable is caught, the entity state transitions
        to `DEGRADED`, and the schedule continues. Small entities (rowCount ≤
        rowsPerWindow) yield exactly 1 window — no separate code path.
-- **`Phase1Hasher`** (R1, R11) — opens
-  `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`. Always issues a windowed
-  query: `SELECT <pk>, CRC32(CONCAT_WS(',', <hashedColumns>)) FROM <tableName>
-  WHERE <pk> BETWEEN ? AND ?`. Reads PK via `rs.getLong(1)` and CRC32 via
-  `rs.getInt(2)` (CRC32 fits in unsigned 32-bit; signed `int` carries the same bytes,
-  comparison is bit-exact). Result: `Long2IntOpenHashMap`. Calls
-  `Statement.setQueryTimeout` from `l2nx.cdc-engine.query-timeout-seconds`. Closes
-  resultset / statement / connection in try-with-resources.
-- **`Phase2Fetcher`** (R1, R11) — given a `LongSet`, builds `SELECT
-  <fetchColumns> FROM <tableName> WHERE <pk> IN (?, ?, ...)` chunked at 1000 PKs.
-  Per-chunk transaction = `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`.
-  PKs bound via `setLong(...)`. Calls `mapping.mapRow(rs)` per row.
-- **`SnapshotStore`** (R4) — wraps a `Long2IntOpenHashMap` per
-  `EntityMapping`. Thread-confined to the task thread (no synchronization needed).
-  Provides `diffWindow(from, to, currentWindow) → ChangeSet` (evaluates only PKs in
-  the `[from, to]` range), `swapWindow(from, to, currentWindow)` (replaces only the
-  window's PK range, keeps entries outside `[from, to]` untouched). Wiped on
-  `DbSyncModule.onDisconnect`. NO RAM cap enforcement — operator sizes the host JVM
-  to fit the configured entities.
+- **`Phase1Hasher`** (R1, R11, R20) — opens
+  `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`. Two windowed-query
+  variants:
+    - `hashPrimary(window, primary, conn, ...)`: `SELECT <pkColumn>,
+      CRC32(CONCAT_WS(',', <hashedColumns>)) FROM <primary.tableName>
+      WHERE <pkColumn> BETWEEN ? AND ?`. Reads PK via `rs.getLong(1)` and
+      CRC32 via `(int) rs.getLong(2)` (CRC32 fits in unsigned 32-bit;
+      signed `int` carries the same bytes, comparison is bit-exact). Result:
+      `Long2IntOpenHashMap` (PK → primary CRC32).
+    - `hashChild(window, child, conn, ...)`: `SELECT <fkColumn>,
+      BIT_XOR(CRC32(CONCAT_WS(',', <hashedColumns>))) FROM <child.tableName>
+      WHERE <fkColumn> BETWEEN ? AND ? GROUP BY <fkColumn>`. Reads FK via
+      `rs.getLong(1)` and aggregate CRC via `(int) rs.getLong(2)`. Result:
+      `Long2IntOpenHashMap` (parent PK → XOR aggregate of child CRC32s).
+      Empty FK groups are not returned by `GROUP BY` — orphan handling
+      happens at fold time in `EntitySyncTask`.
+
+  Both calls `Statement.setQueryTimeout` from
+  `l2nx.cdc-engine.query-timeout-seconds`. Closes resultset / statement
+  in try-with-resources. The transaction commits as soon as the result is
+  drained.
+
+- **`Phase2Fetcher`** (R1, R11, R20) — two chunked-IN variants:
+    - `fetchPrimary(primary, pks, conn, ...)`: `SELECT * FROM
+      <primary.tableName> WHERE <pkColumn> IN (?, ?, ...)` chunked at 1000.
+      Returns `Long2ObjectMap<Object>` (PK → opaque row produced by
+      `primary.mapRow(rs)`).
+    - `fetchChild(child, fks, conn, ...)`: `SELECT * FROM
+      <child.tableName> WHERE <fkColumn> IN (?, ?, ...)` chunked at 1000.
+      Each row produces an opaque object via `child.mapRow(rs)`; engine
+      groups by FK. Returns `Long2ObjectMap<List<Object>>` (FK →
+      possibly-empty list of child rows). FK absence in the result map
+      means "no children for this PK" — caller substitutes `emptyList()`.
+
+  Per-chunk transaction = `START TRANSACTION WITH CONSISTENT SNAPSHOT,
+  READ ONLY`. PKs/FKs bound via `setLong(...)`.
+
+- **`SnapshotStore`** (R4, R2) — wraps a `Long2IntAVLTreeMap` per entity.
+  Thread-confined to the task thread (no synchronization needed). Provides
+  `keysInRange(entity, fromPk, toPk)` for the diff stage and
+  `minPk(entity)` / `maxPk(entity)` `OptionalLong` accessors for the
+  envelope rule (`firstLongKey` / `lastLongKey`, O(log N), empty when entity
+  has no entries). `containsCrc` / `getCrc` for diff lookups; `putCrc` /
+  `removeCrc` for per-row snapshot advance. Wiped on
+  `DbSyncModule.onDisconnect`. NO RAM cap enforcement — operator sizes the
+  host JVM to fit the configured entities.
 - **`ChangeSet`** (R1) — value bag with three `LongSet` (fastutil
   `LongOpenHashSet`). Computed in one pass over the previous-window PKs ∪ current-
   window PKs.
 - **`WindowPlanner`** (R2) — runs
-  `SELECT MIN(<pk>), MAX(<pk>) FROM <tableName>` at the start of each cycle
-  (recompute, NOT cached at connect — auto-extends to capture inserts above the
-  prior MAX). Computes `windowCount = max(1, ceil((MAX - MIN + 1) / rowsPerWindow))`,
-  divides `[MIN, MAX]` into evenly-sized half-open intervals, returns
-  `List<long[]>` of `{from, to}` pairs.
+  `SELECT MIN(<pkColumn>), MAX(<pkColumn>) FROM <primary.tableName>` at the
+  start of each cycle (recompute, NOT cached at connect — auto-extends to
+  capture inserts above the prior MAX), then reads
+  `SnapshotStore.minPk(entity)` / `maxPk(entity)` to compute the envelope
+  `[min(minDb, minSnap), max(maxDb, maxSnap)]`. Computes `windowCount = max(1,
+  ceil((maxEnv - minEnv + 1) / rowsPerWindow))`, divides `[minEnv, maxEnv]`
+  into evenly-sized half-open intervals, returns `List<Window>`. Both DB
+  and snapshot empty → `Collections.emptyList()` (no work this cycle); one
+  side empty → use the other; both populated → enveloped union. Closes
+  the DELETE-at-boundary correctness gap.
 - **`TopicResolver`** (R17) — SAM `String resolveTopic(String entityName)`
   backed by an immutable `Map<String, String>` snapshot taken from
   `ConnectResponse.syncTopics` at engine construction. Returns `null` for entities
@@ -236,29 +286,46 @@ If platform delivered no topic for an entity:
 INFO  CdcEngine [audit] → topic=<missing — entity DEGRADED>
 ```
 
-### 1. Cycle (single windowed strategy)
+### 1. Cycle (multi-source windowed strategy)
 
 ```
 EntitySyncTask.run()  [scheduler thread, daemon]
   → cycleStart = System.nanoTime()
   → try {
-      windows = WindowPlanner.recomputeBoundaries(mapping, cfg.rowsPerWindow)
-                                                    -- MIN/MAX recompute, evenly partitioned
+      windows = WindowPlanner.plan(mapping, conn, snapshot, cfg.rowsPerWindow)
+                          -- envelope [min(minDb, minSnap), max(maxDb, maxSnap)]
       totalCreated = totalUpdated = totalDeleted = 0
-      for (long[] window : windows) {
-          Long2IntOpenHashMap current = Phase1Hasher.hash(mapping, window)
-          ChangeSet diff = SnapshotStore.diffWindow(mapping, window, current)
-          if (!diff.empty()) {
-              List<RowDto> fetched = Phase2Fetcher.fetch(mapping, diff.created ∪ diff.updated)
-              List<CompletableFuture<?>> sends = []
-              for row in fetched:
-                  sends.add(SyncEventPublisher.publish(mapping, op, pk, row))
-              for pk in diff.deleted:
-                  sends.add(SyncEventPublisher.publish(mapping, DELETED, pk, null))
-              CompletableFuture.allOf(sends).get(cfg.publishFlush.getSeconds(), SECONDS)
+      for (Window w : windows) {
+          // Phase 1 — primary
+          Long2IntMap currentScan = Phase1Hasher.hashPrimary(w, primary, conn)
+          // Phase 1 — each child, XOR-fold into currentScan keyed by primary PK
+          for (ChildSource c : children) {
+              Long2IntMap childHash = Phase1Hasher.hashChild(w, c, conn)
+              for (entry in childHash) {
+                  if (currentScan.containsKey(entry.fk)) {
+                      currentScan.put(entry.fk, currentScan.get(entry.fk) ^ entry.xorCrc)
+                  }
+                  -- orphan FKs (no primary row) dropped silently
+              }
           }
-          SnapshotStore.swapWindow(mapping, window, current)
-                                                    -- entries outside [from,to] untouched
+          ChangeSet diff = ChangeSet.diff(currentScan, snapshot.keysInRange(...), snapshot, entity)
+          if (!diff.empty()) {
+              // Phase 2 — primary + each child
+              Long2ObjectMap<Object> primaryRows = Phase2Fetcher.fetchPrimary(primary, createdUpdated, conn)
+              Map<String, Long2ObjectMap<List<Object>>> childRowsByTable = {}
+              for (ChildSource c : children) {
+                  childRowsByTable.put(c.tableName(),
+                          Phase2Fetcher.fetchChild(c, createdUpdated, conn))
+              }
+              // Assemble + publish
+              for pk in createdUpdated:
+                  Map<String, List<Object>> children = collect(childRowsByTable, pk)
+                  T dto = mapping.mapEntity(primaryRows.get(pk), children)
+                  publish(op, pk, dto)
+              for pk in diff.deleted:
+                  publish(DELETED, pk, null)
+              walkInFlightAndAdvance(...)        -- per-PK snapshot swap on Kafka ack
+          }
           totalCreated += diff.created.size()
           totalUpdated += diff.updated.size()
           totalDeleted += diff.deleted.size()
@@ -274,8 +341,9 @@ EntitySyncTask.run()  [scheduler thread, daemon]
 ```
 
 Small entities (rowCount ≤ rowsPerWindow): `windows` returns a single
-`[MIN, MAX]` interval — the loop runs once, operationally identical to a "full
-scan".
+`[minEnv, maxEnv]` interval — the loop runs once, operationally identical to a
+"full scan". Single-table entities (`children = []`): the per-child loops
+are no-ops; behaves like a pure-primary CRC32 cycle.
 
 ### 2. Heartbeat enrichment
 
@@ -333,6 +401,38 @@ HeartbeatService tick   [heartbeat thread]
   `items` rows). The recompute query (`SELECT MIN(pk), MAX(pk) FROM tbl`) uses the PK
   index → O(log n) two index lookups, < 50ms even on 12M rows. The cost is negligible
   compared to the Phase 1 scan (20–40s).
+- **Envelope-based windowing for DELETE correctness.** The window range is the
+  union of `[MIN_db, MAX_db]` and `[MIN_snapshot, MAX_snapshot]`, NOT just
+  `[MIN_db, MAX_db]`. Without the envelope, deleting the row at the current
+  `MIN(pk)` or `MAX(pk)` shrinks the DB range and pushes the deleted PK
+  outside every next-cycle window — its tombstone never fires and stale state
+  lives in the platform indefinitely. AVL-tree-backed `SnapshotStore` exposes
+  `firstLongKey` / `lastLongKey` in O(log N), so the envelope read is
+  sub-millisecond regardless of snapshot size. The cost (slightly larger
+  envelope when snapshot has historical reach beyond DB extremes) is bounded
+  by snapshot-vs-DB drift, which converges back to `[MIN_db, MAX_db]` once
+  the envelope's tombstones publish and the snapshot keys are removed.
+- **Multi-source assembly via PrimarySource + ChildSource, no JOINs.** Each
+  `EntityMapping<T>` declares one primary (drives windowing + identity) and
+  zero-or-more children (FK back to primary's PK). Engine emits one SQL
+  statement per source — never a JOIN — so the SPI stays agnostic about
+  per-tenant column aliases / ON conditions. Aggregation happens in-engine:
+  primary CRC XOR-folded with each child's `BIT_XOR(CRC32(...))` group
+  aggregate. Per-source rows are opaque `Object` to the engine; impl casts
+  inside `mapEntity` to its own private row types.
+- **`BIT_XOR(CRC32(...))` for child aggregation.** Order-insensitive,
+  associative — child row order in the source table has no bearing on the
+  hash. Implementation cost: one `GROUP BY fk` query per child source. The
+  collision risk for two child rows with identical CRC32 inside the same FK
+  group cancelling in XOR is `~1/2^32` per pair — for an entity with N child
+  rows the per-cycle change-miss probability is bounded by `N(N-1)/2 × 1/2^32`
+  and is acceptable for game-data eventual consistency. Mitigation
+  (`XOR COUNT(*)` row-count guard) considered: includes the row count in the
+  aggregate so `add then remove of identical rows` produces a different hash
+  than baseline. Deferred — adds noise without a real collision pattern
+  observed; if M21 e2e or M22 manual smoke surfaces collisions, the guard
+  is purely additive on the wire (snapshot CRC values change once on
+  rollout, behaves like an initial-sync replay for affected entities).
 - **One scheduler thread per `EntityMapping`.** Thread-confined `SnapshotStore`
   removes the need for any synchronization on the per-entity state. N daemon
   threads for N entities; with ~5 entities per provider this is negligible. A

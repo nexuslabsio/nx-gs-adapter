@@ -1,11 +1,8 @@
 package app.l2nx.gs.db.sync.engine;
 
-import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
-import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
-import app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent;
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
-import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
+import app.l2nx.gs.adapter.api.kafka.ops.*;
 import app.l2nx.gs.adapter.api.kafka.sync.db.ClanDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.ClanSkillDto;
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
@@ -73,9 +70,21 @@ class CdcEngineE2ETest {
                     "  clan_level INT NOT NULL DEFAULT 0," +
                     "  leader_id BIGINT NOT NULL DEFAULT 0," +
                     "  ally_id BIGINT NOT NULL DEFAULT 0)");
+            st.execute("CREATE TABLE clan_skills (" +
+                    "  clan_id INT NOT NULL DEFAULT 0," +
+                    "  skill_id INT NOT NULL DEFAULT 0," +
+                    "  skill_level INT NOT NULL DEFAULT 0," +
+                    "  skill_name VARCHAR(26) NULL," +
+                    "  sub_pledge_id INT NOT NULL DEFAULT -2," +
+                    "  PRIMARY KEY (clan_id, skill_id, sub_pledge_id))");
             st.execute("INSERT INTO clan_data VALUES (1, 'Hellbound', 5, 100, 0)");
             st.execute("INSERT INTO clan_data VALUES (2, 'Phoenix', 3, 200, 50)");
             st.execute("INSERT INTO clan_data VALUES (3, 'Dragons', 7, 300, 50)");
+            // Clan 1 — 2 skills; clan 2 — 2 skills; clan 3 — none.
+            st.execute("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (1, 101, 1)");
+            st.execute("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (1, 102, 2)");
+            st.execute("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (2, 201, 5)");
+            st.execute("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (2, 202, 3)");
         }
 
         Properties props = new Properties();
@@ -102,7 +111,7 @@ class CdcEngineE2ETest {
     }
 
     @Test
-    void engine_shouldEmitCreatedUpdatedDeleted_overThreeCycles() throws Exception {
+    void engine_shouldSyncMultiSourceEntity_includingChildCrudAndEnvelopeBoundary() throws Exception {
         EntityStatsTracker statsTracker = new EntityStatsTracker();
         engine = buildEngine(statsTracker);
         engine.start();
@@ -110,20 +119,27 @@ class CdcEngineE2ETest {
         try (KafkaConsumer<byte[], byte[]> consumer = newConsumer()) {
             consumer.subscribe(Collections.singletonList(TOPIC));
 
-            // First tick — initial sync emits 3 CREATED events.
+            // Cycle 1 — initial sync: 3 CREATED events; payloads carry the assembled
+            // skills lists pulled from clan_skills.
             awaitTick();
-            List<ConsumerRecord<byte[], byte[]>> firstCycle = poll(consumer, 3);
-            assertEquals(3, firstCycle.size(), "initial sync emits one event per existing row");
-            for (ConsumerRecord<byte[], byte[]> record : firstCycle) {
+            List<ConsumerRecord<byte[], byte[]>> initial = poll(consumer, 3);
+            assertEquals(3, initial.size(), "initial sync emits one event per existing clan");
+            Map<Long, ClanDto> byClanId = new HashMap<>();
+            for (ConsumerRecord<byte[], byte[]> record : initial) {
                 SyncEvent<ClanDto> event = decode(record.value());
                 assertEquals("clan", event.getEntityName());
                 assertEquals("CREATED", event.getOp());
                 assertEquals(decodeKey(record.key()), event.getPk());
                 assertNotNull(event.getPayload());
-                assertEquals(event.getPk(), event.getPayload().getClanId());
+                byClanId.put(event.getPk(), event.getPayload());
             }
+            assertEquals(2, byClanId.get(1L).getSkills().size(), "clan 1 starts with 2 skills");
+            assertEquals(2, byClanId.get(2L).getSkills().size(), "clan 2 starts with 2 skills");
+            assertEquals(0, byClanId.get(3L).getSkills().size(), "clan 3 has no skills");
+            assertSkillsContain(byClanId.get(1L), 101, 1);
+            assertSkillsContain(byClanId.get(1L), 102, 2);
 
-            // UPDATE one row — next cycle emits 1 UPDATED.
+            // Cycle 2 — primary-only mutation: rename clan 2 → exactly one UPDATED.
             try (Connection c = jdbc(); PreparedStatement ps = c.prepareStatement(
                     "UPDATE clan_data SET clan_name = ? WHERE clan_id = ?")) {
                 ps.setString(1, "Phoenix-renamed");
@@ -131,28 +147,61 @@ class CdcEngineE2ETest {
                 ps.executeUpdate();
             }
             awaitTick();
-            List<ConsumerRecord<byte[], byte[]>> updateCycle = poll(consumer, 1);
-            assertEquals(1, updateCycle.size(), "single row update emits a single UPDATED event");
-            ConsumerRecord<byte[], byte[]> updateRecord = updateCycle.get(0);
-            SyncEvent<ClanDto> updateEvent = decode(updateRecord.value());
-            assertEquals("UPDATED", updateEvent.getOp());
-            assertEquals(2L, updateEvent.getPk());
-            assertNotNull(updateEvent.getPayload());
-            assertEquals("Phoenix-renamed", updateEvent.getPayload().getClanName());
+            SyncEvent<ClanDto> renameEvent = expectSingleEvent(consumer, "UPDATED");
+            assertEquals(2L, renameEvent.getPk());
+            assertEquals("Phoenix-renamed", renameEvent.getPayload().getClanName());
+            assertEquals(2, renameEvent.getPayload().getSkills().size(),
+                    "skill list survives a primary-only rename");
 
-            // DELETE a non-boundary row — next cycle emits 1 DELETED tombstone.
-            // Boundary rows (current MIN/MAX) are deliberately preserved so the
-            // window [MIN(pk), MAX(pk)] does not shrink mid-test; shrinking-window
-            // semantics are out of scope for this e2e and exercised separately.
+            // Cycle 3 — child INSERT: add a new skill row for clan 1 → UPDATED with 3 skills.
+            try (Connection c = jdbc(); Statement st = c.createStatement()) {
+                st.executeUpdate("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (1, 103, 4)");
+            }
+            awaitTick();
+            SyncEvent<ClanDto> addSkillEvent = expectSingleEvent(consumer, "UPDATED");
+            assertEquals(1L, addSkillEvent.getPk());
+            assertEquals(3, addSkillEvent.getPayload().getSkills().size());
+            assertSkillsContain(addSkillEvent.getPayload(), 103, 4);
+
+            // Cycle 4 — child UPDATE: change a skill level for clan 2 → UPDATED with new level.
+            try (Connection c = jdbc(); Statement st = c.createStatement()) {
+                st.executeUpdate("UPDATE clan_skills SET skill_level = 99 "
+                        + "WHERE clan_id = 2 AND skill_id = 201");
+            }
+            awaitTick();
+            SyncEvent<ClanDto> levelEvent = expectSingleEvent(consumer, "UPDATED");
+            assertEquals(2L, levelEvent.getPk());
+            assertSkillsContain(levelEvent.getPayload(), 201, 99);
+
+            // Cycle 5 — child DELETE: drop a skill for clan 1 → UPDATED with 2 skills.
+            try (Connection c = jdbc(); Statement st = c.createStatement()) {
+                st.executeUpdate("DELETE FROM clan_skills WHERE clan_id = 1 AND skill_id = 101");
+            }
+            awaitTick();
+            SyncEvent<ClanDto> dropSkillEvent = expectSingleEvent(consumer, "UPDATED");
+            assertEquals(1L, dropSkillEvent.getPk());
+            assertEquals(2, dropSkillEvent.getPayload().getSkills().size());
+
+            // Cycle 6 — primary DELETE on a non-boundary row (clan 2) → tombstone.
             try (Connection c = jdbc(); Statement st = c.createStatement()) {
                 st.executeUpdate("DELETE FROM clan_data WHERE clan_id = 2");
             }
             awaitTick();
-            List<ConsumerRecord<byte[], byte[]>> deleteCycle = poll(consumer, 1);
-            assertEquals(1, deleteCycle.size(), "single row delete emits a single tombstone");
-            ConsumerRecord<byte[], byte[]> deleteRecord = deleteCycle.get(0);
-            assertEquals(2L, decodeKey(deleteRecord.key()));
-            assertNull(deleteRecord.value(), "tombstone payload is null on the wire");
+            ConsumerRecord<byte[], byte[]> tombstone1 = expectSingleTombstone(consumer);
+            assertEquals(2L, decodeKey(tombstone1.key()));
+
+            // Cycle 7 — envelope regression: delete the current MAX(clan_id) row (clan 3).
+            // Pre-fix, the next cycle's MAX_db would shrink to 1 and clan 3 would
+            // never re-enter any window — its DELETE would silently never fire.
+            // Post-fix, the window envelope includes max(MAX_db, MAX_snapshot) = 3,
+            // so the window covers PK 3 and the diff produces a tombstone.
+            try (Connection c = jdbc(); Statement st = c.createStatement()) {
+                st.executeUpdate("DELETE FROM clan_data WHERE clan_id = 3");
+            }
+            awaitTick();
+            ConsumerRecord<byte[], byte[]> tombstone2 = expectSingleTombstone(consumer);
+            assertEquals(3L, decodeKey(tombstone2.key()),
+                    "envelope-based windowing must catch deletion of the prior MAX(pk)");
         }
 
         // Stats — entity HEALTHY, consecutiveErrors stays at 0 across the run.
@@ -163,9 +212,7 @@ class CdcEngineE2ETest {
         assertEquals(EntityState.HEALTHY, clanStats.getState());
         assertEquals(Integer.valueOf(0), clanStats.getConsecutiveErrors());
 
-        // HeartbeatEvent shape — db-sync module ACTIVE, entities[clan]=HEALTHY. The
-        // engine's tracker output composes cleanly into a wire heartbeat. DbSyncModule
-        // wraps the tracker the same way; that wrap is unit-tested separately.
+        // HeartbeatEvent shape — db-sync module ACTIVE, entities[clan]=HEALTHY.
         ModuleStatus dbSyncStatus = ModuleStatus.builder()
                 .name("db-sync")
                 .state("ACTIVE")
@@ -189,6 +236,30 @@ class CdcEngineE2ETest {
         assertEquals(EntityState.HEALTHY, heartbeatEntities.get(0).getState());
     }
 
+    private static void assertSkillsContain(ClanDto dto, int skillId, int skillLevel) {
+        for (ClanSkillDto s : dto.getSkills()) {
+            if (s.getSkillId() == skillId && s.getSkillLevel() == skillLevel) {
+                return;
+            }
+        }
+        fail("expected skill " + skillId + ":" + skillLevel + " in " + dto.getSkills());
+    }
+
+    private SyncEvent<ClanDto> expectSingleEvent(KafkaConsumer<byte[], byte[]> consumer, String op) {
+        List<ConsumerRecord<byte[], byte[]>> records = poll(consumer, 1);
+        assertEquals(1, records.size(), "expected exactly one " + op + " event");
+        SyncEvent<ClanDto> event = decode(records.get(0).value());
+        assertEquals(op, event.getOp());
+        return event;
+    }
+
+    private ConsumerRecord<byte[], byte[]> expectSingleTombstone(KafkaConsumer<byte[], byte[]> consumer) {
+        List<ConsumerRecord<byte[], byte[]>> records = poll(consumer, 1);
+        assertEquals(1, records.size(), "expected exactly one tombstone");
+        assertNull(records.get(0).value(), "tombstone payload must be null on the wire");
+        return records.get(0);
+    }
+
     private CdcEngine buildEngine(EntityStatsTracker statsTracker) {
         EngineConfig config = new EngineConfig(
                 /* tickIntervalSeconds */ 60, // unused — driven by tickOnceSynchronously()
@@ -197,7 +268,7 @@ class CdcEngineE2ETest {
                 /* publishFlushSeconds */ 5);
         TopicResolver topicResolver = entityName -> "clan".equals(entityName) ? TOPIC : null;
         SyncEventPublisher publisher = new SyncEventPublisher(testKafkaSender());
-        List<EntityMapping<?>> mappings = Collections.singletonList(new TestClanMapping());
+        List<EntityMapping<?>> mappings = Collections.singletonList(TestMappings.clanWithSkills());
         return new CdcEngine(
                 "test",
                 mappings,
@@ -289,51 +360,6 @@ class CdcEngineE2ETest {
         @Override
         public Optional<PoolStats> stats() {
             return Optional.empty();
-        }
-    }
-
-    private static final class TestClanMapping implements EntityMapping<ClanDto> {
-        private static final List<String> HASHED = Collections.unmodifiableList(
-                Arrays.asList("clan_name", "clan_level", "leader_id", "ally_id"));
-
-        @Override
-        public String entityName() {
-            return "clan";
-        }
-
-        @Override
-        public String tableName() {
-            return "clan_data";
-        }
-
-        @Override
-        public String pkColumn() {
-            return "clan_id";
-        }
-
-        @Override
-        public List<String> hashedColumns() {
-            return HASHED;
-        }
-
-        @Override
-        public Class<ClanDto> dtoType() {
-            return ClanDto.class;
-        }
-
-        @Override
-        public ClanDto mapRow(ResultSet rs) throws SQLException {
-            return ClanDto.builder()
-                    .clanId(rs.getLong("clan_id"))
-                    .clanName(rs.getString("clan_name"))
-                    .clanLevel(rs.getInt("clan_level"))
-                    .leaderId(nullIfZero(rs.getLong("leader_id")))
-                    .allyId(nullIfZero(rs.getLong("ally_id")))
-                    .build();
-        }
-
-        private static Long nullIfZero(long v) {
-            return v == 0L ? null : v;
         }
     }
 }

@@ -7,11 +7,11 @@ import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.api.spi.DbSchemaProvider;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.db.sync.engine.TestMappings;
 import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.function.Function;
@@ -279,37 +279,7 @@ class DbSyncModuleTest {
     }
 
     private static EntityMapping<ClanDto> clanMapping() {
-        return new EntityMapping<ClanDto>() {
-            @Override
-            public String entityName() {
-                return "clan";
-            }
-
-            @Override
-            public String tableName() {
-                return "clan_data";
-            }
-
-            @Override
-            public String pkColumn() {
-                return "clan_id";
-            }
-
-            @Override
-            public List<String> hashedColumns() {
-                return Arrays.asList("clan_name", "clan_level");
-            }
-
-            @Override
-            public ClanDto mapRow(ResultSet rs) {
-                return null;
-            }
-
-            @Override
-            public Class<ClanDto> dtoType() {
-                return ClanDto.class;
-            }
-        };
+        return TestMappings.clanOnly();
     }
 
     @SuppressWarnings("unused")

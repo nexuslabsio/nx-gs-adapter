@@ -3,6 +3,8 @@ package app.l2nx.gs.db.sync.engine;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import org.junit.jupiter.api.Test;
 
+import java.util.OptionalLong;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class SnapshotStoreTest {
@@ -111,5 +113,64 @@ class SnapshotStoreTest {
 
         assertEquals(3, store.sizeOf("clan"));
         assertEquals(0, store.sizeOf("character"));
+    }
+
+    @Test
+    void minPk_shouldReturnEmpty_whenEntityUnknown() {
+        SnapshotStore store = new SnapshotStore();
+
+        assertFalse(store.minPk("clan").isPresent());
+    }
+
+    @Test
+    void minPk_shouldReturnEmpty_whenEntityClearedBackToZero() {
+        SnapshotStore store = new SnapshotStore();
+        store.putCrc("clan", 42L, 100);
+        store.removeCrc("clan", 42L);
+
+        assertFalse(store.minPk("clan").isPresent());
+    }
+
+    @Test
+    void minPk_shouldReturnSmallestKey_whenPopulated() {
+        SnapshotStore store = new SnapshotStore();
+        store.putCrc("clan", 5L, 50);
+        store.putCrc("clan", 1L, 10);
+        store.putCrc("clan", 100L, 1000);
+        store.putCrc("clan", 20L, 200);
+
+        assertEquals(OptionalLong.of(1L), store.minPk("clan"));
+    }
+
+    @Test
+    void maxPk_shouldReturnEmpty_whenEntityUnknown() {
+        SnapshotStore store = new SnapshotStore();
+
+        assertFalse(store.maxPk("clan").isPresent());
+    }
+
+    @Test
+    void maxPk_shouldReturnLargestKey_whenPopulated() {
+        SnapshotStore store = new SnapshotStore();
+        store.putCrc("clan", 5L, 50);
+        store.putCrc("clan", 1L, 10);
+        store.putCrc("clan", 100L, 1000);
+        store.putCrc("clan", 20L, 200);
+
+        assertEquals(OptionalLong.of(100L), store.maxPk("clan"));
+    }
+
+    @Test
+    void minPkAndMaxPk_shouldIsolateEntities() {
+        SnapshotStore store = new SnapshotStore();
+        store.putCrc("clan", 5L, 1);
+        store.putCrc("character", 99L, 2);
+
+        assertEquals(OptionalLong.of(5L), store.minPk("clan"));
+        assertEquals(OptionalLong.of(5L), store.maxPk("clan"));
+        assertEquals(OptionalLong.of(99L), store.minPk("character"));
+        assertEquals(OptionalLong.of(99L), store.maxPk("character"));
+        assertFalse(store.minPk("item").isPresent());
+        assertFalse(store.maxPk("item").isPresent());
     }
 }

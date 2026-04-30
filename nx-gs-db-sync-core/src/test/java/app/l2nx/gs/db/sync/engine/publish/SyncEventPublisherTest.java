@@ -3,6 +3,7 @@ package app.l2nx.gs.db.sync.engine.publish;
 import app.l2nx.gs.adapter.api.kafka.sync.db.ClanDto;
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
+import app.l2nx.gs.db.sync.engine.TestMappings;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -10,10 +11,7 @@ import org.apache.kafka.common.serialization.LongSerializer;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -125,37 +123,7 @@ class SyncEventPublisherTest {
     }
 
     private static EntityMapping<ClanDto> clanMapping() {
-        return new EntityMapping<ClanDto>() {
-            @Override
-            public String entityName() {
-                return "clan";
-            }
-
-            @Override
-            public String tableName() {
-                return "clan_data";
-            }
-
-            @Override
-            public String pkColumn() {
-                return "clan_id";
-            }
-
-            @Override
-            public List<String> hashedColumns() {
-                return Arrays.asList("clan_name", "clan_level");
-            }
-
-            @Override
-            public ClanDto mapRow(ResultSet rs) throws SQLException {
-                return null;
-            }
-
-            @Override
-            public Class<ClanDto> dtoType() {
-                return ClanDto.class;
-            }
-        };
+        return TestMappings.clanOnly();
     }
 
     private static final class RecordingSender implements KafkaSender {

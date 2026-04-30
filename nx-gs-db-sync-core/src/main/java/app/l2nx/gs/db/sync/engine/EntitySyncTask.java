@@ -1,6 +1,7 @@
 package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
+import app.l2nx.gs.adapter.api.spi.ChildSource;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.phase.ChangeSet;
@@ -18,7 +19,7 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -29,10 +30,26 @@ import java.util.concurrent.TimeoutException;
  *
  * <ol>
  *     <li>Borrow read-only connection from {@link JdbcConnectionSource}.</li>
- *     <li>{@link WindowPlanner#plan WindowPlanner} → list of windows.</li>
- *     <li>For each window: Phase-1 hash → diff against snapshot → Phase-2
- *         fetch (created ∪ updated) → publish per PK, recording per-PK
- *         {@link CompletableFuture} for end-of-cycle walk.</li>
+ *     <li>{@link WindowPlanner#plan WindowPlanner} → list of windows
+ *         (envelope of DB and snapshot ranges, see cdc-engine R2).</li>
+ *     <li>For each window:
+ *         <ul>
+ *             <li>Phase 1 — primary: {@code SELECT pk, CRC32(...)}.</li>
+ *             <li>Phase 1 — each child: {@code SELECT fk, BIT_XOR(CRC32(...))
+ *                 GROUP BY fk}; XOR-fold into the primary hash for matching
+ *                 PKs (orphan FKs dropped silently).</li>
+ *             <li>Diff aggregated scan against the snapshot for the window's
+ *                 PK range.</li>
+ *             <li>Phase 2 — primary + each child: chunked
+ *                 {@code SELECT * WHERE pk/fk IN (...)} for created ∪
+ *                 updated; group child rows by FK.</li>
+ *             <li>Assemble per PK via
+ *                 {@link EntityMapping#mapEntity}; publish CREATED / UPDATED
+ *                 events. Publish DELETED tombstones for diff.deleted PKs.
+ *                 Record per-PK {@link CompletableFuture} for end-of-cycle
+ *                 walk.</li>
+ *         </ul>
+ *     </li>
  *     <li>End-of-cycle: walk per-PK futures up to {@code publishFlushSeconds};
  *         advance {@link SnapshotStore} only for PKs whose publish actually
  *         succeeded. Failed / timed-out PKs stay in the previous snapshot and
@@ -47,7 +64,8 @@ import java.util.concurrent.TimeoutException;
  *         publishes, no diff.</li>
  *     <li>{@link SQLTimeoutException} mid-window → window skipped, entity
  *         DEGRADED for the cycle, continue to next window.</li>
- *     <li>Generic {@link SQLException} mid-window → abort cycle, entity
+ *     <li>Generic {@link SQLException} mid-window (Phase 1 primary, Phase 1
+ *         child, Phase 2 primary, or Phase 2 child) → abort cycle, entity
  *         DEGRADED, snapshot frozen, next tick retries from the top.</li>
  * </ul>
  */
@@ -121,13 +139,15 @@ public final class EntitySyncTask {
         try {
             conn.setReadOnly(true);
 
-            List<Window> windows = planner.plan(mapping, conn,
+            List<Window> windows = planner.plan(mapping, conn, snapshot,
                     config.rowsPerWindow(), config.queryTimeoutSeconds());
 
             for (Window window : windows) {
                 Long2IntMap currentScan;
                 try {
-                    currentScan = hasher.hash(window, mapping, conn, config.queryTimeoutSeconds());
+                    currentScan = hasher.hashPrimary(
+                            window, mapping.primary(), conn, config.queryTimeoutSeconds());
+                    foldChildrenInto(currentScan, window, conn);
                 } catch (SQLTimeoutException timeout) {
                     log.warn("Entity {} window {} Phase-1 timed out — DEGRADED, skipping window",
                             entity, window);
@@ -144,12 +164,12 @@ public final class EntitySyncTask {
                 ChangeSet diff = ChangeSet.diff(currentScan, prevKeys, snapshot, entity);
 
                 LongList createUpdate = unionToList(diff.created(), diff.updated());
-                Long2ObjectMap<?> rows;
+                Map<Long, Object> assembled;
                 if (createUpdate.isEmpty()) {
-                    rows = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Object>();
+                    assembled = Collections.emptyMap();
                 } else {
                     try {
-                        rows = fetchRows(mapping, createUpdate, conn);
+                        assembled = assembleEntities(createUpdate, conn);
                     } catch (SQLTimeoutException timeout) {
                         log.warn("Entity {} window {} Phase-2 timed out — DEGRADED, skipping window",
                                 entity, window);
@@ -163,7 +183,7 @@ public final class EntitySyncTask {
                     }
                 }
 
-                publishChanges(diff, rows, currentScan, topic,
+                publishChanges(diff, assembled, currentScan, topic,
                         inFlight, pendingCrcAdvance, pendingCreates, pendingDeletes);
             }
         } catch (SQLException unexpectedSqlError) {
@@ -193,15 +213,86 @@ public final class EntitySyncTask {
                 createdCount, updatedCount, deletedCount, rowCount);
     }
 
+    /**
+     * Phase-1 children pass: for every declared {@link ChildSource}, run the
+     * window-bounded {@code BIT_XOR(CRC32(...))} aggregate and XOR-fold each
+     * (parent PK → aggregate CRC) into the primary scan. PKs present in a
+     * child but missing from the primary scan are orphan FKs and are dropped
+     * silently — the entity does not exist without a primary row.
+     */
+    private void foldChildrenInto(Long2IntMap currentScan,
+                                  Window window,
+                                  Connection conn) throws SQLException {
+        for (ChildSource<?> child : mapping.children()) {
+            Long2IntMap childHash = hasher.hashChild(
+                    window, child, conn, config.queryTimeoutSeconds());
+            for (Long2IntMap.Entry e : childHash.long2IntEntrySet()) {
+                long pk = e.getLongKey();
+                int xorCrc = e.getIntValue();
+                if (currentScan.containsKey(pk)) {
+                    currentScan.put(pk, currentScan.get(pk) ^ xorCrc);
+                }
+                // else: orphan child — primary row absent, drop silently
+            }
+        }
+    }
+
+    /**
+     * Phase-2 fetch and assembly. Runs one IN-query for the primary source and
+     * one per child source, groups child rows by FK, then calls
+     * {@link EntityMapping#mapEntity} per PK to produce typed entity DTOs.
+     *
+     * <p>If a PK present in {@code createUpdate} returns no primary row (deleted
+     * between Phase 1 and Phase 2), the engine omits it from the assembled
+     * map; the caller's per-PK loop short-circuits via a null lookup and the
+     * next cycle's Phase-1 diff catches the deletion as a tombstone.</p>
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private Long2ObjectMap<?> fetchRows(EntityMapping<?> mapping, LongList pks, Connection conn) throws SQLException {
+    private Map<Long, Object> assembleEntities(LongList createUpdate, Connection conn) throws SQLException {
+        Long2ObjectMap<Object> primaryRows = fetcher.fetchPrimary(
+                mapping.primary(), createUpdate, conn, config.queryTimeoutSeconds());
+
+        // Per-child fetch; preserve declared order for stable mapEntity input.
+        Map<String, Long2ObjectMap<List<Object>>> childRowsByTable =
+                new LinkedHashMap<String, Long2ObjectMap<List<Object>>>();
+        for (ChildSource<?> child : mapping.children()) {
+            childRowsByTable.put(child.tableName(),
+                    fetcher.fetchChild(child, createUpdate, conn, config.queryTimeoutSeconds()));
+        }
+
+        Map<Long, Object> assembled = new HashMap<Long, Object>(createUpdate.size() * 2);
         EntityMapping erased = mapping;
-        return fetcher.fetch(erased, pks, conn, config.queryTimeoutSeconds());
+        LongIterator pkIt = createUpdate.iterator();
+        while (pkIt.hasNext()) {
+            long pk = pkIt.nextLong();
+            Object primaryRow = primaryRows.get(pk);
+            if (primaryRow == null) {
+                // Phase-2 missing primary row — silent no-op; next cycle catches as DELETE.
+                continue;
+            }
+            Map<String, List<Object>> children = collectChildren(pk, childRowsByTable);
+            Object dto = erased.mapEntity(primaryRow, children);
+            assembled.put(pk, dto);
+        }
+        return assembled;
+    }
+
+    private static Map<String, List<Object>> collectChildren(
+            long pk, Map<String, Long2ObjectMap<List<Object>>> childRowsByTable) {
+        if (childRowsByTable.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, List<Object>> out = new LinkedHashMap<String, List<Object>>(childRowsByTable.size() * 2);
+        for (Map.Entry<String, Long2ObjectMap<List<Object>>> e : childRowsByTable.entrySet()) {
+            List<Object> rows = e.getValue().get(pk);
+            out.put(e.getKey(), rows == null ? Collections.emptyList() : rows);
+        }
+        return out;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void publishChanges(ChangeSet diff,
-                                Long2ObjectMap<?> rows,
+                                Map<Long, Object> assembled,
                                 Long2IntMap currentScan,
                                 String topic,
                                 Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
@@ -212,7 +303,7 @@ public final class EntitySyncTask {
         LongIterator createIt = diff.created().iterator();
         while (createIt.hasNext()) {
             long pk = createIt.nextLong();
-            Object dto = rows.get(pk);
+            Object dto = assembled.get(pk);
             if (dto == null) {
                 continue;
             }
@@ -225,7 +316,7 @@ public final class EntitySyncTask {
         LongIterator updateIt = diff.updated().iterator();
         while (updateIt.hasNext()) {
             long pk = updateIt.nextLong();
-            Object dto = rows.get(pk);
+            Object dto = assembled.get(pk);
             if (dto == null) {
                 continue;
             }

@@ -14,10 +14,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -98,41 +95,7 @@ class EntitySyncTaskTest {
     }
 
     private static EntityMapping<ClanDto> clanMapping() {
-        return new EntityMapping<ClanDto>() {
-            @Override
-            public String entityName() {
-                return "clan";
-            }
-
-            @Override
-            public String tableName() {
-                return "clan_data";
-            }
-
-            @Override
-            public String pkColumn() {
-                return "clan_id";
-            }
-
-            @Override
-            public List<String> hashedColumns() {
-                return Arrays.asList("clan_name", "clan_level");
-            }
-
-            @Override
-            public ClanDto mapRow(ResultSet rs) throws SQLException {
-                return ClanDto.builder()
-                        .clanId(rs.getLong("clan_id"))
-                        .clanName(rs.getString("clan_name"))
-                        .clanLevel(rs.getInt("clan_level"))
-                        .build();
-            }
-
-            @Override
-            public Class<ClanDto> dtoType() {
-                return ClanDto.class;
-            }
-        };
+        return TestMappings.clanOnly();
     }
 
     @SuppressWarnings("unused")

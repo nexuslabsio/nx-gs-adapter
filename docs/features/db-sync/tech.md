@@ -34,7 +34,7 @@ design end-to-end.
     - `META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule` — service descriptor
       with `app.l2nx.gs.db.sync.DbSyncModule`
 - `bohpts-core/` [planned, **lives in the private bohpts-core repo, NOT this monorepo**]
-    - depends on `app.l2nx:nx-gs-db-sync-core:0.1.0` (Maven Central)
+    - depends on `app.l2nx:nx-gs-db-sync-core:0.2.0` (Maven Central)
     - `<bohpts-package>/BohptsDbSchemaProvider.java` [planned] — implements
       `DbSchemaProvider` directly (no `extends` — vanilla L2J doesn't exist yet);
       `schemaName="bohpts"`. Package up to bohpts-core owner — see spec Open question.
@@ -49,11 +49,11 @@ design end-to-end.
     - `spi/ConnectContext.java` — context object passed to
       `AdapterModule.onConnect`; carries identity bundle + per-entity Kafka topic
       map (`syncTopics`)
-    - `spi/DbSchemaProvider.java` — Tier-2 SPI interface (api/0.6.0)
-    - `spi/EntityMapping.java` — Tier-2 SPI; one per synced entity (api/0.6.0)
+    - `spi/DbSchemaProvider.java` — Tier-2 SPI interface (api/0.7.0)
+    - `spi/EntityMapping.java` — Tier-2 SPI; one per synced entity (api/0.7.0)
     - `kafka/sync/db/SyncEvent.java` — typed wire envelope `SyncEvent<T>` with
       `String entityName`, `long pk`, `String op`, `T payload`, `long timestampEpochMs`
-      (api/0.6.0)
+      (api/0.7.0)
     - `kafka/sync/db/ClanDto.java` — clan row DTO (Java 8 POJO, hand-written builder);
       `long clanId` / `int clanLevel` (NOT NULL columns); `Long leaderId` / `Long allyId`
       (nullable per L2J `0`-sentinel convention). Co-located with `SyncEvent<T>` under
@@ -92,8 +92,29 @@ design end-to-end.
 - **`DbSchemaProvider`** (R3, R4) — Tier-2 SPI. Single source of truth for "what tables
   look like in this schema". Vanilla impls expose `protected` template-method hooks for column
   / table names so client overrides change one thing without re-implementing the whole provider.
-- **`EntityMapping<T>`** (R5) — describes one table generically. CDC engine consumes
-  uniformly without knowing the DTO type. Generic `T` carried for compile-time `mapRow` safety.
+- **`EntityMapping<T>`** (R5) — declares one **primary source** + zero-or-more
+  **child sources** for a single platform entity:
+    - `entityName()` — domain identifier (`"clan"`, `"character"`, `"item"`).
+    - `dtoType()` — `Class<T>`, the wire DTO.
+    - `primary()` — `PrimarySource<?>` driving windowing + identity:
+      `tableName`, `pkColumn`, `hashedColumns`, `mapRow(rs)` → opaque per-row
+      record.
+    - `children()` — `List<ChildSource<?>>` (may be empty); each child carries
+      `tableName`, `fkColumn` referencing primary's PK, `hashedColumns`,
+      `mapRow(rs)` → opaque per-row record.
+    - `mapEntity(primaryRow, childRowsByTable)` — assembles the typed DTO `T`.
+      Engine groups child rows by FK and passes a
+      `Map<String, List<Object>>` keyed by `child.tableName()`. Implementations
+      cast back to their private row types and build the DTO. Nullable
+      collection fields on the DTO that the tenant doesn't sync (no
+      corresponding `ChildSource` declared) stay `null` → Gson omits them on
+      the wire.
+
+  Engine consumes the SPI uniformly: per-cycle, per-window it runs one Phase 1
+  hash query per source (primary CRC32, each child `BIT_XOR(CRC32(...))
+  GROUP BY fk`), XOR-folds child contributions into the per-PK aggregate, and
+  in Phase 2 runs one `IN`-fetch per source. See
+  [`cdc-engine/spec.md`](../cdc-engine/spec.md) R1 + R20.
 - **CDC engine** — `CdcEngine`, `EntitySyncTask`, `Phase1Hasher`,
   `Phase2Fetcher`, `SnapshotStore`, `WindowPlanner`, `SyncEventPublisher`,
   `TopicResolver`, `EntityStatsTracker`, `EngineConfig`,
@@ -203,7 +224,7 @@ NxAdapter.shutdown()
   `ConnectContext`, `SyncEvent`, `ClanDto`. Bumped to next minor release. Lands in
   two slices: `AdapterModule` + `ConnectContext` arrive with the `adapter-bootstrap`
   / `adapter-modules` extension; `SyncEvent` (with `entityName`, `pk: long`) +
-  `ClanDto` (Long ID fields) arrive with this feature in api/0.6.0 alongside
+  `ClanDto` (Long ID fields) arrive with this feature in api/0.7.0 alongside
   `EntityStats` / `EntityState` / `ChangesSummary` and
   `ConnectResponse.syncTopics`.
 - **`:nx-gs-adapter-core`** (R1) — extends `NxAdapter.start()` with
@@ -212,10 +233,11 @@ NxAdapter.shutdown()
 - **`:nx-gs-kafka`** — sync events published via `NxKafka.instance().send(topic, key,
   syncEvent)` from `cdc-engine`'s `SyncEventPublisher`. No change to `nx-gs-kafka` API.
 - **`:nx-gs-db-sync-core`** (R1–R9) — new module in this monorepo, published to
-  Maven Central as `app.l2nx:nx-gs-db-sync-core`. Phase 1 released as `0.1.0`
+  Maven Central as `app.l2nx:nx-gs-db-sync-core`. Phase 1 released as `0.1.0`,
+  Phase 2 single-table CDC as `0.1.1`, multi-source CDC engine as `0.2.0`
   with `DbSyncModule` only (no engine, no `DbSchemaProvider` SPI yet).
 - **`bohpts-core`** [planned] (R10) — bohpts-core repo (private) declares
-  `implementation 'app.l2nx:nx-gs-adapter-api:0.6.0'` (Tier-2 SPI lives in api;
+  `implementation 'app.l2nx:nx-gs-adapter-api:0.7.0'` (Tier-2 SPI lives in api;
   bohpts-core does NOT need a runtime dep on `nx-gs-db-sync-core`), hosts
   `BohptsDbSchemaProvider` + `ClanMapping` classes inline in its source tree, and
   ships `META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider` in its

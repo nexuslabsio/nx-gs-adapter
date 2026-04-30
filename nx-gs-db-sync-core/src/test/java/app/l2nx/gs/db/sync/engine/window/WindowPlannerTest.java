@@ -2,6 +2,8 @@ package app.l2nx.gs.db.sync.engine.window;
 
 import app.l2nx.gs.adapter.api.kafka.sync.db.ClanDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
+import app.l2nx.gs.db.sync.engine.SnapshotStore;
+import app.l2nx.gs.db.sync.engine.TestMappings;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -106,10 +108,10 @@ class WindowPlannerTest {
     }
 
     @Test
-    void plan_shouldReturnEmpty_whenTableEmpty() throws SQLException {
+    void plan_shouldReturnEmpty_whenTableEmptyAndSnapshotEmpty() throws SQLException {
         // MIN/MAX of an empty table both come back NULL — wasNull() == true after
-        // each getLong. Plan must collapse to empty list (engine treats this as
-        // "no windows this cycle", not as a single dummy window).
+        // each getLong. With no snapshot keys, the envelope is empty too → empty
+        // window list (engine treats this as "no work this cycle").
         Connection conn = mock(Connection.class);
         Statement st = mock(Statement.class);
         ResultSet rs = mock(ResultSet.class);
@@ -121,7 +123,8 @@ class WindowPlannerTest {
         when(rs.getLong(2)).thenReturn(0L);
         when(rs.wasNull()).thenReturn(true, true);
 
-        List<Window> windows = new WindowPlanner().plan(clanMapping(), conn, 1000, 5);
+        List<Window> windows = new WindowPlanner().plan(
+                clanMapping(), conn, new SnapshotStore(), 1000, 5);
 
         assertTrue(windows.isEmpty());
         verify(st).setQueryTimeout(5);
@@ -129,18 +132,10 @@ class WindowPlannerTest {
 
     @Test
     void plan_shouldUseMinMaxFromConnection_andProduceContiguousWindows() throws SQLException {
-        Connection conn = mock(Connection.class);
-        Statement st = mock(Statement.class);
-        ResultSet rs = mock(ResultSet.class);
+        Connection conn = mockMinMax(1L, 12L);
 
-        when(conn.createStatement()).thenReturn(st);
-        when(st.executeQuery(anyString())).thenReturn(rs);
-        when(rs.next()).thenReturn(true);
-        when(rs.getLong(1)).thenReturn(1L);
-        when(rs.getLong(2)).thenReturn(12L);
-        when(rs.wasNull()).thenReturn(false, false);
-
-        List<Window> windows = new WindowPlanner().plan(clanMapping(), conn, 5, 5);
+        List<Window> windows = new WindowPlanner().plan(
+                clanMapping(), conn, new SnapshotStore(), 5, 5);
 
         assertEquals(3, windows.size());
         assertEquals(new Window(1, 5), windows.get(0));
@@ -148,38 +143,55 @@ class WindowPlannerTest {
         assertEquals(new Window(11, 12), windows.get(2));
     }
 
-    private static EntityMapping<ClanDto> clanMapping() {
-        return new EntityMapping<ClanDto>() {
-            @Override
-            public String entityName() {
-                return "clan";
-            }
+    @Test
+    void plan_shouldUseSnapshotMin_whenDeletedExtremeWouldShrinkDbRange() throws SQLException {
+        // Snapshot remembers PK=1 and PK=12; the row at PK=12 was just deleted →
+        // DB MIN/MAX collapses to [1, 11]. Pre-fix windowing would partition
+        // [1, 11] and never include PK=12 → tombstone never fires. Post-fix:
+        // envelope = [1, max(11, 12)] = [1, 12] → PK=12 falls into the last
+        // window and gets a tombstone next cycle.
+        SnapshotStore snap = new SnapshotStore();
+        snap.putCrc("clan", 1L, 100);
+        snap.putCrc("clan", 12L, 200);
+        Connection conn = mockMinMax(1L, 11L);
 
-            @Override
-            public String tableName() {
-                return "clan_data";
-            }
+        List<Window> windows = new WindowPlanner().plan(clanMapping(), conn, snap, 100, 5);
 
-            @Override
-            public String pkColumn() {
-                return "clan_id";
-            }
+        assertEquals(1, windows.size());
+        assertEquals(new Window(1, 12), windows.get(0));
+    }
 
-            @Override
-            public List<String> hashedColumns() {
-                return Arrays.asList("clan_name", "clan_level");
-            }
+    @Test
+    void plan_shouldUseSnapshotEnvelope_whenAllRowsDeleted() throws SQLException {
+        // DB completely empty (rs.wasNull() = true), but snapshot still holds
+        // 3 PKs from prior cycles. Envelope must equal the snapshot's range
+        // so every leftover PK gets a tombstone on this cycle.
+        SnapshotStore snap = new SnapshotStore();
+        snap.putCrc("clan", 5L, 100);
+        snap.putCrc("clan", 7L, 200);
+        snap.putCrc("clan", 9L, 300);
+        Connection conn = mockEmptyMinMax();
 
-            @Override
-            public ClanDto mapRow(ResultSet r) {
-                return null;
-            }
+        List<Window> windows = new WindowPlanner().plan(clanMapping(), conn, snap, 100, 5);
 
-            @Override
-            public Class<ClanDto> dtoType() {
-                return ClanDto.class;
-            }
-        };
+        assertEquals(1, windows.size());
+        assertEquals(new Window(5, 9), windows.get(0));
+    }
+
+    @Test
+    void plan_shouldExpandEnvelope_whenSnapshotMaxAboveDbMax() throws SQLException {
+        // Symmetric: deleted PK=20 (the prior MAX) → DB MAX shrinks to 18,
+        // but snapshot still has 20. Envelope = [min(1,1), max(18,20)] = [1,20].
+        SnapshotStore snap = new SnapshotStore();
+        snap.putCrc("clan", 1L, 100);
+        snap.putCrc("clan", 18L, 180);
+        snap.putCrc("clan", 20L, 200);
+        Connection conn = mockMinMax(1L, 18L);
+
+        List<Window> windows = new WindowPlanner().plan(clanMapping(), conn, snap, 100, 5);
+
+        assertEquals(1, windows.size());
+        assertEquals(new Window(1, 20), windows.get(0));
     }
 
     @Test
@@ -188,6 +200,36 @@ class WindowPlannerTest {
         Throwable t = assertThrowsOrNull(() ->
                 WindowPlanner.divideRange(0L, WindowPlanner.MAX_WINDOWS_PER_PLAN + 100L, 1));
         assertNotNull(t, "expected IllegalStateException at cap");
+    }
+
+    private static Connection mockMinMax(long min, long max) throws SQLException {
+        Connection conn = mock(Connection.class);
+        Statement st = mock(Statement.class);
+        ResultSet rs = mock(ResultSet.class);
+        when(conn.createStatement()).thenReturn(st);
+        when(st.executeQuery(anyString())).thenReturn(rs);
+        when(rs.next()).thenReturn(true);
+        when(rs.getLong(1)).thenReturn(min);
+        when(rs.getLong(2)).thenReturn(max);
+        when(rs.wasNull()).thenReturn(false, false);
+        return conn;
+    }
+
+    private static Connection mockEmptyMinMax() throws SQLException {
+        Connection conn = mock(Connection.class);
+        Statement st = mock(Statement.class);
+        ResultSet rs = mock(ResultSet.class);
+        when(conn.createStatement()).thenReturn(st);
+        when(st.executeQuery(anyString())).thenReturn(rs);
+        when(rs.next()).thenReturn(true);
+        when(rs.getLong(1)).thenReturn(0L);
+        when(rs.getLong(2)).thenReturn(0L);
+        when(rs.wasNull()).thenReturn(true, true);
+        return conn;
+    }
+
+    private static EntityMapping<ClanDto> clanMapping() {
+        return TestMappings.clanOnly();
     }
 
     private static Throwable assertThrowsOrNull(Runnable r) {

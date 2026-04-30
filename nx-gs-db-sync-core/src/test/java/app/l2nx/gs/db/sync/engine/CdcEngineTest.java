@@ -14,9 +14,6 @@ import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -118,37 +115,7 @@ class CdcEngineTest {
     }
 
     private static EntityMapping<ClanDto> clanMapping() {
-        return new EntityMapping<ClanDto>() {
-            @Override
-            public String entityName() {
-                return "clan";
-            }
-
-            @Override
-            public String tableName() {
-                return "clan_data";
-            }
-
-            @Override
-            public String pkColumn() {
-                return "clan_id";
-            }
-
-            @Override
-            public List<String> hashedColumns() {
-                return Arrays.asList("clan_name", "clan_level");
-            }
-
-            @Override
-            public ClanDto mapRow(ResultSet rs) throws SQLException {
-                return null;
-            }
-
-            @Override
-            public Class<ClanDto> dtoType() {
-                return ClanDto.class;
-            }
-        };
+        return TestMappings.clanOnly();
     }
 
     private static KafkaSender neverCalledSender() {
