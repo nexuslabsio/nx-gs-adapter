@@ -3,9 +3,9 @@ package app.l2nx.gs.adapter.api.spi;
 import org.junit.jupiter.api.Test;
 
 import java.sql.ResultSet;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -19,7 +19,7 @@ class DbSchemaProviderTest {
 
     @Test
     void provider_shouldExposeNameAndMappings() {
-        EntityMapping<Object> clan = mapping("clan", "clan_data", "clan_id");
+        final EntityMapping<Object> clan = mapping("clan");
 
         DbSchemaProvider provider = new DbSchemaProvider() {
             @Override
@@ -37,9 +37,28 @@ class DbSchemaProviderTest {
         assertSame(clan, provider.mappings().get(0));
     }
 
-    private static EntityMapping<Object> mapping(final String entity,
-                                                 final String table,
-                                                 final String pk) {
+    private static EntityMapping<Object> mapping(final String entity) {
+        final PrimarySource<Object> primary = new PrimarySource<Object>() {
+            @Override
+            public String tableName() {
+                return entity + "_data";
+            }
+
+            @Override
+            public String pkColumn() {
+                return entity + "_id";
+            }
+
+            @Override
+            public List<String> hashedColumns() {
+                return java.util.Arrays.asList("col_a", "col_b");
+            }
+
+            @Override
+            public Object mapRow(ResultSet rs) {
+                return new Object();
+            }
+        };
         return new EntityMapping<Object>() {
             @Override
             public String entityName() {
@@ -47,28 +66,23 @@ class DbSchemaProviderTest {
             }
 
             @Override
-            public String tableName() {
-                return table;
-            }
-
-            @Override
-            public String pkColumn() {
-                return pk;
-            }
-
-            @Override
-            public List<String> hashedColumns() {
-                return Arrays.asList("col_a", "col_b");
-            }
-
-            @Override
-            public Object mapRow(ResultSet rs) {
-                return new Object();
-            }
-
-            @Override
             public Class<Object> dtoType() {
                 return Object.class;
+            }
+
+            @Override
+            public PrimarySource<?> primary() {
+                return primary;
+            }
+
+            @Override
+            public List<ChildSource<?>> children() {
+                return Collections.emptyList();
+            }
+
+            @Override
+            public Object mapEntity(Object primaryRow, Map<String, List<Object>> childRowsByTable) {
+                return primaryRow;
             }
         };
     }

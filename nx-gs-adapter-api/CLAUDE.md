@@ -28,7 +28,11 @@ by the L2NX game-server adapter and its consumers. Published as
   are fine.
 - **Zero runtime dependencies** — pure JDK only. No Spring, no Lombok, no Jackson, no Gson.
   JSON serialization is the consumer's responsibility (any binder works — Gson, Jackson,
-  etc.).
+  etc.). One exception: `org.jspecify:jspecify` is allowed for nullability annotations
+  (`@Nullable` / `@NonNull`); JSpecify uses `RetentionPolicy.CLASS`, so it carries no
+  runtime cost — annotations live in classfiles for static tooling but are not loaded at
+  runtime. Wired as `api(libs.jspecify)` so consumers receive the annotations
+  transitively and can run their own static nullness checking against the wire types.
 - **POJOs, not records** — final fields + private constructor + static `builder()` +
   `equals/hashCode`. Records are Java 14+. Stick to plain classes.
 - **Builder pattern** — every multi-field DTO ships with a hand-written `Builder` (no

@@ -92,31 +92,51 @@ module authors (datapack sync, metrics).
       selection key in MVP)
     - `List<TableMapping<?>> mappings()` — the tables this provider knows about
 
-- [done] R5. **[Phase 2]** `EntityMapping<T>` interface MUST describe ONE synced
+- [wip] R5. **[Phase 2]** `EntityMapping<T>` interface MUST describe ONE synced
   entity (clan, character, item, …). The adapter's domain vocabulary is entity-centric
-  — operators and platform consumers think in entities, not in DB tables; the table is
-  an internal-to-the-mapping detail. MVP enforces 1 entity = 1 source table; future
-  multi-table entities are an extension point.
+  — operators and platform consumers think in entities, not in DB tables; the source
+  tables are internal-to-the-mapping details. An entity may be assembled from
+  multiple source tables: one **primary source** (drives windowing + identity) and
+  zero-or-more **child sources** (each with FK back to primary's PK).
     - `String entityName()` — domain identifier in singular form: `"clan"`,
       `"character"`, `"item"`. Used as the lookup key into `ConnectResponse.syncTopics`
       to resolve the Kafka topic for this entity (per [`adapter-bootstrap`
       R16](../adapter-bootstrap/spec.md)). Surfaced through heartbeat as
       `EntityStats.name`.
-    - `String tableName()` — source SQL table for the entity (e.g. `"clan_data"` for
-      the `"clan"` entity). Internal to the mapping — used only by the engine's
-      SQL `FROM` clause and `setReadOnly`-bounded SELECT statements; never appears on
-      the wire.
-    - `String pkColumn()` — primary-key column on `tableName` (single-column numeric
-      PK assumption — see Non-goals). The engine reads PK values as `long` via
-      `rs.getLong(pkColumn())` and binds them via `setLong(...)`. PK is `long`
-      end-to-end — engine internals (fastutil `Long2IntOpenHashMap`), Kafka key
-      (`LongSerializer`), and `SyncEvent.pk: long` payload all carry the raw long.
-      See cdc-engine R1 + R12.
-    - `List<String> hashedColumns()` — columns whose values feed CRC32 in Phase 1
-    - `T mapRow(ResultSet rs)` — Phase 2 row → DTO conversion (called once per changed
-      row). Schema providers convert source-column values to wire types in `mapRow`;
-      ID-column types in DTOs are `Long` (matching the `long` PK invariant).
-    - `Class<T> dtoType()` — DTO class for serialization
+    - `Class<T> dtoType()` — DTO class for serialization. Concrete,
+      non-parameterized class (Gson serializes the typed payload slot directly).
+    - `PrimarySource<?> primary()` — the source table that drives windowing and
+      defines entity identity. Single-column numeric PK assumption (`long`):
+      engine reads PK values as `long` via `rs.getLong(pkColumn())` and binds
+      them via `setLong(...)`. PK is `long` end-to-end — engine internals
+      (fastutil `Long2IntAVLTreeMap`), Kafka key (`LongSerializer`), and
+      `SyncEvent.pk: long` payload all carry the raw long. See cdc-engine R1 + R12.
+        - `String tableName()` — source SQL table (e.g. `"clan_data"`).
+        - `String pkColumn()` — primary-key column on `tableName`.
+        - `List<String> hashedColumns()` — columns feeding `CRC32(CONCAT_WS(...))`
+          in Phase 1.
+        - `P mapRow(ResultSet rs)` — Phase 2 single-row mapper to an opaque
+          per-source row record. The engine treats `P` as `Object`; the
+          `EntityMapping` impl casts back to its private record type inside
+          `mapEntity`.
+    - `List<ChildSource<?>> children()` — additional source tables that
+      contribute to entity assembly via FK back to primary's PK column. May be
+      empty (single-table entity). For each child:
+        - `String tableName()` — child SQL table (e.g. `"clan_skills"`).
+        - `String fkColumn()` — column referencing primary's PK.
+        - `List<String> hashedColumns()` — columns feeding the child's
+          `BIT_XOR(CRC32(CONCAT_WS(...)))` aggregate in Phase 1 (see
+          [`cdc-engine` R20](../cdc-engine/spec.md)).
+        - `C mapRow(ResultSet rs)` — Phase 2 single-row mapper to an opaque
+          per-source row record.
+    - `T mapEntity(Object primaryRow, Map<String, List<Object>> childRowsByTable)`
+      — assembles the entity DTO. `primaryRow` is the value produced by
+      `primary().mapRow(rs)`; `childRowsByTable` is keyed by
+      `child.tableName()` and carries the (possibly empty) list of child rows
+      produced by each `ChildSource.mapRow(rs)`. Implementation casts back to
+      its private row types and returns the typed DTO `T`. Called once per
+      created/updated PK; never called for deletions (tombstones have
+      `payload=null`).
 
   **Notes:**
     - `EntityMapping` describes ONLY the schema shape (what to sync). All
@@ -129,6 +149,11 @@ module authors (datapack sync, metrics).
       arrive from the platform via `ConnectResponse.syncTopics` keyed by
       `entityName()`. See [`adapter-bootstrap` R16](../adapter-bootstrap/spec.md)
       and Decisions in tech.md.
+    - Engine-side aggregation (`BIT_XOR` of child CRCs XOR-folded into the
+      primary CRC per PK), Phase-2 fetch strategy (separate IN-queries per
+      source), orphan-FK handling (silently dropped), and the no-JOIN rule
+      live in [`cdc-engine` R1 + R20](../cdc-engine/spec.md). Provider authors
+      only declare per-source schema shape; engine handles the rest.
 
 > **R6, R7, R8 — moved to [`cdc-engine`](../cdc-engine/spec.md).** The CRC32 two-phase
 > protocol (engine R1), scheduler semantics (cdc-engine R5), and initial-sync flow
@@ -147,52 +172,83 @@ module authors (datapack sync, metrics).
   config when ServiceLoader returns 0 (Phase 3); bundled Hikari pool fails to open
   (Phase 3).
 
-- [todo] R10. **[Phase 2]** Bohpts client + clan entity MVP — `bohpts-core` repo
-  (private; `E:/bohpts/code/bohpts-core`) MUST host a `BohptsDbSchemaProvider` class
-  implementing `DbSchemaProvider` directly (no `extends` — there is no vanilla
-  `nx-gs-db-l2j` to inherit from in MVP), plus a
-  `META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider` resource pointing to
-  it. Bohpts-core declares `implementation 'app.l2nx:nx-gs-adapter-api:0.6.0'` from
-  Maven Central. Provider contract:
+- [wip] R10. **[Phase 2]** Bohpts client + clan entity MVP — `bohpts-core` repo
+  (private; `E:/projects/bohpts/bohpts-core`) MUST host a `BohptsDbSchemaProvider`
+  class implementing `DbSchemaProvider` directly (no `extends` — there is no
+  vanilla `nx-gs-db-l2j` to inherit from in MVP), plus a
+  `META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider` resource
+  pointing to it. Bohpts-core declares `implementation
+  'app.l2nx:nx-gs-adapter-api:0.7.0'` from Maven Central. Provider contract:
     - `schemaName()` = `"bohpts"`
     - `mappings()` returns exactly one `EntityMapping<ClanDto>` for the `clan`
       entity:
         - `entityName()` = `"clan"`
-        - `tableName()` = `"clan_data"` (source SQL table; internal to mapping)
-        - `pkColumn()` = `"clan_id"`
-        - `hashedColumns()` = `["clan_name", "clan_level", "leader_id", "ally_id"]`
-          (4 plain columns — crest_id, ally_name, ally_crest_id, the four
-          `*_penalty_*` / `*_expiry_time` fields and the `membersCount` formula
-          are intentionally out-of-scope for MVP per Non-goals)
         - `dtoType()` = `ClanDto.class`
-        - (no `tickInterval` / strategy / windowCount fields — engine config
-          per [`cdc-engine` R15](../cdc-engine/spec.md))
+        - `primary()` = `ClanPrimarySource`:
+            - `tableName()` = `"clan_data"`
+            - `pkColumn()` = `"clan_id"`
+            - `hashedColumns()` = `["clan_name", "clan_level", "leader_id",
+              "ally_id"]` (crest_id, ally_name, ally_crest_id, the four
+              `*_penalty_*` / `*_expiry_time` fields and the `membersCount`
+              formula are intentionally out-of-scope per Non-goals)
+            - `mapRow(rs)` → `ClanRow` (package-private record/class with
+              `clanId`, `clanName`, `clanLevel`, nullable `leaderId`,
+              nullable `allyId`)
+        - `children()` = `[ClanSkillsChildSource]`:
+            - `tableName()` = `"clan_skills"`
+            - `fkColumn()` = `"clan_id"`
+            - `hashedColumns()` = `["skill_id", "skill_level"]` (the
+              `sub_pledge_id` and `skill_name` columns are intentionally
+              out-of-scope; only id + level are surfaced on the wire)
+            - `mapRow(rs)` → `ClanSkillRow` (package-private record/class with
+              `int skillId`, `int skillLevel`)
+        - `mapEntity(primaryRow, childRowsByTable)` casts `primaryRow` to
+          `ClanRow`, reads `childRowsByTable.get("clan_skills")` (defaulting
+          to empty list), casts each row to `ClanSkillRow`, builds a
+          `List<ClanSkillDto>`, and assembles `ClanDto.builder()
+          .clanId(...).clanName(...).clanLevel(...).leaderId(...).allyId(...)
+          .skills(skills).build()`.
     - `ClanDto` ships in `nx-gs-adapter-api` (Java 8 POJO, hand-written builder) so
       the platform-side consumer compiles against the same wire type. Field types
       mirror DB nullability — primitives for `NOT NULL` columns, boxed for
-      nullable. ID fields are `long`/`Long` end-to-end (matches the engine's `long`
-      PK invariant — platform stores PKs as `long`):
+      nullable. ID fields are `long`/`Long` end-to-end:
         - `long clanId` (PK, `NOT NULL`)
         - `String clanName` (`NOT NULL`)
         - `int clanLevel` (`NOT NULL`, source default `0`)
         - `Long leaderId` (null when source `leader_id = 0` per L2J convention)
         - `Long allyId` (null when source `ally_id = 0`)
-    - The package for `BohptsDbSchemaProvider` inside bohpts-core is operator-chosen
-      — see Open question. No bohpts-internal class names or column conventions leak
-      into this monorepo (bohpts-core is private; this monorepo stays open-core).
+        - `List<ClanSkillDto> skills` — `null` when the tenant does not
+          declare a `ChildSource` for skills at all (no `clan_skills`
+          equivalent in the source schema, or skills intentionally not
+          synced); empty list when the tenant syncs skills but the clan
+          has none. Gson's default `serializeNulls=false` omits the field
+          from JSON when `null`, so the wire shape distinguishes
+          "feature not synced" from "feature synced, value empty".
+    - `ClanSkillDto` (new, ships in `nx-gs-adapter-api`) is a Java 8 POJO with
+      `int skillId`, `int skillLevel`, hand-written builder, equals/hashCode/
+      toString.
+    - The package for `BohptsDbSchemaProvider` inside bohpts-core is
+      `l2e.gameserver.l2nx`. No bohpts-internal class names or column
+      conventions leak into this monorepo (bohpts-core is private; this
+      monorepo stays open-core).
     - The Kafka topic the engine publishes `clan` events to is delivered by the
       platform via `ConnectResponse.syncTopics["clan"]` (e.g.
       `"bohpts.gs.sync.clans"`) — NOT declared in the mapping.
 
-- [wip] R11. **[Phase 1]** First published versions:
-    - `nx-gs-db-sync-core` = `0.1.0` (new module in this monorepo, published to Maven Central).
-      Phase 1 ships with `DbSyncModule` only (no CDC engine, no DbSchemaProvider — Phase 2
-      bumps the minor). Phase 3 adds `BundledHikariConnectionSource`.
-    - `nx-gs-adapter-api` bumped to next minor (adds `AdapterModule`, `ConnectContext`,
-      `ModuleStatus` + `Stats` + `PoolStats`, `JdbcConnectionSource`). `SyncEvent` /
-      `ClanDto` ship in the Phase 2 minor bump.
-    - **No** `nx-gs-db-bohpts` artifact is published — the bohpts schema provider is shipped
-      as part of the bohpts-core game-server JAR itself.
+- [wip] R11. **Module versions (current state):**
+    - `nx-gs-adapter-api` = `0.7.0` (breaking SPI change for multi-source
+      `EntityMapping`: split into `PrimarySource<P>` + `List<ChildSource<C>>` +
+      `mapEntity(...)`; removes top-level `tableName` / `pkColumn` /
+      `hashedColumns` / `mapRow`. Adds `ClanSkillDto`; extends `ClanDto` with
+      `List<ClanSkillDto> skills`).
+    - `nx-gs-db-sync-core` = `0.2.0` (multi-source CDC engine: per-source
+      Phase 1 + `BIT_XOR` aggregate, per-source Phase 2 + `mapEntity`
+      assembly, envelope-based windowing for DELETE-at-boundary correctness).
+    - `nx-gs-adapter-core` stays at `0.3.2` (no wire change in `/connect` /
+      `ConnectContext` for this slice).
+    - `nx-gs-kafka` stays at `0.2.0` (no wire change).
+    - **No** `nx-gs-db-bohpts` artifact is published — the bohpts schema
+      provider is shipped as part of the bohpts-core game-server JAR itself.
 
 **Should:**
 

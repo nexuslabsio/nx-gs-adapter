@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.api.rest;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.*;
 
 /**
@@ -18,7 +20,7 @@ public final class ConnectResponse {
     private final String serverSlug;
     private final String serverName;
     private final KafkaConfig kafka;
-    private final Map<String, String> syncTopics;
+    private final @Nullable Map<String, String> syncTopics;
 
     public ConnectResponse(UUID tenantId,
                            String tenantSlug,
@@ -26,7 +28,7 @@ public final class ConnectResponse {
                            String serverSlug,
                            String serverName,
                            KafkaConfig kafka,
-                           Map<String, String> syncTopics) {
+                           @Nullable Map<String, String> syncTopics) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
@@ -71,7 +73,7 @@ public final class ConnectResponse {
      * Per-entity Kafka topic names delivered by the platform. Keyed by entity name
      * ({@code "clan"}, {@code "character"}, …); value is the fully-qualified topic
      * the adapter is authorized to publish that entity's {@code SyncEvent}s into
-     * (e.g. {@code "bohpts.gs.sync.clans"}).
+     * (e.g. {@code "bohpts.gs.sync.db.clan"}).
      *
      * <p>{@code null} (field absent on the wire) and an empty map are operationally
      * equivalent — db-sync transitions to {@code DISABLED} on either. Adapter does
@@ -83,7 +85,7 @@ public final class ConnectResponse {
      * to an empty map) so the wire-shape round-trip stays lossless for the
      * platform-side producer that builds this object before serialization.</p>
      */
-    public Map<String, String> getSyncTopics() {
+    public @Nullable Map<String, String> getSyncTopics() {
         return syncTopics;
     }
 
@@ -139,7 +141,7 @@ public final class ConnectResponse {
         private String serverSlug;
         private String serverName;
         private KafkaConfig kafka;
-        private Map<String, String> syncTopics;
+        private @Nullable Map<String, String> syncTopics;
 
         public Builder tenantId(UUID tenantId) {
             this.tenantId = tenantId;
@@ -171,7 +173,7 @@ public final class ConnectResponse {
             return this;
         }
 
-        public Builder syncTopics(Map<String, String> syncTopics) {
+        public Builder syncTopics(@Nullable Map<String, String> syncTopics) {
             this.syncTopics = syncTopics;
             return this;
         }

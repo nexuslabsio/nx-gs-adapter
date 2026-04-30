@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Objects;
 
 /**
@@ -53,10 +55,10 @@ public final class SyncEvent<T> {
     private final String entityName;
     private final long pk;
     private final String op;
-    private final T payload;
+    private final @Nullable T payload;
     private final long timestampEpochMs;
 
-    public SyncEvent(String entityName, long pk, String op, T payload, long timestampEpochMs) {
+    public SyncEvent(String entityName, long pk, String op, @Nullable T payload, long timestampEpochMs) {
         this.entityName = entityName;
         this.pk = pk;
         this.op = op;
@@ -76,7 +78,7 @@ public final class SyncEvent<T> {
         return op;
     }
 
-    public T getPayload() {
+    public @Nullable T getPayload() {
         return payload;
     }
 
@@ -127,7 +129,7 @@ public final class SyncEvent<T> {
         private String entityName;
         private long pk;
         private String op;
-        private T payload;
+        private @Nullable T payload;
         private long timestampEpochMs;
 
         public Builder<T> entityName(String entityName) {
@@ -145,7 +147,7 @@ public final class SyncEvent<T> {
             return this;
         }
 
-        public Builder<T> payload(T payload) {
+        public Builder<T> payload(@Nullable T payload) {
             this.payload = payload;
             return this;
         }
