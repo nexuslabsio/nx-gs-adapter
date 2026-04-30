@@ -255,9 +255,14 @@ class CdcEngineE2ETest {
 
     private ConsumerRecord<byte[], byte[]> expectSingleTombstone(KafkaConsumer<byte[], byte[]> consumer) {
         List<ConsumerRecord<byte[], byte[]>> records = poll(consumer, 1);
-        assertEquals(1, records.size(), "expected exactly one tombstone");
-        assertNull(records.get(0).value(), "tombstone payload must be null on the wire");
-        return records.get(0);
+        assertEquals(1, records.size(), "expected exactly one DELETE event");
+        ConsumerRecord<byte[], byte[]> record = records.get(0);
+        assertNotNull(record.value(), "DELETE wire shape is a SyncEvent envelope, not a Kafka tombstone");
+        SyncEvent<ClanDto> event = decode(record.value());
+        assertEquals("DELETED", event.getOp());
+        assertNull(event.getPayload(), "payload slot is null on DELETE");
+        assertTrue(event.getTimestampEpochMs() > 0L);
+        return record;
     }
 
     private CdcEngine buildEngine(EntityStatsTracker statsTracker) {

@@ -251,7 +251,7 @@ per-entity state via heartbeat enrichment).
   **All global engine config keys (MVP):**
 
   | Key                                          | Type           | Default   |
-                    |----------------------------------------------|----------------|-----------|
+  |----------------------------------------------|----------------|-----------|
   | `l2nx.cdc-engine.tick-interval-seconds`      | long, seconds  | 60        |
   | `l2nx.cdc-engine.rows-per-window`            | int            | 500_000   |
   | `l2nx.cdc-engine.query-timeout-seconds`      | int, seconds   | 10        |
@@ -355,9 +355,13 @@ per-entity state via heartbeat enrichment).
       not a string. `payload` is a JSON object (Gson serializes the typed slot
       directly), not an escaped string — platform consumer parameterizes its
       `Consumer<SyncEvent<ClanDto>>` against the same api artifact.
-    - **Tombstone for delete:** `SyncEvent { op: DELETED, payload: null }` — value is a
-      non-null JSON envelope but the payload-slot is null. Compaction-friendly because
-      the key uniquely identifies the row.
+    - **DELETE wire shape:** `SyncEvent { op: DELETED, payload: null }` — Kafka
+      value is a non-null JSON envelope (entityName + pk + op + null payload +
+      timestampEpochMs) so the consumer keeps full audit (entity identity, op,
+      timestamp). Topics in this slice run with bounded retention (≤1 day),
+      not log compaction, so the value-null Kafka-tombstone optimization is
+      intentionally not used — keeping the envelope is more useful for
+      consumers that need to react to deletions and see when they happened.
 
 - [wip] R13. The engine SHOULD NOT block waiting for Kafka acks per row. `NxKafka.send`
   returns immediately; the engine moves to the next row/window. A per-cycle

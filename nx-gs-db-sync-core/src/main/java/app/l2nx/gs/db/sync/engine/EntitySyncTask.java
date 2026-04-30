@@ -198,7 +198,9 @@ public final class EntitySyncTask {
         }
 
         if (cycleAborted) {
-            return CycleResult.degraded(elapsed(started));
+            long abortedElapsedMs = elapsed(started);
+            log.info("Entity {} cycle DEGRADED (aborted), elapsedMs={}", entity, abortedElapsedMs);
+            return CycleResult.degraded(abortedElapsedMs);
         }
 
         long[] applied = walkInFlightAndAdvance(entity, inFlight, pendingCrcAdvance,
@@ -209,7 +211,10 @@ public final class EntitySyncTask {
 
         long rowCount = snapshot.sizeOf(entity);
         EntityState finalState = degradedFromTimeout ? EntityState.DEGRADED : EntityState.HEALTHY;
-        return new CycleResult(finalState, elapsed(started),
+        long elapsedMs = elapsed(started);
+        log.info("Entity {} cycle {}: +{} ~{} -{}, rowCount={}, elapsedMs={}",
+                entity, finalState, createdCount, updatedCount, deletedCount, rowCount, elapsedMs);
+        return new CycleResult(finalState, elapsedMs,
                 createdCount, updatedCount, deletedCount, rowCount);
     }
 

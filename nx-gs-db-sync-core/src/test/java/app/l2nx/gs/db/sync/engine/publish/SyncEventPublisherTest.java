@@ -48,7 +48,7 @@ class SyncEventPublisherTest {
     }
 
     @Test
-    void publish_shouldEmitTombstone_forDeleted() throws Exception {
+    void publish_shouldEmitEnvelopeWithNullPayload_forDeleted() throws Exception {
         RecordingSender sender = new RecordingSender();
         SyncEventPublisher publisher = new SyncEventPublisher(sender);
 
@@ -58,7 +58,14 @@ class SyncEventPublisherTest {
 
         assertEquals(TOPIC, sender.lastTopic);
         assertArrayEquals(ByteBuffer.allocate(8).putLong(42L).array(), sender.lastKey);
-        assertNull(sender.lastValue, "DELETED publishes a tombstone (null Kafka value)");
+        assertNotNull(sender.lastValue, "DELETED publishes a non-null SyncEvent envelope");
+        assertInstanceOf(SyncEvent.class, sender.lastValue);
+        SyncEvent<?> event = (SyncEvent<?>) sender.lastValue;
+        assertEquals("clan", event.getEntityName());
+        assertEquals(42L, event.getPk());
+        assertEquals("DELETED", event.getOp());
+        assertNull(event.getPayload(), "payload slot is null on DELETE — entity is gone");
+        assertTrue(event.getTimestampEpochMs() > 0L);
         assertNotNull(future.get(1, TimeUnit.SECONDS));
     }
 

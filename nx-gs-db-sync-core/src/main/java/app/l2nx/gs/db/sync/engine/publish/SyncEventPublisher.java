@@ -18,12 +18,14 @@ import java.util.concurrent.CompletableFuture;
  * <ul>
  *     <li>Kafka key = 8-byte big-endian encoding of the PK ({@code long}) —
  *     identical to {@code LongSerializer.serialize(...)} for any external
- *     producer that wants to write the same row. Log-compaction operates on
- *     raw key bytes so this guarantees per-PK partition + compaction-key
- *     consistency across writers.</li>
- *     <li>Tombstone — {@code DELETED} events carry {@code payload=null}; the
- *     compacted topic interprets a null value as "delete the entry for this
- *     key".</li>
+ *     producer that wants to write the same row. Per-PK partition assignment
+ *     stays consistent across writers.</li>
+ *     <li>{@code DELETED} events carry a non-null {@link SyncEvent} envelope
+ *     with {@code payload=null}: the consumer still sees {@code entityName},
+ *     {@code op="DELETED"}, and {@code timestampEpochMs} for audit, while the
+ *     payload slot is explicitly null. Topics in this slice run with bounded
+ *     retention (≤1 day) instead of log compaction, so the value-null
+ *     tombstone optimization is intentionally not used.</li>
  * </ul>
  */
 public final class SyncEventPublisher {
@@ -43,18 +45,13 @@ public final class SyncEventPublisher {
                                                          long pk,
                                                          T dto,
                                                          String topic) {
-        Object value;
-        if (OP_DELETED.equals(op)) {
-            value = null;
-        } else {
-            value = SyncEvent.<T>builder()
-                    .entityName(mapping.entityName())
-                    .pk(pk)
-                    .op(op)
-                    .payload(dto)
-                    .timestampEpochMs(System.currentTimeMillis())
-                    .build();
-        }
+        SyncEvent<T> value = SyncEvent.<T>builder()
+                .entityName(mapping.entityName())
+                .pk(pk)
+                .op(op)
+                .payload(dto)
+                .timestampEpochMs(System.currentTimeMillis())
+                .build();
         CompletableFuture<RecordMetadata> future = new CompletableFuture<RecordMetadata>();
         try {
             sender.send(topic, encodeKey(pk), value, (metadata, exception) -> {
