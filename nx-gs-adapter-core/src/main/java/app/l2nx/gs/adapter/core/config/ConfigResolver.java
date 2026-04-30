@@ -8,8 +8,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -45,6 +44,10 @@ public final class ConfigResolver {
     static final String KEY_PLATFORM_URL = "l2nx.platform-url";
     static final String KEY_ENABLED = "l2nx.enabled";
 
+    static final String KEY_KAFKA_BATCH_SIZE = "l2nx.kafka.producer.batch.size";
+    static final String KEY_KAFKA_LINGER_MS = "l2nx.kafka.producer.linger.ms";
+    static final String KEY_KAFKA_COMPRESSION_TYPE = "l2nx.kafka.producer.compression.type";
+
     private static final String SERVER_KEY_PREFIX = "nx_sk_";
     private static final int SERVER_KEY_LENGTH = 38;
 
@@ -65,7 +68,16 @@ public final class ConfigResolver {
         String platformUrl = resolvePlatformUrl();
         String adapterVersion = resolveAdapterVersion();
         boolean enabled = resolveEnabled();
-        return new AdapterConfig(serverKey, platformUrl, adapterVersion, enabled);
+        Map<String, Object> kafkaProducerOverrides = resolveKafkaProducerOverrides();
+        return new AdapterConfig(serverKey, platformUrl, adapterVersion, enabled, kafkaProducerOverrides);
+    }
+
+    Map<String, Object> resolveKafkaProducerOverrides() {
+        Map<String, Object> overrides = new LinkedHashMap<>();
+        resolveString(KEY_KAFKA_BATCH_SIZE).ifPresent(v -> overrides.put("batch.size", v));
+        resolveString(KEY_KAFKA_LINGER_MS).ifPresent(v -> overrides.put("linger.ms", v));
+        resolveString(KEY_KAFKA_COMPRESSION_TYPE).ifPresent(v -> overrides.put("compression.type", v));
+        return overrides.isEmpty() ? Collections.emptyMap() : overrides;
     }
 
     public Optional<String> resolveString(String key) {

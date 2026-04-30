@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.core.config;
 
+import java.util.Collections;
+
 /**
  * Test-only factory exposing the package-private {@link AdapterConfig} constructor
  * to tests in sibling packages. Lives in {@code src/test/java} so it is not
@@ -14,10 +16,10 @@ public final class AdapterConfigFixtures {
     }
 
     public static AdapterConfig enabled(String platformUrl) {
-        return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, true);
+        return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, true, Collections.emptyMap());
     }
 
     public static AdapterConfig disabled(String platformUrl) {
-        return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, false);
+        return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, false, Collections.emptyMap());
     }
 }

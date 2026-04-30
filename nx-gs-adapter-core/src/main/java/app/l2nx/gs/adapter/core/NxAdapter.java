@@ -126,7 +126,7 @@ public final class NxAdapter {
         // the null-check from the dereference.
         KafkaFactory override = kafkaFactoryOverride;
         KafkaFactory factory = override != null ? override : new DefaultKafkaFactory();
-        KafkaInitializer kafkaInit = new KafkaInitializer(factory);
+        KafkaInitializer kafkaInit = new KafkaInitializer(factory, config.getKafkaProducerOverrides());
         Consumer<ConnectResponse> onActive = response -> initKafka(kafkaInit, response);
         ConnectFlow flow = new ConnectFlow(
                 config,

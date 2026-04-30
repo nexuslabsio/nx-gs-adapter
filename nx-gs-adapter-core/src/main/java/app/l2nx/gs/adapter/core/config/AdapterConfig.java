@@ -1,5 +1,9 @@
 package app.l2nx.gs.adapter.core.config;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Immutable holder for adapter configuration resolved at startup.
  * Built by {@link ConfigResolver#resolve()}; not constructed directly.
@@ -10,12 +14,15 @@ public final class AdapterConfig {
     private final String platformUrl;
     private final String adapterVersion;
     private final boolean enabled;
+    private final Map<String, Object> kafkaProducerOverrides;
 
-    AdapterConfig(String serverKey, String platformUrl, String adapterVersion, boolean enabled) {
+    AdapterConfig(String serverKey, String platformUrl, String adapterVersion, boolean enabled,
+                  Map<String, Object> kafkaProducerOverrides) {
         this.serverKey = serverKey;
         this.platformUrl = platformUrl;
         this.adapterVersion = adapterVersion;
         this.enabled = enabled;
+        this.kafkaProducerOverrides = Collections.unmodifiableMap(new LinkedHashMap<>(kafkaProducerOverrides));
     }
 
     public String getServerKey() {
@@ -32,5 +39,9 @@ public final class AdapterConfig {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public Map<String, Object> getKafkaProducerOverrides() {
+        return kafkaProducerOverrides;
     }
 }

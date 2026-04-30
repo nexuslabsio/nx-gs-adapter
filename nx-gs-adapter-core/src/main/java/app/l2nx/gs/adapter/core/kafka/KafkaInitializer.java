@@ -5,6 +5,7 @@ import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.log.NxLog;
 import app.l2nx.log.NxLogFactory;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -27,9 +28,15 @@ public final class KafkaInitializer {
             "org.apache.kafka.common.security.scram.ScramLoginModule";
 
     private final KafkaFactory factory;
+    private final Map<String, Object> producerOverrides;
 
     public KafkaInitializer(KafkaFactory factory) {
+        this(factory, Collections.emptyMap());
+    }
+
+    public KafkaInitializer(KafkaFactory factory, Map<String, Object> producerOverrides) {
         this.factory = factory;
+        this.producerOverrides = Collections.unmodifiableMap(new LinkedHashMap<>(producerOverrides));
     }
 
     /**
@@ -46,7 +53,8 @@ public final class KafkaInitializer {
     public KafkaState init(KafkaConfig kafka,
                            String clientId,
                            Consumer<KafkaState> stateChangeListener) {
-        Map<String, Object> properties = new LinkedHashMap<>();
+        Map<String, Object> properties = new LinkedHashMap<>(producerOverrides);
+        // Security properties always win — must come after producer overrides.
         properties.put("security.protocol", kafka.getSecurityProtocol());
         properties.put("sasl.mechanism", kafka.getSaslMechanism());
         properties.put("sasl.jaas.config", buildJaas(kafka.getSaslUsername(), kafka.getSaslPassword()));
