@@ -137,6 +137,61 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   Default-false enforces explicit operator opt-in — adding the JAR to a classpath alone does
   NOT produce side effects on the host JVM.
 
+- [todo] R17. **`ConnectResponse` topics reorg — namespaced `syncTopics` + root-level
+  `heartbeatTopic`.** Supersedes R16 (flat `Map<String,String> syncTopics` shape) and the
+  `kafka.topics.heartbeat` reference in R7. The `/connect` response MUST carry:
+    - `String heartbeatTopic` at the **root** of `ConnectResponse` — required, immutable
+      for the connect session, sourced by the adapter for heartbeat publishes (replacing
+      the `kafka.topics.heartbeat` nested path used in R7).
+    - `SyncTopics syncTopics` at the root — namespaced by sync-source module:
+      ```
+      class SyncTopics {
+          Map<String, String> db;       // db-sync entity → topic
+          Map<String, String> runtime;  // runtime-sync entity → topic
+          Map<String, String> dp;       // dp-sync entity → topic (future)
+      }
+      ```
+      Entity names within a namespace are local to that namespace — `"character"` may
+      appear in BOTH `db` and `runtime` and resolve to different topics (e.g.
+      `bohpts.gs.sync.db.characters` vs `bohpts.gs.sync.runtime.characters`).
+
+  Adapter behavior:
+    - On 200, `heartbeatTopic` becomes the destination for all heartbeat publishes
+      (R7's reference path is updated by `/specl-sync` once 0.11.0 ships).
+    - `syncTopics` is parsed as the new `SyncTopics` POJO and stored on
+      `ConnectContext`. Modules read their namespace via accessor: `db-sync` calls
+      `ctx.syncTopics().db()`, `runtime-sync` calls `ctx.syncTopics().runtime()`. Both
+      return `Map<String, String>` keyed by entity name in their own namespace.
+    - `null` or empty `db` / `runtime` / `dp` map is a valid wire value — the
+      consuming module decides its own response (`db-sync` / `runtime-sync` transition
+      to `DISABLED` if their respective namespace is empty).
+    - The full `SyncTopics` object is treated as immutable for the connect session;
+      reconnect re-fetches.
+    - Adapter does NOT validate topic names across namespaces, does NOT pre-flight
+      existence on the Kafka cluster, does NOT create topics. Per-namespace values
+      remain opaque strings.
+
+  Wire shape lives on `app.l2nx.gs.adapter.api.rest.ConnectResponse` (root fields
+  `heartbeatTopic` + `syncTopics`) plus `app.l2nx.gs.adapter.api.rest.SyncTopics`. This
+  is a **breaking change** for `nx-gs-adapter-api` (0.10.0 → 0.11.0). Coordinated
+  upgrade between adapter and `nx-tenants` — no production consumers yet on the new
+  shape, so atomic flip is safe.
+
+  Rationale for the reorg:
+    - `heartbeatTopic` is a required, immutable, single-purpose field — burying it under
+      `kafka.topics.heartbeat` mixed it with negotiable per-session state (Kafka SASL
+      creds in `kafka`, dynamic topic delivery in `topics`). Promoting it to root
+      reflects its real semantics.
+    - `runtime-sync` (and future `dp-sync`) introduces entity names that collide with
+      `db-sync` (`"character"` lives in both DB and in-memory data sources). A flat
+      `Map<entity,topic>` cannot disambiguate. Namespaced map separates concerns
+      cleanly without leaking source-type into entity names (operators think in
+      domain entities, not in source types).
+
+    - SC6. After 0.11.0, no production code reads `kafka.topics.heartbeat` —
+      `/specl-sync` removes the field from `ConnectResponse.kafka.topics` once the
+      adapter migration lands.
+
 **Should:**
 
 - [done] R11. Adapter SHOULD expose an `onStateChange(Consumer<AdapterState>)` callback that the
@@ -236,6 +291,13 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   `400`, etc.) currently route to terminal `FAILED`. R5 only specifies the codes-with-body
   scenarios. Lock the fall-through as terminal in R5, or specify transient-retry for some
   (e.g. `404` could be platform deployment misroute, transient)?]
+- [NEEDS CLARIFICATION: R17 migration coordination with `nx-tenants`. The new
+  `ConnectResponse` shape (root `heartbeatTopic` + namespaced `syncTopics`) is a breaking
+  change. Plan: ship `nx-gs-adapter-api` 0.11.0 first, update `nx-tenants` to emit the new
+  shape in lockstep (no production consumers on the new shape yet), then ship
+  `nx-gs-adapter-core` bumped to consume it. Alternative: support both shapes in adapter
+  for one minor (0.11.0 reads either) and flip the platform second — adds parser
+  branching that's worth avoiding if coordinated atomic flip is feasible.]
 
 ## Links
 
@@ -249,4 +311,6 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   [`docs/features/cdc-engine/spec.md`](../cdc-engine/spec.md) R17 (engine reads
   topics via `TopicResolver`),
   [`docs/features/db-sync/spec.md`](../db-sync/spec.md) (`DbSyncModule.onConnect`
-  reads `ctx.syncTopics()`)
+  reads `ctx.syncTopics().db()` after R17),
+  [`docs/features/runtime-sync/spec.md`](../runtime-sync/spec.md)
+  (`RuntimeSyncModule.onConnect` reads `ctx.syncTopics().runtime()` after R17)
