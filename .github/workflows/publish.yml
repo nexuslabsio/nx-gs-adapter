@@ -44,12 +44,13 @@ jobs:
 
           case "$MODULE" in
             api)     GRADLE_MODULE="nx-gs-adapter-api" ;;
+            commons) GRADLE_MODULE="nx-gs-commons" ;;
             kafka)   GRADLE_MODULE="nx-gs-kafka" ;;
             core)    GRADLE_MODULE="nx-gs-adapter-core" ;;
             db-sync) GRADLE_MODULE="nx-gs-db-sync-core" ;;
             *)
               echo "Unknown module prefix in tag: $MODULE"
-              echo "Supported prefixes: api, kafka, core, db-sync"
+              echo "Supported prefixes: api, commons, kafka, core, db-sync"
               exit 1
               ;;
           esac
