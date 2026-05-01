@@ -137,7 +137,7 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   Default-false enforces explicit operator opt-in — adding the JAR to a classpath alone does
   NOT produce side effects on the host JVM.
 
-- [todo] R17. **`ConnectResponse` topics reorg — namespaced `syncTopics` + root-level
+- [done] R17. **`ConnectResponse` topics reorg — namespaced `syncTopics` + root-level
   `heartbeatTopic`.** Supersedes R16 (flat `Map<String,String> syncTopics` shape) and the
   `kafka.topics.heartbeat` reference in R7. The `/connect` response MUST carry:
     - `String heartbeatTopic` at the **root** of `ConnectResponse` — required, immutable

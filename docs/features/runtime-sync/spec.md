@@ -37,7 +37,7 @@ state, siege participants, raid boss vitals).
 
 **Must:**
 
-- [todo] R1. `nx-gs-runtime-sync-core` MUST implement
+- [done] R1. `nx-gs-runtime-sync-core` MUST implement
   `app.l2nx.gs.adapter.api.spi.AdapterModule` and ship a
   `META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule` descriptor pointing to its
   module class. Discovery is zero-config — adding the JAR to the host classpath alongside
@@ -45,7 +45,7 @@ state, siege participants, raid boss vitals).
     - SC1. `AdapterModule.name()` returns the literal string `"runtime-sync"` — surfaced in
       `HeartbeatEvent.enabledModules`. Distinct from `"db-sync"`; the two modules coexist.
 
-- [todo] R2. `nx-gs-runtime-sync-core` MUST consume the Tier-2 SPI `RuntimeStateProvider`
+- [done] R2. `nx-gs-runtime-sync-core` MUST consume the Tier-2 SPI `RuntimeStateProvider`
   (defined in `nx-gs-adapter-api` package `app.l2nx.gs.adapter.api.spi`, alongside Tier-1
   `AdapterModule`, Tier-2 `DbSchemaProvider`, Tier-3 `JdbcConnectionSource`) and discover
   impls via `ServiceLoader.load(RuntimeStateProvider.class)` once at module `start()`.
@@ -57,13 +57,13 @@ state, siege participants, raid boss vitals).
       transitions to `FAILED`. MVP assumes operator's classpath has exactly one activated
       descriptor.
 
-- [todo] R3. `RuntimeStateProvider` interface MUST expose:
+- [done] R3. `RuntimeStateProvider` interface MUST expose:
     - `String schemaName()` — informational identifier (e.g. `"bohpts"`, `"l2j"`); not a
       selection key in MVP
     - `List<RuntimeEntityMapping<?>> mappings()` — the runtime entities this provider
       surfaces
 
-- [todo] R4. `RuntimeEntityMapping<T>` interface MUST describe ONE runtime entity and
+- [done] R4. `RuntimeEntityMapping<T>` interface MUST describe ONE runtime entity and
   expose:
     - `String entityName()` — domain identifier in singular form (`"character"`,
       `"party"`, …). Used as the lookup key into `ConnectResponse.syncTopics.runtime`
@@ -91,7 +91,7 @@ state, siege participants, raid boss vitals).
       ignored — e.g. high-frequency micro-jitter on coordinates can be quantized
       before hashing). Engine treats the hash as opaque.
 
-- [todo] R5. The runtime engine MUST run one daemon thread per declared
+- [done] R5. The runtime engine MUST run one daemon thread per declared
   `RuntimeEntityMapping`, ticking at a configurable interval. Per-tick semantics:
     1. Call `mapping.snapshot()` → `Iterable<RuntimeRow<T>>`
     2. For each row: compute `mapping.hash(row.dto)`, store in a fresh
@@ -119,7 +119,7 @@ state, siege participants, raid boss vitals).
       sharing one knob would force operators to compromise. Unacked pks roll
       over to next tick.
 
-- [todo] R6. The runtime engine treats `mapping.hash(dto)` return value as **opaque** —
+- [done] R6. The runtime engine treats `mapping.hash(dto)` return value as **opaque** —
   it is compared as a long for "changed" detection only; the algorithm is the
   provider's choice. The recommended default is **FNV-1a 64-bit** via
   `app.l2nx.gs.commons.hash.Fnv1a64` (published in `:nx-gs-commons`): faster than
@@ -130,7 +130,7 @@ state, siege participants, raid boss vitals).
   Java-side choice differs from `db-sync`, which uses MySQL-native CRC32 because
   the hash runs on the DB side.)
 
-- [todo] R7. The runtime engine MUST resolve the Kafka topic for each entity from
+- [done] R7. The runtime engine MUST resolve the Kafka topic for each entity from
   `ctx.syncTopics().runtime().get(entityName)` — namespaced shape per
   [`adapter-bootstrap` R17](../adapter-bootstrap/spec.md). Per-entity behavior:
     - Topic missing for the entity → log actionable WARN (`"no runtime topic for
@@ -142,7 +142,7 @@ state, siege participants, raid boss vitals).
       with an actionable WARN; no engine instantiated, no scheduler threads
       started.
 
-- [todo] R8. The runtime engine MUST NOT propagate exceptions to host-JVM threads. Every
+- [done] R8. The runtime engine MUST NOT propagate exceptions to host-JVM threads. Every
   entry point (scheduler tick, `mapping.snapshot()` call, `mapping.hash()` call, Kafka
   producer callback) catches `Throwable`, logs via `NxLog`, and transitions the
   **affected entity** to `DEGRADED` — other entities continue ticking. Module-level
@@ -175,7 +175,7 @@ state, siege participants, raid boss vitals).
       `l2e.gameserver.l2nx` (same as `BohptsDbSchemaProvider`; both providers
       coexist as siblings).
 
-- [todo] R10. `CharacterRuntimeDto` MUST ship in `nx-gs-adapter-api` package
+- [done] R10. `CharacterRuntimeDto` MUST ship in `nx-gs-adapter-api` package
   `app.l2nx.gs.adapter.api.kafka.sync.runtime.character`, parallel to
   `kafka.sync.db.character.CharacterDto`. All fields except `id` are nullable per the
   project-wide DTO convention — tenants without a given concept (e.g. no vitality
@@ -194,7 +194,7 @@ state, siege participants, raid boss vitals).
   Java 8 POJO, hand-written builder, equals/hashCode/toString. Same shape conventions
   as the existing `CharacterDto` in `kafka.sync.db.character`.
 
-- [todo] R11. **Module versions:**
+- [done] R11. **Module versions:**
     - `nx-gs-adapter-api` = `0.11.0` (breaking: namespaced `ConnectResponse.syncTopics`
       shape + `heartbeatTopic`-at-root per [`adapter-bootstrap`
       R17](../adapter-bootstrap/spec.md); new `RuntimeStateProvider` /
@@ -207,7 +207,7 @@ state, siege participants, raid boss vitals).
 
 **Should:**
 
-- [todo] R12. The runtime engine SHOULD surface per-module health on
+- [done] R12. The runtime engine SHOULD surface per-module health on
   `HeartbeatEvent.enabledModules` via `ModuleStatus`. Stats slot:
   `{name: "runtime-sync", state: ACTIVE/DEGRADED/...,
   stats: {entities: List<EntityStats>}}`. Per-entity `EntityStats`:
