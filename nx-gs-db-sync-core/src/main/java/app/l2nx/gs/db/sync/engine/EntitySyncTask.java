@@ -11,8 +11,8 @@ import app.l2nx.gs.db.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.db.sync.engine.publish.TopicResolver;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
-import app.l2nx.log.NxLog;
-import app.l2nx.log.NxLogFactory;
+import app.l2nx.gs.log.NxLog;
+import app.l2nx.gs.log.NxLogFactory;
 import it.unimi.dsi.fastutil.longs.*;
 import org.apache.kafka.clients.producer.RecordMetadata;
 

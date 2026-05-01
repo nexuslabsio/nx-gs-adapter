@@ -2,9 +2,9 @@ package app.l2nx.gs.adapter.core.heartbeat;
 
 import app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
-import app.l2nx.gs.adapter.core.concurrent.SafeRunnable;
-import app.l2nx.log.NxLog;
-import app.l2nx.log.NxLogFactory;
+import app.l2nx.gs.commons.concurrent.SafeRunnable;
+import app.l2nx.gs.log.NxLog;
+import app.l2nx.gs.log.NxLogFactory;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

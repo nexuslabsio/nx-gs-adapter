@@ -2,7 +2,7 @@
 
 Subproject of the `nx-gs-adapter` monorepo. See [`../CLAUDE.md`](../CLAUDE.md) for repo-wide
 conventions (per-module slash-namespaced versioning, Maven Central publishing flow, license,
-shared `:nx-log`).
+shared `:nx-gs-log`).
 
 ## Purpose
 
@@ -18,8 +18,8 @@ package root `app.l2nx.gs.kafka` makes that explicit.
 - `app.l2nx.gs.kafka.serde` — `GsonSerializer`, `GsonDeserializer` (Kafka-side
   `org.apache.kafka.common.serialization.*` impls)
 
-Logging uses `app.l2nx.log.NxLog` from sibling `:nx-log` subproject — shadow-included into
-the published jar so consumers don't see a separate `nx-log` Maven dep.
+Logging uses `app.l2nx.gs.log.NxLog` from sibling `:nx-gs-log` subproject — shadow-included into
+the published jar so consumers don't see a separate `nx-gs-log` Maven dep.
 
 ## Dependencies
 
@@ -36,7 +36,7 @@ Declared via `gradle/libs.versions.toml` at the monorepo root:
 - **Java 8 source + target** — host JVMs span Java 8 to 25+. Tests run on Java 11+.
 - **Never propagate exceptions to host threads** — every public entry point catches and
   logs internally.
-- **SLF4J is optional** (`compileOnly`). Library code MUST use `app.l2nx.log.NxLog` —
+- **SLF4J is optional** (`compileOnly`). Library code MUST use `app.l2nx.gs.log.NxLog` —
   never `import org.slf4j.*` directly.
 - **No compression libs in transitives** — `snappy-java`, `lz4-java`, `zstd-jni` excluded
   in `build.gradle.kts`.

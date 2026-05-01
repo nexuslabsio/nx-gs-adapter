@@ -19,8 +19,8 @@ import app.l2nx.gs.db.sync.engine.publish.TopicResolver;
 import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
-import app.l2nx.log.NxLog;
-import app.l2nx.log.NxLogFactory;
+import app.l2nx.gs.log.NxLog;
+import app.l2nx.gs.log.NxLogFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;

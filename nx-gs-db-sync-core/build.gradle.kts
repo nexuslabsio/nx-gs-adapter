@@ -4,7 +4,7 @@ plugins {
     signing
 }
 
-version = findProperty("${project.name}.version") as String? ?: "0.2.1"
+version = findProperty("${project.name}.version") as String? ?: "0.2.2"
 
 java {
     withSourcesJar()
@@ -23,13 +23,14 @@ repositories {
 dependencies {
     api(project(":nx-gs-adapter-api"))
     implementation(project(":nx-gs-kafka"))
+    implementation(project(":nx-gs-commons"))
     implementation(libs.fastutil.core)
     implementation(libs.gson)
     compileOnly(libs.slf4j.api)
 
-    // :nx-log is shadow-included into the published jar — not exposed as a Maven dep.
-    compileOnly(project(":nx-log"))
-    testImplementation(project(":nx-log"))
+    // :nx-gs-log is shadow-included into the published jar — not exposed as a Maven dep.
+    compileOnly(project(":nx-gs-log"))
+    testImplementation(project(":nx-gs-log"))
 
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -57,11 +58,11 @@ tasks.named<Jar>("jar") {
     manifest {
         attributes("Implementation-Version" to project.version)
     }
-    from(project(":nx-log").sourceSets["main"].output)
+    from(project(":nx-gs-log").sourceSets["main"].output)
 }
 
 tasks.named<Jar>("sourcesJar") {
-    from(project(":nx-log").sourceSets["main"].allSource)
+    from(project(":nx-gs-log").sourceSets["main"].allSource)
 }
 
 publishing {

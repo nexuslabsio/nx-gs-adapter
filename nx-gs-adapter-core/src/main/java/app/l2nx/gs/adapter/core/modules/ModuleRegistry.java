@@ -3,8 +3,8 @@ package app.l2nx.gs.adapter.core.modules;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.spi.AdapterModule;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
-import app.l2nx.log.NxLog;
-import app.l2nx.log.NxLogFactory;
+import app.l2nx.gs.log.NxLog;
+import app.l2nx.gs.log.NxLogFactory;
 
 import java.util.*;
 

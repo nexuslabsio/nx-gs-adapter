@@ -203,7 +203,7 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
   and would refuse to load on Java 8 hosts (which are still common in the L2J
   ecosystem). The `com.zaxxer.hikari.*` packages are relocated to
   `app.l2nx.shaded.hikari.*` via the ShadowJar plugin at build time; this is the same
-  pattern already used for `:nx-log`. Result: zero classpath conflicts with whatever
+  pattern already used for `:nx-gs-log`. Result: zero classpath conflicts with whatever
   HikariCP / DBCP2 / etc. version the host JVM ships, at the cost of ~150 KB extra in
   `nx-gs-db-sync-core.jar`. The trade-off is justified — without bundling, Path 2 isn't
   achievable for closed-source clients without source-access surgery.

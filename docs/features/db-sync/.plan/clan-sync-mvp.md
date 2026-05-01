@@ -139,7 +139,7 @@ the rest of the plan.
 ### CDC engine — `:nx-gs-db-sync-core` package `app.l2nx.gs.db.sync.engine`
 
 14. [x] **Add `fastutil-core` runtime dep** to `:nx-gs-db-sync-core` (`it.unimi.dsi:fastutil-core:8.5.x`,
-    ~3 MB). Verify shadowJar still bundles only `:nx-log` and does NOT relocate
+    ~3 MB). Verify shadowJar still bundles only `:nx-gs-log` and does NOT relocate
     fastutil packages (consumers can use the same fastutil JAR if they want;
     classpath collision risk is low since fastutil-core is read-only data
     structures with no version-coupled API).

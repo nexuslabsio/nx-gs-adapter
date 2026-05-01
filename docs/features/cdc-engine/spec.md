@@ -251,7 +251,7 @@ per-entity state via heartbeat enrichment).
   **All global engine config keys (MVP):**
 
   | Key                                          | Type           | Default   |
-  |----------------------------------------------|----------------|-----------|
+      |----------------------------------------------|----------------|-----------|
   | `l2nx.cdc-engine.tick-interval-seconds`      | long, seconds  | 60        |
   | `l2nx.cdc-engine.rows-per-window`            | int            | 500_000   |
   | `l2nx.cdc-engine.query-timeout-seconds`      | int, seconds   | 10        |

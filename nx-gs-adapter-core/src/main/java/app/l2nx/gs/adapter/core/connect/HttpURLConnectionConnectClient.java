@@ -2,8 +2,8 @@ package app.l2nx.gs.adapter.core.connect;
 
 import app.l2nx.gs.adapter.api.rest.ConnectRequest;
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
-import app.l2nx.log.NxLog;
-import app.l2nx.log.NxLogFactory;
+import app.l2nx.gs.log.NxLog;
+import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 

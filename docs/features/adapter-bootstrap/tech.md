@@ -77,7 +77,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
     - shutdown hook is registered inline inside `NxAdapter.start()` (no separate
       `ShutdownHook.java`); a `Thread` named `nx-adapter-shutdown` wrapping
       `SafeRunnable.wrap(INSTANCE::shutdown)`
-    - logging via `app.l2nx.log.NxLog` from sibling `:nx-log` subproject (shadow-included
+    - logging via `app.l2nx.gs.log.NxLog` from sibling `:nx-gs-log` subproject (shadow-included
       into the published jar — see Integration points)
 - `nx-gs-adapter-core/src/test/java/app/l2nx/gs/adapter/core/` — unit tests for
   `ConfigResolver`, `NxAdapter`, `ConnectFlow` (WireMock-backed, status dispatch via
@@ -177,10 +177,10 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   (R14 short-circuit) so a misconfigured / disabled adapter doesn't leave a hook
   attached. `shutdown()` itself is idempotent — JVM-exit hook + explicit host call won't
   double-fire CLOSED.
-- **Logging** — uses `app.l2nx.log.NxLog` from sibling `:nx-log` subproject (auto-detects
+- **Logging** — uses `app.l2nx.gs.log.NxLog` from sibling `:nx-gs-log` subproject (auto-detects
   `org.slf4j.LoggerFactory` via reflection; SLF4J on classpath → uses it; otherwise →
   formatted `System.out.println` fallback). Shadow-included into the published
-  `nx-gs-adapter-core` jar so consumers don't see a separate `nx-log` Maven dep. Library
+  `nx-gs-adapter-core` jar so consumers don't see a separate `nx-gs-log` Maven dep. Library
   code never imports SLF4J directly.
 
 ## Data flows
@@ -244,7 +244,7 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
 - **`:nx-gs-kafka`** (R6, R7) — sibling subproject. `NxKafka.configure().build()` for the
   producer; `NxKafka.send(topic, key, value)` for heartbeat. `:nx-gs-adapter-core` depends
   on it via `project(":nx-gs-kafka")`.
-- **`:nx-log`** — sibling subproject (internal logging facade, package `app.l2nx.log`).
+- **`:nx-gs-log`** — sibling subproject (internal logging facade, package `app.l2nx.gs.log`).
   Shadow-included into `:nx-gs-adapter-core` and `:nx-gs-kafka` jars at build time, NOT
   published as a separate Maven artifact. Auto-detects SLF4J via reflection, falls back
   to console output. Library code never imports SLF4J directly.

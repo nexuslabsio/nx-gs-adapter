@@ -2,8 +2,8 @@ package app.l2nx.gs.adapter.core.kafka;
 
 import app.l2nx.gs.adapter.api.rest.KafkaConfig;
 import app.l2nx.gs.kafka.KafkaState;
-import app.l2nx.log.NxLog;
-import app.l2nx.log.NxLogFactory;
+import app.l2nx.gs.log.NxLog;
+import app.l2nx.gs.log.NxLogFactory;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;

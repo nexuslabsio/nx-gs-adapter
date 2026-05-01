@@ -4,8 +4,8 @@ import app.l2nx.gs.kafka.KafkaConfig;
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.gs.kafka.NxKafka;
-import app.l2nx.log.NxLog;
-import app.l2nx.log.NxLogFactory;
+import app.l2nx.gs.log.NxLog;
+import app.l2nx.gs.log.NxLogFactory;
 
 import java.util.Map;
 import java.util.function.Consumer;

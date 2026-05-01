@@ -2,7 +2,7 @@
 
 Subproject of the `nx-gs-adapter` monorepo. See [`../CLAUDE.md`](../CLAUDE.md) for repo-wide
 conventions (per-module slash-namespaced versioning, Maven Central publishing flow, license,
-shared `:nx-log`).
+shared `:nx-gs-log`).
 
 ## Purpose
 

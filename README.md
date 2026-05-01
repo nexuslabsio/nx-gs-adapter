@@ -18,7 +18,7 @@ Essence game server core and connects it to the L2NX platform.
 | `nx-gs-kafka`        | `app.l2nx:nx-gs-kafka`        | yes                  | Lightweight Kafka client facade for Java 8+ host JVMs                              |
 | `nx-gs-adapter-core` | `app.l2nx:nx-gs-adapter-core` | yes                  | Adapter runtime — connect, heartbeat, ServiceLoader-based module discovery         |
 | `nx-gs-db-sync-core` | `app.l2nx:nx-gs-db-sync-core` | yes                  | DB-sync `AdapterModule` — CRC32 CDC engine, Tier-2 SPI host, per-entity stats      |
-| `nx-log`             | —                             | no (shadow-included) | Internal logging facade — bundled into `nx-gs-kafka` and `nx-gs-adapter-core` jars |
+| `nx-gs-log`          | —                             | no (shadow-included) | Internal logging facade — bundled into `nx-gs-kafka` and `nx-gs-adapter-core` jars |
 
 Future modules:
 
@@ -64,7 +64,7 @@ Each module's `build.gradle.kts` declares
 CI parses the tag prefix and passes `-P<module>.version=X.Y.Z` to that subproject only —
 other modules stay at their fallback `<base>` version and are NOT republished by the same tag.
 
-`nx-log` is internal-only (shadow-included into consuming jars) and has no tag namespace.
+`nx-gs-log` is internal-only (shadow-included into consuming jars) and has no tag namespace.
 
 ## Quick start
 

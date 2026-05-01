@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.core.lifecycle;
 
-import app.l2nx.log.NxLog;
+import app.l2nx.gs.log.NxLog;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

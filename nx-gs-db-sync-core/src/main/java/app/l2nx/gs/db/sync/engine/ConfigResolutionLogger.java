@@ -2,7 +2,7 @@ package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.db.sync.engine.publish.TopicResolver;
-import app.l2nx.log.NxLog;
+import app.l2nx.gs.log.NxLog;
 
 import java.util.List;
 import java.util.function.Function;

@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
-version = findProperty("${project.name}.version") as String? ?: "0.2.0"
+version = findProperty("${project.name}.version") as String? ?: "0.2.1"
 
 java {
     withSourcesJar()
@@ -32,9 +32,9 @@ dependencies {
     api(libs.gson)
     compileOnly(libs.slf4j.api)
 
-    // :nx-log is shadow-included into the published jar — not exposed as a Maven dep.
-    compileOnly(project(":nx-log"))
-    testImplementation(project(":nx-log"))
+    // :nx-gs-log is shadow-included into the published jar — not exposed as a Maven dep.
+    compileOnly(project(":nx-gs-log"))
+    testImplementation(project(":nx-gs-log"))
 
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -56,14 +56,14 @@ tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:-missing", "-quiet")
 }
 
-// Embed :nx-log compiled classes directly into the published nx-gs-kafka.jar so
-// Maven Central consumers don't need a separate nx-log dependency.
+// Embed :nx-gs-log compiled classes directly into the published nx-gs-kafka.jar so
+// Maven Central consumers don't need a separate nx-gs-log dependency.
 tasks.named<Jar>("jar") {
-    from(project(":nx-log").sourceSets["main"].output)
+    from(project(":nx-gs-log").sourceSets["main"].output)
 }
 
 tasks.named<Jar>("sourcesJar") {
-    from(project(":nx-log").sourceSets["main"].allSource)
+    from(project(":nx-gs-log").sourceSets["main"].allSource)
 }
 
 tasks.shadowJar {

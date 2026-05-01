@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.core.lifecycle;
 
-import app.l2nx.log.NxLog;
+import app.l2nx.gs.log.NxLog;
 
 /**
  * Emits the L2NX startup wordmark and adapter version. Plain text only; host log

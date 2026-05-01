@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
-version = findProperty("${project.name}.version") as String? ?: "0.3.3"
+version = findProperty("${project.name}.version") as String? ?: "0.3.4"
 
 java {
     withSourcesJar()
@@ -26,12 +26,13 @@ repositories {
 dependencies {
     api(project(":nx-gs-adapter-api"))
     api(project(":nx-gs-kafka"))
+    api(project(":nx-gs-commons"))
     api(libs.gson)
     compileOnly(libs.slf4j.api)
 
-    // :nx-log is shadow-included into the published jar — not exposed as a Maven dep.
-    compileOnly(project(":nx-log"))
-    testImplementation(project(":nx-log"))
+    // :nx-gs-log is shadow-included into the published jar — not exposed as a Maven dep.
+    compileOnly(project(":nx-gs-log"))
+    testImplementation(project(":nx-gs-log"))
 
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -53,13 +54,13 @@ tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:-missing", "-quiet")
 }
 
-// Embed :nx-log compiled classes directly into the published nx-gs-adapter-core.jar
-// so Maven Central consumers don't need a separate nx-log dependency.
+// Embed :nx-gs-log compiled classes directly into the published nx-gs-adapter-core.jar
+// so Maven Central consumers don't need a separate nx-gs-log dependency.
 tasks.named<Jar>("jar") {
     manifest {
         attributes("Implementation-Version" to project.version)
     }
-    from(project(":nx-log").sourceSets["main"].output)
+    from(project(":nx-gs-log").sourceSets["main"].output)
 }
 
 // Ship the version as a classpath resource so it survives shadow/fat-JAR repacks
@@ -80,7 +81,7 @@ val generateVersionResource = tasks.register("generateVersionResource") {
 sourceSets["main"].resources.srcDir(generateVersionResource)
 
 tasks.named<Jar>("sourcesJar") {
-    from(project(":nx-log").sourceSets["main"].allSource)
+    from(project(":nx-gs-log").sourceSets["main"].allSource)
 }
 
 tasks.shadowJar {

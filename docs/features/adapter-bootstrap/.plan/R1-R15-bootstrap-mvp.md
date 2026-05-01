@@ -32,7 +32,7 @@ KAFKA_CREDENTIALS_MISSING / 5xx / network → DEGRADED + retry через
 api отложена до момента, когда платформа начнёт читать). Shutdown
 идемпотентен и регистрируется через `Runtime.addShutdownHook`. Все
 daemon-thread entry points обёрнуты в `try { ... } catch (Throwable)`
-с логом через `app.l2nx.log.NxLog` — наружу из адаптера ничего не
+с логом через `app.l2nx.gs.log.NxLog` — наружу из адаптера ничего не
 улетает. **Сам `NxAdapter.start()` тоже не throws в host** — любой
 `Throwable` из `ConfigResolver.resolve()` ловится централизованно,
 логируется через `NxLog.error(...)` и переводит state в `FAILED`
@@ -303,7 +303,7 @@ DEGRADED → REGISTERING on a 5xx then 200.
   in tech.md — keep it interface-shaped from M15 even though only
   one impl ships in MVP.
 - Don't import `org.slf4j.*` from core code — use
-  `app.l2nx.log.NxLogFactory.getLogger(...)`. The `:nx-log` facade
+  `app.l2nx.gs.log.NxLogFactory.getLogger(...)`. The `:nx-gs-log` facade
   is shadow-included into the published jar.
 - WireMock for `ConnectFlow` tests — declared as a test dep; verify
   it's wired in `nx-gs-adapter-core/build.gradle.kts` before M18.

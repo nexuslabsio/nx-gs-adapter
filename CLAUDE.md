@@ -22,11 +22,16 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
 - `:nx-gs-adapter-api` — wire contracts (REST + Kafka DTOs) and SPI types (Tier-1
   `AdapterModule`, Tier-3 `JdbcConnectionSource`) shared with the platform and module
   authors. Java 8 POJOs, zero runtime deps, package root `app.l2nx.gs.adapter.api`.
+- `:nx-gs-commons` — shared utilities for adapter modules and tenant providers:
+  `concurrent.SafeRunnable` (exception-swallowing Runnable wrapper), `hash.Fnv1a64`
+  (FNV-1a 64-bit hash), `Nulls` (sentinel-to-null), `jdbc.JdbcNulls` (null-aware
+  `ResultSet` readers). Java 8, deps: `jspecify` only. Package root
+  `app.l2nx.gs.commons`. `:nx-gs-log` shadow-included. Published to Maven Central.
 - `:nx-gs-kafka` — lightweight Kafka client facade. Java 8, depends on `kafka-clients` + `gson`,
-  `slf4j-api` compileOnly. Package root `app.l2nx.gs.kafka`. `:nx-log` shadow-included.
+  `slf4j-api` compileOnly. Package root `app.l2nx.gs.kafka`. `:nx-gs-log` shadow-included.
 - `:nx-gs-adapter-core` — runtime: config resolution, POST `/connect`, heartbeat, ServiceLoader-based
-  module discovery, lifecycle. Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` + `gson`.
-  Package root `app.l2nx.gs.adapter.core`. `:nx-log` shadow-included.
+  module discovery, lifecycle. Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +
+  `:nx-gs-commons` + `gson`. Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
 - `:nx-gs-db-sync-core` — DB-sync `AdapterModule` shipped to Maven Central. Owns the
   CRC32 two-phase CDC engine (one daemon thread per entity, server-side CRC32 hashing,
   per-row snapshot swap on Kafka ack) and resolves the Tier-2 `DbSchemaProvider` SPI
@@ -34,12 +39,12 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   Surfaces both `pool` (from `JdbcConnectionSource.stats()`) and `entities` (per-entity
   `EntityStats`) slots in the heartbeat. Engine config lives under `l2nx.cdc-engine.*`
   (file-first source chain). Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +
-  `fastutil-core` + `gson`. Package root `app.l2nx.gs.db.sync`. `:nx-log`
-  shadow-included.
-- `:nx-log` — internal logging facade (`app.l2nx.log`). NOT published; classes are bundled
-  into `:nx-gs-kafka`, `:nx-gs-adapter-core`, and `:nx-gs-db-sync-core` jars at build time.
-  Auto-detects SLF4J via reflection, falls back to console output. Library code never
-  imports SLF4J directly.
+  `:nx-gs-commons` + `fastutil-core` + `gson`. Package root `app.l2nx.gs.db.sync`.
+  `:nx-gs-log` shadow-included.
+- `:nx-gs-log` — internal logging facade (`app.l2nx.gs.log`). NOT published; classes are bundled
+  into `:nx-gs-commons`, `:nx-gs-kafka`, `:nx-gs-adapter-core`, and `:nx-gs-db-sync-core` jars
+  at build time. Auto-detects SLF4J via reflection, falls back to console output. Library code
+  never imports SLF4J directly.
 
 ## Constraints
 
@@ -62,8 +67,8 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
 ## Distribution & licensing
 
 Open-core. This repo and every artifact published from it (`nx-gs-adapter-api`,
-`nx-gs-kafka`, `nx-gs-adapter-core`, `nx-gs-db-sync-core`) are public under Apache 2.0 and
-published to Maven Central. The vanilla sync modules (`nx-gs-db-l2j`, `nx-gs-db-lucera`,
+`nx-gs-commons`, `nx-gs-kafka`, `nx-gs-adapter-core`, `nx-gs-db-sync-core`) are public under
+Apache 2.0 and published to Maven Central. The vanilla sync modules (`nx-gs-db-l2j`, `nx-gs-db-lucera`,
 `nx-gs-dp-l2j`, `nx-gs-dp-lucera`) — when they land — ship from this repo on the same terms.
 
 Per-client overrides (`nx-gs-db-l2j-<client>`, `nx-gs-dp-<core>-<client>`) live in
@@ -79,17 +84,18 @@ client-proprietary schemas, table names, or column layouts.
 Per-module independent versioning via slash-namespaced git tags:
 
 - `api/vX.Y.Z` → publish `nx-gs-adapter-api`
+- `commons/vX.Y.Z` → publish `nx-gs-commons`
 - `kafka/vX.Y.Z` → publish `nx-gs-kafka`
 - `core/vX.Y.Z` → publish `nx-gs-adapter-core`
 - `db-sync/vX.Y.Z` → publish `nx-gs-db-sync-core`
-- future: `db-l2j/vX.Y.Z`, `dp-l2j/vX.Y.Z`, ...
+- future: `db-l2j/vX.Y.Z`, `dp-l2j/vX.Y.Z`, `runtime-sync/vX.Y.Z`, ...
 
 Each module's `build.gradle.kts` declares
 `version = findProperty("${project.name}.version") as String? ?: "<base>"`. CI parses the tag,
-maps prefix → subproject (api → nx-gs-adapter-api, kafka → nx-gs-kafka, core → nx-gs-adapter-core,
-db-sync → nx-gs-db-sync-core), passes `-P<subproject>.version=X.Y.Z`, and publishes ONLY that
-module. Other modules stay at fallback. `nx-log` is internal-only (no tag namespace, no
-publication).
+maps prefix → subproject (api → nx-gs-adapter-api, commons → nx-gs-commons, kafka →
+nx-gs-kafka, core → nx-gs-adapter-core, db-sync → nx-gs-db-sync-core), passes
+`-P<subproject>.version=X.Y.Z`, and publishes ONLY that module. Other modules stay at fallback.
+`nx-gs-log` is internal-only (no tag namespace, no publication).
 
 Local builds default to the per-module fallback (no `local-SNAPSHOT`). Maven Central is the
 publish target; CI uses `signingKey`/`signingPassword` Gradle properties (GPG) and
