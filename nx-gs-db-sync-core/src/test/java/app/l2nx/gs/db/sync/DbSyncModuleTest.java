@@ -212,12 +212,15 @@ class DbSyncModuleTest {
         return new DbSyncModule(jdbc, schema, smoke, noSysprops, NEVER_CALLED);
     }
 
-    private static ConnectContext ctx(Map<String, String> syncTopics) {
+    private static ConnectContext ctx(Map<String, String> dbTopics) {
+        app.l2nx.gs.adapter.api.rest.SyncTopics topics = dbTopics == null
+                ? null
+                : app.l2nx.gs.adapter.api.rest.SyncTopics.builder().db(dbTopics).build();
         return ConnectContext.builder()
                 .tenantId(UUID.randomUUID()).tenantSlug("acme")
                 .serverId(UUID.randomUUID()).serverSlug("primary").serverName("Acme Primary")
                 .adapterVersion("0.1.0")
-                .syncTopics(syncTopics)
+                .syncTopics(topics)
                 .build();
     }
 

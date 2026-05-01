@@ -101,9 +101,12 @@ public final class DbSyncModule implements AdapterModule {
     @Override
     public void onConnect(ConnectContext ctx) {
         this.context = ctx;
-        if (ctx == null || ctx.getSyncTopics() == null || ctx.getSyncTopics().isEmpty()) {
-            log.warn("ConnectContext carries no syncTopics — db-sync DISABLED. "
-                    + "Platform must publish per-entity topics in /connect for the engine to run.");
+        if (ctx == null || ctx.getSyncTopics() == null
+                || ctx.getSyncTopics().getDb() == null
+                || ctx.getSyncTopics().getDb().isEmpty()) {
+            log.warn("ConnectContext carries no db sync topics — db-sync DISABLED. "
+                    + "Platform must publish per-entity topics under syncTopics.db in /connect "
+                    + "for the engine to run.");
             state = STATE_DISABLED;
             return;
         }

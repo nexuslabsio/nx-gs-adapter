@@ -38,9 +38,13 @@ public interface TopicResolver {
     }
 
     /**
-     * Convenience binding to a {@link ConnectContext}.
+     * Convenience binding to a {@link ConnectContext} — reads the {@code db}
+     * namespace of {@code syncTopics} (db-sync's slice).
      */
     static TopicResolver fromContext(ConnectContext ctx) {
-        return fromSnapshot(ctx == null ? null : ctx.getSyncTopics());
+        if (ctx == null || ctx.getSyncTopics() == null) {
+            return fromSnapshot(null);
+        }
+        return fromSnapshot(ctx.getSyncTopics().getDb());
     }
 }

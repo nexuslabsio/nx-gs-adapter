@@ -57,7 +57,11 @@ class TopicResolverTest {
     }
 
     @Test
-    void fromContext_shouldRouteThroughCtxSyncTopics() {
+    void fromContext_shouldRouteThroughCtxSyncTopicsDb() {
+        app.l2nx.gs.adapter.api.rest.SyncTopics topics = app.l2nx.gs.adapter.api.rest.SyncTopics.builder()
+                .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                .runtime(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"))
+                .build();
         ConnectContext ctx = ConnectContext.builder()
                 .tenantId(UUID.randomUUID())
                 .tenantSlug("acme")
@@ -65,12 +69,14 @@ class TopicResolverTest {
                 .serverSlug("acme-x1")
                 .serverName("X1")
                 .adapterVersion("1.0.0")
-                .syncTopics(Collections.singletonMap("clan", "bohpts.gs.sync.clans"))
+                .syncTopics(topics)
                 .build();
 
         TopicResolver resolver = TopicResolver.fromContext(ctx);
 
-        assertEquals("bohpts.gs.sync.clans", resolver.resolveTopic("clan"));
+        // Resolves only the db namespace — runtime entries do not leak in.
+        assertEquals("bohpts.gs.sync.db.clan", resolver.resolveTopic("clan"));
+        assertNull(resolver.resolveTopic("character"));
     }
 
     @Test
