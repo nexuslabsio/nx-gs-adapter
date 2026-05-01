@@ -2,15 +2,17 @@ package app.l2nx.gs.adapter.api.rest;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.*;
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Adapter handshake response — identity bundle plus the Kafka context the adapter
- * needs to bootstrap its client, plus per-entity sync topics for DB-reading
- * modules.
+ * needs to bootstrap its client, plus a namespaced {@link SyncTopics} bundle and
+ * the heartbeat topic.
  *
  * @see ConnectRequest
  * @see KafkaConfig
+ * @see SyncTopics
  */
 public final class ConnectResponse {
 
@@ -20,7 +22,8 @@ public final class ConnectResponse {
     private final String serverSlug;
     private final String serverName;
     private final KafkaConfig kafka;
-    private final @Nullable Map<String, String> syncTopics;
+    private final @Nullable String heartbeatTopic;
+    private final @Nullable SyncTopics syncTopics;
 
     public ConnectResponse(UUID tenantId,
                            String tenantSlug,
@@ -28,16 +31,16 @@ public final class ConnectResponse {
                            String serverSlug,
                            String serverName,
                            KafkaConfig kafka,
-                           @Nullable Map<String, String> syncTopics) {
+                           @Nullable String heartbeatTopic,
+                           @Nullable SyncTopics syncTopics) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
         this.serverSlug = serverSlug;
         this.serverName = serverName;
         this.kafka = kafka;
-        this.syncTopics = syncTopics == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(syncTopics));
+        this.heartbeatTopic = heartbeatTopic;
+        this.syncTopics = syncTopics;
     }
 
     public UUID getTenantId() {
@@ -70,22 +73,22 @@ public final class ConnectResponse {
     }
 
     /**
-     * Per-entity Kafka topic names delivered by the platform. Keyed by entity name
-     * ({@code "clan"}, {@code "character"}, …); value is the fully-qualified topic
-     * the adapter is authorized to publish that entity's {@code SyncEvent}s into
-     * (e.g. {@code "bohpts.gs.sync.db.clan"}).
-     *
-     * <p>{@code null} (field absent on the wire) and an empty map are operationally
-     * equivalent — db-sync transitions to {@code DISABLED} on either. Adapter does
-     * NOT validate topic names, does NOT pre-flight existence on the Kafka cluster,
-     * does NOT create topics.</p>
-     *
-     * <p>The map is immutable: defensively copied on construction; consumers see
-     * an unmodifiable view. {@code null} is preserved on this DTO (not normalized
-     * to an empty map) so the wire-shape round-trip stays lossless for the
-     * platform-side producer that builds this object before serialization.</p>
+     * Heartbeat Kafka topic — fully-qualified topic the adapter publishes
+     * {@code HeartbeatEvent} into (e.g. {@code "<tenant>.gs.heartbeat"}).
+     * {@code null} when the platform omits heartbeat (heartbeat module then
+     * stays inactive).
      */
-    public @Nullable Map<String, String> getSyncTopics() {
+    public @Nullable String getHeartbeatTopic() {
+        return heartbeatTopic;
+    }
+
+    /**
+     * Per-namespace per-entity Kafka topic addressing for sync modules.
+     * {@code null} (field absent on the wire) means no sync namespaces are
+     * configured — every sync module ({@code db-sync}, {@code runtime-sync},
+     * {@code dp-sync}) transitions to {@code DISABLED}.
+     */
+    public @Nullable SyncTopics getSyncTopics() {
         return syncTopics;
     }
 
@@ -97,6 +100,7 @@ public final class ConnectResponse {
                 .serverSlug(serverSlug)
                 .serverName(serverName)
                 .kafka(kafka)
+                .heartbeatTopic(heartbeatTopic)
                 .syncTopics(syncTopics);
     }
 
@@ -115,12 +119,14 @@ public final class ConnectResponse {
                 && Objects.equals(serverSlug, that.serverSlug)
                 && Objects.equals(serverName, that.serverName)
                 && Objects.equals(kafka, that.kafka)
+                && Objects.equals(heartbeatTopic, that.heartbeatTopic)
                 && Objects.equals(syncTopics, that.syncTopics);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tenantId, tenantSlug, serverId, serverSlug, serverName, kafka, syncTopics);
+        return Objects.hash(tenantId, tenantSlug, serverId, serverSlug, serverName,
+                kafka, heartbeatTopic, syncTopics);
     }
 
     @Override
@@ -131,6 +137,7 @@ public final class ConnectResponse {
                 + ", serverSlug=" + serverSlug
                 + ", serverName=" + serverName
                 + ", kafka=" + kafka
+                + ", heartbeatTopic=" + heartbeatTopic
                 + ", syncTopics=" + syncTopics + "]";
     }
 
@@ -141,7 +148,8 @@ public final class ConnectResponse {
         private String serverSlug;
         private String serverName;
         private KafkaConfig kafka;
-        private @Nullable Map<String, String> syncTopics;
+        private @Nullable String heartbeatTopic;
+        private @Nullable SyncTopics syncTopics;
 
         public Builder tenantId(UUID tenantId) {
             this.tenantId = tenantId;
@@ -173,14 +181,19 @@ public final class ConnectResponse {
             return this;
         }
 
-        public Builder syncTopics(@Nullable Map<String, String> syncTopics) {
+        public Builder heartbeatTopic(@Nullable String heartbeatTopic) {
+            this.heartbeatTopic = heartbeatTopic;
+            return this;
+        }
+
+        public Builder syncTopics(@Nullable SyncTopics syncTopics) {
             this.syncTopics = syncTopics;
             return this;
         }
 
         public ConnectResponse build() {
             return new ConnectResponse(tenantId, tenantSlug, serverId, serverSlug,
-                    serverName, kafka, syncTopics);
+                    serverName, kafka, heartbeatTopic, syncTopics);
         }
     }
 }

@@ -1,19 +1,20 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import java.util.*;
+import app.l2nx.gs.adapter.api.rest.SyncTopics;
+
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Identity bundle handed to every {@link AdapterModule#onConnect(ConnectContext)} call
  * after a successful platform handshake. Modules cache only the bits they need;
  * the context itself is immutable.
  *
- * <p>Phase 1 carries identity only. Phase 2 adds {@link #getSyncTopics()} —
- * per-entity Kafka topic names delivered by the platform via
+ * <p>Phase 1 carried identity only. Phase 2 added {@link #getSyncTopics()} —
+ * namespaced per-entity Kafka topic names delivered by the platform via
  * {@code ConnectResponse.syncTopics}; consumed by sync modules
- * (e.g. {@code db-sync}). Future phases will extend with operator-config access
- * and a narrow Kafka publish capability — kept out of the contract for as long
- * as possible to minimize coupling between {@code nx-gs-adapter-api} and the rest
- * of the stack.</p>
+ * ({@code db-sync}, {@code runtime-sync}). Future phases will extend with
+ * operator-config access and a narrow Kafka publish capability.</p>
  */
 public final class ConnectContext {
 
@@ -23,7 +24,7 @@ public final class ConnectContext {
     private final String serverSlug;
     private final String serverName;
     private final String adapterVersion;
-    private final Map<String, String> syncTopics;
+    private final SyncTopics syncTopics;
 
     public ConnectContext(UUID tenantId,
                           String tenantSlug,
@@ -31,16 +32,14 @@ public final class ConnectContext {
                           String serverSlug,
                           String serverName,
                           String adapterVersion,
-                          Map<String, String> syncTopics) {
+                          SyncTopics syncTopics) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
         this.serverSlug = serverSlug;
         this.serverName = serverName;
         this.adapterVersion = adapterVersion;
-        this.syncTopics = syncTopics == null
-                ? Collections.emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(syncTopics));
+        this.syncTopics = syncTopics == null ? new SyncTopics(null, null, null) : syncTopics;
     }
 
     public UUID getTenantId() {
@@ -68,18 +67,14 @@ public final class ConnectContext {
     }
 
     /**
-     * Per-entity Kafka topic names delivered by the platform via
-     * {@code ConnectResponse.syncTopics}. Keyed by entity name
-     * ({@code "clan"}, {@code "character"}, …); value is the fully-qualified topic
-     * the adapter is authorized to publish that entity's {@code SyncEvent}s into.
-     *
-     * <p>Always non-null at this layer — {@code null} from the wire is normalized
-     * to an empty map. Modules treat {@code null} and empty wire values
-     * identically (both → {@code DISABLED} for sync modules); the wire-level
-     * distinction is intentionally erased here so module code only branches on
-     * {@code isEmpty()}. The map is unmodifiable.</p>
+     * Namespaced per-entity Kafka topic addressing for sync modules. Always
+     * non-null — a {@code null} {@code ConnectResponse.syncTopics} on the wire
+     * is normalized here to an empty {@link SyncTopics} (every namespace
+     * resolves to an empty map). Modules read their namespace via
+     * {@code getSyncTopics().getDb()} / {@code .getRuntime()} / {@code .getDp()}
+     * and treat empty as {@code DISABLED}.
      */
-    public Map<String, String> getSyncTopics() {
+    public SyncTopics getSyncTopics() {
         return syncTopics;
     }
 
@@ -136,7 +131,7 @@ public final class ConnectContext {
         private String serverSlug;
         private String serverName;
         private String adapterVersion;
-        private Map<String, String> syncTopics;
+        private SyncTopics syncTopics;
 
         public Builder tenantId(UUID tenantId) {
             this.tenantId = tenantId;
@@ -168,7 +163,7 @@ public final class ConnectContext {
             return this;
         }
 
-        public Builder syncTopics(Map<String, String> syncTopics) {
+        public Builder syncTopics(SyncTopics syncTopics) {
             this.syncTopics = syncTopics;
             return this;
         }

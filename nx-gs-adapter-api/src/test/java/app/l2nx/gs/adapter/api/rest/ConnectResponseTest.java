@@ -3,8 +3,6 @@ package app.l2nx.gs.adapter.api.rest;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -21,42 +19,45 @@ class ConnectResponseTest {
                 .build();
 
         assertNull(response.getSyncTopics());
+        assertNull(response.getHeartbeatTopic());
     }
 
     @Test
-    void syncTopics_shouldExposeMap_whenBuilderProvidesIt() {
-        Map<String, String> topics = new HashMap<String, String>();
-        topics.put("clan", "bohpts.gs.sync.clans");
-        topics.put("character", "bohpts.gs.sync.characters");
+    void heartbeatTopic_shouldRoundtrip() {
+        ConnectResponse response = ConnectResponse.builder()
+                .heartbeatTopic("acme.gs.heartbeat")
+                .build();
+
+        assertEquals("acme.gs.heartbeat", response.getHeartbeatTopic());
+    }
+
+    @Test
+    void syncTopics_shouldExposeNamespaces_whenBuilderProvidesIt() {
+        SyncTopics topics = SyncTopics.builder()
+                .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                .runtime(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"))
+                .build();
 
         ConnectResponse response = ConnectResponse.builder()
                 .syncTopics(topics)
                 .build();
 
         assertEquals(topics, response.getSyncTopics());
+        assertEquals("bohpts.gs.sync.db.clan", response.getSyncTopics().getDb().get("clan"));
+        assertEquals("bohpts.gs.sync.runtime.character",
+                response.getSyncTopics().getRuntime().get("character"));
     }
 
     @Test
-    void syncTopics_shouldBeUnmodifiable() {
-        Map<String, String> topics = new HashMap<String, String>();
-        topics.put("clan", "bohpts.gs.sync.clans");
+    void syncTopics_namespacesShouldBeUnmodifiable() {
+        SyncTopics topics = SyncTopics.builder()
+                .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                .build();
 
         ConnectResponse response = ConnectResponse.builder().syncTopics(topics).build();
 
         assertThrows(UnsupportedOperationException.class,
-                () -> response.getSyncTopics().put("character", "x"));
-    }
-
-    @Test
-    void syncTopics_shouldDefensivelyCopy_whenSourceMutates() {
-        Map<String, String> source = new HashMap<String, String>();
-        source.put("clan", "bohpts.gs.sync.clans");
-
-        ConnectResponse response = ConnectResponse.builder().syncTopics(source).build();
-        source.put("character", "should-not-leak");
-
-        assertEquals(Collections.singletonMap("clan", "bohpts.gs.sync.clans"),
-                response.getSyncTopics());
+                () -> response.getSyncTopics().getDb().put("character", "x"));
     }
 
     @Test
@@ -66,7 +67,10 @@ class ConnectResponseTest {
                 .serverId(UUID.randomUUID()).serverSlug("primary")
                 .serverName("Acme")
                 .kafka(KafkaConfig.builder().bootstrap("localhost:9092").build())
-                .syncTopics(Collections.singletonMap("clan", "bohpts.gs.sync.clans"))
+                .heartbeatTopic("acme.gs.heartbeat")
+                .syncTopics(SyncTopics.builder()
+                        .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                        .build())
                 .build();
 
         assertEquals(original, original.toBuilder().build());

@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.spi;
 
+import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,49 +33,49 @@ class ConnectContextTest {
     }
 
     @Test
-    void syncTopics_shouldDefaultToEmptyMap_whenBuilderOmitsIt() {
+    void syncTopics_shouldDefaultToEmpty_whenBuilderOmitsIt() {
         ConnectContext ctx = ConnectContext.builder().build();
 
-        assertTrue(ctx.getSyncTopics().isEmpty());
+        assertNotNull(ctx.getSyncTopics());
+        assertTrue(ctx.getSyncTopics().getDb().isEmpty());
+        assertTrue(ctx.getSyncTopics().getRuntime().isEmpty());
+        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
     }
 
     @Test
-    void syncTopics_shouldNormalizeNullToEmptyMap() {
+    void syncTopics_shouldNormalizeNullToEmpty() {
         ConnectContext ctx = ConnectContext.builder().syncTopics(null).build();
 
-        assertTrue(ctx.getSyncTopics().isEmpty());
+        assertNotNull(ctx.getSyncTopics());
+        assertTrue(ctx.getSyncTopics().getDb().isEmpty());
+        assertTrue(ctx.getSyncTopics().getRuntime().isEmpty());
+        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
     }
 
     @Test
-    void syncTopics_shouldExposeMap_whenBuilderProvidesIt() {
-        Map<String, String> topics = new HashMap<String, String>();
-        topics.put("clan", "bohpts.gs.sync.clans");
+    void syncTopics_shouldExposeNamespaces_whenBuilderProvidesIt() {
+        SyncTopics topics = SyncTopics.builder()
+                .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                .runtime(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"))
+                .build();
 
         ConnectContext ctx = ConnectContext.builder().syncTopics(topics).build();
 
-        assertEquals(topics, ctx.getSyncTopics());
+        assertEquals("bohpts.gs.sync.db.clan", ctx.getSyncTopics().getDb().get("clan"));
+        assertEquals("bohpts.gs.sync.runtime.character",
+                ctx.getSyncTopics().getRuntime().get("character"));
+        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
     }
 
     @Test
-    void syncTopics_shouldBeUnmodifiable() {
-        ConnectContext ctx = ConnectContext.builder()
-                .syncTopics(Collections.singletonMap("clan", "bohpts.gs.sync.clans"))
+    void syncTopics_namespacesShouldBeUnmodifiable() {
+        SyncTopics topics = SyncTopics.builder()
+                .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
                 .build();
+        ConnectContext ctx = ConnectContext.builder().syncTopics(topics).build();
 
         assertThrows(UnsupportedOperationException.class,
-                () -> ctx.getSyncTopics().put("character", "x"));
-    }
-
-    @Test
-    void syncTopics_shouldDefensivelyCopy_whenSourceMutates() {
-        Map<String, String> source = new HashMap<String, String>();
-        source.put("clan", "bohpts.gs.sync.clans");
-
-        ConnectContext ctx = ConnectContext.builder().syncTopics(source).build();
-        source.put("character", "should-not-leak");
-
-        assertEquals(Collections.singletonMap("clan", "bohpts.gs.sync.clans"),
-                ctx.getSyncTopics());
+                () -> ctx.getSyncTopics().getDb().put("character", "x"));
     }
 
     @Test
@@ -88,7 +87,9 @@ class ConnectContextTest {
                 .serverSlug("primary")
                 .serverName("Acme Primary")
                 .adapterVersion("0.1.0")
-                .syncTopics(Collections.singletonMap("clan", "bohpts.gs.sync.clans"))
+                .syncTopics(SyncTopics.builder()
+                        .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                        .build())
                 .build();
 
         assertEquals(original, original.toBuilder().build());

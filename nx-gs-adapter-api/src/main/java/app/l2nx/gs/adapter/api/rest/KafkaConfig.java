@@ -3,7 +3,7 @@ package app.l2nx.gs.adapter.api.rest;
 import java.util.Objects;
 
 /**
- * Kafka credentials and topic addressing returned in {@link ConnectResponse}.
+ * Kafka credentials and bootstrap addressing returned in {@link ConnectResponse}.
  *
  * <p>{@code saslPassword} travels in plaintext within this DTO — wire-level confidentiality
  * is the transport's responsibility, not this contract's.</p>
@@ -17,20 +17,17 @@ public final class KafkaConfig {
     private final String saslMechanism;
     private final String saslUsername;
     private final String saslPassword;
-    private final Topics topics;
 
     public KafkaConfig(String bootstrap,
                        String securityProtocol,
                        String saslMechanism,
                        String saslUsername,
-                       String saslPassword,
-                       Topics topics) {
+                       String saslPassword) {
         this.bootstrap = bootstrap;
         this.securityProtocol = securityProtocol;
         this.saslMechanism = saslMechanism;
         this.saslUsername = saslUsername;
         this.saslPassword = saslPassword;
-        this.topics = topics;
     }
 
     public String getBootstrap() {
@@ -53,18 +50,13 @@ public final class KafkaConfig {
         return saslPassword;
     }
 
-    public Topics getTopics() {
-        return topics;
-    }
-
     public Builder toBuilder() {
         return new Builder()
                 .bootstrap(bootstrap)
                 .securityProtocol(securityProtocol)
                 .saslMechanism(saslMechanism)
                 .saslUsername(saslUsername)
-                .saslPassword(saslPassword)
-                .topics(topics);
+                .saslPassword(saslPassword);
     }
 
     public static Builder builder() {
@@ -80,13 +72,12 @@ public final class KafkaConfig {
                 && Objects.equals(securityProtocol, that.securityProtocol)
                 && Objects.equals(saslMechanism, that.saslMechanism)
                 && Objects.equals(saslUsername, that.saslUsername)
-                && Objects.equals(saslPassword, that.saslPassword)
-                && Objects.equals(topics, that.topics);
+                && Objects.equals(saslPassword, that.saslPassword);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(bootstrap, securityProtocol, saslMechanism, saslUsername, saslPassword, topics);
+        return Objects.hash(bootstrap, securityProtocol, saslMechanism, saslUsername, saslPassword);
     }
 
     @Override
@@ -95,8 +86,7 @@ public final class KafkaConfig {
                 + ", securityProtocol=" + securityProtocol
                 + ", saslMechanism=" + saslMechanism
                 + ", saslUsername=" + saslUsername
-                + ", saslPassword=***"
-                + ", topics=" + topics + "]";
+                + ", saslPassword=***]";
     }
 
     public static final class Builder {
@@ -105,7 +95,6 @@ public final class KafkaConfig {
         private String saslMechanism;
         private String saslUsername;
         private String saslPassword;
-        private Topics topics;
 
         public Builder bootstrap(String bootstrap) {
             this.bootstrap = bootstrap;
@@ -132,13 +121,8 @@ public final class KafkaConfig {
             return this;
         }
 
-        public Builder topics(Topics topics) {
-            this.topics = topics;
-            return this;
-        }
-
         public KafkaConfig build() {
-            return new KafkaConfig(bootstrap, securityProtocol, saslMechanism, saslUsername, saslPassword, topics);
+            return new KafkaConfig(bootstrap, securityProtocol, saslMechanism, saslUsername, saslPassword);
         }
     }
 }

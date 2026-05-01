@@ -15,7 +15,6 @@ class KafkaConfigTest {
                 .saslMechanism("SCRAM-SHA-512")
                 .saslUsername("acme")
                 .saslPassword("S3cureP@ss!")
-                .topics(Topics.builder().heartbeat("acme.adapter.heartbeat").build())
                 .build();
 
         String rendered = kafka.toString();
