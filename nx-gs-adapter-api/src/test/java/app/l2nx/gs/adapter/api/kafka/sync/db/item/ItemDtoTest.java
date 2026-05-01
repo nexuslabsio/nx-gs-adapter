@@ -1,7 +1,7 @@
-package app.l2nx.gs.adapter.api.kafka.sync.db;
+package app.l2nx.gs.adapter.api.kafka.sync.db.item;
 
-import app.l2nx.gs.adapter.api.domain.Attribute;
-import app.l2nx.gs.adapter.api.domain.ItemLocation;
+import app.l2nx.gs.adapter.api.domain.item.ItemAttribute;
+import app.l2nx.gs.adapter.api.domain.item.ItemLocation;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -15,8 +15,8 @@ class ItemDtoTest {
     @Test
     void builder_shouldMapEachFieldToConstructorPosition() {
         List<ItemAttributeDto> attrs = Arrays.asList(
-                ItemAttributeDto.builder().type(Attribute.FIRE).value(150).build(),
-                ItemAttributeDto.builder().type(Attribute.WATER).value(60).build());
+                ItemAttributeDto.builder().type(ItemAttribute.FIRE).value(150).build(),
+                ItemAttributeDto.builder().type(ItemAttribute.WATER).value(60).build());
 
         ItemDto item = ItemDto.builder()
                 .id(98765L)
@@ -87,7 +87,7 @@ class ItemDtoTest {
     @Test
     void toBuilder_shouldRoundtrip() {
         List<ItemAttributeDto> attrs = Collections.singletonList(
-                ItemAttributeDto.builder().type(Attribute.HOLY).value(120).build());
+                ItemAttributeDto.builder().type(ItemAttribute.HOLY).value(120).build());
         ItemDto original = new ItemDto(1L, 7L, 2L, 5L, 10, ItemLocation.INVENTORY, attrs);
 
         assertEquals(original, original.toBuilder().build());

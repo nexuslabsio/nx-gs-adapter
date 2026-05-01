@@ -53,10 +53,10 @@ public interface PrimarySource<P> {
     /**
      * Phase 2 single-row mapper. Called once per row whose CRC32 changed (the
      * engine fetches primary rows for {@code created ∪ updated} PKs in a
-     * cycle). Implementations SHOULD apply L2J sentinel-zero conventions here
-     * (e.g. {@code 0 → null} for {@code leader_id} / {@code ally_id}) and
-     * return a private row record that {@link EntityMapping#mapEntity} casts
-     * back.
+     * cycle). Implementations SHOULD apply source-side sentinel-zero
+     * conventions here (e.g. {@code 0 → null} for {@code leader_id} /
+     * {@code ally_id}) and return a private row record that
+     * {@link EntityMapping#mapEntity} casts back.
      *
      * @throws SQLException re-thrown to the engine, which transitions the
      *                      affected entity to {@code DEGRADED} for the cycle.

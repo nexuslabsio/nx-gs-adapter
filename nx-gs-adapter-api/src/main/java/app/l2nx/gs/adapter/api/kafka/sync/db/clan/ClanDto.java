@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.sync.db;
+package app.l2nx.gs.adapter.api.kafka.sync.db.clan;
 
 import org.jspecify.annotations.Nullable;
 
@@ -15,7 +15,7 @@ import java.util.Objects;
  * boxed for nullable. Gson serializes both identically (both render as JSON
  * numbers); the type carries the nullability contract.</p>
  *
- * <p>Sentinel mapping: bohpts (and most L2J forks) use {@code 0} as the
+ * <p>Sentinel mapping: most game-server schemas use {@code 0} as the
  * "no leader" / "no ally" sentinel in {@code clan_data.leader_id} /
  * {@code ally_id}. Schema providers translate sentinel-zero to {@code null}
  * when populating these fields ({@code Long leaderId / allyId}); platform
@@ -72,14 +72,16 @@ public final class ClanDto {
     }
 
     /**
-     * {@code null} when source {@code leader_id = 0} (L2J convention).
+     * {@code null} when source {@code leader_id = 0} (the conventional
+     * "no leader" sentinel).
      */
     public @Nullable Long getLeaderId() {
         return leaderId;
     }
 
     /**
-     * {@code null} when source {@code ally_id = 0} (L2J convention).
+     * {@code null} when source {@code ally_id = 0} (the conventional
+     * "no ally" sentinel).
      */
     public @Nullable Long getAllyId() {
         return allyId;

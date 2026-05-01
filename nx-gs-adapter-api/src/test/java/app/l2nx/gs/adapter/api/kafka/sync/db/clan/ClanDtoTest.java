@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.sync.db;
+package app.l2nx.gs.adapter.api.kafka.sync.db.clan;
 
 import org.junit.jupiter.api.Test;
 

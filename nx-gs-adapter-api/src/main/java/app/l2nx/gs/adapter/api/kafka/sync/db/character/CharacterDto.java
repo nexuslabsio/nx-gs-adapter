@@ -1,9 +1,13 @@
-package app.l2nx.gs.adapter.api.kafka.sync.db;
+package app.l2nx.gs.adapter.api.kafka.sync.db.character;
 
-import app.l2nx.gs.adapter.api.domain.Race;
-import app.l2nx.gs.adapter.api.domain.Sex;
+import app.l2nx.gs.adapter.api.domain.character.CharacterClass;
+import app.l2nx.gs.adapter.api.domain.character.CharacterPrivateStore;
+import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
+import app.l2nx.gs.adapter.api.domain.character.CharacterSex;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -18,7 +22,7 @@ import java.util.Objects;
  * {@code PrimarySource.hashedColumns()} and what they put into the row in
  * {@code mapRow()}.</p>
  *
- * <p>Sentinel mapping: bohpts (and most L2J forks) use {@code 0} as the
+ * <p>Sentinel mapping: most game-server schemas use {@code 0} as the
  * "no clan" sentinel in {@code characters.clanid}. Schema providers
  * translate sentinel-zero (and source SQL NULL) to {@code null} when
  * populating {@code clanId}; platform consumers see explicit nulls.</p>
@@ -36,8 +40,12 @@ public final class CharacterDto {
     private final @Nullable String name;
     private final @Nullable String title;
     private final @Nullable Integer level;
-    private final @Nullable Sex sex;
-    private final @Nullable Race race;
+    private final @Nullable CharacterSex sex;
+    private final @Nullable CharacterRace race;
+    private final @Nullable CharacterClass classId;
+    private final @Nullable CharacterClass baseClassId;
+    private final @Nullable List<CharacterSubclassDto> subclasses;
+    private final @Nullable CharacterPrivateStore privateStore;
     private final @Nullable Long clanId;
     private final @Nullable Integer pvpCounter;
     private final @Nullable Integer pkCounter;
@@ -47,8 +55,12 @@ public final class CharacterDto {
                         @Nullable String name,
                         @Nullable String title,
                         @Nullable Integer level,
-                        @Nullable Sex sex,
-                        @Nullable Race race,
+                        @Nullable CharacterSex sex,
+                        @Nullable CharacterRace race,
+                        @Nullable CharacterClass classId,
+                        @Nullable CharacterClass baseClassId,
+                        @Nullable List<CharacterSubclassDto> subclasses,
+                        @Nullable CharacterPrivateStore privateStore,
                         @Nullable Long clanId,
                         @Nullable Integer pvpCounter,
                         @Nullable Integer pkCounter,
@@ -59,6 +71,10 @@ public final class CharacterDto {
         this.level = level;
         this.sex = sex;
         this.race = race;
+        this.classId = classId;
+        this.baseClassId = baseClassId;
+        this.subclasses = subclasses == null ? null : Collections.unmodifiableList(subclasses);
+        this.privateStore = privateStore;
         this.clanId = clanId;
         this.pvpCounter = pvpCounter;
         this.pkCounter = pkCounter;
@@ -97,21 +113,59 @@ public final class CharacterDto {
     /**
      * Character sex.
      */
-    public @Nullable Sex getSex() {
+    public @Nullable CharacterSex getSex() {
         return sex;
     }
 
     /**
      * Character race.
      */
-    public @Nullable Race getRace() {
+    public @Nullable CharacterRace getRace() {
         return race;
     }
 
     /**
+     * Active class. {@code null} when the source ID is not part of the
+     * canonical class set surfaced by {@link CharacterClass}, or when the
+     * tenant does not surface this column.
+     */
+    public @Nullable CharacterClass getClassId() {
+        return classId;
+    }
+
+    /**
+     * Base (root) class — source {@code base_class}. Equal to
+     * {@link #getClassId()} for characters that have not used a subclass /
+     * dual-class slot.
+     */
+    public @Nullable CharacterClass getBaseClassId() {
+        return baseClassId;
+    }
+
+    /**
+     * Character subclasses, ordered as the schema provider's
+     * {@code mapEntity} produced them (no platform-side ordering contract).
+     * {@code null} when the tenant does not sync subclasses (no
+     * {@code ChildSource} declared); empty list when the tenant syncs
+     * subclasses but the character has none.
+     */
+    public @Nullable List<CharacterSubclassDto> getSubclasses() {
+        return subclasses;
+    }
+
+    /**
+     * Active private-store mode. {@code null} when the character has no
+     * store open (or only a transient menu-pending state), or when the
+     * tenant does not surface this datum.
+     */
+    public @Nullable CharacterPrivateStore getPrivateStore() {
+        return privateStore;
+    }
+
+    /**
      * Clan membership. {@code null} when the source {@code clanid = 0}
-     * (L2J convention) or SQL NULL or when the tenant does not surface
-     * this column.
+     * (the conventional "no clan" sentinel) or SQL NULL or when the
+     * tenant does not surface this column.
      */
     public @Nullable Long getClanId() {
         return clanId;
@@ -146,6 +200,10 @@ public final class CharacterDto {
                 .level(level)
                 .sex(sex)
                 .race(race)
+                .classId(classId)
+                .baseClassId(baseClassId)
+                .subclasses(subclasses)
+                .privateStore(privateStore)
                 .clanId(clanId)
                 .pvpCounter(pvpCounter)
                 .pkCounter(pkCounter)
@@ -167,6 +225,10 @@ public final class CharacterDto {
                 && Objects.equals(level, that.level)
                 && sex == that.sex
                 && race == that.race
+                && classId == that.classId
+                && baseClassId == that.baseClassId
+                && Objects.equals(subclasses, that.subclasses)
+                && privateStore == that.privateStore
                 && Objects.equals(clanId, that.clanId)
                 && Objects.equals(pvpCounter, that.pvpCounter)
                 && Objects.equals(pkCounter, that.pkCounter)
@@ -176,6 +238,7 @@ public final class CharacterDto {
     @Override
     public int hashCode() {
         return Objects.hash(id, name, title, level, sex, race,
+                classId, baseClassId, subclasses, privateStore,
                 clanId, pvpCounter, pkCounter, karma);
     }
 
@@ -187,6 +250,10 @@ public final class CharacterDto {
                 + ", level=" + level
                 + ", sex=" + sex
                 + ", race=" + race
+                + ", classId=" + classId
+                + ", baseClassId=" + baseClassId
+                + ", subclasses=" + subclasses
+                + ", privateStore=" + privateStore
                 + ", clanId=" + clanId
                 + ", pvpCounter=" + pvpCounter
                 + ", pkCounter=" + pkCounter
@@ -198,8 +265,12 @@ public final class CharacterDto {
         private @Nullable String name;
         private @Nullable String title;
         private @Nullable Integer level;
-        private @Nullable Sex sex;
-        private @Nullable Race race;
+        private @Nullable CharacterSex sex;
+        private @Nullable CharacterRace race;
+        private @Nullable CharacterClass classId;
+        private @Nullable CharacterClass baseClassId;
+        private @Nullable List<CharacterSubclassDto> subclasses;
+        private @Nullable CharacterPrivateStore privateStore;
         private @Nullable Long clanId;
         private @Nullable Integer pvpCounter;
         private @Nullable Integer pkCounter;
@@ -225,13 +296,33 @@ public final class CharacterDto {
             return this;
         }
 
-        public Builder sex(@Nullable Sex sex) {
+        public Builder sex(@Nullable CharacterSex sex) {
             this.sex = sex;
             return this;
         }
 
-        public Builder race(@Nullable Race race) {
+        public Builder race(@Nullable CharacterRace race) {
             this.race = race;
+            return this;
+        }
+
+        public Builder classId(@Nullable CharacterClass classId) {
+            this.classId = classId;
+            return this;
+        }
+
+        public Builder baseClassId(@Nullable CharacterClass baseClassId) {
+            this.baseClassId = baseClassId;
+            return this;
+        }
+
+        public Builder subclasses(@Nullable List<CharacterSubclassDto> subclasses) {
+            this.subclasses = subclasses;
+            return this;
+        }
+
+        public Builder privateStore(@Nullable CharacterPrivateStore privateStore) {
+            this.privateStore = privateStore;
             return this;
         }
 
@@ -257,6 +348,7 @@ public final class CharacterDto {
 
         public CharacterDto build() {
             return new CharacterDto(id, name, title, level, sex, race,
+                    classId, baseClassId, subclasses, privateStore,
                     clanId, pvpCounter, pkCounter, karma);
         }
     }

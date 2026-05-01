@@ -1,7 +1,7 @@
 package app.l2nx.gs.db.sync.engine.publish;
 
-import app.l2nx.gs.adapter.api.kafka.sync.db.ClanDto;
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.db.sync.engine.TestMappings;
 import org.apache.kafka.clients.producer.Callback;

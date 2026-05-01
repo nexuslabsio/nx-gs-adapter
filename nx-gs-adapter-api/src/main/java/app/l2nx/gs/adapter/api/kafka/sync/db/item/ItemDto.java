@@ -1,6 +1,6 @@
-package app.l2nx.gs.adapter.api.kafka.sync.db;
+package app.l2nx.gs.adapter.api.kafka.sync.db.item;
 
-import app.l2nx.gs.adapter.api.domain.ItemLocation;
+import app.l2nx.gs.adapter.api.domain.item.ItemLocation;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
@@ -19,7 +19,7 @@ import java.util.Objects;
  * {@code PrimarySource.hashedColumns()} and what they put into the row in
  * {@code mapRow()}.</p>
  *
- * <p>Sentinel mapping: bohpts (and most L2J forks) use {@code 0} as the
+ * <p>Sentinel mapping: most game-server schemas use {@code 0} as the
  * "no owner" sentinel in {@code items.owner_id}. Schema providers translate
  * sentinel-zero to {@code null} when populating {@code ownerId}; platform
  * consumers see explicit nulls.</p>
@@ -77,8 +77,8 @@ public final class ItemDto {
 
     /**
      * Owner identifier (player or clan, depending on the {@code location}).
-     * {@code null} when the source {@code owner_id = 0} (L2J convention) or
-     * when the tenant does not surface this column.
+     * {@code null} when the source {@code owner_id = 0} (the conventional
+     * "no owner" sentinel) or when the tenant does not surface this column.
      */
     public @Nullable Long getOwnerId() {
         return ownerId;

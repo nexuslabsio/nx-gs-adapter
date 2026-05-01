@@ -1,0 +1,92 @@
+package app.l2nx.gs.adapter.api.kafka.sync.db.character;
+
+import app.l2nx.gs.adapter.api.domain.character.CharacterClass;
+
+import java.util.Objects;
+
+/**
+ * Wire DTO for one row of {@code character_subclasses} (or its tenant
+ * equivalent), carried inside {@link CharacterDto#getSubclasses()}.
+ *
+ * <p>Surfaces the identifying-and-versioning pair: {@code classId} (which
+ * subclass) and {@code level} (current subclass level). Volatile columns
+ * ({@code exp}, {@code sp}) are intentionally not modeled — they tick on
+ * every kill and would generate an UPDATE storm per cycle. Other source
+ * columns ({@code class_index}) are details that platform consumers do
+ * not need in the v1 wire.</p>
+ *
+ * <p>Subclass rows whose {@code class_id} resolves to a value outside
+ * {@link CharacterClass}'s canonical set are dropped by the schema
+ * provider before assembly — every row that reaches the wire has a
+ * non-null {@code classId}.</p>
+ */
+public final class CharacterSubclassDto {
+
+    private final CharacterClass classId;
+    private final int level;
+
+    public CharacterSubclassDto(CharacterClass classId, int level) {
+        this.classId = classId;
+        this.level = level;
+    }
+
+    /**
+     * Subclass class identifier — {@code NOT NULL} on the wire (rows with
+     * unknown source class IDs are dropped by the schema provider).
+     */
+    public CharacterClass getClassId() {
+        return classId;
+    }
+
+    /**
+     * Subclass level — {@code NOT NULL} on the source side.
+     */
+    public int getLevel() {
+        return level;
+    }
+
+    public Builder toBuilder() {
+        return new Builder().classId(classId).level(level);
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof CharacterSubclassDto)) return false;
+        CharacterSubclassDto that = (CharacterSubclassDto) o;
+        return classId == that.classId && level == that.level;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(classId, level);
+    }
+
+    @Override
+    public String toString() {
+        return "CharacterSubclassDto[classId=" + classId + ", level=" + level + "]";
+    }
+
+    public static final class Builder {
+        private CharacterClass classId;
+        private int level;
+
+        public Builder classId(CharacterClass classId) {
+            this.classId = classId;
+            return this;
+        }
+
+        public Builder level(int level) {
+            this.level = level;
+            return this;
+        }
+
+        public CharacterSubclassDto build() {
+            return new CharacterSubclassDto(classId, level);
+        }
+    }
+}

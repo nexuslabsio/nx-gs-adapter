@@ -1,6 +1,6 @@
 package app.l2nx.gs.db.sync.engine.window;
 
-import app.l2nx.gs.adapter.api.kafka.sync.db.ClanDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
 import app.l2nx.gs.db.sync.engine.TestMappings;

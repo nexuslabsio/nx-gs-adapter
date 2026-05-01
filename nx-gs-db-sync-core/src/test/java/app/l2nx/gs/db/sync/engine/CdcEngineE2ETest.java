@@ -1,9 +1,9 @@
 package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.kafka.ops.*;
-import app.l2nx.gs.adapter.api.kafka.sync.db.ClanDto;
-import app.l2nx.gs.adapter.api.kafka.sync.db.ClanSkillDto;
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanSkillDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
