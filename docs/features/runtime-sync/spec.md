@@ -149,7 +149,7 @@ state, siege participants, raid boss vitals).
   `FAILED` is reserved for non-recoverable startup conditions (0 / >1
   `RuntimeStateProvider`). Same isolation contract as `db-sync` R9.
 
-- [todo] R9. Bohpts client + character runtime MVP — `bohpts-core`
+- [done] R9. Bohpts client + character runtime MVP — `bohpts-core`
   (`E:/projects/bohpts/bohpts-core`) MUST host a `BohptsRuntimeStateProvider` class
   implementing `RuntimeStateProvider` directly (no `extends` — there is no vanilla
   `nx-gs-runtime-l2j` to inherit from in MVP), plus a
