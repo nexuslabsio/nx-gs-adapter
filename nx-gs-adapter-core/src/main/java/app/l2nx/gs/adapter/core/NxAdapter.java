@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.core;
 
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
-import app.l2nx.gs.adapter.api.rest.Topics;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.ConfigResolver;
@@ -277,8 +276,7 @@ public final class NxAdapter {
 
         // Re-arming on a re-handshake recaptures connectInstant, so uptime is session-scoped.
         HeartbeatService hb = heartbeatService;
-        Topics topics = response.getKafka() != null ? response.getKafka().getTopics() : null;
-        String heartbeatTopic = topics != null ? topics.getHeartbeat() : null;
+        String heartbeatTopic = response.getHeartbeatTopic();
         if (hb != null && heartbeatTopic != null && response.getServerId() != null) {
             try {
                 String tenantId = response.getTenantId() != null ? response.getTenantId().toString() : null;

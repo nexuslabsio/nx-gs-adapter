@@ -35,9 +35,9 @@ class ConnectFlowTest {
             + "\"securityProtocol\":\"SASL_SSL\","
             + "\"saslMechanism\":\"SCRAM-SHA-256\","
             + "\"saslUsername\":\"acme-x1-user\","
-            + "\"saslPassword\":\"redacted\","
-            + "\"topics\":{\"heartbeat\":\"tenants.heartbeat\"}"
-            + "}"
+            + "\"saslPassword\":\"redacted\""
+            + "},"
+            + "\"heartbeatTopic\":\"tenants.heartbeat\""
             + "}";
 
     private WireMockServer wireMock;
@@ -208,10 +208,16 @@ class ConnectFlowTest {
                 + "\"serverId\":\"00000000-0000-0000-0000-000000000002\","
                 + "\"serverSlug\":\"acme-x1\","
                 + "\"serverName\":\"Acme X1\","
-                + "\"kafka\":{\"bootstrap\":\"k:9092\",\"topics\":{\"heartbeat\":\"hb\"}},"
+                + "\"kafka\":{\"bootstrap\":\"k:9092\"},"
+                + "\"heartbeatTopic\":\"hb\","
                 + "\"syncTopics\":{"
-                + "\"clan\":\"bohpts.gs.sync.clans\","
-                + "\"character\":\"bohpts.gs.sync.characters\""
+                + "\"db\":{"
+                + "\"clan\":\"bohpts.gs.sync.db.clan\","
+                + "\"character\":\"bohpts.gs.sync.db.character\""
+                + "},"
+                + "\"runtime\":{"
+                + "\"character\":\"bohpts.gs.sync.runtime.character\""
+                + "}"
                 + "}}";
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
                 .willReturn(aResponse().withStatus(200)
@@ -231,10 +237,14 @@ class ConnectFlowTest {
         assertEquals(Collections.singletonList(ConnectFlow.Outcome.STARTING), outcomes);
         ConnectResponse response = captured.get();
         assertNotNull(response);
-        Map<String, String> expected = new HashMap<String, String>();
-        expected.put("clan", "bohpts.gs.sync.clans");
-        expected.put("character", "bohpts.gs.sync.characters");
-        assertEquals(expected, response.getSyncTopics());
+        Map<String, String> expectedDb = new HashMap<String, String>();
+        expectedDb.put("clan", "bohpts.gs.sync.db.clan");
+        expectedDb.put("character", "bohpts.gs.sync.db.character");
+        assertEquals(expectedDb, response.getSyncTopics().getDb());
+        assertEquals(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"),
+                response.getSyncTopics().getRuntime());
+        assertTrue(response.getSyncTopics().getDp().isEmpty());
+        assertEquals("hb", response.getHeartbeatTopic());
     }
 
     @Test
@@ -257,17 +267,19 @@ class ConnectFlowTest {
         ConnectResponse response = captured.get();
         assertNotNull(response);
         assertNull(response.getSyncTopics());
+        assertEquals("tenants.heartbeat", response.getHeartbeatTopic());
     }
 
     @Test
-    void run_shouldExposeEmptySyncTopics_whenFieldEmpty() {
+    void run_shouldExposeEmptyNamespaces_whenSyncTopicsEmpty() {
         String body = "{"
                 + "\"tenantId\":\"00000000-0000-0000-0000-000000000001\","
                 + "\"tenantSlug\":\"acme\","
                 + "\"serverId\":\"00000000-0000-0000-0000-000000000002\","
                 + "\"serverSlug\":\"acme-x1\","
                 + "\"serverName\":\"Acme X1\","
-                + "\"kafka\":{\"bootstrap\":\"k:9092\",\"topics\":{\"heartbeat\":\"hb\"}},"
+                + "\"kafka\":{\"bootstrap\":\"k:9092\"},"
+                + "\"heartbeatTopic\":\"hb\","
                 + "\"syncTopics\":{}}";
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
                 .willReturn(aResponse().withStatus(200)
@@ -287,7 +299,9 @@ class ConnectFlowTest {
         ConnectResponse response = captured.get();
         assertNotNull(response);
         assertNotNull(response.getSyncTopics());
-        assertTrue(response.getSyncTopics().isEmpty());
+        assertTrue(response.getSyncTopics().getDb().isEmpty());
+        assertTrue(response.getSyncTopics().getRuntime().isEmpty());
+        assertTrue(response.getSyncTopics().getDp().isEmpty());
     }
 
     @Test

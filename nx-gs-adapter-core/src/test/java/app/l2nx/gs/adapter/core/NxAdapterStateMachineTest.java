@@ -2,7 +2,6 @@ package app.l2nx.gs.adapter.core;
 
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.rest.KafkaConfig;
-import app.l2nx.gs.adapter.api.rest.Topics;
 import app.l2nx.gs.adapter.core.connect.ConnectFlow;
 import app.l2nx.gs.adapter.core.kafka.CapturingKafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
@@ -122,6 +121,7 @@ class NxAdapterStateMachineTest {
                 .serverSlug(serverSlug)
                 .serverName("Test")
                 .kafka(kafka)
+                .heartbeatTopic("heartbeat")
                 .build();
     }
 
@@ -132,7 +132,6 @@ class NxAdapterStateMachineTest {
                 .saslMechanism("SCRAM-SHA-256")
                 .saslUsername("u")
                 .saslPassword("p")
-                .topics(new Topics("heartbeat"))
                 .build();
     }
 

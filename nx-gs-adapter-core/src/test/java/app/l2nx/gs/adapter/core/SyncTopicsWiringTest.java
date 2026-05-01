@@ -2,7 +2,7 @@ package app.l2nx.gs.adapter.core;
 
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.rest.KafkaConfig;
-import app.l2nx.gs.adapter.api.rest.Topics;
+import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.core.kafka.CapturingKafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
@@ -48,23 +48,28 @@ class SyncTopicsWiringTest {
 
     @Test
     void initKafka_shouldSurfaceSyncTopics_inConnectContext() {
-        Map<String, String> wireTopics = new HashMap<String, String>();
-        wireTopics.put("clan", "bohpts.gs.sync.clans");
-        wireTopics.put("character", "bohpts.gs.sync.characters");
+        Map<String, String> dbTopics = new HashMap<String, String>();
+        dbTopics.put("clan", "bohpts.gs.sync.db.clan");
+        dbTopics.put("character", "bohpts.gs.sync.db.character");
+        Map<String, String> runtimeTopics = new HashMap<String, String>();
+        runtimeTopics.put("character", "bohpts.gs.sync.runtime.character");
+        SyncTopics topics = SyncTopics.builder().db(dbTopics).runtime(runtimeTopics).build();
 
         NxAdapter.simulateInitKafkaForTesting(
                 new KafkaInitializer(new CapturingKafkaFactory()),
-                response(wireTopics));
+                response(topics));
 
         ConnectContext ctx = CapturingAdapterModule.lastContext();
         assertNotNull(ctx, "module.onConnect was not invoked");
-        assertEquals(wireTopics, ctx.getSyncTopics());
+        assertEquals(dbTopics, ctx.getSyncTopics().getDb());
+        assertEquals(runtimeTopics, ctx.getSyncTopics().getRuntime());
+        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
         assertTrue(CapturingAdapterModule.wasStarted(),
                 "module.start should fire after a successful onConnect");
     }
 
     @Test
-    void initKafka_shouldNormalizeNullSyncTopics_toEmptyMap() {
+    void initKafka_shouldNormalizeNullSyncTopics_toEmptyNamespaces() {
         NxAdapter.simulateInitKafkaForTesting(
                 new KafkaInitializer(new CapturingKafkaFactory()),
                 response(null));
@@ -72,36 +77,37 @@ class SyncTopicsWiringTest {
         ConnectContext ctx = CapturingAdapterModule.lastContext();
         assertNotNull(ctx);
         assertNotNull(ctx.getSyncTopics(),
-                "ConnectContext normalizes wire-null syncTopics to empty map");
-        assertTrue(ctx.getSyncTopics().isEmpty());
+                "ConnectContext normalizes wire-null syncTopics to empty SyncTopics");
+        assertTrue(ctx.getSyncTopics().getDb().isEmpty());
+        assertTrue(ctx.getSyncTopics().getRuntime().isEmpty());
+        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
     }
 
     @Test
-    void initKafka_shouldExposeUnmodifiableSyncTopics_inConnectContext() {
-        Map<String, String> wireTopics = new HashMap<String, String>();
-        wireTopics.put("clan", "bohpts.gs.sync.clans");
+    void initKafka_shouldExposeUnmodifiableNamespaces_inConnectContext() {
+        SyncTopics topics = SyncTopics.builder()
+                .db(java.util.Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                .build();
 
         NxAdapter.simulateInitKafkaForTesting(
                 new KafkaInitializer(new CapturingKafkaFactory()),
-                response(wireTopics));
+                response(topics));
 
         ConnectContext ctx = CapturingAdapterModule.lastContext();
         assertNotNull(ctx);
         assertThrows(UnsupportedOperationException.class,
-                () -> ctx.getSyncTopics().put("character", "x"));
+                () -> ctx.getSyncTopics().getDb().put("character", "x"));
     }
 
-    private static ConnectResponse response(Map<String, String> syncTopics) {
+    private static ConnectResponse response(SyncTopics syncTopics) {
         return ConnectResponse.builder()
                 .tenantId(UUID.randomUUID())
                 .tenantSlug("acme")
                 .serverId(UUID.randomUUID())
                 .serverSlug("acme-x1")
                 .serverName("Acme X1")
-                .kafka(KafkaConfig.builder()
-                        .bootstrap("k:9092")
-                        .topics(new Topics("hb"))
-                        .build())
+                .kafka(KafkaConfig.builder().bootstrap("k:9092").build())
+                .heartbeatTopic("acme.gs.heartbeat")
                 .syncTopics(syncTopics)
                 .build();
     }

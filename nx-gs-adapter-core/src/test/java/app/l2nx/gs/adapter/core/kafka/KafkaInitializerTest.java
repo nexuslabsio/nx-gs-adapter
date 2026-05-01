@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.core.kafka;
 
 import app.l2nx.gs.adapter.api.rest.KafkaConfig;
-import app.l2nx.gs.adapter.api.rest.Topics;
 import app.l2nx.gs.kafka.KafkaState;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +17,6 @@ class KafkaInitializerTest {
                 .saslMechanism("SCRAM-SHA-256")
                 .saslUsername(user)
                 .saslPassword(password)
-                .topics(new Topics(null))
                 .build();
     }
 
