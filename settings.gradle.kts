@@ -7,4 +7,5 @@ include(
     ":nx-gs-kafka",
     ":nx-gs-adapter-core",
     ":nx-gs-db-sync-core",
+    ":nx-gs-runtime-sync-core",
 )
