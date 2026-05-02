@@ -20,6 +20,7 @@ public final class KafkaConfig {
     private final boolean reconnect;
     private final long reconnectIntervalMs;
     private final Map<String, Object> properties;
+    private final Map<String, byte[]> producerStaticHeaders;
     private final Gson gson;
     private final Consumer<KafkaState> stateChangeListener;
 
@@ -30,6 +31,7 @@ public final class KafkaConfig {
         this.reconnect = builder.reconnect;
         this.reconnectIntervalMs = builder.reconnectIntervalMs;
         this.properties = Collections.unmodifiableMap(new HashMap<>(builder.properties));
+        this.producerStaticHeaders = Collections.unmodifiableMap(new HashMap<>(builder.producerStaticHeaders));
         this.gson = builder.gson;
         this.stateChangeListener = builder.stateChangeListener;
     }
@@ -56,6 +58,15 @@ public final class KafkaConfig {
 
     public Map<String, Object> getProperties() {
         return properties;
+    }
+
+    /**
+     * Static Kafka headers stamped on every record produced by this client.
+     * Used to attach connection-scoped metadata (e.g. {@code Nx-Server-Id})
+     * once at adapter bootstrap without modifying every per-call site.
+     */
+    public Map<String, byte[]> getProducerStaticHeaders() {
+        return producerStaticHeaders;
     }
 
     public Gson getGson() {
@@ -90,6 +101,7 @@ public final class KafkaConfig {
         private boolean reconnect = true;
         private long reconnectIntervalMs = 30000;
         private final Map<String, Object> properties = new HashMap<>();
+        private final Map<String, byte[]> producerStaticHeaders = new HashMap<>();
         private Gson gson = new Gson();
         private Consumer<KafkaState> stateChangeListener;
 
@@ -158,6 +170,17 @@ public final class KafkaConfig {
          */
         public Builder property(String key, Object value) {
             this.properties.put(key, value);
+            return this;
+        }
+
+        /**
+         * Adds a static Kafka header stamped on every record produced by the
+         * resulting client. Pre-encoded {@code byte[]} value is reused per record
+         * — caller is responsible for the encoding (e.g. raw 16-byte UUID for
+         * {@code Nx-Server-Id}).
+         */
+        public Builder producerStaticHeader(String name, byte[] value) {
+            this.producerStaticHeaders.put(name, value);
             return this;
         }
 

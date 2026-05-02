@@ -85,4 +85,24 @@ public interface NxProducer {
     static NxProducer create(Map<String, Object> config, Gson gson) {
         return new DefaultNxProducer(config, gson);
     }
+
+    /**
+     * Creates a new producer that stamps the given static headers on every
+     * outbound record. Use this overload to attach connection-scoped metadata
+     * (e.g. {@code Nx-Server-Id} resolved once at adapter bootstrap) without
+     * modifying every per-call site.
+     *
+     * <p>The {@code staticHeaders} map is defensively copied; mutations after
+     * construction do not affect the producer.</p>
+     *
+     * @param config        Kafka producer configuration properties
+     * @param gson          Gson instance for value serialization
+     * @param staticHeaders headers added to every {@link ProducerRecord} before
+     *                      send; may be empty but not {@code null}
+     * @return a new producer instance
+     */
+    static NxProducer create(Map<String, Object> config, Gson gson,
+                             Map<String, byte[]> staticHeaders) {
+        return new DefaultNxProducer(config, gson, staticHeaders);
+    }
 }

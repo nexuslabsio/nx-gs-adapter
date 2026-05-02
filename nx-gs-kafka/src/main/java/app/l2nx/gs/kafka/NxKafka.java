@@ -390,7 +390,7 @@ public final class NxKafka {
         // Internal settings — not overridable
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, config.getBrokers());
         props.put(ProducerConfig.CLIENT_ID_CONFIG, config.getClientId() + "-producer");
-        return NxProducer.create(props, config.getGson());
+        return NxProducer.create(props, config.getGson(), config.getProducerStaticHeaders());
     }
 
     private void tryConnect() {
