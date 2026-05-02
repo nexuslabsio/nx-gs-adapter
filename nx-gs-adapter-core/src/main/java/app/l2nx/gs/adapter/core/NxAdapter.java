@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core;
 
+import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
@@ -21,6 +22,9 @@ import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -265,9 +269,10 @@ public final class NxAdapter {
 
     private static void initKafka(KafkaInitializer init, ConnectResponse response) {
         String clientId = "nx-gs-adapter-" + response.getTenantSlug() + "-" + response.getServerSlug();
+        Map<String, byte[]> staticHeaders = buildStaticHeaders(response.getServerId());
         KafkaState postBuild;
         try {
-            postBuild = init.init(response.getKafka(), clientId, NxAdapter::handleKafkaStateChange);
+            postBuild = init.init(response.getKafka(), clientId, staticHeaders, NxAdapter::handleKafkaStateChange);
         } catch (Throwable t) {
             log.error("Kafka init failed — adapter degraded: {}", t.getMessage(), t);
             transition(AdapterState.DEGRADED);
@@ -317,6 +322,13 @@ public final class NxAdapter {
         } else {
             transition(AdapterState.DEGRADED);
         }
+    }
+
+    private static Map<String, byte[]> buildStaticHeaders(UUID serverId) {
+        if (serverId == null) {
+            return Collections.emptyMap();
+        }
+        return Collections.singletonMap(NxHeaders.NX_SERVER_ID, NxHeaders.encodeUuid(serverId));
     }
 
     private static void handleKafkaStateChange(KafkaState newState) {

@@ -1,14 +1,20 @@
 package app.l2nx.gs.adapter.core.kafka;
 
+import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.rest.KafkaConfig;
 import app.l2nx.gs.kafka.KafkaState;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class KafkaInitializerTest {
+
+    private static final UUID SERVER_ID = UUID.fromString("01997e26-1000-7000-8000-000000000001");
 
     private static KafkaConfig kafkaConfig(String user, String password) {
         return KafkaConfig.builder()
@@ -21,14 +27,17 @@ class KafkaInitializerTest {
     }
 
     @Test
-    void init_shouldComposePropertiesAndForwardListener() {
+    void init_shouldComposePropertiesAndForwardListenerAndHeaders() {
         CapturingKafkaFactory factory = new CapturingKafkaFactory();
         KafkaInitializer init = new KafkaInitializer(factory);
         Consumer<KafkaState> listener = state -> { /* test placeholder */ };
+        Map<String, byte[]> staticHeaders = Collections.singletonMap(
+                NxHeaders.NX_SERVER_ID, NxHeaders.encodeUuid(SERVER_ID));
 
         KafkaState result = init.init(
                 kafkaConfig("acme-x1-user", "p@ss"),
                 "nx-gs-adapter-acme-acme-x1",
+                staticHeaders,
                 listener);
 
         assertEquals(KafkaState.CONNECTED, result);
@@ -43,6 +52,21 @@ class KafkaInitializerTest {
                 "org.apache.kafka.common.security.scram.ScramLoginModule"
                         + " required username=\"acme-x1-user\" password=\"p@ss\";",
                 factory.capturedProperties.get("sasl.jaas.config"));
+        assertNotNull(factory.capturedStaticHeaders);
+        assertEquals(SERVER_ID,
+                NxHeaders.decodeUuid(factory.capturedStaticHeaders.get(NxHeaders.NX_SERVER_ID)));
+    }
+
+    @Test
+    void init_shouldForwardEmptyHeaders_whenServerIdAbsent() {
+        CapturingKafkaFactory factory = new CapturingKafkaFactory();
+        KafkaInitializer init = new KafkaInitializer(factory);
+
+        init.init(kafkaConfig("u", "p"), "client-id", Collections.emptyMap(), s -> {
+        });
+
+        assertNotNull(factory.capturedStaticHeaders);
+        assertTrue(factory.capturedStaticHeaders.isEmpty());
     }
 
     @Test
@@ -52,7 +76,7 @@ class KafkaInitializerTest {
         KafkaInitializer init = new KafkaInitializer(factory);
 
         KafkaState result = init.init(kafkaConfig("user", "pass"),
-                "nx-gs-adapter-acme-acme-x1", state -> {
+                "nx-gs-adapter-acme-acme-x1", Collections.emptyMap(), state -> {
                 });
 
         assertEquals(KafkaState.DISCONNECTED, result);

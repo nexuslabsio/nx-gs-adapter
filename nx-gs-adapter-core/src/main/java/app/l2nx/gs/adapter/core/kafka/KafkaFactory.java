@@ -32,6 +32,9 @@ public interface KafkaFactory {
      *                            {@code nx-gs-adapter-<tenant-slug>-<server-slug>}
      * @param properties          raw Kafka client properties (security.protocol,
      *                            sasl.mechanism, sasl.jaas.config)
+     * @param staticHeaders       Kafka headers stamped on every produced record
+     *                            (e.g. {@code Nx-Server-Id} resolved from the
+     *                            connect response); may be empty
      * @param stateChangeListener invoked on every {@link KafkaState} transition
      *                            after build (CONNECTED ↔ DISCONNECTED, → CLOSED)
      * @return the post-build state — {@link KafkaState#CONNECTED} or
@@ -40,5 +43,6 @@ public interface KafkaFactory {
     KafkaState build(String brokers,
                      String clientId,
                      Map<String, Object> properties,
+                     Map<String, byte[]> staticHeaders,
                      Consumer<KafkaState> stateChangeListener);
 }

@@ -48,10 +48,13 @@ public final class KafkaInitializer {
      * @param kafka               wire payload from the platform handshake
      * @param clientId            composed client identifier
      *                            ({@code nx-gs-adapter-<tenant>-<server>})
+     * @param staticHeaders       Kafka headers stamped on every produced record
+     *                            (e.g. {@code Nx-Server-Id}); may be empty
      * @param stateChangeListener forwarded to {@code NxKafka.onStateChange}
      */
     public KafkaState init(KafkaConfig kafka,
                            String clientId,
+                           Map<String, byte[]> staticHeaders,
                            Consumer<KafkaState> stateChangeListener) {
         Map<String, Object> properties = new LinkedHashMap<>(producerOverrides);
         // Security properties always win — must come after producer overrides.
@@ -59,9 +62,9 @@ public final class KafkaInitializer {
         properties.put("sasl.mechanism", kafka.getSaslMechanism());
         properties.put("sasl.jaas.config", buildJaas(kafka.getSaslUsername(), kafka.getSaslPassword()));
 
-        log.info("Initializing Kafka client — bootstrap={}, clientId={}, sasl.mechanism={}",
-                kafka.getBootstrap(), clientId, kafka.getSaslMechanism());
-        return factory.build(kafka.getBootstrap(), clientId, properties, stateChangeListener);
+        log.info("Initializing Kafka client — bootstrap={}, clientId={}, sasl.mechanism={}, staticHeaders={}",
+                kafka.getBootstrap(), clientId, kafka.getSaslMechanism(), staticHeaders.keySet());
+        return factory.build(kafka.getBootstrap(), clientId, properties, staticHeaders, stateChangeListener);
     }
 
     static String buildJaas(String username, String password) {

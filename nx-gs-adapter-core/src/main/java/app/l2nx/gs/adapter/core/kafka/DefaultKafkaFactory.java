@@ -24,6 +24,7 @@ public final class DefaultKafkaFactory implements KafkaFactory {
     public KafkaState build(String brokers,
                             String clientId,
                             Map<String, Object> properties,
+                            Map<String, byte[]> staticHeaders,
                             Consumer<KafkaState> stateChangeListener) {
         shutdownExistingIfAlive();
 
@@ -33,6 +34,9 @@ public final class DefaultKafkaFactory implements KafkaFactory {
                 .onStateChange(stateChangeListener);
         for (Map.Entry<String, Object> e : properties.entrySet()) {
             builder.property(e.getKey(), e.getValue());
+        }
+        for (Map.Entry<String, byte[]> e : staticHeaders.entrySet()) {
+            builder.producerStaticHeader(e.getKey(), e.getValue());
         }
         NxKafka kafka = builder.build();
         return kafka.state();
