@@ -4,24 +4,24 @@
 >
 > **Cross-repo scope:**
 > - `nx-gs-adapter` — `nx-gs-adapter-api` (NxHeaders contract), `nx-gs-kafka`
->   (Kafka binding), `nx-gs-adapter-core` (post-connect wiring),
->   `nx-gs-db-sync-core` + `nx-gs-runtime-sync-core` (publishers stay unchanged
->   — wiring layer hands them a stamping producer), heartbeat service
+    > (Kafka binding), `nx-gs-adapter-core` (post-connect wiring),
+    > `nx-gs-db-sync-core` + `nx-gs-runtime-sync-core` (publishers stay unchanged
+    > — wiring layer hands them a stamping producer), heartbeat service
 > - `nx-gameservers` — Liquibase forward-only changeset, repository SQL,
->   ingestors, `SyncEventConsumer` header extraction, `TenantCache` extended
->   snapshot, `NxTenantsClient` DTOs
+    > ingestors, `SyncEventConsumer` header extraction, `TenantCache` extended
+    > snapshot, `NxTenantsClient` DTOs
 > - `nx-tenants` — `TenantSummary` shape, repository query, controller,
->   integration tests
+    > integration tests
 >
 > **Resolved decisions (locked in spec/tech, no rediscussion):**
 > - Header `Nx-Server-Id`, raw 16-byte UUID, NOT in key, NOT in payload
 > - Single header only; tenantSlug stays in topic name, others derivable
 > - Constant + encoding live in `nx-gs-adapter-api.NxHeaders`; Kafka-binding
->   in `nx-gs-kafka`
+    > in `nx-gs-kafka`
 > - Forward-only Liquibase, drop & recreate; data is testing-only
 > - `/internal/tenants` payload extended in-place (no versioned endpoint)
 > - Missing/unknown header on consumer → warn + skip (symmetric with
->   unknown-tenant handling)
+    > unknown-tenant handling)
 
 ## Approach
 
@@ -162,13 +162,11 @@ Docker. Commit candidate:
 
 ### Group D — `nx-gameservers`: schema (R7)
 
-11. [x] **Liquibase forward-only changeset.** Add
-    `nx-gameservers/src/main/resources/db/liquibase/v1.x_per_server_pk.sql`
-    (next available version) — included via `liquibase-changelog.yml`.
-    Steps inside the changeset:
-    `DROP TABLE character_subclasses, characters, clan_skills, clans,
-    item_attributes, items CASCADE;`
-    Then recreate each with composite PK / FK:
+11. [x] **Liquibase baseline (in-place edit).** Update
+    `nx-gameservers/src/main/resources/db/liquibase/v1.0.0_baseline.sql`
+    in place — баз с реальными данными нет, отдельная миграция не нужна;
+    меняем changeset bodies, dev пересоздаёт БД при apply.
+    Tables to recreate with composite PK / FK:
     - `characters` PK `(tenant_id, server_id, id)`; all other columns as
       they are today.
     - `character_subclasses` PK `(tenant_id, server_id, char_id, class)`,
@@ -348,6 +346,6 @@ Commit candidate:
 - No `nx-gs-adapter-api` version bump is needed for local development;
   release-time the CI tags `api/v0.X.Y`.
 - Integration tests across all three repos require Docker (Testcontainers
-  + Kafka + Postgres).
+    + Kafka + Postgres).
 - The plan does NOT touch `nx-gs-adapter-api` `SyncEvent<T>` schema —
   header is purely transport-level by design.

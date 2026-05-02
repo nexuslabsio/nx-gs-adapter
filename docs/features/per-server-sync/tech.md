@@ -41,9 +41,10 @@ wiring + sync/heartbeat модули), `nx-gameservers` (header extraction + sch
 - `nx-gameservers/src/main/java/app/l2nx/gameservers/infra/tenants/TenantCache.java`
   — расширенная схема снапшота: `Map<slug, TenantInfo>` где
   `TenantInfo` несёт `tenantId` + `Map<serverId, serverSlug>`.
-- `nx-gameservers/src/main/resources/db/liquibase/` — forward-only
-  changeset, drop + recreate `characters`/`clans`/`items` + child-таблиц с
-  трёхколоночным PK/FK.
+- `nx-gameservers/src/main/resources/db/liquibase/v1.0.0_baseline.sql` —
+  baseline changeset обновлён in-place: 6 таблиц с трёхколоночным PK
+  `(tenant_id, server_id, id)` на parent и FK + cascade на child. Данные
+  testing-only, dev wipe'ает БД при apply.
 - `nx-gameservers/src/main/java/app/l2nx/gameservers/ingest/*Ingestor.java`
   — UPSERT/DELETE SQL переключается на трёхколоночный PK; batch
   dedup ключ становится `(server_id, pk)`.
@@ -86,10 +87,11 @@ wiring + sync/heartbeat модули), `nx-gameservers` (header extraction + sch
   делает `LEFT JOIN game_servers ON game_servers.tenant_id = tenants.id AND
   game_servers.active = true` за один round-trip; mapper аггрегирует строки
   по `tenant.id`.
-- **`nx-gameservers` schema migration** (implements R7) —
-  forward-only Liquibase changeset: `DROP TABLE` для всех 6 таблиц с
-  CASCADE, затем `CREATE TABLE` с трёхколоночным PK/FK. Без data migration
-  (current data — testing).
+- **`nx-gameservers` schema baseline** (implements R7) —
+  `v1.0.0_baseline.sql` обновлён in-place: 6 таблиц с трёхколоночным PK
+  `(tenant_id, server_id, id)` на parent и трёхколоночным FK +
+  `ON DELETE CASCADE` на child. Без отдельной миграции — данные
+  testing-only, dev пересоздаёт БД при apply.
 
 ## Data flows
 
@@ -192,9 +194,13 @@ JOIN'ом из `InternalTenantsController` с фильтром `active = true`.
   poison'ит остальной poll. Также упрощает rollout adapter'ов в гетерогенной
   среде (хотя в этой фиче data — testing, no real backwards-compat
   concern).
-- **Decision:** forward-only Liquibase + drop & recreate в `nx-gameservers`.
-  **Why:** платформенное правило (forward-only, no `--rollback`); данные —
-  testing-only, никакой ценности backfill'у нет.
+- **Decision:** edit `v1.0.0_baseline.sql` in-place, не отдельная миграция.
+  **Why:** данные testing-only, реальных environments с применённым старым
+  changeset checksum'ом нет; dev пересоздаёт БД при apply. Чище: один
+  baseline без тянущегося shim'а `v1.1.0_per_server_pk` который иначе
+  повисает в репе навсегда. Платформенное правило forward-only / no
+  `--rollback` сохраняется — это про разрешённые операции в новых
+  миграциях, а не запрет на in-place edit нерелизнутого baseline'а.
 - **Decision:** `/internal/tenants` контракт меняется in-place, не через
   versioned endpoint.
   **Why:** единственный consumer — `nx-gameservers` в том же монорепе под

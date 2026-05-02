@@ -22,7 +22,10 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
 - `:nx-gs-adapter-api` — wire contracts (REST + Kafka DTOs) and SPI types (Tier-1
   `AdapterModule`, Tier-2 `DbSchemaProvider` / `RuntimeStateProvider`, Tier-3
   `JdbcConnectionSource`) shared with the platform and module authors. Java 8 POJOs,
-  zero runtime deps, package root `app.l2nx.gs.adapter.api`.
+  zero runtime deps, package root `app.l2nx.gs.adapter.api`. Includes
+  `kafka.NxHeaders` — the wire-level Kafka header contract (`NX_SERVER_ID` constant
+    + pure-JDK `encodeUuid` / `decodeUuid` helpers) shared between adapter producers
+      and platform consumers.
 - `:nx-gs-commons` — shared utilities for adapter modules and tenant providers:
   `concurrent.SafeRunnable` (exception-swallowing Runnable wrapper), `hash.Fnv1a64`
   (FNV-1a 64-bit hash), `Nulls` (sentinel-to-null), `jdbc.JdbcNulls` (null-aware
@@ -30,6 +33,9 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   `app.l2nx.gs.commons`. `:nx-gs-log` shadow-included. Published to Maven Central.
 - `:nx-gs-kafka` — lightweight Kafka client facade. Java 8, depends on `kafka-clients` + `gson`,
   `slf4j-api` compileOnly. Package root `app.l2nx.gs.kafka`. `:nx-gs-log` shadow-included.
+  Producer supports connection-scoped static headers (`KafkaConfig.Builder.producerStaticHeader` /
+  `NxProducer.create(props, gson, headers)`) — adapter-core stamps `Nx-Server-Id`
+  (raw 16-byte UUID) on every record post-`/connect`.
 - `:nx-gs-adapter-core` — runtime: config resolution, POST `/connect`, heartbeat, ServiceLoader-based
   module discovery, lifecycle. Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +
   `:nx-gs-commons` + `gson`. Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
