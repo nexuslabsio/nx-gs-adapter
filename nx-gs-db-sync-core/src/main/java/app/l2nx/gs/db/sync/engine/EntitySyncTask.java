@@ -19,7 +19,10 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -159,9 +162,9 @@ public final class EntitySyncTask {
                 ChangeSet diff = ChangeSet.diff(currentScan, prevKeys, snapshot, entity);
 
                 LongList createUpdate = unionToList(diff.created(), diff.updated());
-                Map<Long, Object> assembled;
+                Long2ObjectMap<Object> assembled;
                 if (createUpdate.isEmpty()) {
-                    assembled = Collections.emptyMap();
+                    assembled = Long2ObjectMaps.emptyMap();
                 } else {
                     try {
                         assembled = assembleEntities(createUpdate, conn);
@@ -178,18 +181,22 @@ public final class EntitySyncTask {
                     }
                 }
 
-                // Per-window publish + flush. Bounding inFlight / pending* to a
-                // single window's PK count caps cycle-resident memory at
-                // O(rowsPerWindow) instead of O(totalRows). At 6.5M items with
-                // rowsPerWindow=500_000 this is ~40 MB peak vs ~500 MB if the
-                // accumulators were carried across all 13 windows of the cycle.
-                int windowSize = currentScan.size() + diff.deleted().size();
-                int presize = Math.max(16, windowSize * 2);
+                // Per-window publish + flush. Sizing the accumulators by the
+                // diff (created ∪ updated ∪ deleted) — not by currentScan.size()
+                // — keeps presize tight in steady-state: a window with 500_000
+                // primary rows but only 1k actual changes presizes for ~1k, not
+                // ~1M. The previous size-by-scan formula over-allocated ~32 MB
+                // per Long2ObjectMap per entity per window for near-zero diffs.
+                int createdSize = diff.created().size();
+                int updatedSize = diff.updated().size();
+                int deletedSize = diff.deleted().size();
+                int crcAdvanceSize = createdSize + updatedSize;
+                int totalChanges = crcAdvanceSize + deletedSize;
                 Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight =
-                        new Long2ObjectOpenHashMap<CompletableFuture<RecordMetadata>>(presize);
-                Long2IntMap pendingCrcAdvance = new Long2IntOpenHashMap(presize);
-                LongSet pendingCreates = new LongOpenHashSet(presize);
-                LongSet pendingDeletes = new LongOpenHashSet(diff.deleted().size() * 2);
+                        new Long2ObjectOpenHashMap<CompletableFuture<RecordMetadata>>(totalChanges);
+                Long2IntMap pendingCrcAdvance = new Long2IntOpenHashMap(crcAdvanceSize);
+                LongSet pendingCreates = new LongOpenHashSet(createdSize);
+                LongSet pendingDeletes = new LongOpenHashSet(deletedSize);
 
                 publishChanges(diff, assembled, currentScan, topic,
                         inFlight, pendingCrcAdvance, pendingCreates, pendingDeletes);
@@ -261,7 +268,7 @@ public final class EntitySyncTask {
      * next cycle's Phase-1 diff catches the deletion as a tombstone.</p>
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private Map<Long, Object> assembleEntities(LongList createUpdate, Connection conn) throws SQLException {
+    private Long2ObjectMap<Object> assembleEntities(LongList createUpdate, Connection conn) throws SQLException {
         Long2ObjectMap<Object> primaryRows = fetcher.fetchPrimary(
                 mapping.primary(), createUpdate, conn, config.queryTimeoutSeconds());
 
@@ -273,7 +280,7 @@ public final class EntitySyncTask {
                     fetcher.fetchChild(child, createUpdate, conn, config.queryTimeoutSeconds()));
         }
 
-        Map<Long, Object> assembled = new HashMap<Long, Object>(createUpdate.size() * 2);
+        Long2ObjectMap<Object> assembled = new Long2ObjectOpenHashMap<Object>(createUpdate.size());
         EntityMapping erased = mapping;
         LongIterator pkIt = createUpdate.iterator();
         while (pkIt.hasNext()) {
@@ -305,7 +312,7 @@ public final class EntitySyncTask {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void publishChanges(ChangeSet diff,
-                                Map<Long, Object> assembled,
+                                Long2ObjectMap<Object> assembled,
                                 Long2IntMap currentScan,
                                 String topic,
                                 Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
