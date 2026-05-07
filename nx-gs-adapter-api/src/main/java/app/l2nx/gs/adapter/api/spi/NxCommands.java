@@ -50,11 +50,18 @@ public interface NxCommands {
      * Register {@code handler} for inbound commands whose
      * {@code Nx-Message-Type} header matches {@code type.getSimpleName()}.
      *
+     * <p>The bound {@code C extends NxCommand<R>} forces the handler's reply
+     * payload type {@code R} to match the command class's declared type at
+     * compile time. Handler attempting to return a different payload shape
+     * is rejected by the compiler — there is no runtime way to disagree
+     * about the reply contract.</p>
+     *
      * @param type    concrete command class; {@code type.getSimpleName()} is
      *                the routing key
      * @param handler the dispatcher to invoke; non-null
-     * @param <C>     command type
-     * @param <R>     reply payload type
+     * @param <R>     reply payload type, fixed by the command's
+     *                {@code NxCommand<R>} declaration
+     * @param <C>     command type, must extend {@code NxCommand<R>}
      */
-    <C extends NxCommand, R> void on(Class<C> type, CommandHandler<C, R> handler);
+    <R, C extends NxCommand<R>> void on(Class<C> type, CommandHandler<C, R> handler);
 }

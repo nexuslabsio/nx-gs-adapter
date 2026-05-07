@@ -66,21 +66,33 @@ logic for individual command types; platform-side operators who consume reply ev
   punishments) MAY use a synthetic key derived from `accountName.hashCode()` and accept
   reduced cross-character ordering.
 
-- [todo] R3. `nx-gs-adapter-api.kafka.commands.NxCommand` MUST remain a marker interface
-  for inbound command DTOs. Concrete DTOs MUST live under
-  `app.l2nx.gs.adapter.api.kafka.commands.<group>.*` (group = code-org bucket:
-  `character`, `item`, `mail`, `account`) — the topic remains single, the package split
-  is for Javadoc / discovery.
+- [todo] R3. `nx-gs-adapter-api.kafka.commands.NxCommand<R>` MUST be a
+  type-parameterized marker interface for inbound command DTOs. The type
+  parameter `R` declares the command's success-payload type — fixed at the
+  command class declaration, not at handler-registration time. This makes
+  the wire reply contract **statically typed**: the platform-web side and
+  the host-side handler look at the same `NxCommand<R>` binding and cannot
+  disagree about reply shape.
 
-  **Phase-2.0 starter catalog** (proof-of-life DTO so the released api artifact has a
-  usable command type for integration testing on the bohpts side):
-    - `kafka.commands.item.DeleteItemCommand` — replaces legacy
-      `DeleteItemRequestV1`. Fields: `Long charId`, `Long itemObjectId`,
-      `Long count` (semantically REQUIRED, builder defaults `count` to `1`,
-      `count` MUST be positive). Reply: `CommandResult<Void>`. Constructor
-      enforces non-null + positive-count via `IllegalArgumentException` for
-      programmatic construction; wire-path Gson bypasses the constructor via
-      `Unsafe`, so handler is responsible for null-checking and emitting
+  Concrete DTOs MUST live under
+  `app.l2nx.gs.adapter.api.kafka.commands.<group>.*` (group = code-org bucket:
+  `character`, `item`, `mail`, `account`) — the topic remains single, the
+  package split is for Javadoc / discovery.
+
+  Use `NxCommand<Void>` for commands that produce success/error envelopes
+  with no typed payload. Use `NxCommand<MyPayload>` when the reply carries
+  typed data (e.g. `CharInfoCommand implements NxCommand<CharInfoPayload>`).
+
+  **Phase-2.0 starter catalog** (proof-of-life DTO so the released api artifact
+  has a usable command type for integration testing on the bohpts side):
+    - `kafka.commands.item.DeleteItemCommand implements NxCommand<Void>` —
+      replaces legacy `DeleteItemRequestV1`. Fields: `Long charId`,
+      `Long itemObjectId`, `Long count` (semantically REQUIRED, builder
+      defaults `count` to `1`, `count` MUST be positive). Reply payload:
+      `Void` — only success/error envelope. Constructor enforces non-null +
+      positive-count via `IllegalArgumentException` for programmatic
+      construction; wire-path Gson bypasses the constructor via `Unsafe`, so
+      handler is responsible for null-checking and emitting
       `VALIDATION_FAILED` on missing wire fields. Field renames vs legacy:
       `charIdFrom` → `charId` (no "from" semantic for delete); `count` is
       new (legacy always deleted full stack).
@@ -109,16 +121,20 @@ logic for individual command types; platform-side operators who consume reply ev
     - `UNSUPPORTED_COMMAND` — adapter-emitted when no handler is registered for the
       received `Nx-Message-Type` header.
 
-- [todo] R6. `nx-gs-adapter-api.spi.CommandHandler<C extends NxCommand, R>` MUST ship
-  as a SAM:
+- [todo] R6. `nx-gs-adapter-api.spi.CommandHandler<C extends NxCommand<R>, R>` MUST
+  ship as a SAM:
     ```java
     @FunctionalInterface
-    public interface CommandHandler<C extends NxCommand, R> {
+    public interface CommandHandler<C extends NxCommand<R>, R> {
         CommandResult<R> handle(C command, CommandContext ctx);
     }
     ```
-  Handler runs synchronously on the adapter's commands consumer thread. Game-state
-  mutations require an explicit `ctx.host().sync(...)` hop.
+  The bound `C extends NxCommand<R>` forces the handler's reply payload type to
+  match the command class's declared type at compile time — a handler for
+  `DeleteItemCommand` (`NxCommand<Void>`) cannot return
+  `CommandResult<String>`; the compiler rejects it. Handler runs synchronously
+  on the adapter's commands consumer thread. Game-state mutations require an
+  explicit `ctx.host().sync(...)` hop.
 
 - [todo] R7. `nx-gs-adapter-api.spi.CommandContext` MUST expose:
     - `UUID correlationId()` — the inbound `Nx-Correlation-Id`, useful for log tagging.
@@ -150,13 +166,16 @@ logic for individual command types; platform-side operators who consume reply ev
 - [todo] R9. `nx-gs-adapter-api.spi.NxCommands` registration SPI MUST expose:
     ```java
     public interface NxCommands {
-        <C extends NxCommand, R> void on(Class<C> type, CommandHandler<C, R> handler);
+        <R, C extends NxCommand<R>> void on(Class<C> type, CommandHandler<C, R> handler);
     }
     ```
-  Acquired via `ConnectContext.commands()`. Registration window opens at the host's
-  `onConnect(ctx)` callback; late registration (after the consumer thread has started)
-  is permitted (idempotent `Map.put`). Re-registering the same `Class` overwrites the
-  previous handler (last write wins).
+  Acquired via `ConnectContext.commands()`. The bound `C extends NxCommand<R>`
+  ensures the handler's reply type matches the command's declared payload at
+  registration time — there is no runtime way for the host and platform to
+  disagree about the reply contract. Registration window opens at the host's
+  `onConnect(ctx)` callback; late registration (after the consumer thread has
+  started) is permitted (idempotent `Map.put`). Re-registering the same
+  `Class` overwrites the previous handler (last write wins).
 
 - [todo] R10. `nx-gs-adapter-api.spi.ConnectContext` MUST expose `NxCommands commands()`
   accessor — symmetric to existing `events()`. Returned facade is non-null; when

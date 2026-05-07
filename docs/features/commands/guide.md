@@ -11,7 +11,7 @@ A command is a JSON message the platform's web side sends to the game-server cor
 asking it to **do something** — kick a player, send mail, transfer items, ban an
 account. Each command:
 
-- Implements the marker interface `app.l2nx.gs.adapter.api.kafka.commands.NxCommand`
+- Implements the type-parameterized marker `app.l2nx.gs.adapter.api.kafka.commands.NxCommand<R>` where `R` is the success-payload type (use `Void` if the reply has no typed body)
 - Travels on a single Kafka topic `<tenant>.gs.commands` (partitioned by character id)
 - Carries two headers: `Nx-Message-Type` (the simple class name) and
   `Nx-Correlation-Id` (UUID issued by web side)
@@ -76,6 +76,54 @@ on(KickCommand .class, BohptsCommandHandlers::handleKick);
 ```
 
 That's the whole story. The rest of this guide is the "why" and edge cases.
+
+## Reply type — declared on the command, not on the handler
+
+Every command class declares its reply payload type via the `NxCommand<R>`
+generic. The handler MUST return `CommandResult<R>` matching that `R` —
+the compiler enforces it.
+
+```java
+// Command declares the payload — Void = "no typed body, success/error only"
+public final class KickCommand implements NxCommand<Void> { ... }
+
+// Handler must return CommandResult<Void>; anything else is a compile error.
+commands.on(KickCommand.class, (cmd, ctx) -> {
+    ctx.host().sync(() -> /* kick */);
+    return CommandResult.success();          // ✓ CommandResult<Void>
+});
+
+commands.on(KickCommand.class, (cmd, ctx) -> {
+    return CommandResult.<String>success("ok");  // ✗ COMPILE ERROR
+});
+```
+
+For commands that carry a typed reply, declare the payload class:
+
+```java
+public final class CharInfoCommand implements NxCommand<CharInfoPayload> { ... }
+
+commands.on(CharInfoCommand.class, (cmd, ctx) -> {
+    Player p = GameObjectsStorage.getPlayer(cmd.getCharId().intValue());
+    if (p == null) return CommandResult.error(ErrorCode.NOT_FOUND);
+    return CommandResult.success(CharInfoPayload.from(p));   // ✓ CommandResult<CharInfoPayload>
+});
+```
+
+The platform-web side imports the same `nx-gs-adapter-api` artifact, sees
+`KickCommand implements NxCommand<Void>`, and statically knows the reply
+shape. No external coordination needed; the wire contract is the type system.
+
+The reply envelope itself is always `CommandResult<R>`:
+
+```
+CommandResult {
+  success: boolean
+  errorCode: ErrorCode?         // non-null iff !success
+  errorDetails: Map<String,String>?
+  payload: R?                    // <-- the R from NxCommand<R>; null on error
+}
+```
 
 ## Threading model — what runs where
 
@@ -487,7 +535,7 @@ scheduler with a delay, not block.)
 
 ## Glossary
 
-- **`NxCommand`** — marker interface every command DTO implements
+- **`NxCommand<R>`** — type-parameterized marker every command DTO implements; `R` declares the success-payload type that lives in `CommandResult.getPayload()`
 - **`CommandHandler<C, R>`** — SAM `(cmd, ctx) -> CommandResult<R>`
 - **`CommandContext`** — per-invocation context (correlationId, host(), events())
 - **`HostExecutor`** — wrapper around the host's game-side `Executor`

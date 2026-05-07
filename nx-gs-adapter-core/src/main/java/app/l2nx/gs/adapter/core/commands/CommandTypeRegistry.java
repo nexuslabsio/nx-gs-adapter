@@ -40,7 +40,7 @@ final class CommandTypeRegistry {
      * @return {@code true} if a previous binding for the same class simple
      * name was overwritten; {@code false} for the first registration.
      */
-    <C extends NxCommand, R> boolean register(Class<C> type, CommandHandler<C, R> handler) {
+    <R, C extends NxCommand<R>> boolean register(Class<C> type, CommandHandler<C, R> handler) {
         CommandTypeBinding binding = new CommandTypeBinding(type, handler);
         CommandTypeBinding previous = bindingsByMessageType.put(type.getSimpleName(), binding);
         return previous != null;

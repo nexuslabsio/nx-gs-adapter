@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CommandsConsumerTest {
 
-    static final class FakeCommand implements NxCommand {
+    static final class FakeCommand implements NxCommand<Void> {
         Long charId;
 
         public Long getCharId() {

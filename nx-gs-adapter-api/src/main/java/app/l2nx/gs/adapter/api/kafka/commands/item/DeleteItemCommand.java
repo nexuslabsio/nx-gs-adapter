@@ -59,7 +59,7 @@ import java.util.Objects;
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
  */
-public final class DeleteItemCommand implements NxCommand {
+public final class DeleteItemCommand implements NxCommand<Void> {
 
     private final Long charId;
     private final Long itemObjectId;

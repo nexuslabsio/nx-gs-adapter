@@ -32,12 +32,21 @@ import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
  * Handlers MUST be idempotent; the adapter does not maintain a built-in
  * dedup cache.</p>
  *
- * @param <C> concrete {@link NxCommand} subtype this handler accepts
- * @param <R> success-payload type returned via {@link CommandResult}; use
- *            {@link Void} for void replies.
+ * <p><b>Type safety.</b> The bound {@code C extends NxCommand<R>} forces the
+ * handler's reply payload type to match the command's declared payload type
+ * at compile time — a handler for {@code DeleteItemCommand} (which is
+ * {@code NxCommand<Void>}) cannot return {@code CommandResult<String>}; the
+ * compiler rejects it.</p>
+ *
+ * @param <C> concrete {@link NxCommand} subtype this handler accepts; its
+ *            declared payload type {@code R} must match the handler's
+ *            {@code R}.
+ * @param <R> success-payload type returned via {@link CommandResult}, taken
+ *            from the command's {@code NxCommand<R>} declaration. Use
+ *            {@link Void} for commands declared {@code NxCommand<Void>}.
  */
 @FunctionalInterface
-public interface CommandHandler<C extends NxCommand, R> {
+public interface CommandHandler<C extends NxCommand<R>, R> {
 
     CommandResult<R> handle(C command, CommandContext ctx);
 }

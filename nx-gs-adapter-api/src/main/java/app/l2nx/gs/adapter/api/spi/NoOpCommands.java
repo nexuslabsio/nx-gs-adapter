@@ -22,7 +22,7 @@ final class NoOpCommands implements NxCommands {
     }
 
     @Override
-    public <C extends NxCommand, R> void on(Class<C> type, CommandHandler<C, R> handler) {
+    public <R, C extends NxCommand<R>> void on(Class<C> type, CommandHandler<C, R> handler) {
         // intentional no-op — see class Javadoc
     }
 }

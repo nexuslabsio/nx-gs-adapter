@@ -11,10 +11,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CommandTypeRegistryTest {
 
-    static final class FakeCommandA implements NxCommand {
+    static final class FakeCommandA implements NxCommand<Void> {
     }
 
-    static final class FakeCommandB implements NxCommand {
+    static final class FakeCommandB implements NxCommand<Void> {
     }
 
     private static final CommandHandler<FakeCommandA, Void> NOOP_HANDLER_A =

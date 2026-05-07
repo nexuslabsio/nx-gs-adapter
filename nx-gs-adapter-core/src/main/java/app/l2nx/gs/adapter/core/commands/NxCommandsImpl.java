@@ -26,7 +26,7 @@ final class NxCommandsImpl implements NxCommands {
     }
 
     @Override
-    public <C extends NxCommand, R> void on(Class<C> type, CommandHandler<C, R> handler) {
+    public <R, C extends NxCommand<R>> void on(Class<C> type, CommandHandler<C, R> handler) {
         if (type == null) {
             log.warn("commands.on(null, ...) — ignoring");
             return;

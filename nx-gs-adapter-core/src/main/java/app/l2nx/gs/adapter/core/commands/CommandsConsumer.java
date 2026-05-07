@@ -329,11 +329,11 @@ public final class CommandsConsumer {
         byte[] replyTypeBytes = binding.replyMessageTypeBytes();
 
         // 2. Deserialize
-        NxCommand command;
+        NxCommand<?> command;
         try {
             byte[] value = record.value();
             String json = (value == null) ? "{}" : new String(value, StandardCharsets.UTF_8);
-            command = (NxCommand) gson.fromJson(json, binding.commandClass());
+            command = (NxCommand<?>) gson.fromJson(json, binding.commandClass());
             if (command == null) {
                 throw new JsonSyntaxException("Gson returned null for non-null payload");
             }

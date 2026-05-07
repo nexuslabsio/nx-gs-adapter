@@ -21,13 +21,13 @@ import java.nio.charset.StandardCharsets;
  */
 final class CommandTypeBinding {
 
-    private final Class<? extends NxCommand> commandClass;
+    private final Class<? extends NxCommand<?>> commandClass;
     private final byte[] replyMessageTypeBytes;
     @SuppressWarnings("rawtypes")
     private final CommandHandler handler;
 
     @SuppressWarnings("rawtypes")
-    CommandTypeBinding(Class<? extends NxCommand> commandClass,
+    CommandTypeBinding(Class<? extends NxCommand<?>> commandClass,
                        CommandHandler handler) {
         this.commandClass = commandClass;
         this.replyMessageTypeBytes = (commandClass.getSimpleName() + "Result")
@@ -35,7 +35,7 @@ final class CommandTypeBinding {
         this.handler = handler;
     }
 
-    Class<? extends NxCommand> commandClass() {
+    Class<? extends NxCommand<?>> commandClass() {
         return commandClass;
     }
 
