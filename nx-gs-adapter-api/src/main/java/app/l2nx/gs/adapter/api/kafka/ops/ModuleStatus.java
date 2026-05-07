@@ -100,22 +100,30 @@ public final class ModuleStatus {
      *     modules; populated by the CDC engine on every cycle. Replaces the
      *     earlier placeholder names-only {@code tables} list (entity-centric
      *     vocabulary; {@code "clan"}, not {@code "clan_data"}).</li>
+     *     <li>{@link #getEvents()} — bounded-queue counters for the built-in
+     *     {@code events} module (adapter-core's outbound fan-out).</li>
      * </ul>
      * <p>Future slots ship as additional optional fields without breaking
      * existing consumers — unknown JSON keys are ignored.</p>
      */
     public static final class Stats {
 
-        private static final Stats EMPTY = new Stats(null, null);
+        private static final Stats EMPTY = new Stats(null, null, null);
 
         private final PoolStats pool;
         private final List<EntityStats> entities;
+        private final EventsStats events;
 
         public Stats(PoolStats pool, List<EntityStats> entities) {
+            this(pool, entities, null);
+        }
+
+        public Stats(PoolStats pool, List<EntityStats> entities, EventsStats events) {
             this.pool = pool;
             this.entities = entities == null
                     ? null
                     : Collections.unmodifiableList(new ArrayList<EntityStats>(entities));
+            this.events = events;
         }
 
         public static Stats empty() {
@@ -130,8 +138,12 @@ public final class ModuleStatus {
             return Optional.ofNullable(entities);
         }
 
+        public Optional<EventsStats> getEvents() {
+            return Optional.ofNullable(events);
+        }
+
         public Builder toBuilder() {
-            return new Builder().pool(pool).entities(entities);
+            return new Builder().pool(pool).entities(entities).events(events);
         }
 
         public static Builder builder() {
@@ -143,22 +155,25 @@ public final class ModuleStatus {
             if (this == o) return true;
             if (!(o instanceof Stats)) return false;
             Stats that = (Stats) o;
-            return Objects.equals(pool, that.pool) && Objects.equals(entities, that.entities);
+            return Objects.equals(pool, that.pool)
+                    && Objects.equals(entities, that.entities)
+                    && Objects.equals(events, that.events);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(pool, entities);
+            return Objects.hash(pool, entities, events);
         }
 
         @Override
         public String toString() {
-            return "Stats[pool=" + pool + ", entities=" + entities + "]";
+            return "Stats[pool=" + pool + ", entities=" + entities + ", events=" + events + "]";
         }
 
         public static final class Builder {
             private PoolStats pool;
             private List<EntityStats> entities;
+            private EventsStats events;
 
             public Builder pool(PoolStats pool) {
                 this.pool = pool;
@@ -170,8 +185,13 @@ public final class ModuleStatus {
                 return this;
             }
 
+            public Builder events(EventsStats events) {
+                this.events = events;
+                return this;
+            }
+
             public Stats build() {
-                return new Stats(pool, entities);
+                return new Stats(pool, entities, events);
             }
         }
     }

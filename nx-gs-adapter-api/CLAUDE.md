@@ -18,8 +18,21 @@ by the L2NX game-server adapter and its consumers. Published as
 ## Package layout
 
 - `app.l2nx.gs.adapter.api.rest` — REST request/response DTOs (`ConnectRequest`,
-  `ConnectResponse`, `KafkaConfig`, `Topics`)
-- `app.l2nx.gs.adapter.api.kafka` — Kafka message payloads (`HeartbeatEvent`)
+  `ConnectResponse`, `KafkaConfig`, `SyncTopics`, `MessagingTopics`)
+- `app.l2nx.gs.adapter.api.kafka` — Kafka message payloads + header contract
+  (`HeartbeatEvent`, `NxHeaders`)
+- `app.l2nx.gs.adapter.api.kafka.events.<family>` — outbound discrete-fact event
+  DTOs grouped by family; Phase 1 ships `events.premium` (`PremiumEvent` abstract
+  base + `PremiumPurchaseEvent` + `PurchaseItem` / `PurchaseService` / `Payment` +
+  `WellKnownServices` constants)
+- `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`
+  (Phase 2 placeholder, no concrete subtypes yet)
+- `app.l2nx.gs.adapter.api.kafka.ops` — operational telemetry payloads
+  (`HeartbeatEvent`, `ModuleStatus`, `EntityStats`, `PoolStats`, `EventsStats`)
+- `app.l2nx.gs.adapter.api.spi` — SPIs: Tier-1 `AdapterModule`, Tier-2
+  `DbSchemaProvider` / `RuntimeStateProvider`, Tier-3 `JdbcConnectionSource`,
+  context bundle `ConnectContext`, capability `NxEvents` (consumed by host
+  hooks; implementation lives in adapter-core)
 
 ## Constraints
 

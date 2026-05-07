@@ -71,8 +71,35 @@ class ConnectResponseTest {
                 .syncTopics(SyncTopics.builder()
                         .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
                         .build())
+                .messagingTopics(MessagingTopics.builder()
+                        .events(Collections.singletonMap("premium", "acme.gs.events.premium"))
+                        .build())
                 .build();
 
         assertEquals(original, original.toBuilder().build());
+    }
+
+    @Test
+    void messagingTopics_shouldDefaultToNull_whenBuilderOmitsIt() {
+        ConnectResponse response = ConnectResponse.builder()
+                .tenantId(UUID.randomUUID()).tenantSlug("acme")
+                .serverId(UUID.randomUUID()).serverSlug("primary")
+                .serverName("Acme")
+                .kafka(KafkaConfig.builder().bootstrap("localhost:9092").build())
+                .build();
+
+        assertNull(response.getMessagingTopics());
+    }
+
+    @Test
+    void messagingTopics_shouldExposeEventsMap_whenBuilderProvidesIt() {
+        ConnectResponse response = ConnectResponse.builder()
+                .messagingTopics(MessagingTopics.builder()
+                        .events(Collections.singletonMap("premium", "acme.gs.events.premium"))
+                        .build())
+                .build();
+
+        assertEquals("acme.gs.events.premium",
+                response.getMessagingTopics().getEvents().get("premium"));
     }
 }

@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.core.config;
 
+import app.l2nx.gs.adapter.core.events.EventsConfig;
+
 import java.util.Collections;
 
 /**
@@ -16,10 +18,12 @@ public final class AdapterConfigFixtures {
     }
 
     public static AdapterConfig enabled(String platformUrl) {
-        return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, true, Collections.emptyMap());
+        return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, true,
+                Collections.emptyMap(), EventsConfig.defaults());
     }
 
     public static AdapterConfig disabled(String platformUrl) {
-        return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, false, Collections.emptyMap());
+        return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, false,
+                Collections.emptyMap(), EventsConfig.defaults());
     }
 }

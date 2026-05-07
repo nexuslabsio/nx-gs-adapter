@@ -23,22 +23,39 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   `AdapterModule`, Tier-2 `DbSchemaProvider` / `RuntimeStateProvider`, Tier-3
   `JdbcConnectionSource`) shared with the platform and module authors. Java 8 POJOs,
   zero runtime deps, package root `app.l2nx.gs.adapter.api`. Includes
-  `kafka.NxHeaders` — the wire-level Kafka header contract (`NX_SERVER_ID` constant
-    + pure-JDK `encodeUuid` / `decodeUuid` helpers) shared between adapter producers
-      and platform consumers.
+  `kafka.NxHeaders` — the wire-level Kafka header contract (`NX_SERVER_ID` raw-16-byte
+  UUID stamped on every record post-`/connect`, `NX_MESSAGE_TYPE` simple class name
+  for polymorphic dispatch on outbound events, `NX_CORRELATION_ID` reserved for
+  inbound commands Phase 2). Hosts the per-family event DTOs under
+  `kafka.events.<family>` (Phase 1: `events.premium.PremiumPurchaseEvent` with
+  multi-line items + services + per-line multi-currency `Payment`s, plus
+  `WellKnownServices` constants) and the inbound-commands placeholder marker
+  `kafka.commands.NxCommand`. The `NxEvents` capability SPI lives in `spi.*`,
+  acquired via `ConnectContext.events()`.
 - `:nx-gs-commons` — shared utilities for adapter modules and tenant providers:
   `concurrent.SafeRunnable` (exception-swallowing Runnable wrapper), `hash.Fnv1a64`
   (FNV-1a 64-bit hash), `Nulls` (sentinel-to-null), `jdbc.JdbcNulls` (null-aware
-  `ResultSet` readers). Java 8, deps: `jspecify` only. Package root
+  `ResultSet` readers), `UUIDv7` (RFC 9562 time-ordered ids — pure JDK, monotonic
+  per-JVM, used as `eventId` on outbound events so platform consumers extract
+  `occurredAt` from the id alone). Java 8, deps: `jspecify` only. Package root
   `app.l2nx.gs.commons`. `:nx-gs-log` shadow-included. Published to Maven Central.
 - `:nx-gs-kafka` — lightweight Kafka client facade. Java 8, depends on `kafka-clients` + `gson`,
   `slf4j-api` compileOnly. Package root `app.l2nx.gs.kafka`. `:nx-gs-log` shadow-included.
   Producer supports connection-scoped static headers (`KafkaConfig.Builder.producerStaticHeader` /
   `NxProducer.create(props, gson, headers)`) — adapter-core stamps `Nx-Server-Id`
-  (raw 16-byte UUID) on every record post-`/connect`.
+  (raw 16-byte UUID) on every record post-`/connect`. Per-record headers (e.g.
+  `Nx-Message-Type`) attach via `NxKafka.sendBytesKeyRecord(record, callback)`
+  — used by adapter-core's events publisher for outbound family dispatch.
 - `:nx-gs-adapter-core` — runtime: config resolution, POST `/connect`, heartbeat, ServiceLoader-based
-  module discovery, lifecycle. Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +
-  `:nx-gs-commons` + `gson`. Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
+  module discovery, lifecycle. Hosts the built-in `NxEvents` capability — bounded-queue
+    + daemon-thread fan-out (`events.EventsPublisher`, `events.NxEventsImpl`,
+      `events.EventTypeRegistry`) reading per-family topic addressing from
+      `ConnectResponse.messagingTopics.events`. Heartbeat surfaces an `events` module
+      slot (`queue-depth`, `published-total`, `dropped-total`, `failed-total`,
+      `disabled-families`) via `ModuleStatus.Stats.events`. Engine config under
+      `l2nx.events.*` (queue-capacity / drop-policy / shutdown-drain-timeout-ms,
+      file-first source chain). Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +
+      `:nx-gs-commons` + `gson`. Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
 - `:nx-gs-db-sync-core` — DB-sync `AdapterModule` shipped to Maven Central. Owns the
   CRC32 two-phase CDC engine (one daemon thread per entity, server-side CRC32 hashing,
   per-row snapshot swap on Kafka ack) and resolves the Tier-2 `DbSchemaProvider` SPI

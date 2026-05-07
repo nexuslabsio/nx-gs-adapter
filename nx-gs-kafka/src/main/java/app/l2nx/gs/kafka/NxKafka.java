@@ -186,13 +186,7 @@ public final class NxKafka {
      *                 on success, or with an exception on failure; never null
      */
     public void send(String topic, Object message, Callback callback) {
-        if (closed.get()) {
-            log.warn("Cannot send to {}: NxKafka is shut down", topic);
-            try {
-                callback.onCompletion(null, new KafkaException("NxKafka is shut down"));
-            } catch (Exception e) {
-                log.error("Callback error for topic {}: {}", topic, e.getMessage());
-            }
+        if (rejectIfClosed(topic, callback)) {
             return;
         }
         producer.send(topic, message, callback);
@@ -209,13 +203,7 @@ public final class NxKafka {
      *                 on success, or with an exception on failure; never null
      */
     public void send(String topic, String key, Object message, Callback callback) {
-        if (closed.get()) {
-            log.warn("Cannot send to {}: NxKafka is shut down", topic);
-            try {
-                callback.onCompletion(null, new KafkaException("NxKafka is shut down"));
-            } catch (Exception e) {
-                log.error("Callback error for topic {}: {}", topic, e.getMessage());
-            }
+        if (rejectIfClosed(topic, callback)) {
             return;
         }
         producer.send(topic, key, message, callback);
@@ -234,16 +222,44 @@ public final class NxKafka {
      *                 on success, or with an exception on failure; never null
      */
     public void send(String topic, byte[] key, Object message, Callback callback) {
-        if (closed.get()) {
-            log.warn("Cannot send to {}: NxKafka is shut down", topic);
-            try {
-                callback.onCompletion(null, new KafkaException("NxKafka is shut down"));
-            } catch (Exception e) {
-                log.error("Callback error for topic {}: {}", topic, e.getMessage());
-            }
+        if (rejectIfClosed(topic, callback)) {
             return;
         }
         producer.send(topic, key, message, callback);
+    }
+
+    /**
+     * Sends a pre-built byte-array-keyed producer record with a delivery callback.
+     * Use when the caller needs to attach per-record headers (e.g.
+     * {@code Nx-Message-Type}) in addition to the producer's static headers.
+     *
+     * @param record   pre-built record carrying topic + key + headers + value
+     * @param callback invoked on the Kafka I/O thread when the broker acknowledges or rejects the record
+     */
+    public void sendBytesKeyRecord(org.apache.kafka.clients.producer.ProducerRecord<byte[], Object> record,
+                                   Callback callback) {
+        if (rejectIfClosed(record.topic(), callback)) {
+            return;
+        }
+        producer.sendBytesKeyRecord(record, callback);
+    }
+
+    /**
+     * Shared close-state guard for callback-flavored sends. Returns {@code true}
+     * when the call has been rejected (caller MUST return without sending);
+     * fires the failure callback with a "NxKafka is shut down" exception.
+     */
+    private boolean rejectIfClosed(String topic, Callback callback) {
+        if (!closed.get()) {
+            return false;
+        }
+        log.warn("Cannot send to {}: NxKafka is shut down", topic);
+        try {
+            callback.onCompletion(null, new KafkaException("NxKafka is shut down"));
+        } catch (Exception e) {
+            log.error("Callback error for topic {}: {}", topic, e.getMessage());
+        }
+        return true;
     }
 
     /**

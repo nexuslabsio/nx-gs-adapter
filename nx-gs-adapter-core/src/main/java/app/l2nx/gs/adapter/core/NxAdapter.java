@@ -1,13 +1,19 @@
 package app.l2nx.gs.adapter.core;
 
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
+import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
+import app.l2nx.gs.adapter.api.rest.MessagingTopics;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
+import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.ConfigResolver;
 import app.l2nx.gs.adapter.core.connect.ConnectFlow;
 import app.l2nx.gs.adapter.core.connect.DefaultBackoffSchedule;
 import app.l2nx.gs.adapter.core.connect.HttpURLConnectionConnectClient;
+import app.l2nx.gs.adapter.core.events.EventsBootstrap;
+import app.l2nx.gs.adapter.core.events.EventsConfig;
+import app.l2nx.gs.adapter.core.events.EventsPublisher;
 import app.l2nx.gs.adapter.core.heartbeat.HeartbeatService;
 import app.l2nx.gs.adapter.core.kafka.DefaultKafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaFactory;
@@ -22,9 +28,7 @@ import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +71,8 @@ public final class NxAdapter {
     private static volatile String adapterVersion;
     private static volatile Thread shutdownHook;
     private static volatile KafkaFactory kafkaFactoryOverride;
+    private static volatile EventsPublisher eventsPublisher;
+    private static volatile EventsConfig eventsConfig;
 
     private NxAdapter() {
     }
@@ -120,10 +126,12 @@ public final class NxAdapter {
         ScheduledExecutorService hbScheduler = createHeartbeatScheduler();
         heartbeatScheduler = hbScheduler;
         adapterVersion = config.getAdapterVersion();
+        eventsConfig = config.getEvents();
         ModuleRegistry registry = new ModuleRegistry();
         moduleRegistry = registry;
         heartbeatService = new HeartbeatService(
-                defaultPublisher(), hbScheduler, config.getAdapterVersion(), registry::currentStatuses);
+                defaultPublisher(), hbScheduler, config.getAdapterVersion(),
+                NxAdapter::collectModuleStatuses);
 
         // Single read of the volatile so a concurrent test-only swap can't split
         // the null-check from the dereference.
@@ -185,6 +193,16 @@ public final class NxAdapter {
                 log.error("ModuleRegistry.shutdown threw {}", t.getClass().getName());
             }
             moduleRegistry = null;
+        }
+
+        EventsPublisher pub = eventsPublisher;
+        if (pub != null) {
+            try {
+                pub.stop();
+            } catch (Throwable t) {
+                log.error("EventsPublisher.stop threw {}", t.getClass().getName());
+            }
+            eventsPublisher = null;
         }
 
         try {
@@ -297,6 +315,8 @@ public final class NxAdapter {
             }
         }
 
+        NxEvents events = startEventsPublisher(response.getMessagingTopics());
+
         ModuleRegistry registry = moduleRegistry;
         if (registry != null) {
             try {
@@ -309,6 +329,7 @@ public final class NxAdapter {
                         .serverName(response.getServerName())
                         .adapterVersion(adapterVersion)
                         .syncTopics(response.getSyncTopics())
+                        .events(events)
                         .build();
                 registry.connect(ctx);
             } catch (Throwable t) {
@@ -329,6 +350,63 @@ public final class NxAdapter {
             return Collections.emptyMap();
         }
         return Collections.singletonMap(NxHeaders.NX_SERVER_ID, NxHeaders.encodeUuid(serverId));
+    }
+
+    /**
+     * Build and start the events publisher with the per-family topic map from
+     * the connect response. Returns the {@link NxEvents} façade that goes
+     * into {@link ConnectContext#events()}. {@code messagingTopics}
+     * absent on the wire is normalized to an empty event-family map — the
+     * publisher still spins up so the heartbeat slot is populated; every
+     * {@code publishX} call short-circuits as a no-op + DEBUG log without
+     * burning queue capacity.
+     */
+    private static NxEvents startEventsPublisher(MessagingTopics messagingTopics) {
+        // Stop a publisher inherited from a previous connect cycle so the daemon thread
+        // is replaced cleanly on reconnect.
+        EventsPublisher previous = eventsPublisher;
+        if (previous != null) {
+            try {
+                previous.stop();
+            } catch (Throwable t) {
+                log.error("EventsPublisher.stop on reconnect threw {}", t.getClass().getName());
+            }
+        }
+        Map<String, String> familyTopics = messagingTopics != null
+                ? messagingTopics.getEvents()
+                : Collections.emptyMap();
+        EventsConfig cfg = eventsConfig != null ? eventsConfig : EventsConfig.defaults();
+        EventsBootstrap.Started started = EventsBootstrap.start(
+                familyTopics,
+                (record, callback) -> NxKafka.instance().sendBytesKeyRecord(record, callback),
+                cfg);
+        eventsPublisher = started.publisher();
+        return started.events();
+    }
+
+    /**
+     * Heartbeat-supplier seam — combines registry-discovered modules with the
+     * built-in {@code events} module slot. Called once per heartbeat tick on
+     * the heartbeat scheduler thread.
+     */
+    private static List<ModuleStatus> collectModuleStatuses() {
+        ModuleRegistry registry = moduleRegistry;
+        List<ModuleStatus> registryStatuses = registry != null ? registry.currentStatuses() : Collections.emptyList();
+        EventsPublisher pub = eventsPublisher;
+        if (pub == null) {
+            return registryStatuses != null ? registryStatuses : Collections.emptyList();
+        }
+        List<ModuleStatus> all = new ArrayList<ModuleStatus>(
+                (registryStatuses != null ? registryStatuses.size() : 0) + 1);
+        if (registryStatuses != null) {
+            all.addAll(registryStatuses);
+        }
+        try {
+            all.add(pub.currentStatus());
+        } catch (Throwable t) {
+            log.error("EventsPublisher.currentStatus threw {}", t.getClass().getName());
+        }
+        return all;
     }
 
     private static void handleKafkaStateChange(KafkaState newState) {
@@ -413,6 +491,16 @@ public final class NxAdapter {
             connectScheduler = null;
         }
         moduleRegistry = null;
+        EventsPublisher pub = eventsPublisher;
+        if (pub != null) {
+            try {
+                pub.stop();
+            } catch (Throwable t) {
+                log.error("EventsPublisher.stop in resetForTesting threw {}", t.getClass().getName());
+            }
+            eventsPublisher = null;
+        }
+        eventsConfig = null;
         adapterVersion = null;
         STATE.set(AdapterState.INIT);
         stateCallback = null;

@@ -72,6 +72,18 @@ public interface NxProducer {
     void sendRecord(ProducerRecord<String, Object> record);
 
     /**
+     * Sends a pre-built byte-array-keyed producer record with a delivery
+     * callback. Used by callers that need full control over partition key,
+     * per-record headers, and ack-tracking — e.g. {@code nx-gs-adapter-core}
+     * stamping {@code Nx-Message-Type} per-event on per-character-keyed records.
+     * Static headers are still appended to the record's headers before send.
+     *
+     * @param record   the producer record to send
+     * @param callback invoked on the Kafka I/O thread when the broker acknowledges or rejects the record
+     */
+    void sendBytesKeyRecord(ProducerRecord<byte[], Object> record, Callback callback);
+
+    /**
      * Closes the underlying Kafka producer and releases resources.
      */
     void close();

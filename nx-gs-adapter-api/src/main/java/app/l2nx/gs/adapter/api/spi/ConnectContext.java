@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -13,8 +14,15 @@ import java.util.UUID;
  * <p>Phase 1 carried identity only. Phase 2 added {@link #getSyncTopics()} —
  * namespaced per-entity Kafka topic names delivered by the platform via
  * {@code ConnectResponse.syncTopics}; consumed by sync modules
- * ({@code db-sync}, {@code runtime-sync}). Future phases will extend with
- * operator-config access and a narrow Kafka publish capability.</p>
+ * ({@code db-sync}, {@code runtime-sync}). Phase 3 added {@link #events()} —
+ * the {@link NxEvents} capability for per-family discrete-fact fanout to
+ * {@code <tenant>.gs.events.<family>} topics. Future phases will extend with
+ * operator-config access and an inbound-commands capability.</p>
+ *
+ * <p>{@link #events()} is excluded from {@link #equals(Object)} / {@link #hashCode()} /
+ * {@link #toString()} — it is a service handle, not part of the value-typed
+ * identity bundle. Two contexts with the same identity bits compare equal
+ * regardless of which {@link NxEvents} implementation they wrap.</p>
  */
 public final class ConnectContext {
 
@@ -25,6 +33,7 @@ public final class ConnectContext {
     private final String serverName;
     private final String adapterVersion;
     private final SyncTopics syncTopics;
+    private final NxEvents events;
 
     public ConnectContext(UUID tenantId,
                           String tenantSlug,
@@ -32,7 +41,8 @@ public final class ConnectContext {
                           String serverSlug,
                           String serverName,
                           String adapterVersion,
-                          SyncTopics syncTopics) {
+                          @Nullable SyncTopics syncTopics,
+                          @Nullable NxEvents events) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
@@ -40,6 +50,7 @@ public final class ConnectContext {
         this.serverName = serverName;
         this.adapterVersion = adapterVersion;
         this.syncTopics = syncTopics == null ? new SyncTopics(null, null, null) : syncTopics;
+        this.events = events == null ? NoOpEvents.INSTANCE : events;
     }
 
     public UUID getTenantId() {
@@ -78,6 +89,17 @@ public final class ConnectContext {
         return syncTopics;
     }
 
+    /**
+     * Per-family discrete-fact fanout capability. Always non-null — a
+     * {@code null} passed to the constructor is normalized to a no-op
+     * implementation that swallows every publish call (with a DEBUG log entry).
+     * Phase-1 host code calls {@code ctx.events().publishPremium(event)};
+     * future families add sibling methods to {@link NxEvents}.
+     */
+    public NxEvents events() {
+        return events;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .tenantId(tenantId)
@@ -86,7 +108,8 @@ public final class ConnectContext {
                 .serverSlug(serverSlug)
                 .serverName(serverName)
                 .adapterVersion(adapterVersion)
-                .syncTopics(syncTopics);
+                .syncTopics(syncTopics)
+                .events(events);
     }
 
     public static Builder builder() {
@@ -131,7 +154,8 @@ public final class ConnectContext {
         private String serverSlug;
         private String serverName;
         private String adapterVersion;
-        private SyncTopics syncTopics;
+        private @Nullable SyncTopics syncTopics;
+        private @Nullable NxEvents events;
 
         public Builder tenantId(UUID tenantId) {
             this.tenantId = tenantId;
@@ -163,14 +187,19 @@ public final class ConnectContext {
             return this;
         }
 
-        public Builder syncTopics(SyncTopics syncTopics) {
+        public Builder syncTopics(@Nullable SyncTopics syncTopics) {
             this.syncTopics = syncTopics;
+            return this;
+        }
+
+        public Builder events(@Nullable NxEvents events) {
+            this.events = events;
             return this;
         }
 
         public ConnectContext build() {
             return new ConnectContext(tenantId, tenantSlug, serverId, serverSlug,
-                    serverName, adapterVersion, syncTopics);
+                    serverName, adapterVersion, syncTopics, events);
         }
     }
 }

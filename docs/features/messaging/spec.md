@@ -32,11 +32,11 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
 
 > **Sibling features carry the SPI plumbing and topic delivery contract:**
 > - Tier-1 SPI (`AdapterModule` + ServiceLoader) lives in
->   [`adapter-modules`](../adapter-modules/spec.md). Phase 1 messaging is **not**
->   a discovered Tier-1 module — it lives inside `nx-gs-adapter-core` as a built-in
->   capability surfaced through `ConnectContext`.
+    > [`adapter-modules`](../adapter-modules/spec.md). Phase 1 messaging is **not**
+    > a discovered Tier-1 module — it lives inside `nx-gs-adapter-core` as a built-in
+    > capability surfaced through `ConnectContext`.
 > - Existing `Nx-Server-Id` header stamping (raw 16-byte UUID on every record post-`/connect`)
->   from [`per-server-sync`](../per-server-sync/spec.md) is reused unchanged.
+    > from [`per-server-sync`](../per-server-sync/spec.md) is reused unchanged.
 >
 > All requirements below assume `adapter-bootstrap` topic-delivery contract is extended
 > with the new `messagingTopics` field in this slice.
@@ -260,15 +260,23 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
 - [todo] R13. **Module versions (MVP slice ship):**
     - `nx-gs-adapter-api` = `0.13.0` — additive (new `MessagingTopics` field on
       `ConnectResponse`, new `kafka.events.*` and `kafka.commands` packages,
-      new `NxHeaders.NX_MESSAGE_TYPE` constant, new `NxEvents` SPI in `spi.*`,
-      new `ConnectContext.events()` accessor). No deletions; clients on `0.12.x`
-      continue to work against an `0.13.0` platform that omits `messagingTopics`.
+      new `NxHeaders.NX_MESSAGE_TYPE` + `NX_CORRELATION_ID` constants, new
+      `NxEvents` SPI in `spi.*`, new `ConnectContext.events()` accessor, new
+      `EventsStats` POJO + `events` slot on `ModuleStatus.Stats`). No deletions;
+      clients on `0.12.x` continue to work against an `0.13.0` platform that
+      omits `messagingTopics`.
     - `nx-gs-commons` = `0.2.0` — new `UUIDv7` utility class.
+    - `nx-gs-kafka` = `0.4.0` — additive: new
+      `NxProducer.sendBytesKeyRecord(record, callback)` +
+      `NxKafka.sendBytesKeyRecord(record, callback)` so adapter-core can
+      attach per-record headers ({@code Nx-Message-Type}) on byte-keyed
+      events records. No removals.
     - `nx-gs-adapter-core` = `0.6.0` — new `EventsPublisher` + `NxEvents` impl,
       new `messagingTopics` parsing on `ConnectResponse`, heartbeat slot
-      extension. Bumps API dep to `0.13.0` and commons dep to `0.2.0`.
-    - `nx-gs-kafka`, `nx-gs-db-sync-core`, `nx-gs-runtime-sync-core` — no
-      contract change; versions stay where they are.
+      extension. Bumps API dep to `0.13.0`, commons to `0.2.0`, kafka to
+      `0.4.0`.
+    - `nx-gs-db-sync-core`, `nx-gs-runtime-sync-core` — no contract change;
+      versions stay where they are.
 
 **Should:**
 

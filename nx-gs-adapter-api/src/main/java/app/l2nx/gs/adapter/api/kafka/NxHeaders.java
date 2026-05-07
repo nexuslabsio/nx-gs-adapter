@@ -16,6 +16,24 @@ public final class NxHeaders {
      */
     public static final String NX_SERVER_ID = "Nx-Server-Id";
 
+    /**
+     * Header carrying the concrete event / command type for polymorphic
+     * dispatch on the platform consumer side. Value is the UTF-8-encoded
+     * simple class name of the payload type (e.g. {@code "PremiumPurchaseEvent"}).
+     * Adapter-core stamps this automatically on every event publish; consumers
+     * switch on this header to pick the right deserializer without peeking
+     * into the JSON payload.
+     */
+    public static final String NX_MESSAGE_TYPE = "Nx-Message-Type";
+
+    /**
+     * Header carrying the platform-issued correlation id for an inbound command
+     * (Phase 2). Value is the textual UUID (string form). Reused on the
+     * outbound {@code CommandResultEvent} so the platform can route the reply
+     * back to the originating web-side request.
+     */
+    public static final String NX_CORRELATION_ID = "Nx-Correlation-Id";
+
     private NxHeaders() {
     }
 

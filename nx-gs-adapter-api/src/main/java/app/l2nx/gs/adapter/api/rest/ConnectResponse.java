@@ -7,12 +7,14 @@ import java.util.UUID;
 
 /**
  * Adapter handshake response — identity bundle plus the Kafka context the adapter
- * needs to bootstrap its client, plus a namespaced {@link SyncTopics} bundle and
- * the heartbeat topic.
+ * needs to bootstrap its client, plus a namespaced {@link SyncTopics} bundle, the
+ * heartbeat topic, and a {@link MessagingTopics} bundle for the events / commands
+ * surface.
  *
  * @see ConnectRequest
  * @see KafkaConfig
  * @see SyncTopics
+ * @see MessagingTopics
  */
 public final class ConnectResponse {
 
@@ -24,6 +26,7 @@ public final class ConnectResponse {
     private final KafkaConfig kafka;
     private final @Nullable String heartbeatTopic;
     private final @Nullable SyncTopics syncTopics;
+    private final @Nullable MessagingTopics messagingTopics;
 
     public ConnectResponse(UUID tenantId,
                            String tenantSlug,
@@ -32,7 +35,8 @@ public final class ConnectResponse {
                            String serverName,
                            KafkaConfig kafka,
                            @Nullable String heartbeatTopic,
-                           @Nullable SyncTopics syncTopics) {
+                           @Nullable SyncTopics syncTopics,
+                           @Nullable MessagingTopics messagingTopics) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
@@ -41,6 +45,7 @@ public final class ConnectResponse {
         this.kafka = kafka;
         this.heartbeatTopic = heartbeatTopic;
         this.syncTopics = syncTopics;
+        this.messagingTopics = messagingTopics;
     }
 
     public UUID getTenantId() {
@@ -92,6 +97,16 @@ public final class ConnectResponse {
         return syncTopics;
     }
 
+    /**
+     * Outbound-events / inbound-commands topic addressing. {@code null} (field
+     * absent on the wire) means messaging is unconfigured — every
+     * {@code NxEvents.publishX(...)} call becomes a no-op + DEBUG log, and
+     * inbound commands (Phase 2) stay disabled.
+     */
+    public @Nullable MessagingTopics getMessagingTopics() {
+        return messagingTopics;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .tenantId(tenantId)
@@ -101,7 +116,8 @@ public final class ConnectResponse {
                 .serverName(serverName)
                 .kafka(kafka)
                 .heartbeatTopic(heartbeatTopic)
-                .syncTopics(syncTopics);
+                .syncTopics(syncTopics)
+                .messagingTopics(messagingTopics);
     }
 
     public static Builder builder() {
@@ -120,13 +136,14 @@ public final class ConnectResponse {
                 && Objects.equals(serverName, that.serverName)
                 && Objects.equals(kafka, that.kafka)
                 && Objects.equals(heartbeatTopic, that.heartbeatTopic)
-                && Objects.equals(syncTopics, that.syncTopics);
+                && Objects.equals(syncTopics, that.syncTopics)
+                && Objects.equals(messagingTopics, that.messagingTopics);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(tenantId, tenantSlug, serverId, serverSlug, serverName,
-                kafka, heartbeatTopic, syncTopics);
+                kafka, heartbeatTopic, syncTopics, messagingTopics);
     }
 
     @Override
@@ -138,7 +155,8 @@ public final class ConnectResponse {
                 + ", serverName=" + serverName
                 + ", kafka=" + kafka
                 + ", heartbeatTopic=" + heartbeatTopic
-                + ", syncTopics=" + syncTopics + "]";
+                + ", syncTopics=" + syncTopics
+                + ", messagingTopics=" + messagingTopics + "]";
     }
 
     public static final class Builder {
@@ -150,6 +168,7 @@ public final class ConnectResponse {
         private KafkaConfig kafka;
         private @Nullable String heartbeatTopic;
         private @Nullable SyncTopics syncTopics;
+        private @Nullable MessagingTopics messagingTopics;
 
         public Builder tenantId(UUID tenantId) {
             this.tenantId = tenantId;
@@ -191,9 +210,14 @@ public final class ConnectResponse {
             return this;
         }
 
+        public Builder messagingTopics(@Nullable MessagingTopics messagingTopics) {
+            this.messagingTopics = messagingTopics;
+            return this;
+        }
+
         public ConnectResponse build() {
             return new ConnectResponse(tenantId, tenantSlug, serverId, serverSlug,
-                    serverName, kafka, heartbeatTopic, syncTopics);
+                    serverName, kafka, heartbeatTopic, syncTopics, messagingTopics);
         }
     }
 }

@@ -171,6 +171,27 @@ class DefaultNxProducer implements NxProducer {
     }
 
     @Override
+    public void sendBytesKeyRecord(ProducerRecord<byte[], Object> record, Callback callback) {
+        try {
+            stamp(record.headers());
+            bytesKeyProducer.send(record, (metadata, exception) -> {
+                try {
+                    callback.onCompletion(metadata, exception);
+                } catch (Exception e) {
+                    log.error("Callback error for topic {}: {}", record.topic(), e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            log.error("Failed to send record to {}: {}", record.topic(), e.getMessage());
+            try {
+                callback.onCompletion(null, e);
+            } catch (Exception callbackError) {
+                log.error("Callback error for topic {}: {}", record.topic(), callbackError.getMessage());
+            }
+        }
+    }
+
+    @Override
     public void close() {
         try {
             producer.close();

@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.core.config;
 
+import app.l2nx.gs.adapter.core.events.EventsConfig;
+import app.l2nx.gs.adapter.core.events.EventsPublisher;
 import app.l2nx.gs.adapter.core.lifecycle.AdapterVersion;
 
 import java.io.IOException;
@@ -48,6 +50,10 @@ public final class ConfigResolver {
     static final String KEY_KAFKA_LINGER_MS = "l2nx.kafka.producer.linger.ms";
     static final String KEY_KAFKA_COMPRESSION_TYPE = "l2nx.kafka.producer.compression.type";
 
+    static final String KEY_EVENTS_QUEUE_CAPACITY = "l2nx.events.queue-capacity";
+    static final String KEY_EVENTS_DROP_POLICY = "l2nx.events.drop-policy";
+    static final String KEY_EVENTS_SHUTDOWN_DRAIN_MS = "l2nx.events.shutdown-drain-timeout-ms";
+
     private static final String SERVER_KEY_PREFIX = "nx_sk_";
     private static final int SERVER_KEY_LENGTH = 38;
 
@@ -69,7 +75,70 @@ public final class ConfigResolver {
         String adapterVersion = resolveAdapterVersion();
         boolean enabled = resolveEnabled();
         Map<String, Object> kafkaProducerOverrides = resolveKafkaProducerOverrides();
-        return new AdapterConfig(serverKey, platformUrl, adapterVersion, enabled, kafkaProducerOverrides);
+        EventsConfig events = resolveEventsConfig();
+        return new AdapterConfig(serverKey, platformUrl, adapterVersion, enabled,
+                kafkaProducerOverrides, events);
+    }
+
+    public EventsConfig resolveEventsConfig() {
+        int queueCapacity = resolveInt(KEY_EVENTS_QUEUE_CAPACITY, EventsConfig.DEFAULT_QUEUE_CAPACITY);
+        if (queueCapacity < 1) {
+            throw new IllegalStateException(
+                    "Invalid value for '" + KEY_EVENTS_QUEUE_CAPACITY + "': "
+                            + queueCapacity + " (expected positive integer)");
+        }
+        EventsPublisher.DropPolicy dropPolicy = resolveDropPolicy(
+                KEY_EVENTS_DROP_POLICY, EventsConfig.DEFAULT_DROP_POLICY);
+        long shutdownDrainMs = resolveLong(KEY_EVENTS_SHUTDOWN_DRAIN_MS,
+                EventsConfig.DEFAULT_SHUTDOWN_DRAIN_MS);
+        if (shutdownDrainMs < 0) {
+            throw new IllegalStateException(
+                    "Invalid value for '" + KEY_EVENTS_SHUTDOWN_DRAIN_MS + "': "
+                            + shutdownDrainMs + " (expected non-negative)");
+        }
+        return new EventsConfig(queueCapacity, dropPolicy, shutdownDrainMs);
+    }
+
+    private int resolveInt(String key, int defaultValue) {
+        Optional<String> raw = resolveString(key);
+        if (!raw.isPresent()) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(raw.get());
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException(
+                    "Invalid integer value for '" + key + "': '" + raw.get() + "'", e);
+        }
+    }
+
+    private long resolveLong(String key, long defaultValue) {
+        Optional<String> raw = resolveString(key);
+        if (!raw.isPresent()) {
+            return defaultValue;
+        }
+        try {
+            return Long.parseLong(raw.get());
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException(
+                    "Invalid long value for '" + key + "': '" + raw.get() + "'", e);
+        }
+    }
+
+    private EventsPublisher.DropPolicy resolveDropPolicy(String key,
+                                                         EventsPublisher.DropPolicy defaultValue) {
+        Optional<String> raw = resolveString(key);
+        if (!raw.isPresent()) {
+            return defaultValue;
+        }
+        String value = raw.get();
+        try {
+            return EventsPublisher.DropPolicy.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(
+                    "Invalid drop-policy value for '" + key + "': '" + value
+                            + "' (expected 'oldest' or 'newest', case-insensitive)", e);
+        }
     }
 
     Map<String, Object> resolveKafkaProducerOverrides() {
