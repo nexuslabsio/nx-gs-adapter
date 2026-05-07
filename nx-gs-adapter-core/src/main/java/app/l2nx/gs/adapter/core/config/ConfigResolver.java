@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.config;
 
+import app.l2nx.gs.adapter.core.commands.CommandsConfig;
 import app.l2nx.gs.adapter.core.events.EventsConfig;
 import app.l2nx.gs.adapter.core.events.EventsPublisher;
 import app.l2nx.gs.adapter.core.lifecycle.AdapterVersion;
@@ -54,6 +55,12 @@ public final class ConfigResolver {
     static final String KEY_EVENTS_DROP_POLICY = "l2nx.events.drop-policy";
     static final String KEY_EVENTS_SHUTDOWN_DRAIN_MS = "l2nx.events.shutdown-drain-timeout-ms";
 
+    static final String KEY_COMMANDS_POLL_TIMEOUT_MS = "l2nx.commands.poll-timeout-ms";
+    static final String KEY_COMMANDS_SHUTDOWN_TIMEOUT_MS = "l2nx.commands.shutdown-timeout-ms";
+    static final String KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS = "l2nx.commands.host-sync-timeout-ms";
+    static final String KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS = "l2nx.commands.reply-flush-timeout-ms";
+    static final String KEY_COMMANDS_KAFKA_PREFIX = "l2nx.commands.kafka.";
+
     private static final String SERVER_KEY_PREFIX = "nx_sk_";
     private static final int SERVER_KEY_LENGTH = 38;
 
@@ -76,8 +83,9 @@ public final class ConfigResolver {
         boolean enabled = resolveEnabled();
         Map<String, Object> kafkaProducerOverrides = resolveKafkaProducerOverrides();
         EventsConfig events = resolveEventsConfig();
+        CommandsConfig commands = resolveCommandsConfig();
         return new AdapterConfig(serverKey, platformUrl, adapterVersion, enabled,
-                kafkaProducerOverrides, events);
+                kafkaProducerOverrides, events, commands);
     }
 
     public EventsConfig resolveEventsConfig() {
@@ -97,6 +105,60 @@ public final class ConfigResolver {
                             + shutdownDrainMs + " (expected non-negative)");
         }
         return new EventsConfig(queueCapacity, dropPolicy, shutdownDrainMs);
+    }
+
+    public CommandsConfig resolveCommandsConfig() {
+        long pollTimeoutMs = resolveLong(KEY_COMMANDS_POLL_TIMEOUT_MS,
+                CommandsConfig.DEFAULT_POLL_TIMEOUT_MS);
+        if (pollTimeoutMs < 1) {
+            throw new IllegalStateException(
+                    "Invalid value for '" + KEY_COMMANDS_POLL_TIMEOUT_MS + "': "
+                            + pollTimeoutMs + " (expected positive integer)");
+        }
+        long shutdownTimeoutMs = resolveLong(KEY_COMMANDS_SHUTDOWN_TIMEOUT_MS,
+                CommandsConfig.DEFAULT_SHUTDOWN_TIMEOUT_MS);
+        if (shutdownTimeoutMs < 0) {
+            throw new IllegalStateException(
+                    "Invalid value for '" + KEY_COMMANDS_SHUTDOWN_TIMEOUT_MS + "': "
+                            + shutdownTimeoutMs + " (expected non-negative)");
+        }
+        long hostSyncTimeoutMs = resolveLong(KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS,
+                CommandsConfig.DEFAULT_HOST_SYNC_TIMEOUT_MS);
+        if (hostSyncTimeoutMs < 1) {
+            throw new IllegalStateException(
+                    "Invalid value for '" + KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS + "': "
+                            + hostSyncTimeoutMs + " (expected positive integer)");
+        }
+        long replyFlushTimeoutMs = resolveLong(KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS,
+                CommandsConfig.DEFAULT_REPLY_FLUSH_TIMEOUT_MS);
+        if (replyFlushTimeoutMs < 0) {
+            throw new IllegalStateException(
+                    "Invalid value for '" + KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS + "': "
+                            + replyFlushTimeoutMs + " (expected non-negative; 0 disables flush)");
+        }
+        Map<String, Object> kafkaOverrides = resolveCommandsKafkaOverrides();
+        return new CommandsConfig(pollTimeoutMs, shutdownTimeoutMs, hostSyncTimeoutMs,
+                replyFlushTimeoutMs, kafkaOverrides);
+    }
+
+    private Map<String, Object> resolveCommandsKafkaOverrides() {
+        Map<String, Object> overrides = new LinkedHashMap<String, Object>();
+        // Walk file properties and sysprops to collect any l2nx.commands.kafka.* keys.
+        // File properties win where keys collide (consistent with resolveString precedence).
+        for (String name : fileProps.stringPropertyNames()) {
+            if (name.startsWith(KEY_COMMANDS_KAFKA_PREFIX) && name.length() > KEY_COMMANDS_KAFKA_PREFIX.length()) {
+                String kafkaKey = name.substring(KEY_COMMANDS_KAFKA_PREFIX.length());
+                String value = fileProps.getProperty(name);
+                if (value != null && !value.trim().isEmpty()) {
+                    overrides.put(kafkaKey, value.trim());
+                }
+            }
+        }
+        // Sysprop overrides — only fill in keys not already taken by file.
+        // Cannot enumerate sysprops via a Function<String,String>, so this branch
+        // only sees keys the file declared; sysprop-only keys require placement
+        // in the properties file (acceptable — config-file is the preferred medium).
+        return overrides.isEmpty() ? Collections.<String, Object>emptyMap() : overrides;
     }
 
     private int resolveInt(String key, int defaultValue) {

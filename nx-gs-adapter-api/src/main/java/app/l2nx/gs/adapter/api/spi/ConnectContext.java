@@ -16,13 +16,15 @@ import java.util.UUID;
  * {@code ConnectResponse.syncTopics}; consumed by sync modules
  * ({@code db-sync}, {@code runtime-sync}). Phase 3 added {@link #events()} —
  * the {@link NxEvents} capability for per-family discrete-fact fanout to
- * {@code <tenant>.gs.events.<family>} topics. Future phases will extend with
- * operator-config access and an inbound-commands capability.</p>
+ * {@code <tenant>.gs.events.<family>} topics. Phase 4 adds {@link #commands()} —
+ * the {@link NxCommands} capability for registering inbound command handlers
+ * dispatched off the {@code <tenant>.gs.commands} topic.</p>
  *
- * <p>{@link #events()} is excluded from {@link #equals(Object)} / {@link #hashCode()} /
- * {@link #toString()} — it is a service handle, not part of the value-typed
- * identity bundle. Two contexts with the same identity bits compare equal
- * regardless of which {@link NxEvents} implementation they wrap.</p>
+ * <p>{@link #events()} and {@link #commands()} are excluded from
+ * {@link #equals(Object)} / {@link #hashCode()} / {@link #toString()} — they
+ * are service handles, not part of the value-typed identity bundle. Two
+ * contexts with the same identity bits compare equal regardless of which
+ * implementations they wrap.</p>
  */
 public final class ConnectContext {
 
@@ -34,6 +36,7 @@ public final class ConnectContext {
     private final String adapterVersion;
     private final SyncTopics syncTopics;
     private final NxEvents events;
+    private final NxCommands commands;
 
     public ConnectContext(UUID tenantId,
                           String tenantSlug,
@@ -42,7 +45,8 @@ public final class ConnectContext {
                           String serverName,
                           String adapterVersion,
                           @Nullable SyncTopics syncTopics,
-                          @Nullable NxEvents events) {
+                          @Nullable NxEvents events,
+                          @Nullable NxCommands commands) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
@@ -51,6 +55,24 @@ public final class ConnectContext {
         this.adapterVersion = adapterVersion;
         this.syncTopics = syncTopics == null ? new SyncTopics(null, null, null) : syncTopics;
         this.events = events == null ? NoOpEvents.INSTANCE : events;
+        this.commands = commands == null ? NoOpCommands.INSTANCE : commands;
+    }
+
+    /**
+     * Backward-compat constructor — pre-{@link NxCommands} callers continue
+     * to work and get a no-op commands façade. Phase-4 callers should use the
+     * 9-arg constructor (or, preferably, the {@link Builder}).
+     */
+    public ConnectContext(UUID tenantId,
+                          String tenantSlug,
+                          UUID serverId,
+                          String serverSlug,
+                          String serverName,
+                          String adapterVersion,
+                          @Nullable SyncTopics syncTopics,
+                          @Nullable NxEvents events) {
+        this(tenantId, tenantSlug, serverId, serverSlug, serverName, adapterVersion,
+                syncTopics, events, null);
     }
 
     public UUID getTenantId() {
@@ -93,11 +115,23 @@ public final class ConnectContext {
      * Per-family discrete-fact fanout capability. Always non-null — a
      * {@code null} passed to the constructor is normalized to a no-op
      * implementation that swallows every publish call (with a DEBUG log entry).
-     * Phase-1 host code calls {@code ctx.events().publishPremium(event)};
+     * Phase-3 host code calls {@code ctx.events().publishPremium(event)};
      * future families add sibling methods to {@link NxEvents}.
      */
     public NxEvents events() {
         return events;
+    }
+
+    /**
+     * Inbound command-handler registration capability. Always non-null — a
+     * {@code null} passed to the constructor is normalized to a no-op
+     * implementation that drops registrations silently. Host code calls
+     * {@code ctx.commands().on(KickCommand.class, handler)} from its
+     * {@code onConnect} callback; the adapter dispatches inbound records
+     * to the registered handler by {@code Nx-Message-Type} header lookup.
+     */
+    public NxCommands commands() {
+        return commands;
     }
 
     public Builder toBuilder() {
@@ -109,7 +143,8 @@ public final class ConnectContext {
                 .serverName(serverName)
                 .adapterVersion(adapterVersion)
                 .syncTopics(syncTopics)
-                .events(events);
+                .events(events)
+                .commands(commands);
     }
 
     public static Builder builder() {
@@ -156,6 +191,7 @@ public final class ConnectContext {
         private String adapterVersion;
         private @Nullable SyncTopics syncTopics;
         private @Nullable NxEvents events;
+        private @Nullable NxCommands commands;
 
         public Builder tenantId(UUID tenantId) {
             this.tenantId = tenantId;
@@ -197,9 +233,14 @@ public final class ConnectContext {
             return this;
         }
 
+        public Builder commands(@Nullable NxCommands commands) {
+            this.commands = commands;
+            return this;
+        }
+
         public ConnectContext build() {
             return new ConnectContext(tenantId, tenantSlug, serverId, serverSlug,
-                    serverName, adapterVersion, syncTopics, events);
+                    serverName, adapterVersion, syncTopics, events, commands);
         }
     }
 }

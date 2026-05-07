@@ -25,14 +25,20 @@ by the L2NX game-server adapter and its consumers. Published as
   DTOs grouped by family; Phase 1 ships `events.premium` (`PremiumEvent` abstract
   base + `PremiumPurchaseEvent` + `PurchaseItem` / `PurchaseService` / `Payment` +
   `WellKnownServices` constants)
-- `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`
-  (Phase 2 placeholder, no concrete subtypes yet)
+- `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
+  reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
+  command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:
+  `character` / `item` / `mail` / `account`); the topic remains single, the
+  package split is for Javadoc / IDE discovery only.
 - `app.l2nx.gs.adapter.api.kafka.ops` — operational telemetry payloads
-  (`HeartbeatEvent`, `ModuleStatus`, `EntityStats`, `PoolStats`, `EventsStats`)
+  (`HeartbeatEvent`, `ModuleStatus`, `EntityStats`, `PoolStats`, `EventsStats`,
+  `CommandsStats`)
 - `app.l2nx.gs.adapter.api.spi` — SPIs: Tier-1 `AdapterModule`, Tier-2
   `DbSchemaProvider` / `RuntimeStateProvider`, Tier-3 `JdbcConnectionSource`,
-  context bundle `ConnectContext`, capability `NxEvents` (consumed by host
-  hooks; implementation lives in adapter-core)
+  context bundle `ConnectContext`, capabilities `NxEvents` and `NxCommands`
+  (consumed by host hooks; implementations live in adapter-core), per-invocation
+  `CommandContext` + handler SAM `CommandHandler<C, R>` + game-thread hop helper
+  `HostExecutor`
 
 ## Constraints
 

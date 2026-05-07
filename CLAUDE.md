@@ -25,13 +25,22 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   zero runtime deps, package root `app.l2nx.gs.adapter.api`. Includes
   `kafka.NxHeaders` — the wire-level Kafka header contract (`NX_SERVER_ID` raw-16-byte
   UUID stamped on every record post-`/connect`, `NX_MESSAGE_TYPE` simple class name
-  for polymorphic dispatch on outbound events, `NX_CORRELATION_ID` reserved for
-  inbound commands Phase 2). Hosts the per-family event DTOs under
+  for polymorphic dispatch on outbound events / inbound commands / replies,
+  `NX_CORRELATION_ID` carrying the platform-issued UUID on inbound commands and
+  echoed onto reply records). Hosts the per-family event DTOs under
   `kafka.events.<family>` (Phase 1: `events.premium.PremiumPurchaseEvent` with
   multi-line items + services + per-line multi-currency `Payment`s, plus
-  `WellKnownServices` constants) and the inbound-commands placeholder marker
-  `kafka.commands.NxCommand`. The `NxEvents` capability SPI lives in `spi.*`,
-  acquired via `ConnectContext.events()`.
+  `WellKnownServices` constants); the inbound-commands marker
+  `kafka.commands.NxCommand` + reply envelope `kafka.commands.CommandResult<R>`
+  with structured `kafka.commands.ErrorCode` enum (`NOT_FOUND` / `INVALID_STATE` /
+  `FORBIDDEN` / `RATE_LIMITED` / `UNAVAILABLE` / `VALIDATION_FAILED` /
+  `INTERNAL_ERROR` / `UNSUPPORTED_COMMAND`); concrete command DTOs land in a
+  follow-up slice. Capability SPIs live in `spi.*`: `NxEvents` (events fanout,
+  acquired via `ConnectContext.events()`), `NxCommands` (handler registration,
+  acquired via `ConnectContext.commands()`), `CommandHandler<C, R>` SAM,
+  `CommandContext` (per-invocation correlationId / host() / events()),
+  `HostExecutor` (game-thread hop helper with `sync(Runnable)` / `<T> sync(Supplier<T>)`
+  / `async(Runnable)`).
 - `:nx-gs-commons` — shared utilities for adapter modules and tenant providers:
   `concurrent.SafeRunnable` (exception-swallowing Runnable wrapper), `hash.Fnv1a64`
   (FNV-1a 64-bit hash), `Nulls` (sentinel-to-null), `jdbc.JdbcNulls` (null-aware
@@ -52,10 +61,27 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
       `events.EventTypeRegistry`) reading per-family topic addressing from
       `ConnectResponse.messagingTopics.events`. Heartbeat surfaces an `events` module
       slot (`queue-depth`, `published-total`, `dropped-total`, `failed-total`,
-      `disabled-families`) via `ModuleStatus.Stats.events`. Engine config under
-      `l2nx.events.*` (queue-capacity / drop-policy / shutdown-drain-timeout-ms,
-      file-first source chain). Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +
-      `:nx-gs-commons` + `gson`. Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
+      `disabled-families`) via `ModuleStatus.Stats.events`. Also hosts the built-in
+      `NxCommands` capability — single Kafka consumer + dispatch table
+      (`commands.CommandsConsumer`, `commands.NxCommandsImpl`,
+      `commands.CommandTypeRegistry`) reading inbound topic from
+      `MessagingTopics.commandsTopic` and publishing replies to
+      `MessagingTopics.commandsRepliesTopic` via the existing producer.
+      Manual offset commit per batch; handler `RuntimeException` auto-wraps as
+      `INTERNAL_ERROR` reply. Heartbeat surfaces a `commands` module slot
+      (`consumed-total` / `handled-total` / `unsupported-total` /
+      `validation-failed-total` / `internal-errors-total` /
+      `replies-published-total` / `replies-failed-total` /
+      `commit-failures-total` / `registered-types`) via
+      `ModuleStatus.Stats.commands`. Host registers its game-thread `Executor`
+      via static `NxAdapter.hostExecutor(Executor)` BEFORE `start()`; the
+      adapter wraps it as `HostExecutor` for handler-side
+      `ctx.host().sync(...)` / `.async(...)` hops. Engine configs under
+      `l2nx.events.*` (queue-capacity / drop-policy / shutdown-drain-timeout-ms)
+      and `l2nx.commands.*` (poll-timeout-ms / shutdown-timeout-ms /
+      kafka.<prop>); both file-first source chain. Depends on
+      `:nx-gs-adapter-api` + `:nx-gs-kafka` + `:nx-gs-commons` + `gson`.
+      Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
 - `:nx-gs-db-sync-core` — DB-sync `AdapterModule` shipped to Maven Central. Owns the
   CRC32 two-phase CDC engine (one daemon thread per entity, server-side CRC32 hashing,
   per-row snapshot swap on Kafka ack) and resolves the Tier-2 `DbSchemaProvider` SPI

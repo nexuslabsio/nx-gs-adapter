@@ -102,28 +102,38 @@ public final class ModuleStatus {
      *     vocabulary; {@code "clan"}, not {@code "clan_data"}).</li>
      *     <li>{@link #getEvents()} — bounded-queue counters for the built-in
      *     {@code events} module (adapter-core's outbound fan-out).</li>
+     *     <li>{@link #getCommands()} — consumer + dispatch counters for the
+     *     built-in {@code commands} module (adapter-core's inbound RPC
+     *     surface).</li>
      * </ul>
      * <p>Future slots ship as additional optional fields without breaking
      * existing consumers — unknown JSON keys are ignored.</p>
      */
     public static final class Stats {
 
-        private static final Stats EMPTY = new Stats(null, null, null);
+        private static final Stats EMPTY = new Stats(null, null, null, null);
 
         private final PoolStats pool;
         private final List<EntityStats> entities;
         private final EventsStats events;
+        private final CommandsStats commands;
 
         public Stats(PoolStats pool, List<EntityStats> entities) {
-            this(pool, entities, null);
+            this(pool, entities, null, null);
         }
 
         public Stats(PoolStats pool, List<EntityStats> entities, EventsStats events) {
+            this(pool, entities, events, null);
+        }
+
+        public Stats(PoolStats pool, List<EntityStats> entities, EventsStats events,
+                     CommandsStats commands) {
             this.pool = pool;
             this.entities = entities == null
                     ? null
                     : Collections.unmodifiableList(new ArrayList<EntityStats>(entities));
             this.events = events;
+            this.commands = commands;
         }
 
         public static Stats empty() {
@@ -142,8 +152,12 @@ public final class ModuleStatus {
             return Optional.ofNullable(events);
         }
 
+        public Optional<CommandsStats> getCommands() {
+            return Optional.ofNullable(commands);
+        }
+
         public Builder toBuilder() {
-            return new Builder().pool(pool).entities(entities).events(events);
+            return new Builder().pool(pool).entities(entities).events(events).commands(commands);
         }
 
         public static Builder builder() {
@@ -157,23 +171,26 @@ public final class ModuleStatus {
             Stats that = (Stats) o;
             return Objects.equals(pool, that.pool)
                     && Objects.equals(entities, that.entities)
-                    && Objects.equals(events, that.events);
+                    && Objects.equals(events, that.events)
+                    && Objects.equals(commands, that.commands);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(pool, entities, events);
+            return Objects.hash(pool, entities, events, commands);
         }
 
         @Override
         public String toString() {
-            return "Stats[pool=" + pool + ", entities=" + entities + ", events=" + events + "]";
+            return "Stats[pool=" + pool + ", entities=" + entities
+                    + ", events=" + events + ", commands=" + commands + "]";
         }
 
         public static final class Builder {
             private PoolStats pool;
             private List<EntityStats> entities;
             private EventsStats events;
+            private CommandsStats commands;
 
             public Builder pool(PoolStats pool) {
                 this.pool = pool;
@@ -190,8 +207,13 @@ public final class ModuleStatus {
                 return this;
             }
 
+            public Builder commands(CommandsStats commands) {
+                this.commands = commands;
+                return this;
+            }
+
             public Stats build() {
-                return new Stats(pool, entities, events);
+                return new Stats(pool, entities, events, commands);
             }
         }
     }

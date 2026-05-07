@@ -5,7 +5,11 @@ import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.rest.MessagingTopics;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
+import app.l2nx.gs.adapter.api.spi.NxCommands;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
+import app.l2nx.gs.adapter.core.commands.CommandsBootstrap;
+import app.l2nx.gs.adapter.core.commands.CommandsConfig;
+import app.l2nx.gs.adapter.core.commands.CommandsConsumer;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.ConfigResolver;
 import app.l2nx.gs.adapter.core.connect.ConnectFlow;
@@ -29,6 +33,7 @@ import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
 import java.util.*;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -73,6 +78,9 @@ public final class NxAdapter {
     private static volatile KafkaFactory kafkaFactoryOverride;
     private static volatile EventsPublisher eventsPublisher;
     private static volatile EventsConfig eventsConfig;
+    private static volatile CommandsConsumer commandsConsumer;
+    private static volatile CommandsConfig commandsConfig;
+    private static final AtomicReference<Executor> hostExecutorRef = new AtomicReference<Executor>();
 
     private NxAdapter() {
     }
@@ -83,6 +91,30 @@ public final class NxAdapter {
      */
     public static void onStateChange(Consumer<AdapterState> callback) {
         stateCallback = callback;
+    }
+
+    /**
+     * Register the host's game-side {@link Executor} for command-handler
+     * {@code ctx.host().sync(...)} / {@code .async(...)} hops. MUST be called
+     * before {@link #start()} when {@code commandsTopic} is configured.
+     *
+     * <p>Typical bohpts wiring:</p>
+     * <pre>
+     *   NxAdapter.hostExecutor(task -&gt; ThreadPoolManager.getInstance().executeGeneral(task));
+     *   NxAdapter.start();
+     * </pre>
+     *
+     * <p>Calling without an executor when {@code commandsTopic} is configured
+     * surfaces as a startup WARN; the first {@code ctx.host().sync(...)} call
+     * from any handler then throws {@link IllegalStateException}. Read-only
+     * handlers (no game state mutation) keep working unaffected.</p>
+     *
+     * <p>May be called more than once — last write wins. Replacing while the
+     * adapter is already running is permitted but discouraged; the new
+     * executor takes effect on the next {@code ctx.host()} call.</p>
+     */
+    public static void hostExecutor(Executor executor) {
+        hostExecutorRef.set(executor);
     }
 
     /**
@@ -127,6 +159,7 @@ public final class NxAdapter {
         heartbeatScheduler = hbScheduler;
         adapterVersion = config.getAdapterVersion();
         eventsConfig = config.getEvents();
+        commandsConfig = config.getCommands();
         ModuleRegistry registry = new ModuleRegistry();
         moduleRegistry = registry;
         heartbeatService = new HeartbeatService(
@@ -193,6 +226,19 @@ public final class NxAdapter {
                 log.error("ModuleRegistry.shutdown threw {}", t.getClass().getName());
             }
             moduleRegistry = null;
+        }
+
+        // Stop the commands consumer first so the daemon stops admitting new
+        // records and in-flight handlers can finish + emit their replies before
+        // we tear down the producer that NxKafka owns.
+        CommandsConsumer cmds = commandsConsumer;
+        if (cmds != null) {
+            try {
+                cmds.stop();
+            } catch (Throwable t) {
+                log.error("CommandsConsumer.stop threw {}", t.getClass().getName());
+            }
+            commandsConsumer = null;
         }
 
         EventsPublisher pub = eventsPublisher;
@@ -316,6 +362,8 @@ public final class NxAdapter {
         }
 
         NxEvents events = startEventsPublisher(response.getMessagingTopics());
+        NxCommands commands = startCommandsConsumer(response.getMessagingTopics(),
+                response.getKafka(), clientId, events);
 
         ModuleRegistry registry = moduleRegistry;
         if (registry != null) {
@@ -330,6 +378,7 @@ public final class NxAdapter {
                         .adapterVersion(adapterVersion)
                         .syncTopics(response.getSyncTopics())
                         .events(events)
+                        .commands(commands)
                         .build();
                 registry.connect(ctx);
             } catch (Throwable t) {
@@ -385,26 +434,70 @@ public final class NxAdapter {
     }
 
     /**
+     * Build and start the commands consumer with the inbound + replies topic
+     * pair from the connect response. Returns the {@link NxCommands} façade
+     * that goes into {@link ConnectContext#commands()} — non-null even when
+     * commands are disabled (registrations are accepted as no-ops). When
+     * {@code commandsTopic} is unconfigured no consumer thread is spawned.
+     */
+    private static NxCommands startCommandsConsumer(MessagingTopics messagingTopics,
+                                                    app.l2nx.gs.adapter.api.rest.KafkaConfig kafka,
+                                                    String clientId,
+                                                    NxEvents events) {
+        // Stop a consumer inherited from a previous connect cycle so the daemon thread
+        // is replaced cleanly on reconnect.
+        CommandsConsumer previous = commandsConsumer;
+        if (previous != null) {
+            try {
+                previous.stop();
+            } catch (Throwable t) {
+                log.error("CommandsConsumer.stop on reconnect threw {}", t.getClass().getName());
+            }
+        }
+        CommandsBootstrap.Started started = CommandsBootstrap.start(
+                messagingTopics,
+                kafka,
+                clientId,
+                hostExecutorRef.get(),
+                events,
+                (record, callback) -> NxKafka.instance().sendBytesKeyRecord(record, callback),
+                commandsConfig);
+        commandsConsumer = started.consumer();
+        return started.commands();
+    }
+
+    /**
      * Heartbeat-supplier seam — combines registry-discovered modules with the
-     * built-in {@code events} module slot. Called once per heartbeat tick on
-     * the heartbeat scheduler thread.
+     * built-in {@code events} and {@code commands} module slots. Called once
+     * per heartbeat tick on the heartbeat scheduler thread.
      */
     private static List<ModuleStatus> collectModuleStatuses() {
         ModuleRegistry registry = moduleRegistry;
         List<ModuleStatus> registryStatuses = registry != null ? registry.currentStatuses() : Collections.emptyList();
         EventsPublisher pub = eventsPublisher;
-        if (pub == null) {
+        CommandsConsumer cmds = commandsConsumer;
+        int extra = (pub != null ? 1 : 0) + (cmds != null ? 1 : 0);
+        if (extra == 0) {
             return registryStatuses != null ? registryStatuses : Collections.emptyList();
         }
         List<ModuleStatus> all = new ArrayList<ModuleStatus>(
-                (registryStatuses != null ? registryStatuses.size() : 0) + 1);
+                (registryStatuses != null ? registryStatuses.size() : 0) + extra);
         if (registryStatuses != null) {
             all.addAll(registryStatuses);
         }
-        try {
-            all.add(pub.currentStatus());
-        } catch (Throwable t) {
-            log.error("EventsPublisher.currentStatus threw {}", t.getClass().getName());
+        if (pub != null) {
+            try {
+                all.add(pub.currentStatus());
+            } catch (Throwable t) {
+                log.error("EventsPublisher.currentStatus threw {}", t.getClass().getName());
+            }
+        }
+        if (cmds != null) {
+            try {
+                all.add(cmds.currentStatus());
+            } catch (Throwable t) {
+                log.error("CommandsConsumer.currentStatus threw {}", t.getClass().getName());
+            }
         }
         return all;
     }
@@ -491,6 +584,15 @@ public final class NxAdapter {
             connectScheduler = null;
         }
         moduleRegistry = null;
+        CommandsConsumer cmds = commandsConsumer;
+        if (cmds != null) {
+            try {
+                cmds.stop();
+            } catch (Throwable t) {
+                log.error("CommandsConsumer.stop in resetForTesting threw {}", t.getClass().getName());
+            }
+            commandsConsumer = null;
+        }
         EventsPublisher pub = eventsPublisher;
         if (pub != null) {
             try {
@@ -501,6 +603,8 @@ public final class NxAdapter {
             eventsPublisher = null;
         }
         eventsConfig = null;
+        commandsConfig = null;
+        hostExecutorRef.set(null);
         adapterVersion = null;
         STATE.set(AdapterState.INIT);
         stateCallback = null;

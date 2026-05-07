@@ -12,16 +12,25 @@ class MessagingTopicsTest {
 
     @Test
     void getEvents_shouldReturnEmptyMap_whenConstructorReceivesNull() {
-        MessagingTopics topics = new MessagingTopics(null, null);
+        MessagingTopics topics = new MessagingTopics(null, null, null);
 
         assertTrue(topics.getEvents().isEmpty());
     }
 
     @Test
-    void getCommands_shouldReturnEmptyMap_whenConstructorReceivesNull() {
-        MessagingTopics topics = new MessagingTopics(null, null);
+    void getCommandsTopic_shouldReturnNull_whenConstructorReceivesNull() {
+        MessagingTopics topics = new MessagingTopics(null, null, null);
 
-        assertTrue(topics.getCommands().isEmpty());
+        assertNull(topics.getCommandsTopic());
+        assertNull(topics.getCommandsRepliesTopic());
+    }
+
+    @Test
+    void getCommandsTopic_shouldReturnNull_whenConstructorReceivesBlank() {
+        MessagingTopics topics = new MessagingTopics(null, "  ", "");
+
+        assertNull(topics.getCommandsTopic());
+        assertNull(topics.getCommandsRepliesTopic());
     }
 
     @Test
@@ -30,7 +39,7 @@ class MessagingTopicsTest {
         events.put("premium", "acme.gs.events.premium");
         events.put("character", "acme.gs.events.character");
 
-        MessagingTopics topics = new MessagingTopics(events, null);
+        MessagingTopics topics = new MessagingTopics(events, null, null);
 
         assertEquals("acme.gs.events.premium", topics.getEvents().get("premium"));
         assertEquals("acme.gs.events.character", topics.getEvents().get("character"));
@@ -47,13 +56,14 @@ class MessagingTopicsTest {
     }
 
     @Test
-    void getCommands_shouldBeUnmodifiable() {
+    void commandsTopic_shouldRoundtrip() {
         MessagingTopics topics = MessagingTopics.builder()
-                .commands(Collections.singletonMap("char", "acme.gs.commands.char"))
+                .commandsTopic("acme.gs.commands")
+                .commandsRepliesTopic("acme.gs.commands.replies")
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> topics.getCommands().put("clan", "x"));
+        assertEquals("acme.gs.commands", topics.getCommandsTopic());
+        assertEquals("acme.gs.commands.replies", topics.getCommandsRepliesTopic());
     }
 
     @Test
@@ -61,7 +71,7 @@ class MessagingTopicsTest {
         Map<String, String> source = new HashMap<String, String>();
         source.put("premium", "acme.gs.events.premium");
 
-        MessagingTopics topics = new MessagingTopics(source, null);
+        MessagingTopics topics = new MessagingTopics(source, null, null);
         source.put("character", "acme.gs.events.character"); // mutate after construction
 
         assertEquals(1, topics.getEvents().size());
@@ -71,7 +81,8 @@ class MessagingTopicsTest {
     void toBuilder_shouldRoundtrip() {
         MessagingTopics original = MessagingTopics.builder()
                 .events(Collections.singletonMap("premium", "acme.gs.events.premium"))
-                .commands(Collections.singletonMap("char", "acme.gs.commands.char"))
+                .commandsTopic("acme.gs.commands")
+                .commandsRepliesTopic("acme.gs.commands.replies")
                 .build();
 
         assertEquals(original, original.toBuilder().build());
@@ -85,6 +96,22 @@ class MessagingTopicsTest {
         MessagingTopics b = MessagingTopics.builder()
                 .events(Collections.singletonMap("premium", "b"))
                 .build();
+
+        assertNotEquals(a, b);
+    }
+
+    @Test
+    void equals_shouldDistinguishDifferentCommandsTopic() {
+        MessagingTopics a = MessagingTopics.builder().commandsTopic("a").build();
+        MessagingTopics b = MessagingTopics.builder().commandsTopic("b").build();
+
+        assertNotEquals(a, b);
+    }
+
+    @Test
+    void equals_shouldDistinguishDifferentCommandsRepliesTopic() {
+        MessagingTopics a = MessagingTopics.builder().commandsRepliesTopic("a").build();
+        MessagingTopics b = MessagingTopics.builder().commandsRepliesTopic("b").build();
 
         assertNotEquals(a, b);
     }

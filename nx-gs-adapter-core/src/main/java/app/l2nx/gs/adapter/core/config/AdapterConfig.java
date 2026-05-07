@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.config;
 
+import app.l2nx.gs.adapter.core.commands.CommandsConfig;
 import app.l2nx.gs.adapter.core.events.EventsConfig;
 
 import java.util.Collections;
@@ -18,15 +19,18 @@ public final class AdapterConfig {
     private final boolean enabled;
     private final Map<String, Object> kafkaProducerOverrides;
     private final EventsConfig events;
+    private final CommandsConfig commands;
 
     AdapterConfig(String serverKey, String platformUrl, String adapterVersion, boolean enabled,
-                  Map<String, Object> kafkaProducerOverrides, EventsConfig events) {
+                  Map<String, Object> kafkaProducerOverrides, EventsConfig events,
+                  CommandsConfig commands) {
         this.serverKey = serverKey;
         this.platformUrl = platformUrl;
         this.adapterVersion = adapterVersion;
         this.enabled = enabled;
         this.kafkaProducerOverrides = Collections.unmodifiableMap(new LinkedHashMap<>(kafkaProducerOverrides));
         this.events = events != null ? events : EventsConfig.defaults();
+        this.commands = commands != null ? commands : CommandsConfig.defaults();
     }
 
     public String getServerKey() {
@@ -51,5 +55,9 @@ public final class AdapterConfig {
 
     public EventsConfig getEvents() {
         return events;
+    }
+
+    public CommandsConfig getCommands() {
+        return commands;
     }
 }

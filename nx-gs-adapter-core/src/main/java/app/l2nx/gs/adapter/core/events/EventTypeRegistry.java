@@ -1,9 +1,9 @@
 package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
+import app.l2nx.gs.commons.bytes.LongBytes;
 import org.jspecify.annotations.Nullable;
 
-import java.nio.ByteBuffer;
 import java.util.*;
 
 /**
@@ -36,7 +36,7 @@ final class EventTypeRegistry {
         map.put(PremiumPurchaseEvent.class, new EventTypeBinding(
                 "premium",
                 "PremiumPurchaseEvent",
-                evt -> longBytesBe(((PremiumPurchaseEvent) evt).getCharacterId())));
+                evt -> LongBytes.bigEndian(((PremiumPurchaseEvent) evt).getCharacterId())));
         families.add("premium");
 
         this.bindings = Collections.unmodifiableMap(map);
@@ -59,9 +59,5 @@ final class EventTypeRegistry {
      */
     Set<String> knownFamilies() {
         return familyKeys;
-    }
-
-    private static byte[] longBytesBe(long value) {
-        return ByteBuffer.allocate(8).putLong(value).array();
     }
 }
