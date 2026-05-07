@@ -31,11 +31,17 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   `kafka.events.<family>` (Phase 1: `events.premium.PremiumPurchaseEvent` with
   multi-line items + services + per-line multi-currency `Payment`s, plus
   `WellKnownServices` constants); the inbound-commands marker
-  `kafka.commands.NxCommand` + reply envelope `kafka.commands.CommandResult<R>`
+  `kafka.commands.NxCommand<R>` + reply envelope `kafka.commands.CommandResult<R>`
   with structured `kafka.commands.ErrorCode` enum (`NOT_FOUND` / `INVALID_STATE` /
   `FORBIDDEN` / `RATE_LIMITED` / `UNAVAILABLE` / `VALIDATION_FAILED` /
-  `INTERNAL_ERROR` / `UNSUPPORTED_COMMAND`); concrete command DTOs land in a
-  follow-up slice. Capability SPIs live in `spi.*`: `NxEvents` (events fanout,
+  `INTERNAL_ERROR` / `UNSUPPORTED_COMMAND`). Concrete command DTOs ship under
+  `kafka.commands.<group>.*` (group = code-org bucket: `character` / `item` /
+  `mail` / `account`); shipped today: `commands.item.DeleteItemCommand`
+  (`NxCommand<Void>`) and `commands.mail.SendMailCommand`
+  (`NxCommand<SendMailPayload>` carrying `Long charId` + `String author?` +
+  `String title` + `String body?` + `List<MailItem>` attachments;
+  `SendMailPayload` carries `List<Long> createdMailIds` + `List<ItemDeliveryError>`
+  partial-failure entries on the success envelope). Capability SPIs live in `spi.*`: `NxEvents` (events fanout,
   acquired via `ConnectContext.events()`), `NxCommands` (handler registration,
   acquired via `ConnectContext.commands()`), `CommandHandler<C, R>` SAM,
   `CommandContext` (per-invocation correlationId / host() / events()),
