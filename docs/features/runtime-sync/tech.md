@@ -56,8 +56,9 @@ Bohpts-side (in `bohpts-core` repo, not this monorepo):
   `Long2LongMap`, diff vs previous, publish via `SyncEventPublisher`, swap in only the
   acked subset of the new snapshot. All exception handling at this boundary.
 - **SyncEventPublisher** [planned] — wraps `NxKafka` producer. Reuses the same
-  `inFlight`-future + flush-on-cycle-end mechanism `db-sync` has (parallel implementation,
-  not literal reuse — module isolation).
+  `inFlight`-future + flush-at-tick-end mechanism `db-sync` has on a per-window basis;
+  runtime-sync has no windows, so the equivalent flush boundary is the tick itself
+  (parallel implementation, not literal reuse — module isolation).
 - **Fnv1a64** (implements R6) — `app.l2nx.gs.commons.hash.Fnv1a64` from published
   `:nx-gs-commons` artifact. Public API: `long start()`, `long mix(long state, long
   value)` / `mix(state, int)` / `mix(state, boolean)` / `mix(state, CharSequence)`.

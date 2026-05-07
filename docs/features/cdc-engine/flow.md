@@ -95,10 +95,10 @@ discovers `JdbcConnectionSource` + `DbSchemaProvider` independently.
 │               │  ┌──────────────────┐  ┌──────────────────┐                │    │
 │               │  │ ChangeSet.diff   │◀─│ SnapshotStore    │ prev CRCs      │    │
 │               │  │                  │  │ keysInRange(...) │ in window      │    │
-│               │  │ → created   set  │  │ (AVL subMap)     │                │    │
-│               │  │ → updated   set  │  └──────────────────┘                │    │
-│               │  │ → deleted   set  │                                      │    │
-│               │  └────────┬─────────┘                                      │    │
+│               │  │ → created   set  │  │ (O(N) scan       │                │    │
+│               │  │ → updated   set  │  │  filtered by     │                │    │
+│               │  │ → deleted   set  │  │  [from, to])     │                │    │
+│               │  └────────┬─────────┘  └──────────────────┘                │    │
 │               │           │                                                │    │
 │               │           ▼  (created ∪ updated)                           │    │
 │               │  ┌──────────────────┐                                      │    │
@@ -119,37 +119,28 @@ discovers `JdbcConnectionSource` + `DbSchemaProvider` independently.
 │               │  └────────┬─────────┘                                      │    │
 │               │           │                                                │    │
 │               │           ▼                                                │    │
-│               │   inFlight: Long2ObjectMap<pk, Future>                     │    │
+│               │   inFlight: Long2ObjectMap<pk, Future>  (window-scoped)    │    │
 │               │   pendingCreates / pendingDeletes / pendingCrcAdvance      │    │
+│               │                                                            │    │
+│               │           ▼                                                │    │
+│               │  ┌──────────────────────────────────────────────────────┐  │    │
+│               │  │ walkInFlightAndAdvance — budget = publishFlushSeconds │  │    │
+│               │  │                                                      │  │    │
+│               │  │  for each (pk, future) in inFlight:                  │  │    │
+│               │  │    ok       → SnapshotStore advance:                 │  │    │
+│               │  │                 create/update → putCrc + count++     │  │    │
+│               │  │                 delete        → removeCrc + count++  │  │    │
+│               │  │    pending  → wait remainingNs (per shared deadline) │  │    │
+│               │  │    failed   → leave snapshot untouched → replay      │  │    │
+│               │  │                next cycle, one summary log per cycle │  │    │
+│               │  └──────────────────────────────────────────────────────┘  │    │
+│               │  inFlight + pending* now GC-eligible — capping cycle-     │    │
+│               │  resident heap at one window's worth, not the whole       │    │
+│               │  cycle's. (R1 per-window flush.)                           │    │
 │               │                                                            │    │
 │               └──────────────── next window ───────────────────────────────┘    │
 │                                                                                 │
 │           ▼  windows done                                                       │
-│  ┌─────────────────────────────────────────────────────────────────────────┐   │
-│  │                walkInFlightAndAdvance — budget = publishFlushSeconds    │   │
-│  │                                                                         │   │
-│  │  for each (pk, future) in inFlight:                                     │   │
-│  │    ┌──────────────┐    ok      ┌─────────────────────────────────┐      │   │
-│  │    │ isDone()?    │ ─────────▶ │ SnapshotStore advance:          │      │   │
-│  │    │              │            │   create → putCrc + count++     │      │   │
-│  │    │              │            │   update → putCrc + count++     │      │   │
-│  │    │              │            │   delete → removeCrc + count++  │      │   │
-│  │    └──────┬───────┘            └─────────────────────────────────┘      │   │
-│  │           │ pending                                                     │   │
-│  │           ▼                                                             │   │
-│  │    ┌──────────────┐  budget left  ┌─────────────┐                       │   │
-│  │    │ future.get   │ ────────────▶ │ wait         │ ─▶ same advance      │   │
-│  │    │ (remaining)  │               │ remainingNs │                       │   │
-│  │    └──────┬───────┘  exhausted    └─────────────┘                       │   │
-│  │           │                                                             │   │
-│  │           ▼                                                             │   │
-│  │    ┌──────────────────────────────────────────────────────────────┐     │   │
-│  │    │ leave snapshot untouched → diff re-detects next cycle,       │     │   │
-│  │    │ publish replays. one summary log per cycle, not per PK.      │     │   │
-│  │    └──────────────────────────────────────────────────────────────┘     │   │
-│  └────────────────────────────────────┬────────────────────────────────────┘   │
-│                                       │                                         │
-│                                       ▼                                         │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
 │  │ EntityStatsTracker.recordCycleResult(entityName, CycleResult)           │   │
 │  │   state ∈ {HEALTHY, DEGRADED}                                           │   │

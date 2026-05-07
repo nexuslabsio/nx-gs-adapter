@@ -109,7 +109,7 @@ module authors (datapack sync, metrics).
       defines entity identity. Single-column numeric PK assumption (`long`):
       engine reads PK values as `long` via `rs.getLong(pkColumn())` and binds
       them via `setLong(...)`. PK is `long` end-to-end — engine internals
-      (fastutil `Long2IntAVLTreeMap`), Kafka key (`LongSerializer`), and
+      (fastutil `Long2IntOpenHashMap`), Kafka key (`LongSerializer`), and
       `SyncEvent.pk: long` payload all carry the raw long. See cdc-engine R1 + R12.
         - `String tableName()` — source SQL table (e.g. `"clan_data"`).
         - `String pkColumn()` — primary-key column on `tableName`.

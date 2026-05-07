@@ -91,16 +91,21 @@ per-entity state via heartbeat enrichment).
       and reads it back as `long`. Topic name comes from
       `ConnectResponse.syncTopics[entityName]` (per
       [`adapter-bootstrap` R16](../adapter-bootstrap/spec.md)).
-    - **Per-row snapshot swap:** the in-memory `Long2IntAVLTreeMap` for the
-      entity is advanced **per PK**, not per window. Each Phase-2 publish
-      records its `Future<RecordMetadata>` keyed by PK in a per-cycle
-      in-flight map. At end-of-cycle (within `publish-flush-seconds`) the
-      engine walks the map and advances `SnapshotStore` only for PKs whose
-      publish succeeded (created/updated → put aggregated CRC32 from current
-      scan; deleted → remove). PKs whose publish failed (or timed out) are
-      left untouched in the previous snapshot, so the next cycle's diff
+    - **Per-row snapshot swap:** the in-memory `Long2IntOpenHashMap` for the
+      entity is advanced **per PK** at end-of-window (within
+      `publish-flush-seconds`), not per cycle. Each Phase-2 publish records
+      its `Future<RecordMetadata>` keyed by PK in a window-local in-flight
+      map; once Phase-2 publishing for the window finishes, the engine walks
+      the map and advances `SnapshotStore` only for PKs whose publish
+      succeeded (created/updated → put aggregated CRC32 from current scan;
+      deleted → remove). PKs whose publish failed (or timed out) are left
+      untouched in the previous snapshot, so the next cycle's diff
       re-detects them and replays the publish. PKs outside the current
-      window's `[fromPk, toPk]` are never touched.
+      window's `[fromPk, toPk]` are never touched. Per-window flush keeps
+      cycle-resident `inFlight` / `pending*` heap bounded by `rowsPerWindow`
+      rather than by total snapshot size — at items-scale (6.5M+ rows ×
+      default 500K window) this caps the accumulators at ~40 MB instead of
+      ~500 MB if they were carried across all 13 windows of one cycle.
 
 - [wip] R2. **Single windowed sync strategy with envelope-based windowing.** There is
   one strategy: PK-range windowed scan. The engine partitions the entity's PK range
@@ -136,14 +141,13 @@ per-entity state via heartbeat enrichment).
     - Sparse-PK entities (auto-increment + many deletions, large gaps in PK range):
       window count over-estimates relative to actual row count — windows simply contain
       fewer rows than `rowsPerWindow`. Operationally fine; predictable.
-    - The single in-memory `Long2IntAVLTreeMap` per entity covers all windows of that
+    - The single in-memory `Long2IntOpenHashMap` per entity covers all windows of that
       entity (per R4) — only the window currently being scanned is touched per
-      iteration. AVL-tree storage gives O(log N) `minPk` / `maxPk` lookup for the
-      envelope rule.
+      iteration. `SnapshotStore.minPk` / `maxPk` are O(N) full-key scans called
+      once per cycle (envelope planning) — at 6.5M items ~50 ms, dwarfed by the
+      DB scan itself.
     - SC1. MIN/MAX recompute query completes in < 50ms even on the largest target
-      entity (~12M items) on a host with PK index intact. `SnapshotStore.minPk` /
-      `maxPk` are O(log N) AVL-tree key access — sub-millisecond regardless of
-      snapshot size.
+      entity (~12M items) on a host with PK index intact.
 
 > **R3 (formerly `SLIDING_WINDOW` strategy as a separate mode) — folded into R2.**
 > Single-strategy decision: removed the `SyncStrategy { FULL_SCAN | SLIDING_WINDOW }`
@@ -153,18 +157,20 @@ per-entity state via heartbeat enrichment).
 > left as a gap.
 
 - [wip] R4. The engine MUST hold each entity's previous-snapshot in a fastutil
-  `it.unimi.dsi.fastutil.longs.Long2IntAVLTreeMap` (PK → aggregate CRC32). One
-  map per `EntityMapping`, lifetime = adapter lifetime. Wiped on
-  `DbSyncModule.onDisconnect`. AVL-tree (rather than open-hash) is required so
-  the per-window `keysInRange(from, to)` lookup runs in `O(log N + k)` via
-  `subMap`, and so the R2 envelope rule reads `firstLongKey` / `lastLongKey`
-  in `O(log N)` — open-hash would force a full-map walk per window, going
-  quadratic at items scale (12M × N windows). RAM cost is ~3–4× the open-hash
-  baseline; operators size the host JVM accordingly per the no-cap policy
-  (no `EntityState.SKIPPED`). `fastutil-core` (~3 MB JAR; primitive maps only
-  — full `fastutil` ~21 MB is NOT pulled) is added as a runtime dep on
-  `nx-gs-db-sync-core`.
-    - SC2. For 12M entries, RAM occupancy of one snapshot stays under 320 MB measured via
+  `it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap` (PK → aggregate CRC32).
+  One map per `EntityMapping`, lifetime = adapter lifetime. Wiped on
+  `DbSyncModule.onDisconnect`. Open-hash (rather than AVL tree) is required
+  so the per-entry footprint stays at ~16 B — at items scale (6.5M+ rows)
+  this is ~100 MB resident vs ~360 MB the AVL tree would burn. The trade is
+  CPU: per-window `keysInRange(from, to)` becomes an O(N) filtered key
+  scan, and the R2 envelope rule's `minPk` / `maxPk` become single O(N)
+  scans — but each is called once per window or once per cycle on the
+  entity's daemon thread (~150 ms / cycle of full-map walks at 6.5M),
+  always dwarfed by the JDBC scans they bracket. On a 4 GB host JVM, heap
+  is the binding constraint, not CPU.
+  `fastutil-core` (~3 MB JAR; primitive maps only — full `fastutil` ~21 MB
+  is NOT pulled) is added as a runtime dep on `nx-gs-db-sync-core`.
+    - SC2. For 12M entries, RAM occupancy of one snapshot stays under 200 MB measured via
       `Runtime.totalMemory() - Runtime.freeMemory()` delta around the snapshot population.
 
 - [wip] R5. The engine MUST run each `EntityMapping` on a daemon
@@ -251,7 +257,7 @@ per-entity state via heartbeat enrichment).
   **All global engine config keys (MVP):**
 
   | Key                                          | Type           | Default   |
-      |----------------------------------------------|----------------|-----------|
+        |----------------------------------------------|----------------|-----------|
   | `l2nx.cdc-engine.tick-interval-seconds`      | long, seconds  | 60        |
   | `l2nx.cdc-engine.rows-per-window`            | int            | 500_000   |
   | `l2nx.cdc-engine.query-timeout-seconds`      | int, seconds   | 10        |
@@ -515,22 +521,30 @@ per-entity state via heartbeat enrichment).
   `[min(MIN_db, MIN_snapshot), max(MAX_db, MAX_snapshot)]` instead of `[MIN_db,
   MAX_db]`. Closes the boundary bug where deleting the row at current
   `MIN(pk)` / `MAX(pk)` shrinks the DB range, leaves the deleted PK outside every
-  next-cycle window, and never emits its tombstone. AVL-tree-backed `SnapshotStore`
-  exposes `minPk(entity)` / `maxPk(entity)` in O(log N) via `firstLongKey` /
-  `lastLongKey` — no measurable Phase-0 overhead.]
+  next-cycle window, and never emits its tombstone. Open-hash-backed
+  `SnapshotStore` exposes `minPk(entity)` / `maxPk(entity)` via O(N)
+  full-key scans called once per cycle (envelope planning) — at 6.5M items
+  ~50 ms, dwarfed by the JDBC `SELECT MIN(pk), MAX(pk)` it brackets.]
 - [resolved: `windowCount()` does NOT live on `EntityMapping`. Engine uses a
   single global `l2nx.cdc-engine.rows-per-window` knob (R15) to derive window
   count per-cycle from `MIN/MAX(pk)`; R3's `SLIDING_WINDOW`-as-a-mode was
   folded into R2 along with `mapping.strategy()` / `mapping.windowCount()`.
   Tier-2 SPI in `db-sync` R5 carries no engine-config fields.]
-- [resolved: `SnapshotStore` is backed by `Long2IntAVLTreeMap`, NOT
-  `Long2IntOpenHashMap`. AVL-tree chosen for two reasons: (1) `keysInRange`
-  via `subMap` is O(log N + k) — open-hash would force O(N) full-walks per
-  window (12M items × N windows ⇒ quadratic at items scale); (2) the R2
-  envelope rule needs `firstLongKey` / `lastLongKey` in O(log N), which
-  open-hash cannot provide. RAM cost is ~3–4× higher than open-hash but
-  acceptable per R4's "operator sizes the heap to fit configured entities"
-  clause. R4's wording above is updated accordingly.]
+- [resolved: `SnapshotStore` is backed by `Long2IntOpenHashMap`, NOT
+  `Long2IntAVLTreeMap`. Earlier the AVL tree was chosen for O(log N + k)
+  `keysInRange` and O(log N) `minPk` / `maxPk`. At a tenant with 6.5M items
+  on a 4 GB heap this cost ~360 MB resident on snapshot alone — combined
+  with cycle-resident `inFlight` accumulators (pre-fix, see R1 above) it
+  pushed the host JVM into OOM. Switched to `Long2IntOpenHashMap`: ~16 B
+  per entry (~100 MB at 6.5M) at the cost of O(N) `keysInRange` /
+  `minPk` / `maxPk`. Each is called once per window or once per cycle on
+  the entity's daemon thread; the ~150 ms / cycle of full-map walks is
+  always dwarfed by the JDBC scans they bracket. The earlier "open-hash
+  goes quadratic at items scale" concern was scoped to the cycle-level
+  flush design — once R1's per-window flush bounds the in-flight window
+  to `rowsPerWindow`, total per-cycle full-map walks stay at one per
+  window (13 at default `rowsPerWindow=500_000` for items), not one per
+  PK. R4's wording above is updated accordingly.]
 - [NEEDS CLARIFICATION: code defines `WindowPlanner.MAX_WINDOWS_PER_PLAN = 1_000_000`
   as a sanity cap — protects host JVM from OOM when MIN/MAX span the full BIGINT
   range and `rowsPerWindow` is misconfigured. Plan size > cap throws

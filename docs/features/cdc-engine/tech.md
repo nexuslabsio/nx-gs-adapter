@@ -33,12 +33,18 @@ read by `HeartbeatService` per heartbeat tick.
     - `EntitySyncTask.java` — per-entity `Runnable`. One cycle = borrow → plan
       (with snapshot envelope) → for-each-window {Phase1 primary + per-child
       hash, XOR-fold, diff → Phase2 primary + per-child fetch, mapEntity assemble
-      → publish per PK} → end-of-cycle walk of `Long2ObjectMap<pk, Future>`
-      advancing only successful publishes (R1, R2, R5, R7, R9, R20)
-    - `SnapshotStore.java` — `Long2IntAVLTreeMap` per entity. AVL chosen over
-      open-hash so `keysInRange` runs `O(log N + k)` via `subMap`; critical
-      for items at 12M. Also exposes `minPk` / `maxPk` in O(log N) for the
-      envelope rule (R2, R4)
+      → publish per PK → walk `Long2ObjectMap<pk, Future>` for THIS window,
+      advance snapshot for acked PKs} (R1, R2, R5, R7, R9, R20). Per-window
+      flush keeps cycle-resident memory bounded by `rowsPerWindow` rather
+      than total snapshot size — at 6.5M items × default 500K window the
+      peak `inFlight` / `pending*` heap drops from ~500 MB (cycle-level
+      flush) to ~40 MB (window-level)
+    - `SnapshotStore.java` — `Long2IntOpenHashMap` per entity. Open-hash
+      chosen over AVL tree so the per-entry footprint stays at ~16 bytes;
+      at 6.5M items this is ~100 MB resident vs ~360 MB the AVL tree would
+      hold. `keysInRange` becomes O(N) (filtered scan) but only one window's
+      worth of PKs materializes at a time, and `minPk` / `maxPk` are O(N)
+      single scans called once per cycle by `WindowPlanner` (R2, R4)
     - `EntityStatsTracker.java` — `ConcurrentHashMap<String, EntityStats>` +
       per-entity `AtomicInteger` consecutiveErrors. `recordCycleResult`
       writes `entityOrder` first then `latest` so a heartbeat reader between
@@ -192,13 +198,16 @@ read by `HeartbeatService` per heartbeat tick.
   Per-chunk transaction = `START TRANSACTION WITH CONSISTENT SNAPSHOT,
   READ ONLY`. PKs/FKs bound via `setLong(...)`.
 
-- **`SnapshotStore`** (R4, R2) — wraps a `Long2IntAVLTreeMap` per entity.
+- **`SnapshotStore`** (R4, R2) — wraps a `Long2IntOpenHashMap` per entity.
   Thread-confined to the task thread (no synchronization needed). Provides
   `keysInRange(entity, fromPk, toPk)` for the diff stage and
   `minPk(entity)` / `maxPk(entity)` `OptionalLong` accessors for the
-  envelope rule (`firstLongKey` / `lastLongKey`, O(log N), empty when entity
-  has no entries). `containsCrc` / `getCrc` for diff lookups; `putCrc` /
-  `removeCrc` for per-row snapshot advance. Wiped on
+  envelope rule. All three are O(N) full-key scans on the hash map — called
+  once per window (`keysInRange`) or once per cycle (`minPk` / `maxPk`) on
+  the entity's daemon thread; the trade-off is heap (open-hash ~16 B/entry
+  vs AVL-tree ~56 B/entry — at 6.5M items: ~100 MB vs ~360 MB) for CPU
+  (~150ms / cycle of full-map walks). `containsCrc` / `getCrc` for diff
+  lookups; `putCrc` / `removeCrc` for per-row snapshot advance. Wiped on
   `DbSyncModule.onDisconnect`. NO RAM cap enforcement — operator sizes the
   host JVM to fit the configured entities.
 - **`ChangeSet`** (R1) — value bag with three `LongSet` (fastutil

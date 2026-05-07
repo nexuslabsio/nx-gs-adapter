@@ -125,11 +125,6 @@ public final class EntitySyncTask {
             return CycleResult.degraded(elapsed(started));
         }
 
-        Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight =
-                new Long2ObjectOpenHashMap<CompletableFuture<RecordMetadata>>();
-        Long2IntMap pendingCrcAdvance = new Long2IntOpenHashMap();
-        LongSet pendingCreates = new LongOpenHashSet();
-        LongSet pendingDeletes = new LongOpenHashSet();
         long createdCount = 0L;
         long updatedCount = 0L;
         long deletedCount = 0L;
@@ -183,8 +178,27 @@ public final class EntitySyncTask {
                     }
                 }
 
+                // Per-window publish + flush. Bounding inFlight / pending* to a
+                // single window's PK count caps cycle-resident memory at
+                // O(rowsPerWindow) instead of O(totalRows). At 6.5M items with
+                // rowsPerWindow=500_000 this is ~40 MB peak vs ~500 MB if the
+                // accumulators were carried across all 13 windows of the cycle.
+                int windowSize = currentScan.size() + diff.deleted().size();
+                int presize = Math.max(16, windowSize * 2);
+                Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight =
+                        new Long2ObjectOpenHashMap<CompletableFuture<RecordMetadata>>(presize);
+                Long2IntMap pendingCrcAdvance = new Long2IntOpenHashMap(presize);
+                LongSet pendingCreates = new LongOpenHashSet(presize);
+                LongSet pendingDeletes = new LongOpenHashSet(diff.deleted().size() * 2);
+
                 publishChanges(diff, assembled, currentScan, topic,
                         inFlight, pendingCrcAdvance, pendingCreates, pendingDeletes);
+
+                long[] applied = walkInFlightAndAdvance(entity, inFlight, pendingCrcAdvance,
+                        pendingCreates, pendingDeletes);
+                createdCount += applied[0];
+                updatedCount += applied[1];
+                deletedCount += applied[2];
             }
         } catch (SQLException unexpectedSqlError) {
             log.error("Entity {} cycle SQL error: {} — aborting", entity, unexpectedSqlError.getMessage());
@@ -202,12 +216,6 @@ public final class EntitySyncTask {
             log.info("Entity {} cycle DEGRADED (aborted), elapsedMs={}", entity, abortedElapsedMs);
             return CycleResult.degraded(abortedElapsedMs);
         }
-
-        long[] applied = walkInFlightAndAdvance(entity, inFlight, pendingCrcAdvance,
-                pendingCreates, pendingDeletes);
-        createdCount = applied[0];
-        updatedCount = applied[1];
-        deletedCount = applied[2];
 
         long rowCount = snapshot.sizeOf(entity);
         EntityState finalState = degradedFromTimeout ? EntityState.DEGRADED : EntityState.HEALTHY;

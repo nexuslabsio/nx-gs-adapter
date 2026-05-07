@@ -1,19 +1,25 @@
 package app.l2nx.gs.db.sync.engine;
 
-import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.OptionalLong;
 
 /**
- * In-memory primitive-keyed CRC32 snapshot, one {@link Long2IntAVLTreeMap} per
+ * In-memory primitive-keyed CRC32 snapshot, one {@link Long2IntOpenHashMap} per
  * synced entity. The engine uses this to detect created / updated / deleted PKs
  * by comparing the previous-cycle snapshot against the current Phase-1 scan.
  *
- * <p>AVL tree (rather than open-hash) so {@link #keysInRange} runs in
- * {@code O(log N + k)} via {@code subMap} instead of an O(N) full-map walk —
- * critical for the items table at 12M rows × N windows per cycle.</p>
+ * <p>Open-hash map (rather than AVL tree) keeps the per-entry footprint at
+ * ~16 bytes — critical at 6.5M+ items, where an AVL tree would otherwise
+ * burn ~360 MB on snapshot alone. Range / extreme lookups become O(N) scans
+ * (per-window {@link #keysInRange} and per-cycle {@link #minPk} /
+ * {@link #maxPk}) on dedicated daemon threads — the trade is heap for CPU,
+ * and on a 4 GB host heap is the constraint.</p>
  *
  * <p>Sentinel: {@code defaultReturnValue()} stays at the fastutil default (0).
  * Callers must use {@link #containsCrc(String, long)} before reading via
@@ -25,10 +31,10 @@ import java.util.OptionalLong;
  */
 public final class SnapshotStore {
 
-    private final Map<String, Long2IntAVLTreeMap> byEntity = new HashMap<String, Long2IntAVLTreeMap>();
+    private final Map<String, Long2IntOpenHashMap> byEntity = new HashMap<String, Long2IntOpenHashMap>();
 
     public int getCrc(String entityName, long pk) {
-        Long2IntAVLTreeMap map = byEntity.get(entityName);
+        Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null) {
             return 0;
         }
@@ -36,7 +42,7 @@ public final class SnapshotStore {
     }
 
     public boolean containsCrc(String entityName, long pk) {
-        Long2IntAVLTreeMap map = byEntity.get(entityName);
+        Long2IntOpenHashMap map = byEntity.get(entityName);
         return map != null && map.containsKey(pk);
     }
 
@@ -45,7 +51,7 @@ public final class SnapshotStore {
     }
 
     public void removeCrc(String entityName, long pk) {
-        Long2IntAVLTreeMap map = byEntity.get(entityName);
+        Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map != null) {
             map.remove(pk);
         }
@@ -54,95 +60,103 @@ public final class SnapshotStore {
     /**
      * Returns the PKs in {@code [fromPk, toPk]} (closed interval, matching
      * {@code WHERE pk BETWEEN ? AND ?}) currently stored for the entity. Used
-     * by the diff stage to know which previously-seen PKs fall in the just-scanned
-     * window — a PK in this set but missing from the current scan = DELETED.
+     * by the diff stage to know which previously-seen PKs fall in the
+     * just-scanned window — a PK in this set but missing from the current scan
+     * = DELETED.
      *
-     * <p>Range derivation:</p>
-     * <ul>
-     *     <li>{@code toPk < Long.MAX_VALUE}: {@code subMap(fromPk, toPk + 1)} —
-     *     fastutil's {@code subMap} upper bound is exclusive.</li>
-     *     <li>{@code toPk == Long.MAX_VALUE}: {@code tailMap(fromPk)} so the
-     *     {@code +1} doesn't overflow.</li>
-     * </ul>
+     * <p>Open-hash backing means this is an O(N) full-keys scan filtered by
+     * range. Called once per window per cycle; per-window result is small (one
+     * window's worth of PKs) so transient memory stays bounded by
+     * {@code rowsPerWindow}, not by total snapshot size.</p>
      */
     public LongSet keysInRange(String entityName, long fromPk, long toPk) {
-        Long2IntAVLTreeMap map = byEntity.get(entityName);
+        Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null || map.isEmpty()) {
             return new LongOpenHashSet();
         }
-        Long2IntSortedMap rangeView;
-        if (toPk == Long.MAX_VALUE) {
-            rangeView = map.tailMap(fromPk);
-        } else {
-            rangeView = map.subMap(fromPk, toPk + 1L);
-        }
-        LongSortedSet rangeKeys = rangeView.keySet();
-        LongOpenHashSet result = new LongOpenHashSet(rangeKeys.size());
-        LongIterator it = rangeKeys.iterator();
+        LongOpenHashSet result = new LongOpenHashSet();
+        LongIterator it = map.keySet().iterator();
         while (it.hasNext()) {
-            result.add(it.nextLong());
+            long pk = it.nextLong();
+            if (pk >= fromPk && pk <= toPk) {
+                result.add(pk);
+            }
         }
         return result;
     }
 
     public int sizeOf(String entityName) {
-        Long2IntAVLTreeMap map = byEntity.get(entityName);
+        Long2IntOpenHashMap map = byEntity.get(entityName);
         return map == null ? 0 : map.size();
     }
 
     /**
      * Smallest PK currently held in the snapshot for the entity, or empty if
      * the entity has no entries (initial cold cycle, or every previously-seen
-     * PK has been published as a tombstone). Backed by AVL-tree
-     * {@code firstLongKey} — O(log N), no full scan.
+     * PK has been published as a tombstone).
      *
-     * <p>Used by {@code WindowPlanner} to compute the cycle's window envelope
-     * (per cdc-engine R2): the partitioned range covers the union of the
-     * live DB range AND the snapshot's range, so deletion of the row at the
-     * current {@code MIN(pk)} still falls inside some next-cycle window.</p>
+     * <p>Open-hash backing forces an O(N) scan; called once per cycle by
+     * {@code WindowPlanner} for envelope planning (cdc-engine R2: the
+     * partitioned range covers the union of the live DB range AND the
+     * snapshot's range so deletion of the row at the current {@code MIN(pk)}
+     * still falls inside some next-cycle window).</p>
      */
     public OptionalLong minPk(String entityName) {
-        Long2IntAVLTreeMap map = byEntity.get(entityName);
+        Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null || map.isEmpty()) {
             return OptionalLong.empty();
         }
-        return OptionalLong.of(map.firstLongKey());
+        long min = Long.MAX_VALUE;
+        LongIterator it = map.keySet().iterator();
+        while (it.hasNext()) {
+            long pk = it.nextLong();
+            if (pk < min) {
+                min = pk;
+            }
+        }
+        return OptionalLong.of(min);
     }
 
     /**
      * Largest PK currently held in the snapshot for the entity, or empty if
-     * the entity has no entries. Backed by AVL-tree {@code lastLongKey} —
-     * O(log N), no full scan.
-     *
-     * <p>Symmetric to {@link #minPk}; together they bound the snapshot's PK
-     * envelope for the {@code WindowPlanner} (cdc-engine R2).</p>
+     * the entity has no entries. Symmetric to {@link #minPk}; together they
+     * bound the snapshot's PK envelope for the {@code WindowPlanner}
+     * (cdc-engine R2). Same O(N) cost — single scan per cycle.
      */
     public OptionalLong maxPk(String entityName) {
-        Long2IntAVLTreeMap map = byEntity.get(entityName);
+        Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null || map.isEmpty()) {
             return OptionalLong.empty();
         }
-        return OptionalLong.of(map.lastLongKey());
+        long max = Long.MIN_VALUE;
+        LongIterator it = map.keySet().iterator();
+        while (it.hasNext()) {
+            long pk = it.nextLong();
+            if (pk > max) {
+                max = pk;
+            }
+        }
+        return OptionalLong.of(max);
     }
 
     public void clearEntity(String entityName) {
-        Long2IntAVLTreeMap map = byEntity.remove(entityName);
+        Long2IntOpenHashMap map = byEntity.remove(entityName);
         if (map != null) {
             map.clear();
         }
     }
 
     public void clearAll() {
-        for (Long2IntAVLTreeMap map : byEntity.values()) {
+        for (Long2IntOpenHashMap map : byEntity.values()) {
             map.clear();
         }
         byEntity.clear();
     }
 
-    private Long2IntAVLTreeMap mapOf(String entityName) {
-        Long2IntAVLTreeMap map = byEntity.get(entityName);
+    private Long2IntOpenHashMap mapOf(String entityName) {
+        Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null) {
-            map = new Long2IntAVLTreeMap();
+            map = new Long2IntOpenHashMap();
             byEntity.put(entityName, map);
         }
         return map;
