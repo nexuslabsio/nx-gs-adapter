@@ -6,7 +6,7 @@ import java.util.*;
 
 /**
  * Wire DTO published to the {@code premium} family topic
- * ({@code <tenant>.gs.events.premium}) when a player buys items / services
+ * ({@code <tenant>.gs.events.premiumpurchase}) when a player buys items / services
  * inside the game world. Combined item+service baskets are first-class —
  * a single purchase event MAY carry any mix of items and services.
  *

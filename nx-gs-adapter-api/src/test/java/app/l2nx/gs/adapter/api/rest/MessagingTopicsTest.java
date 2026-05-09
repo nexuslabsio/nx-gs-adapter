@@ -36,19 +36,19 @@ class MessagingTopicsTest {
     @Test
     void getEvents_shouldExposeProvidedKeys() {
         Map<String, String> events = new HashMap<String, String>();
-        events.put("premium", "acme.gs.events.premium");
+        events.put("premiumpurchase", "acme.gs.events.premiumpurchase");
         events.put("character", "acme.gs.events.character");
 
         MessagingTopics topics = new MessagingTopics(events, null, null);
 
-        assertEquals("acme.gs.events.premium", topics.getEvents().get("premium"));
+        assertEquals("acme.gs.events.premiumpurchase", topics.getEvents().get("premiumpurchase"));
         assertEquals("acme.gs.events.character", topics.getEvents().get("character"));
     }
 
     @Test
     void getEvents_shouldBeUnmodifiable() {
         MessagingTopics topics = MessagingTopics.builder()
-                .events(Collections.singletonMap("premium", "acme.gs.events.premium"))
+                .events(Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"))
                 .build();
 
         assertThrows(UnsupportedOperationException.class,
@@ -69,7 +69,7 @@ class MessagingTopicsTest {
     @Test
     void constructor_shouldDefensivelyCopySource_soLaterMutationsDontLeak() {
         Map<String, String> source = new HashMap<String, String>();
-        source.put("premium", "acme.gs.events.premium");
+        source.put("premiumpurchase", "acme.gs.events.premiumpurchase");
 
         MessagingTopics topics = new MessagingTopics(source, null, null);
         source.put("character", "acme.gs.events.character"); // mutate after construction
@@ -80,7 +80,7 @@ class MessagingTopicsTest {
     @Test
     void toBuilder_shouldRoundtrip() {
         MessagingTopics original = MessagingTopics.builder()
-                .events(Collections.singletonMap("premium", "acme.gs.events.premium"))
+                .events(Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"))
                 .commandsTopic("acme.gs.commands")
                 .commandsRepliesTopic("acme.gs.commands.replies")
                 .build();
@@ -91,10 +91,10 @@ class MessagingTopicsTest {
     @Test
     void equals_shouldDistinguishDifferentEventMaps() {
         MessagingTopics a = MessagingTopics.builder()
-                .events(Collections.singletonMap("premium", "a"))
+                .events(Collections.singletonMap("premiumpurchase", "a"))
                 .build();
         MessagingTopics b = MessagingTopics.builder()
-                .events(Collections.singletonMap("premium", "b"))
+                .events(Collections.singletonMap("premiumpurchase", "b"))
                 .build();
 
         assertNotEquals(a, b);

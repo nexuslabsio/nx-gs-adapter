@@ -20,7 +20,7 @@ class EventTypeRegistryTest {
         EventTypeBinding binding = new EventTypeRegistry().lookup(PremiumPurchaseEvent.class);
 
         assertNotNull(binding);
-        assertEquals("premium", binding.familyKey());
+        assertEquals("premiumpurchase", binding.familyKey());
         assertEquals("PremiumPurchaseEvent", binding.messageType());
     }
 
@@ -46,7 +46,7 @@ class EventTypeRegistryTest {
 
     @Test
     void knownFamilies_shouldContainPremium() {
-        assertTrue(new EventTypeRegistry().knownFamilies().contains("premium"));
+        assertTrue(new EventTypeRegistry().knownFamilies().contains("premiumpurchase"));
     }
 
     @Test
@@ -54,7 +54,7 @@ class EventTypeRegistryTest {
         EventTypeBinding binding = new EventTypeRegistry().lookup(OnlineSnapshotEvent.class);
 
         assertNotNull(binding);
-        assertEquals("online", binding.familyKey());
+        assertEquals("serveronline", binding.familyKey());
         assertEquals("OnlineSnapshotEvent", binding.messageType());
     }
 
@@ -71,7 +71,7 @@ class EventTypeRegistryTest {
 
     @Test
     void knownFamilies_shouldContainOnline() {
-        assertTrue(new EventTypeRegistry().knownFamilies().contains("online"));
+        assertTrue(new EventTypeRegistry().knownFamilies().contains("serveronline"));
     }
 
     @Test

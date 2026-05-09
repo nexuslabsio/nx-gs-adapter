@@ -17,7 +17,7 @@ import java.util.Objects;
  * <ul>
  *     <li>{@link #getEvents()} — outbound discrete-fact streams from core to
  *     platform. Per-family fully-qualified Kafka topic
- *     ({@code <tenant>.gs.events.<family>}). Phase-1 family: {@code premium}.
+ *     ({@code <tenant>.gs.events.<family>}). Phase-1 family: {@code premiumpurchase}.
  *     Phase-2 reserved keys: {@code character}, {@code clan}, {@code server}.</li>
  *     <li>{@link #getCommandsTopic()} — single inbound topic for all command
  *     types (e.g. {@code <tenant>.gs.commands}). Phase-2 contract: cross-domain

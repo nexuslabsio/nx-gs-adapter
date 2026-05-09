@@ -42,7 +42,7 @@ class EventsPublisherTest {
             latch.countDown();
         };
 
-        Map<String, String> topics = Collections.singletonMap("premium", "acme.gs.events.premium");
+        Map<String, String> topics = Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase");
         publisher = new EventsPublisher(topics, sender, cfg(100, EventsPublisher.DropPolicy.OLDEST, 500L), new EventTypeRegistry());
         publisher.start();
 
@@ -56,7 +56,7 @@ class EventsPublisherTest {
         assertTrue(latch.await(2, TimeUnit.SECONDS), "sender not invoked within 2s");
         ProducerRecord<byte[], Object> record = sent.peek();
         assertNotNull(record);
-        assertEquals("acme.gs.events.premium", record.topic());
+        assertEquals("acme.gs.events.premiumpurchase", record.topic());
 
         // Partition key is 8 raw BE bytes of characterId.
         long extracted = ByteBuffer.wrap(record.key()).getLong();
@@ -103,7 +103,7 @@ class EventsPublisherTest {
             latch.countDown();
         };
 
-        Map<String, String> topics = Collections.singletonMap("premium", "acme.gs.events.premium");
+        Map<String, String> topics = Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase");
         EventTypeRegistry registry = new EventTypeRegistry();
         // shutdownDrainMs=0 keeps tearDown.stop() fast; daemon-poll grace is enough
         // to drain 2 envelopes before assertion.
@@ -151,7 +151,7 @@ class EventsPublisherTest {
 
     @Test
     void doSend_shouldDrop_whenFamilyTopicMissing() throws InterruptedException {
-        // No topic for "premium" → enqueued envelopes drop on the daemon thread.
+        // No topic for "premiumpurchase" → enqueued envelopes drop on the daemon thread.
         publisher = new EventsPublisher(Collections.emptyMap(),
                 noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 100L), new EventTypeRegistry());
         publisher.start();
@@ -179,14 +179,14 @@ class EventsPublisherTest {
         assertEquals("events", status.getName());
         EventsStats stats = status.getStats().getEvents().orElseThrow(() -> new AssertionError("missing events stats"));
         List<String> disabled = stats.getDisabledFamilies();
-        assertTrue(disabled.contains("premium"), "expected 'premium' in disabled-families, got " + disabled);
+        assertTrue(disabled.contains("premiumpurchase"), "expected 'premiumpurchase' in disabled-families, got " + disabled);
     }
 
     @Test
     void currentStatus_shouldReportNoDisabledFamilies_whenAllConfigured() {
         Map<String, String> topics = new HashMap<String, String>();
-        topics.put("premium", "acme.gs.events.premium");
-        topics.put("online", "acme.gs.events.online");
+        topics.put("premiumpurchase", "acme.gs.events.premiumpurchase");
+        topics.put("serveronline", "acme.gs.events.serveronline");
         topics.put("privatestore", "acme.gs.events.privatestore");
         publisher = new EventsPublisher(topics, noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
 

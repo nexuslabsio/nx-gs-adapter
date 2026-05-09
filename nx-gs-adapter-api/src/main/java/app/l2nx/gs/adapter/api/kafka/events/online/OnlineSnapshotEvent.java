@@ -6,7 +6,7 @@ import java.util.*;
 
 /**
  * Wire DTO published to the {@code online} family topic
- * ({@code <tenant>.gs.events.online}) on a host-driven cadence. Carries a
+ * ({@code <tenant>.gs.events.serveronline}) on a host-driven cadence. Carries a
  * point-in-time breakdown of game-server population by activity bucket.
  *
  * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire timestamp is

@@ -44,7 +44,7 @@ class NxEventsImplTest {
         };
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("premium", "acme.gs.events.premium"),
+                Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"),
                 sender, cfg(50, 500L), registry);
         publisher.start();
 
@@ -65,7 +65,7 @@ class NxEventsImplTest {
     void publishPremium_shouldNoOp_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("premium", "acme.gs.events.premium"),
+                Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
@@ -80,7 +80,7 @@ class NxEventsImplTest {
     void publishPremium_shouldDrop_forUnregisteredSubtype() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("premium", "acme.gs.events.premium"),
+                Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
@@ -97,7 +97,7 @@ class NxEventsImplTest {
 
     @Test
     void publishPremium_shouldShortCircuit_whenFamilyTopicMissing() {
-        // No topic for "premium" → publishPremium short-circuits BEFORE enqueueing.
+        // No topic for "premiumpurchase" → publishPremium short-circuits BEFORE enqueueing.
         // Verifies that disabled-family publishes don't burn queue capacity or
         // inflate dropped-total (R10 "no-op + DEBUG log" semantics).
         EventTypeRegistry registry = new EventTypeRegistry();
@@ -132,7 +132,7 @@ class NxEventsImplTest {
         };
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("online", "acme.gs.events.online"),
+                Collections.singletonMap("serveronline", "acme.gs.events.serveronline"),
                 sender, cfg(50, 500L), registry);
         publisher.start();
 
@@ -155,7 +155,7 @@ class NxEventsImplTest {
     void publishOnline_shouldNoOp_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("online", "acme.gs.events.online"),
+                Collections.singletonMap("serveronline", "acme.gs.events.serveronline"),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
@@ -170,7 +170,7 @@ class NxEventsImplTest {
     void publishOnline_shouldDrop_forUnregisteredSubtype() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("online", "acme.gs.events.online"),
+                Collections.singletonMap("serveronline", "acme.gs.events.serveronline"),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
@@ -185,7 +185,7 @@ class NxEventsImplTest {
 
     @Test
     void publishOnline_shouldShortCircuit_whenFamilyTopicMissing() {
-        // No topic for "online" → publishOnline short-circuits BEFORE enqueueing.
+        // No topic for "serveronline" → publishOnline short-circuits BEFORE enqueueing.
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(Collections.emptyMap(),
                 (r, c) -> {

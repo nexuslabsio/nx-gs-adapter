@@ -40,7 +40,7 @@ import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
 public interface NxEvents {
 
     /**
-     * Publish an event in the {@code premium} family.
+     * Publish an event in the {@code premiumpurchase} family.
      *
      * <p>{@link PremiumEvent} is the family's abstract base; the concrete
      * subtype (e.g. {@code PremiumPurchaseEvent}) is reflected on the
@@ -57,7 +57,7 @@ public interface NxEvents {
     void publishPremium(PremiumEvent event);
 
     /**
-     * Publish an event in the {@code online} family.
+     * Publish an event in the {@code serveronline} family.
      *
      * <p>{@link OnlineEvent} is the family's abstract base; the concrete
      * subtype (Phase 1: {@code OnlineSnapshotEvent}) is reflected on the

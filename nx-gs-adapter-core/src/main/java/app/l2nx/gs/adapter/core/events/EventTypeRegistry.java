@@ -32,18 +32,18 @@ final class EventTypeRegistry {
         Set<String> families = new LinkedHashSet<>();
 
         map.put(PremiumPurchaseEvent.class, new EventTypeBinding(
-                "premium",
+                "premiumpurchase",
                 "PremiumPurchaseEvent",
                 evt -> LongBytes.bigEndian(((PremiumPurchaseEvent) evt).getCharacterId())));
-        families.add("premium");
+        families.add("premiumpurchase");
 
         // Snapshots have no natural per-entity partition key; null → round-robin,
         // consumers group/order by Nx-Server-Id header + UUIDv7 eventId.
         map.put(OnlineSnapshotEvent.class, new EventTypeBinding(
-                "online",
+                "serveronline",
                 "OnlineSnapshotEvent",
                 evt -> null));
-        families.add("online");
+        families.add("serveronline");
 
         // Trade events: two parties (buyer + seller), no single natural per-entity
         // key; null → round-robin. Per-character history is a consumer-side query

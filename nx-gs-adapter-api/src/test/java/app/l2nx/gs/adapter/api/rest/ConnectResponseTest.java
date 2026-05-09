@@ -72,7 +72,7 @@ class ConnectResponseTest {
                         .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
                         .build())
                 .messagingTopics(MessagingTopics.builder()
-                        .events(Collections.singletonMap("premium", "acme.gs.events.premium"))
+                        .events(Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"))
                         .build())
                 .build();
 
@@ -95,11 +95,11 @@ class ConnectResponseTest {
     void messagingTopics_shouldExposeEventsMap_whenBuilderProvidesIt() {
         ConnectResponse response = ConnectResponse.builder()
                 .messagingTopics(MessagingTopics.builder()
-                        .events(Collections.singletonMap("premium", "acme.gs.events.premium"))
+                        .events(Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"))
                         .build())
                 .build();
 
-        assertEquals("acme.gs.events.premium",
-                response.getMessagingTopics().getEvents().get("premium"));
+        assertEquals("acme.gs.events.premiumpurchase",
+                response.getMessagingTopics().getEvents().get("premiumpurchase"));
     }
 }
