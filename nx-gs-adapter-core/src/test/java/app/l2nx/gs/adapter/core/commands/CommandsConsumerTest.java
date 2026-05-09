@@ -6,6 +6,7 @@ import app.l2nx.gs.adapter.api.kafka.commands.ErrorCode;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
 import app.l2nx.gs.adapter.api.spi.CommandHandler;
 import app.l2nx.gs.adapter.api.spi.HostExecutorTimeoutException;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
@@ -64,6 +65,10 @@ class CommandsConsumerTest {
 
         @Override
         public void publishOnline(OnlineEvent event) {
+        }
+
+        @Override
+        public void publishPrivateStore(PrivateStoreEvent event) {
         }
     }
 

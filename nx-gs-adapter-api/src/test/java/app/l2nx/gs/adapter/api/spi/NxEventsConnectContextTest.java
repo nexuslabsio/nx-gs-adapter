@@ -3,6 +3,7 @@ package app.l2nx.gs.adapter.api.spi;
 import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import org.junit.jupiter.api.Test;
 
@@ -39,6 +40,10 @@ class NxEventsConnectContextTest {
             @Override
             public void publishOnline(OnlineEvent event) {
             }
+
+            @Override
+            public void publishPrivateStore(PrivateStoreEvent event) {
+            }
         };
 
         ConnectContext ctx = ConnectContext.builder()
@@ -72,6 +77,10 @@ class NxEventsConnectContextTest {
 
                     @Override
                     public void publishOnline(OnlineEvent event) {
+                    }
+
+                    @Override
+                    public void publishPrivateStore(PrivateStoreEvent event) {
                     }
                 })
                 .build();

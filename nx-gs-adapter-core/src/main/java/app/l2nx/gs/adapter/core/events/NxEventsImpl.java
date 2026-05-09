@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
@@ -37,6 +38,11 @@ final class NxEventsImpl implements NxEvents {
 
     @Override
     public void publishOnline(OnlineEvent event) {
+        dispatch(event);
+    }
+
+    @Override
+    public void publishPrivateStore(PrivateStoreEvent event) {
         dispatch(event);
     }
 

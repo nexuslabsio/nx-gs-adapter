@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
 
 /**
  * Default {@link NxEvents} implementation used when {@link ConnectContext} is
@@ -28,5 +29,9 @@ final class NoOpEvents implements NxEvents {
 
     @Override
     public void publishOnline(OnlineEvent event) {
+    }
+
+    @Override
+    public void publishPrivateStore(PrivateStoreEvent event) {
     }
 }

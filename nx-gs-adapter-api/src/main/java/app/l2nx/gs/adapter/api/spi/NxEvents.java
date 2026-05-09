@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
 
 /**
  * Adapter-side capability for fanning out discrete in-game facts to the
@@ -77,4 +78,39 @@ public interface NxEvents {
      *              with a WARN log entry (does not throw — game-loop safety).
      */
     void publishOnline(OnlineEvent event);
+
+    /**
+     * Publish an event in the {@code private_store} family.
+     *
+     * <p>{@link PrivateStoreEvent} is the family's abstract base; concrete
+     * subtypes ({@code PrivateStoreTradeEvent} /
+     * {@code PrivateStoreSnapshotEvent}) are reflected on the platform side
+     * via the {@code Nx-Message-Type} Kafka header (carrying the simple
+     * class name) — adapter-core stamps this header automatically.</p>
+     *
+     * <p><b>Two production patterns share this entry-point.</b> Trade events
+     * are pushed by host hooks at the moment a private-store deal is
+     * finalized on the game thread (one event per closed transaction,
+     * possibly multi-line). Snapshot events are pushed by a host-managed
+     * daemon on a configured cadence — one event per
+     * {@code (itemId, side)} pair whose order book changed since the
+     * previous tick, plus one tombstone event ({@code offers=[]}) when a
+     * tracked pair empties. Change-detection is the host's responsibility;
+     * the adapter only provides the wire path.</p>
+     *
+     * <p>Returns immediately after enqueueing. Same delivery semantics as
+     * {@link #publishPremium} — at-least-once, idempotency on UUIDv7
+     * {@code eventId}.</p>
+     *
+     * <p>Trade events are partitioned round-robin (no single natural
+     * per-entity key — buyer and seller are equally valid). Snapshot events
+     * are partitioned by {@code itemId} so all updates for the same item
+     * land on one partition for ordered consumption / topic-compaction-friendly
+     * "latest known book" caching.</p>
+     *
+     * @param event non-null private-store event; {@code null} is treated as a
+     *              no-op with a WARN log entry (does not throw —
+     *              game-loop safety).
+     */
+    void publishPrivateStore(PrivateStoreEvent event);
 }

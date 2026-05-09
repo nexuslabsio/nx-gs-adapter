@@ -187,6 +187,7 @@ class EventsPublisherTest {
         Map<String, String> topics = new HashMap<String, String>();
         topics.put("premium", "acme.gs.events.premium");
         topics.put("online", "acme.gs.events.online");
+        topics.put("private_store", "acme.gs.events.private_store");
         publisher = new EventsPublisher(topics, noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
 
         ModuleStatus status = publisher.currentStatus();

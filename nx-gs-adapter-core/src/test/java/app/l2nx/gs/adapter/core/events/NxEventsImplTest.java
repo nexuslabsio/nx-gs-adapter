@@ -5,7 +5,12 @@ import app.l2nx.gs.adapter.api.kafka.events.online.OnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.online.WellKnownOnlineBuckets;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreTradeEvent;
 import app.l2nx.gs.commons.UUIDv7;
+import app.l2nx.gs.commons.bytes.LongBytes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -190,6 +195,123 @@ class NxEventsImplTest {
         events.publishOnline(OnlineSnapshotEvent.builder()
                 .eventId(UUIDv7.generate())
                 .buckets(Collections.singletonMap(WellKnownOnlineBuckets.TOTAL, 1L))
+                .build());
+
+        assertEquals(0, publisher.queueDepth(),
+                "disabled family must not enqueue an envelope");
+        assertEquals(0L, publisher.droppedTotal(),
+                "disabled family must not count toward dropped-total");
+    }
+
+    @Test
+    void publishPrivateStore_shouldEnqueueTradeEventRoundRobin() throws InterruptedException {
+        ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
+        AtomicBoolean partitionKeyWasNull = new AtomicBoolean(false);
+        CountDownLatch latch = new CountDownLatch(1);
+        EventsPublisher.Sender sender = (record, callback) -> {
+            sentValues.add(record.value());
+            partitionKeyWasNull.set(record.key() == null);
+            callback.onCompletion(null, null);
+            latch.countDown();
+        };
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("private_store", "acme.gs.events.private_store"),
+                sender, cfg(50, 500L), registry);
+        publisher.start();
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        PrivateStoreTradeEvent event = PrivateStoreTradeEvent.builder()
+                .eventId(UUIDv7.generate())
+                .storeType(PrivateStoreSide.ASK)
+                .sellerId(1L).buyerId(2L)
+                .build();
+
+        events.publishPrivateStore(event);
+
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPrivateStore did not reach sender");
+        assertEquals(1, sentValues.size());
+        assertEquals(event, sentValues.peek());
+        assertTrue(partitionKeyWasNull.get(),
+                "private-store trade partition key must be null (round-robin)");
+    }
+
+    @Test
+    void publishPrivateStore_shouldEnqueueSnapshotEventPartitionedByItemId() throws InterruptedException {
+        ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
+        ConcurrentLinkedQueue<byte[]> sentKeys = new ConcurrentLinkedQueue<byte[]>();
+        CountDownLatch latch = new CountDownLatch(1);
+        EventsPublisher.Sender sender = (record, callback) -> {
+            sentValues.add(record.value());
+            sentKeys.add(record.key());
+            callback.onCompletion(null, null);
+            latch.countDown();
+        };
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("private_store", "acme.gs.events.private_store"),
+                sender, cfg(50, 500L), registry);
+        publisher.start();
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        PrivateStoreSnapshotEvent event = PrivateStoreSnapshotEvent.builder()
+                .eventId(UUIDv7.generate())
+                .itemId(0xCAFEBABEL)
+                .side(PrivateStoreSide.ASK)
+                .build();
+
+        events.publishPrivateStore(event);
+
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPrivateStore did not reach sender");
+        assertEquals(1, sentValues.size());
+        assertEquals(event, sentValues.peek());
+        assertArrayEquals(LongBytes.bigEndian(0xCAFEBABEL), sentKeys.peek(),
+                "snapshot event must be keyed by itemId as 8 big-endian bytes");
+    }
+
+    @Test
+    void publishPrivateStore_shouldNoOp_forNullEvent() {
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("private_store", "acme.gs.events.private_store"),
+                (r, c) -> {
+                }, cfg(5, 0L), registry);
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        events.publishPrivateStore(null);
+
+        assertEquals(0, publisher.queueDepth());
+        assertEquals(0L, publisher.droppedTotal());
+    }
+
+    @Test
+    void publishPrivateStore_shouldDrop_forUnregisteredSubtype() {
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("private_store", "acme.gs.events.private_store"),
+                (r, c) -> {
+                }, cfg(5, 0L), registry);
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        events.publishPrivateStore(new PrivateStoreEvent() {
+        });
+
+        assertEquals(0, publisher.queueDepth());
+        assertEquals(0L, publisher.droppedTotal());
+    }
+
+    @Test
+    void publishPrivateStore_shouldShortCircuit_whenFamilyTopicMissing() {
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(Collections.emptyMap(),
+                (r, c) -> {
+                }, cfg(5, 0L), registry);
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        events.publishPrivateStore(PrivateStoreTradeEvent.builder()
+                .eventId(UUIDv7.generate())
+                .storeType(PrivateStoreSide.ASK)
+                .sellerId(1L).buyerId(2L)
                 .build());
 
         assertEquals(0, publisher.queueDepth(),
