@@ -12,7 +12,7 @@ iterates `GameObjectsStorage.getPlayers()` on demand, applies inline predicates
 (`isInOfflineMode`, `isFishing`, `isFakePlayer`), and draws the counts. Nothing
 leaves the JVM. The platform sees nothing.
 
-The premium-purchase rail (`events.premium` family) shipped in Phase 3 already
+The premium-purchase rail (`events.premiumpurchase` family) shipped in Phase 3 already
 proves the wire-level pattern for discrete in-game facts: per-family Kafka topic,
 abstract base class, `Nx-Message-Type` header dispatch, UUIDv7 `eventId`,
 host-pushed via `NxEvents.publishX(...)`. Online stats are the next family to
@@ -35,36 +35,36 @@ plugging in a snapshot-builder.
 
 **Must:**
 
-- [todo] R1. `nx-gs-adapter-api.kafka.events.online.OnlineEvent` MUST ship as
+- [todo] R1. `nx-gs-adapter-api.kafka.events.serveronline.ServerOnlineSnapshotEvent` MUST ship as
   the abstract base for the `online` family — empty body, `protected` no-arg
-  constructor, type-bound for `NxEvents.publishOnline(OnlineEvent)`. Mirrors
-  `events.premium.PremiumEvent` exactly.
+  constructor, type-bound for `NxEvents.publishServerOnline(ServerOnlineSnapshotEvent)`. Mirrors
+  `events.premiumpurchase.PremiumPurchaseEvent` exactly.
 
-- [todo] R2. `nx-gs-adapter-api.kafka.events.online.OnlineSnapshotEvent` MUST
+- [todo] R2. `nx-gs-adapter-api.kafka.events.serveronline.ServerOnlineSnapshotEvent` MUST
   ship as the Phase-1 concrete subtype with the following fields:
     - `UUID eventId` — REQUIRED. UUIDv7; the upper 48 bits encode the snapshot
       occurrence timestamp. Platform consumers dedupe on this id.
     - `@Nullable Map<String, Long> buckets` — bucket-key → count map. Keys
-      SHOULD include constants from `WellKnownOnlineBuckets` where the host has
+      SHOULD include constants from `WellKnownServerOnlineBuckets` where the host has
       the corresponding concept; arbitrary additional keys are allowed for
       host-specific buckets. Null at the constructor normalizes to an empty
       map; getter returns an unmodifiable view.
 
   No top-level `total` field — buckets can overlap (e.g. a fishing player is
   also in `REAL` and `ONLINE`), so `TOTAL` cannot be derived as `sum(buckets)`.
-  The host publishes `WellKnownOnlineBuckets.TOTAL` as an explicit map entry
+  The host publishes `WellKnownServerOnlineBuckets.TOTAL` as an explicit map entry
   when it tracks a meaningful total.
 
   POJO + hand-written Builder + `equals`/`hashCode`/`toString` + Java-8 source.
   Constructor parameter names preserved for Gson `-parameters` deserialization.
 
-- [todo] R3. `nx-gs-adapter-api.kafka.events.online.WellKnownOnlineBuckets` MUST
+- [todo] R3. `nx-gs-adapter-api.kafka.events.serveronline.WellKnownServerOnlineBuckets` MUST
   ship a constants class enumerating the canonical bucket keys observed in
   L2 game-server forks. Wire values are `lower_snake_case` (consistent with
   `WellKnownServices`):
     - `TOTAL` → `"total"` — total player presence (includes offline-trade and
       phantoms).
-    - `ONLINE` → `"online"` — players actively in the world (excludes
+    - `ONLINE` → `"serveronline"` — players actively in the world (excludes
       offline-trade).
     - `REAL` → `"real"` — non-phantom human players (the operator's "real
       audience").
@@ -79,25 +79,25 @@ plugging in a snapshot-builder.
   Adding a new constant is a non-breaking minor-version change.
 
 - [todo] R4. `nx-gs-adapter-api.spi.NxEvents` MUST gain a single new method
-  `void publishOnline(OnlineEvent event)` mirroring `publishPremium` exactly:
+  `void publishServerOnline(ServerOnlineSnapshotEvent event)` mirroring `publishPremiumPurchase` exactly:
   null event → silent no-op + WARN log, unregistered subtype → drop + WARN,
-  family disabled (no topic in `MessagingTopics.events.online`) → drop + DEBUG,
+  family disabled (no topic in `MessagingTopics.events.serveronline`) → drop + DEBUG,
   game-loop-safety contract (never blocks beyond enqueue, never throws).
 
 - [todo] R5. `nx-gs-adapter-core.events.EventTypeRegistry` MUST gain a binding
-  for `OnlineSnapshotEvent`: family `"online"`, message-type
-  `"OnlineSnapshotEvent"`, partition-key extractor returning `null` (round-robin
+  for `ServerOnlineSnapshotEvent`: family `"serveronline"`, message-type
+  `"ServerOnlineSnapshotEvent"`, partition-key extractor returning `null` (round-robin
   partitioning; consumer groups by `Nx-Server-Id` header and orders by the
   UUIDv7 `eventId` timestamp).
 
 - [todo] R6. `nx-gs-adapter-core.events.NxEventsImpl` MUST implement
-  `publishOnline(OnlineEvent)` with the same dispatch + null-check + family-disabled
-  short-circuit logic as `publishPremium`. No new internal infrastructure —
+  `publishServerOnline(ServerOnlineSnapshotEvent)` with the same dispatch + null-check + family-disabled
+  short-circuit logic as `publishPremiumPurchase`. No new internal infrastructure —
   reuses `EventsPublisher` / `EventEnvelope` / `EventTypeRegistry` as-is.
 
 - [todo] R7. `bohpts-core` MUST extend the existing
   `l2e.gameserver.l2nx.events.BohptsEventsModule` (the same module that owns
-  the `events.premium` wiring) to additionally:
+  the `events.premiumpurchase` wiring) to additionally:
     - `onConnect(ctx)` — bind the captured `ctx.events()` handle into a new
       `OnlineSnapshotBuilder` static facade alongside the existing
       `PremiumPublisher.bind(...)` call.
@@ -111,12 +111,12 @@ plugging in a snapshot-builder.
   walks every player, applies the bohpts predicates (`isInOfflineMode`,
   `isFishing`, `isFakePlayer`) and computes the wellknown buckets:
   `total`, `online`, `real`, `offline_trade`, `fishing`, `phantoms`. Builds
-  `OnlineSnapshotEvent` with UUIDv7 `eventId`, calls
-  `nxEvents.publishOnline(event)`. Any uncaught `Throwable` is logged at DEBUG
+  `ServerOnlineSnapshotEvent` with UUIDv7 `eventId`, calls
+  `nxEvents.publishServerOnline(event)`. Any uncaught `Throwable` is logged at DEBUG
   and swallowed — game-loop safety identical to `PremiumPublisher`.
 
-  No separate `AdapterModule` registration — `events.online` rides the same
-  `bohpts-events` module entry in `META-INF/services` as `events.premium`.
+  No separate `AdapterModule` registration — `events.serveronline` rides the same
+  `bohpts-events` module entry in `META-INF/services` as `events.premiumpurchase`.
 
 **Should:**
 
@@ -133,7 +133,7 @@ plugging in a snapshot-builder.
 **Non-goals:**
 
 - **Adapter-side scheduler / pull-SPI.** Host owns cadence, identical to
-  `events.premium` shape. Adapter-core stays mechanism-only.
+  `events.premiumpurchase` shape. Adapter-core stays mechanism-only.
 - **Per-family heartbeat counters.** `EventsStats` aggregates queue/published/
   dropped/failed across all families today; per-family breakdown is a separate
   enhancement that lands when there are 3+ families.
@@ -148,12 +148,12 @@ plugging in a snapshot-builder.
   curve. No special-case suppression — observability prefers explicit zeros.
 - **Snapshot publish during `onDisconnect`.** Module's `stop()` cancels the
   scheduled task before `onDisconnect()` releases the handle. Race window:
-  a tick already in `run()` may call `publishOnline` after handle release;
+  a tick already in `run()` may call `publishServerOnline` after handle release;
   `NoOpEvents` swallows it (per `ConnectContext` normalization).
-- **`publishOnline` thrown from inside the host (e.g. snapshot-builder bug).**
+- **`publishServerOnline` thrown from inside the host (e.g. snapshot-builder bug).**
   Tick logs at DEBUG, skips the publish, schedules the next tick normally.
   No backoff — transient bug fixes itself on next tick.
-- **Family disabled (platform did not configure `MessagingTopics.events.online`).**
+- **Family disabled (platform did not configure `MessagingTopics.events.serveronline`).**
   Adapter logs DEBUG once per call, increments nothing, surfaces via the
   `events.disabled-families` heartbeat slot (existing mechanism).
 - **Buckets overlap.** A fishing player counts toward both `FISHING` and
@@ -165,8 +165,8 @@ plugging in a snapshot-builder.
 - [resolved: snapshot-only, no per-character deltas in Phase 1 — user confirmed
   during design that per-character stats land later as a separate slice.]
 - [resolved: host-pushed (no SPI / no engine in adapter-core) — symmetric with
-  `events.premium`. Adapter does not own the cadence.]
-- [resolved: open `Map<String, Long>` + `WellKnownOnlineBuckets` constants
+  `events.premiumpurchase`. Adapter does not own the cadence.]
+- [resolved: open `Map<String, Long>` + `WellKnownServerOnlineBuckets` constants
   (rejected typed-fields-per-bucket alternative). Allows adding new
   conventional buckets without api releases and accommodates host-specific
   custom buckets without a wire-schema change.]

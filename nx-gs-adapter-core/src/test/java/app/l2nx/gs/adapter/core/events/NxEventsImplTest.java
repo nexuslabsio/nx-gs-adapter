@@ -1,14 +1,12 @@
 package app.l2nx.gs.adapter.core.events;
 
-import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
-import app.l2nx.gs.adapter.api.kafka.events.online.OnlineSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.online.WellKnownOnlineBuckets;
-import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
-import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreTradeEvent;
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.WellKnownServerOnlineBuckets;
 import app.l2nx.gs.commons.UUIDv7;
 import app.l2nx.gs.commons.bytes.LongBytes;
 import org.junit.jupiter.api.AfterEach;
@@ -34,7 +32,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishPremium_shouldEnqueueIntoPublisher() throws InterruptedException {
+    void publishPremiumPurchase_shouldEnqueueIntoPublisher() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sent = new ConcurrentLinkedQueue<Object>();
         CountDownLatch latch = new CountDownLatch(1);
         EventsPublisher.Sender sender = (record, callback) -> {
@@ -54,15 +52,15 @@ class NxEventsImplTest {
                 .characterId(42L)
                 .build();
 
-        events.publishPremium(event);
+        events.publishPremiumPurchase(event);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPremium did not reach sender");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPremiumPurchase did not reach sender");
         assertEquals(1, sent.size());
         assertEquals(event, sent.peek());
     }
 
     @Test
-    void publishPremium_shouldNoOp_forNullEvent() {
+    void publishPremiumPurchase_shouldNoOp_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
                 Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"),
@@ -70,43 +68,21 @@ class NxEventsImplTest {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPremium(null);
+        events.publishPremiumPurchase(null);
 
         assertEquals(0, publisher.queueDepth());
         assertEquals(0L, publisher.droppedTotal());
     }
 
     @Test
-    void publishPremium_shouldDrop_forUnregisteredSubtype() {
-        EventTypeRegistry registry = new EventTypeRegistry();
-        publisher = new EventsPublisher(
-                Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"),
-                (r, c) -> {
-                }, cfg(5, 0L), registry);
-
-        NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        // Anonymous subtype with no registry binding.
-        events.publishPremium(new PremiumEvent() {
-        });
-
-        assertEquals(0, publisher.queueDepth());
-        // Dropped at the registry-lookup boundary, not the queue boundary —
-        // dropped-total tracks queue evictions only.
-        assertEquals(0L, publisher.droppedTotal());
-    }
-
-    @Test
-    void publishPremium_shouldShortCircuit_whenFamilyTopicMissing() {
-        // No topic for "premiumpurchase" → publishPremium short-circuits BEFORE enqueueing.
-        // Verifies that disabled-family publishes don't burn queue capacity or
-        // inflate dropped-total (R10 "no-op + DEBUG log" semantics).
+    void publishPremiumPurchase_shouldShortCircuit_whenFamilyTopicMissing() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(Collections.emptyMap(),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPremium(PremiumPurchaseEvent.builder()
+        events.publishPremiumPurchase(PremiumPurchaseEvent.builder()
                 .eventId(UUIDv7.generate())
                 .characterId(42L)
                 .build());
@@ -118,7 +94,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishOnline_shouldEnqueueIntoPublisher() throws InterruptedException {
+    void publishServerOnline_shouldEnqueueIntoPublisher() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
         // ConcurrentLinkedQueue rejects nulls, so partition-key=null observation
         // is recorded via a flag rather than queueing the byte[].
@@ -137,22 +113,22 @@ class NxEventsImplTest {
         publisher.start();
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        OnlineSnapshotEvent event = OnlineSnapshotEvent.builder()
+        ServerOnlineSnapshotEvent event = ServerOnlineSnapshotEvent.builder()
                 .eventId(UUIDv7.generate())
-                .buckets(Collections.singletonMap(WellKnownOnlineBuckets.TOTAL, 1808L))
+                .buckets(Collections.singletonMap(WellKnownServerOnlineBuckets.TOTAL, 1808L))
                 .build();
 
-        events.publishOnline(event);
+        events.publishServerOnline(event);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishOnline did not reach sender");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishServerOnline did not reach sender");
         assertEquals(1, sentValues.size());
         assertEquals(event, sentValues.peek());
         assertTrue(partitionKeyWasNull.get(),
-                "online snapshot partition key must be null (round-robin)");
+                "server-online snapshot partition key must be null (round-robin)");
     }
 
     @Test
-    void publishOnline_shouldNoOp_forNullEvent() {
+    void publishServerOnline_shouldNoOp_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
                 Collections.singletonMap("serveronline", "acme.gs.events.serveronline"),
@@ -160,41 +136,23 @@ class NxEventsImplTest {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishOnline(null);
+        events.publishServerOnline(null);
 
         assertEquals(0, publisher.queueDepth());
         assertEquals(0L, publisher.droppedTotal());
     }
 
     @Test
-    void publishOnline_shouldDrop_forUnregisteredSubtype() {
-        EventTypeRegistry registry = new EventTypeRegistry();
-        publisher = new EventsPublisher(
-                Collections.singletonMap("serveronline", "acme.gs.events.serveronline"),
-                (r, c) -> {
-                }, cfg(5, 0L), registry);
-
-        NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        // Anonymous subtype with no registry binding.
-        events.publishOnline(new OnlineEvent() {
-        });
-
-        assertEquals(0, publisher.queueDepth());
-        assertEquals(0L, publisher.droppedTotal());
-    }
-
-    @Test
-    void publishOnline_shouldShortCircuit_whenFamilyTopicMissing() {
-        // No topic for "serveronline" → publishOnline short-circuits BEFORE enqueueing.
+    void publishServerOnline_shouldShortCircuit_whenFamilyTopicMissing() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(Collections.emptyMap(),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishOnline(OnlineSnapshotEvent.builder()
+        events.publishServerOnline(ServerOnlineSnapshotEvent.builder()
                 .eventId(UUIDv7.generate())
-                .buckets(Collections.singletonMap(WellKnownOnlineBuckets.TOTAL, 1L))
+                .buckets(Collections.singletonMap(WellKnownServerOnlineBuckets.TOTAL, 1L))
                 .build());
 
         assertEquals(0, publisher.queueDepth(),

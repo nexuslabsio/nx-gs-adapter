@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
-import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 
 /**
  * Adapter-side capability for fanning out discrete in-game facts to the
@@ -13,10 +13,13 @@ import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
  *
  * <p>One method per event family. Adding a family is a binary-compatible
  * API expansion — host code calls these methods, doesn't implement the
- * interface. Within a family, growth is free: a new
- * {@code PremiumRefundEvent extends PremiumEvent} subtype reuses the same
- * {@link #publishPremium(PremiumEvent)} entry-point, dispatched on the
- * platform consumer side via the {@code Nx-Message-Type} Kafka header.</p>
+ * interface. A family with multiple concrete subtypes (today: only
+ * {@code privatestore}, carrying {@code Trade} and {@code Snapshot} events)
+ * uses an abstract base bound on the publish method; a single-event family
+ * (today: {@code premiumpurchase}, {@code serveronline}) takes the concrete
+ * type directly. Within a multi-event family, the {@code Nx-Message-Type}
+ * Kafka header (carrying the simple class name) routes subtypes on the
+ * platform consumer side.</p>
  *
  * <p><b>Game-loop safety contract.</b> Implementations MUST NOT block the
  * caller longer than enqueueing a record into a bounded queue, MUST NOT
@@ -40,44 +43,45 @@ import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
 public interface NxEvents {
 
     /**
-     * Publish an event in the {@code premiumpurchase} family.
-     *
-     * <p>{@link PremiumEvent} is the family's abstract base; the concrete
-     * subtype (e.g. {@code PremiumPurchaseEvent}) is reflected on the
-     * platform side via the {@code Nx-Message-Type} Kafka header (carrying
-     * the simple class name) — adapter-core stamps this header automatically.</p>
+     * Publish an event in the {@code premiumpurchase} family. The family
+     * carries one concrete event today ({@link PremiumPurchaseEvent}); a
+     * future refund / gift / chargeback fact would ship as its own family
+     * (e.g. {@code premiumrefund}) rather than as another subtype here.
      *
      * <p>Returns immediately after enqueueing. Caller MUST NOT assume
      * delivery — at-least-once semantics, idempotency by {@code eventId}
-     * (UUIDv7) on the consumer side.</p>
+     * (UUIDv7) on the consumer side. Partition key is the
+     * {@code characterId}, so per-character history lands on one partition
+     * in occurrence order.</p>
      *
-     * @param event non-null premium event; {@code null} is treated as a no-op
-     *              with a WARN log entry (does not throw — game-loop safety).
+     * @param event non-null premium-purchase event; {@code null} is treated
+     *              as a no-op with a WARN log entry (does not throw —
+     *              game-loop safety).
      */
-    void publishPremium(PremiumEvent event);
+    void publishPremiumPurchase(PremiumPurchaseEvent event);
 
     /**
-     * Publish an event in the {@code serveronline} family.
-     *
-     * <p>{@link OnlineEvent} is the family's abstract base; the concrete
-     * subtype (Phase 1: {@code OnlineSnapshotEvent}) is reflected on the
-     * platform side via the {@code Nx-Message-Type} Kafka header — adapter-core
-     * stamps this header automatically.</p>
+     * Publish an event in the {@code serveronline} family — a server-level
+     * population snapshot, distinct from per-character "online" facts. One
+     * concrete event today ({@link ServerOnlineSnapshotEvent}).
      *
      * <p>Cadence is host-managed: the host runs its own scheduler, computes
      * a population breakdown (e.g. by walking its in-memory player set),
-     * builds an {@code OnlineSnapshotEvent} and calls this method. The
+     * builds a {@link ServerOnlineSnapshotEvent} and calls this method. The
      * adapter neither dictates the interval nor pulls — it only provides
      * the wire path. Typical cadence is 30–60 seconds.</p>
      *
      * <p>Returns immediately after enqueueing. Same delivery semantics as
-     * {@link #publishPremium} — at-least-once, idempotency on UUIDv7
-     * {@code eventId}.</p>
+     * {@link #publishPremiumPurchase} — at-least-once, idempotency on
+     * UUIDv7 {@code eventId}. Partition key is {@code null} (round-robin)
+     * — server-level snapshots have no per-entity sharding axis; consumers
+     * group by the {@code Nx-Server-Id} header.</p>
      *
-     * @param event non-null online event; {@code null} is treated as a no-op
-     *              with a WARN log entry (does not throw — game-loop safety).
+     * @param event non-null server-online event; {@code null} is treated as
+     *              a no-op with a WARN log entry (does not throw —
+     *              game-loop safety).
      */
-    void publishOnline(OnlineEvent event);
+    void publishServerOnline(ServerOnlineSnapshotEvent event);
 
     /**
      * Publish an event in the {@code privatestore} family.
@@ -99,8 +103,8 @@ public interface NxEvents {
      * the adapter only provides the wire path.</p>
      *
      * <p>Returns immediately after enqueueing. Same delivery semantics as
-     * {@link #publishPremium} — at-least-once, idempotency on UUIDv7
-     * {@code eventId}.</p>
+     * {@link #publishPremiumPurchase} — at-least-once, idempotency on
+     * UUIDv7 {@code eventId}.</p>
      *
      * <p>Trade events are partitioned round-robin (no single natural
      * per-entity key — buyer and seller are equally valid). Snapshot events

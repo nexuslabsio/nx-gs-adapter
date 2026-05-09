@@ -4,19 +4,19 @@
 
 ## Overview
 
-`events.online` is the second event family on the per-family Kafka rail
-introduced by `events.premium`. It carries periodic snapshots of game-server
+`events.serveronline` is the second event family on the per-family Kafka rail
+introduced by `events.premiumpurchase`. It carries periodic snapshots of game-server
 population broken down by activity bucket. Wire shape: a single concrete DTO
-`OnlineSnapshotEvent` with a UUIDv7 `eventId` and an open `Map<String, Long>`
+`ServerOnlineSnapshotEvent` with a UUIDv7 `eventId` and an open `Map<String, Long>`
 of bucket-key → count entries (lower_snake_case keys, consistent with
-`WellKnownServices`); `WellKnownOnlineBuckets` enumerates the canonical
+`WellKnownServices`); `WellKnownServerOnlineBuckets` enumerates the canonical
 constants (`total`, `online`, `real`, `offline_trade`, `fishing`,
 `phantoms`). Hosts publish via a single new
-`NxEvents.publishOnline(OnlineEvent)` SPI method. Adapter-core registers the
+`NxEvents.publishServerOnline(ServerOnlineSnapshotEvent)` SPI method. Adapter-core registers the
 binding in `EventTypeRegistry`; the existing `EventsPublisher` /
 `EventEnvelope` machinery handles fanout, headers, and disabled-family
 short-circuiting unchanged. bohpts-core extends its existing
-`BohptsEventsModule` (the module that already owns `events.premium` wiring)
+`BohptsEventsModule` (the module that already owns `events.premiumpurchase` wiring)
 to schedule a 30-second snapshot tick (`scheduleAtFixedDelay`) on
 `ThreadPoolManager`, walking `GameObjectsStorage.getPlayers()`, computing
 the six wellknown buckets, and publishing.
@@ -24,16 +24,16 @@ the six wellknown buckets, and publishing.
 ## Structure
 
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/events/online/`
-    - `OnlineEvent.java` — abstract family base (empty body, type-bound)
-    - `OnlineSnapshotEvent.java` — Phase-1 concrete DTO + Builder
-    - `WellKnownOnlineBuckets.java` — canonical bucket-key constants
+    - `ServerOnlineSnapshotEvent.java` — abstract family base (empty body, type-bound)
+    - `ServerOnlineSnapshotEvent.java` — Phase-1 concrete DTO + Builder
+    - `WellKnownServerOnlineBuckets.java` — canonical bucket-key constants
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/`
-    - `NxEvents.java` — adds `publishOnline(OnlineEvent)`
+    - `NxEvents.java` — adds `publishServerOnline(ServerOnlineSnapshotEvent)`
     - `NoOpEvents.java` — adds the no-op variant
 - `nx-gs-adapter-core/src/main/java/app/l2nx/gs/adapter/core/events/`
-    - `EventTypeRegistry.java` — adds `online` family + `OnlineSnapshotEvent`
+    - `EventTypeRegistry.java` — adds `online` family + `ServerOnlineSnapshotEvent`
       binding
-    - `NxEventsImpl.java` — adds `publishOnline` dispatch
+    - `NxEventsImpl.java` — adds `publishServerOnline` dispatch
 - `bohpts-core/core/src/main/java/l2e/gameserver/l2nx/events/`
     - `BohptsEventsModule.java` — extended to also schedule the online snapshot
       tick alongside its existing premium wiring
@@ -42,29 +42,29 @@ the six wellknown buckets, and publishing.
 
 ## Key components
 
-- **OnlineEvent** (implements R1) — abstract base for the `online` family,
-  empty body. Mirrors `PremiumEvent` exactly so future subtypes (e.g.
+- **ServerOnlineSnapshotEvent** (implements R1) — abstract base for the `online` family,
+  empty body. Mirrors `PremiumPurchaseEvent` exactly so future subtypes (e.g.
   `OnlineLoginEvent`, `OnlineLogoutEvent`) plug into the same
-  `publishOnline(OnlineEvent)` entry-point and dispatch via `Nx-Message-Type`.
+  `publishServerOnline(ServerOnlineSnapshotEvent)` entry-point and dispatch via `Nx-Message-Type`.
 
-- **OnlineSnapshotEvent** (implements R2) — concrete Phase-1 subtype.
+- **ServerOnlineSnapshotEvent** (implements R2) — concrete Phase-1 subtype.
   Two fields: `UUID eventId` (UUIDv7), `Map<String, Long> buckets`. Map is
   defensively copied on construction and exposed via an unmodifiable view;
   null normalizes to `Collections.emptyMap()`. Has a hand-written `Builder`
   with `toBuilder()`. Java-8 source (no records).
 
-- **WellKnownOnlineBuckets** (implements R3) — string constants. Doc-only
+- **WellKnownServerOnlineBuckets** (implements R3) — string constants. Doc-only
   semantics: each constant carries a Javadoc paragraph clarifying the bohpts
   reference definition; other forks may reuse the constant with their own
   bucket-builder logic so long as the operator-facing meaning is consistent.
 
-- **NxEvents.publishOnline / NxEventsImpl.publishOnline** (implements R4, R6) —
-  symmetric to `publishPremium`. Null event → WARN + drop; missing registry
+- **NxEvents.publishServerOnline / NxEventsImpl.publishServerOnline** (implements R4, R6) —
+  symmetric to `publishPremiumPurchase`. Null event → WARN + drop; missing registry
   binding → WARN + drop; family disabled → DEBUG + drop; otherwise enqueue
   on `EventsPublisher` via the existing `EventEnvelope` path.
 
-- **EventTypeRegistry online binding** (implements R5) — `("online",
-  "OnlineSnapshotEvent", evt -> null)`. Null partition-key is intentional —
+- **EventTypeRegistry online binding** (implements R5) — `("serveronline",
+  "ServerOnlineSnapshotEvent", evt -> null)`. Null partition-key is intentional —
   consumer groups by `Nx-Server-Id` header (always present post-handshake)
   and orders within-server by the UUIDv7 timestamp.
 
@@ -96,8 +96,8 @@ ThreadPoolManager.scheduleAtFixedDelay
       → counters: total++, online++ if !offline, real++ if !fake,
                   offlineTrade++ if offline, fishing++ if fishing,
                   phantoms++ if fake
-    → OnlineSnapshotEvent (eventId = UUIDv7.generate(), buckets = Map.of(...))
-    → NxEvents.publishOnline(event)
+    → ServerOnlineSnapshotEvent (eventId = UUIDv7.generate(), buckets = Map.of(...))
+    → NxEvents.publishServerOnline(event)
       → NxEventsImpl: registry.lookup → publisher.isFamilyEnabled →
         publisher.enqueue(EventEnvelope)
         → EventsPublisher daemon: KafkaProducer.send(record + Nx-Message-Type
@@ -107,8 +107,8 @@ ThreadPoolManager.scheduleAtFixedDelay
 Disabled family (no `online` topic in `MessagingTopics.events`):
 
 ```
-NxEventsImpl.publishOnline → registry.lookup → publisher.isFamilyEnabled = false
-  → log.debug("events.online disabled — no topic configured; skipping publish")
+NxEventsImpl.publishServerOnline → registry.lookup → publisher.isFamilyEnabled = false
+  → log.debug("events.serveronline disabled — no topic configured; skipping publish")
   → return (no enqueue, no queue-depth growth, no dropped-total increment)
 ```
 
@@ -119,7 +119,7 @@ NxEventsImpl.publishOnline → registry.lookup → publisher.isFamilyEnabled = f
   require platform-side state reconstruction and add traffic proportional
   to login churn. Delta-based per-character events are deferred.
 
-- **Host-pushed (no SPI on the host side).** Symmetric with `events.premium`.
+- **Host-pushed (no SPI on the host side).** Symmetric with `events.premiumpurchase`.
   Adapter has no `OnlineStatsProvider` SPI and no scheduled engine; the host
   owns the cadence and the bucket-builder. Trade-off: cadence is per-host
   rather than centrally tunable from the platform — acceptable since hosts
@@ -143,13 +143,13 @@ NxEventsImpl.publishOnline → registry.lookup → publisher.isFamilyEnabled = f
 ## Extension points
 
 - **Add a new wellknown bucket.** Append a `public static final String`
-  constant to `WellKnownOnlineBuckets`. Update each host's bucket-builder
+  constant to `WellKnownServerOnlineBuckets`. Update each host's bucket-builder
   to populate the new entry where applicable. Old consumers ignore the
   new key; new consumers see `null`/missing for old hosts.
 
-- **Add a new concrete subtype to `events.online`.** Define a new class
-  extending `OnlineEvent`, append a binding entry to `EventTypeRegistry`
-  (same family `"online"`, distinct message-type string). The platform
+- **Add a new concrete subtype to `events.serveronline`.** Define a new class
+  extending `ServerOnlineSnapshotEvent`, append a binding entry to `EventTypeRegistry`
+  (same family `"serveronline"`, distinct message-type string). The platform
   consumer must learn to dispatch the new `Nx-Message-Type`.
 
 - **Add a new event family.** Define `<family>Event` abstract base under

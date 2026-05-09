@@ -1,9 +1,9 @@
 package app.l2nx.gs.adapter.core.events;
 
-import app.l2nx.gs.adapter.api.kafka.events.online.OnlineSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreTradeEvent;
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.commons.bytes.LongBytes;
 import org.jspecify.annotations.Nullable;
 
@@ -39,9 +39,9 @@ final class EventTypeRegistry {
 
         // Snapshots have no natural per-entity partition key; null → round-robin,
         // consumers group/order by Nx-Server-Id header + UUIDv7 eventId.
-        map.put(OnlineSnapshotEvent.class, new EventTypeBinding(
+        map.put(ServerOnlineSnapshotEvent.class, new EventTypeBinding(
                 "serveronline",
-                "OnlineSnapshotEvent",
+                "ServerOnlineSnapshotEvent",
                 evt -> null));
         families.add("serveronline");
 

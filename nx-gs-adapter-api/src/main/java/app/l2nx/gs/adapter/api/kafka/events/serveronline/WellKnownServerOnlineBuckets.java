@@ -1,11 +1,11 @@
-package app.l2nx.gs.adapter.api.kafka.events.online;
+package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
 /**
  * Canonical bucket-key constants for the {@code buckets} map of
- * {@link OnlineSnapshotEvent}. Hosts MAY use additional non-canonical keys —
- * the platform treats unknown keys as opaque strings — but populating these
- * constants when applicable lets cross-tenant dashboards aggregate the same
- * concept consistently.
+ * {@link ServerOnlineSnapshotEvent}. Hosts MAY use additional non-canonical
+ * keys — the platform treats unknown keys as opaque strings — but populating
+ * these constants when applicable lets cross-tenant dashboards aggregate the
+ * same concept consistently.
  *
  * <p>Catalog curated from L2 Lineage 2 game-mechanic vocabulary covering
  * L2J / Lucera / Essence forks. Adding a new constant is a non-breaking
@@ -16,9 +16,9 @@ package app.l2nx.gs.adapter.api.kafka.events.online;
  * {@link #TOTAL} is published as an explicit map entry — consumers MUST NOT
  * derive it as {@code sum(buckets)} since the buckets are not disjoint.</p>
  */
-public final class WellKnownOnlineBuckets {
+public final class WellKnownServerOnlineBuckets {
 
-    private WellKnownOnlineBuckets() {
+    private WellKnownServerOnlineBuckets() {
     }
 
     /**

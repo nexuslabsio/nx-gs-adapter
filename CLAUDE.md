@@ -28,14 +28,20 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   for polymorphic dispatch on outbound events / inbound commands / replies,
   `NX_CORRELATION_ID` carrying the platform-issued UUID on inbound commands and
   echoed onto reply records). Hosts the per-family event DTOs under
-  `kafka.events.<family>` (Phase 1: `events.premium.PremiumPurchaseEvent` with
+  `kafka.events.<family>` — Phase 1 families:
+  `events.premiumpurchase.PremiumPurchaseEvent` (single-event family;
   multi-line items + services + per-line multi-currency `Payment`s, plus
-  `WellKnownServices` constants; `events.online.OnlineSnapshotEvent` —
+  `WellKnownServices` constants);
+  `events.serveronline.ServerOnlineSnapshotEvent` (single-event family;
   periodic population breakdown carrying UUIDv7 `eventId` + open
-  `Map<String, Long> buckets` keyed by `WellKnownOnlineBuckets`
-  lower_snake_case constants (`total` / `online` / `real` /
-  `offline_trade` / `fishing` / `phantoms`), cadence host-managed);
-  the inbound-commands marker
+  `Map<String, Long> buckets` keyed by `WellKnownServerOnlineBuckets`
+  lower_snake_case constants — `total` / `online` / `real` /
+  `offline_trade` / `fishing` / `phantoms`, cadence host-managed);
+  `events.privatestore` (multi-event family: `PrivateStoreEvent` abstract
+  base + `PrivateStoreTradeEvent` for closed deals +
+  `PrivateStoreSnapshotEvent` for per-`(itemId, side)` order book, with
+  `TradeLine` / `Offer` line types, `PrivateStoreSide` enum, and
+  `WellKnownElements` constants). The inbound-commands marker
   `kafka.commands.NxCommand<R>` + reply envelope `kafka.commands.CommandResult<R>`
   with structured `kafka.commands.ErrorCode` enum (`NOT_FOUND` / `INVALID_STATE` /
   `FORBIDDEN` / `RATE_LIMITED` / `UNAVAILABLE` / `VALIDATION_FAILED` /

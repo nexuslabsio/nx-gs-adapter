@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.events.premium;
+package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
 
 /**
  * Canonical service codes used as the {@link PurchaseService#getCode() code}

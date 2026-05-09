@@ -1,14 +1,15 @@
-package app.l2nx.gs.adapter.api.kafka.events.premium;
+package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
 
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 
 /**
- * Wire DTO published to the {@code premium} family topic
- * ({@code <tenant>.gs.events.premiumpurchase}) when a player buys items / services
- * inside the game world. Combined item+service baskets are first-class —
- * a single purchase event MAY carry any mix of items and services.
+ * Wire DTO published to the {@code premiumpurchase} family topic
+ * ({@code <tenant>.gs.events.premiumpurchase}) when a player buys items /
+ * services inside the game world. Combined item+service baskets are
+ * first-class — a single purchase event MAY carry any mix of items and
+ * services.
  *
  * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire timestamp is
  * encoded in the upper 48 bits — extractable via
@@ -23,7 +24,7 @@ import java.util.*;
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
  * parameter names so Gson can deserialize without {@code @JsonProperty}.</p>
  */
-public final class PremiumPurchaseEvent extends PremiumEvent {
+public final class PremiumPurchaseEvent {
 
     private final UUID eventId;
     private final long characterId;

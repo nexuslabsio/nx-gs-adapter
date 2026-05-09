@@ -22,16 +22,27 @@ by the L2NX game-server adapter and its consumers. Published as
 - `app.l2nx.gs.adapter.api.kafka` — Kafka message payloads + header contract
   (`HeartbeatEvent`, `NxHeaders`)
 - `app.l2nx.gs.adapter.api.kafka.events.<family>` — outbound discrete-fact event
-  DTOs grouped by family. Shipped families:
-    - `events.premium` — `PremiumEvent` abstract base + `PremiumPurchaseEvent` +
+  DTOs grouped by family. Single-event families take the concrete type on the
+  publish method directly; multi-event families bind on an abstract base and
+  dispatch on the platform via the `Nx-Message-Type` header. Shipped families:
+    - `events.premiumpurchase` — `PremiumPurchaseEvent` (final) +
       `PurchaseItem` / `PurchaseService` / `Payment` + `WellKnownServices`
-      constants. Per-fact, host-pushed via `NxEvents.publishPremium`.
-    - `events.online` — `OnlineEvent` abstract base + `OnlineSnapshotEvent`
-      (UUIDv7 `eventId` + open `Map<String, Long> buckets`) +
-      `WellKnownOnlineBuckets` lower_snake_case constants (`total` /
+      constants. Single-event family; per-fact, host-pushed via
+      `NxEvents.publishPremiumPurchase(PremiumPurchaseEvent)`.
+    - `events.serveronline` — `ServerOnlineSnapshotEvent` (final, UUIDv7
+      `eventId` + open `Map<String, Long> buckets`) +
+      `WellKnownServerOnlineBuckets` lower_snake_case constants (`total` /
       `online` / `real` / `offline_trade` / `fishing` / `phantoms`).
-      Periodic snapshots, host-pushed via `NxEvents.publishOnline` on a
+      Single-event family; periodic snapshots, host-pushed via
+      `NxEvents.publishServerOnline(ServerOnlineSnapshotEvent)` on a
       host-managed cadence.
+    - `events.privatestore` — `PrivateStoreEvent` abstract base +
+      `PrivateStoreTradeEvent` (closed-deal facts) +
+      `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
+      `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
+      `WellKnownElements` constants. Multi-event family; both subtypes
+      ride one topic, host-pushed via
+      `NxEvents.publishPrivateStore(PrivateStoreEvent)`.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:

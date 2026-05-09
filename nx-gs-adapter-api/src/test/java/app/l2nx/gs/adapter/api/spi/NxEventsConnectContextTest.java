@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
-import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
-import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import org.junit.jupiter.api.Test;
 
@@ -25,20 +24,20 @@ class NxEventsConnectContextTest {
 
         // No NPE, no throw — and the same singleton across calls.
         assertNotNull(ctx.events());
-        ctx.events().publishPremium(stubPurchase());
+        ctx.events().publishPremiumPurchase(stubPurchase());
     }
 
     @Test
     void events_shouldReturnProvidedImpl_whenBuilderSets() {
-        AtomicReference<PremiumEvent> seen = new AtomicReference<PremiumEvent>();
+        AtomicReference<PremiumPurchaseEvent> seen = new AtomicReference<PremiumPurchaseEvent>();
         NxEvents capturing = new NxEvents() {
             @Override
-            public void publishPremium(PremiumEvent event) {
+            public void publishPremiumPurchase(PremiumPurchaseEvent event) {
                 seen.set(event);
             }
 
             @Override
-            public void publishOnline(OnlineEvent event) {
+            public void publishServerOnline(ServerOnlineSnapshotEvent event) {
             }
 
             @Override
@@ -54,7 +53,7 @@ class NxEventsConnectContextTest {
                 .build();
 
         PremiumPurchaseEvent event = stubPurchase();
-        ctx.events().publishPremium(event);
+        ctx.events().publishPremiumPurchase(event);
 
         assertSame(event, seen.get());
     }
@@ -72,11 +71,11 @@ class NxEventsConnectContextTest {
         ConnectContext withCustom = withNoOp.toBuilder()
                 .events(new NxEvents() {
                     @Override
-                    public void publishPremium(PremiumEvent event) {
+                    public void publishPremiumPurchase(PremiumPurchaseEvent event) {
                     }
 
                     @Override
-                    public void publishOnline(OnlineEvent event) {
+                    public void publishServerOnline(ServerOnlineSnapshotEvent event) {
                     }
 
                     @Override

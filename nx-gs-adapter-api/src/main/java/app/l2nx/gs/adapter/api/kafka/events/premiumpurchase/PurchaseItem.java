@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.events.premium;
+package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
 
 import org.jspecify.annotations.Nullable;
 

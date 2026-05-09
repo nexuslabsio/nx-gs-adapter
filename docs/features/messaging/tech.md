@@ -8,7 +8,7 @@ Messaging is a built-in capability of `nx-gs-adapter-core` (not a discovered
 `AdapterModule`). It exposes one bidirectional surface to host integration code:
 `ConnectContext.events()` returns an `NxEvents` facade for outbound discrete-fact
 fanout to per-family Kafka topics. Host hooks call typed publish methods
-(`publishPremium`, …) which enqueue into a shared bounded `ArrayBlockingQueue`
+(`publishPremiumPurchase`, …) which enqueue into a shared bounded `ArrayBlockingQueue`
 on a single internal `nx-events-publisher` daemon thread; the daemon Gson-serializes,
 stamps `Nx-Server-Id` + `Nx-Message-Type` headers, derives a partition key from
 the event payload via a hardcoded type-registry, and hands off to the existing
@@ -33,7 +33,7 @@ in Javadoc + an empty `commands` map; the consumer + dispatch runtime is Phase 2
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/events/`
   [planned] — package root for event families
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/events/premium/`
-  [planned] — Phase-1 family; `PremiumEvent` (abstract base),
+  [planned] — Phase-1 family; `PremiumPurchaseEvent` (abstract base),
   `PremiumPurchaseEvent`, `PurchaseItem`, `PurchaseService`, `Payment`,
   `WellKnownServices`
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/commands/`
@@ -56,7 +56,7 @@ in Javadoc + an empty `commands` map; the consumer + dispatch runtime is Phase 2
 Bohpts-side (in `bohpts-core` repo, not this monorepo):
 
 - `bohpts-core/core/src/main/java/l2e/gameserver/l2nx/BohptsPremiumPurchaseHook.java`
-  [planned] — wires CB service-listeners + multisell callbacks → `nxEvents.publishPremium(...)`
+  [planned] — wires CB service-listeners + multisell callbacks → `nxEvents.publishPremiumPurchase(...)`
 
 ## Key components
 
@@ -66,7 +66,7 @@ Bohpts-side (in `bohpts-core` repo, not this monorepo):
 
 - **NxEvents** [planned] (implements R6, R7) — Tier-2-style SPI consumed by host
   integration code. Returned from `ConnectContext.events()`; never null. One
-  method per event family — `publishPremium(PremiumEvent)`. Future families add
+  method per event family — `publishPremiumPurchase(PremiumPurchaseEvent)`. Future families add
   sibling methods without breaking existing callers (binary-compatible).
 
 - **NxEventsImpl** [planned] (implements R7) — adapter-core implementation.
@@ -83,7 +83,7 @@ Bohpts-side (in `bohpts-core` repo, not this monorepo):
   EventTypeBinding>` populated at adapter-core startup. Each binding carries
   `familyKey` (used to look up the topic in `messagingTopics.events`),
   `messageTypeHeader` value, and `Function<Object, byte[]> partitionKeyExtractor`.
-  Phase 1 has exactly one binding (`PremiumPurchaseEvent` → `"premium"` /
+  Phase 1 has exactly one binding (`PremiumPurchaseEvent` → `"premiumpurchase"` /
   `"PremiumPurchaseEvent"` / `characterId-as-long-bytes`).
 
 - **EventsModuleStatus** [planned] (implements R14) — adapter-core renders the
@@ -95,9 +95,9 @@ Bohpts-side (in `bohpts-core` repo, not this monorepo):
   `:nx-gs-commons`. Public API: `generate()`, `extractCreatedAt(UUID)`,
   `fromString(String)`. Pure JDK, ~50 LOC. Java 8 syntax (no `String.isBlank`).
 
-- **PremiumEvent / PremiumPurchaseEvent** [planned] (implements R3) — abstract
+- **PremiumPurchaseEvent / PremiumPurchaseEvent** [planned] (implements R3) — abstract
   family base + Phase-1 concrete subtype. Subclassing pattern is `PremiumX
-  extends PremiumEvent` so Future subtypes (`PremiumRefundEvent`,
+  extends PremiumPurchaseEvent` so Future subtypes (`PremiumRefundEvent`,
   `PremiumGiftReceivedEvent`) plug in without changing `NxEvents`.
 
 - **WellKnownServices** [planned] (implements R3.5) — string constants class,
@@ -130,11 +130,11 @@ End-to-end publish (premium purchase from a community-board buy-noblesse click):
                    Payment.builder().currencyItemId(4037).qty(50).build()))
                .build()))
        .build()`
-   and calls `nxEvents.publishPremium(event)`.
+   and calls `nxEvents.publishPremiumPurchase(event)`.
 3. `NxEventsImpl` calls `EventsPublisher.enqueue(envelope)` where
    `envelope = (event, registryBinding)`. Returns immediately.
 4. `nx-events-publisher` daemon picks up the envelope:
-    - Resolves topic via `messagingTopics.events.get("premium")`.
+    - Resolves topic via `messagingTopics.events.get("premiumpurchase")`.
     - If topic null/missing → log DEBUG, increment `disabled-family-drops`,
       drop. (Tracked separately from `dropped-total` so operators can tell
       "platform didn't issue a topic" from "queue overflow".)
@@ -154,7 +154,7 @@ End-to-end publish (premium purchase from a community-board buy-noblesse click):
 
 Queue-overflow path (drop-oldest):
 
-1. Caller calls `publishPremium(event)`.
+1. Caller calls `publishPremiumPurchase(event)`.
 2. `EventsPublisher.enqueue` checks `queue.remainingCapacity() == 0`.
 3. If so → `queue.poll()` evicts the head, `dropped-total++`, log WARN once
    per second (rate-limited), then `queue.offer(envelope)` (which now succeeds).
@@ -191,7 +191,7 @@ In-memory only; no DB tables, no persistence.
 
 Wire DTOs (Kafka payloads):
 
-- **PremiumPurchaseEvent** [planned] — `kafka.events.premium.PremiumPurchaseEvent`
+- **PremiumPurchaseEvent** [planned] — `kafka.events.premiumpurchase.PremiumPurchaseEvent`
   in `nx-gs-adapter-api`. Field set per spec R3.1.
 - Future families add their own DTOs in `kafka.events.<family>.*` packages.
 
@@ -228,12 +228,12 @@ Wire DTOs (Kafka payloads):
   yet" during brainstorm.
 
 - **Decision:** Per-family typed publish method
-  (`publishPremium(PremiumEvent)`), not generic `publish(NxEvent)`.
+  (`publishPremiumPurchase(PremiumPurchaseEvent)`), not generic `publish(NxEvent)`.
   **Why:** Discoverability — IDE autocomplete shows every family the host can
   publish to. Prevents typos in family names (which `publish(String family,
   Object payload)` would allow). Adding a family is a binary-compatible API
   expansion (host code calls these, doesn't implement them). Within-family
-  growth is free — `PremiumRefundEvent extends PremiumEvent` requires zero
+  growth is free — `PremiumRefundEvent extends PremiumPurchaseEvent` requires zero
   changes to the SPI. Considered: generic `publish(NxEvent)` with a registry
   resolving topic from runtime type. Rejected because the type-to-family
   registry then becomes a string-key bottleneck and the discovery story
@@ -274,10 +274,10 @@ Wire DTOs (Kafka payloads):
   pricing works in L2 and lets the platform compute totals trivially by
   summation.
 
-- **Decision:** Per-family Kafka topic (`<tenant>.gs.events.premium` etc.),
+- **Decision:** Per-family Kafka topic (`<tenant>.gs.events.premiumpurchase` etc.),
   not one shared `<tenant>.gs.events` topic with a `family` discriminator.
   **Why:** Different families want different retention, partitioning, and
-  consumer-lag SLAs. `events.premium` is high-value and long-retained;
+  consumer-lag SLAs. `events.premiumpurchase` is high-value and long-retained;
   `events.server` (online snapshots, periodic) is low-value and short-retained.
   Separate topics let operators tune each independently without affecting
   the others. Within a family, multiple concrete event types share the topic
@@ -320,7 +320,7 @@ Wire DTOs (Kafka payloads):
   `EventTypeRegistry`. Phase 2 candidates: `character`, `clan`, `server`.
 
 - **Add a new concrete event type within an existing family** — declare
-  `Premium<Action>Event extends PremiumEvent`, add registry binding in
+  `Premium<Action>Event extends PremiumPurchaseEvent`, add registry binding in
   `EventTypeRegistry` (same family-key, distinct `messageType` header),
   no `NxEvents` SPI change required. Platform consumer switches on
   `Nx-Message-Type` header. Examples: `PremiumRefundEvent`,

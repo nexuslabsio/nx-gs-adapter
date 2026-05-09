@@ -15,7 +15,7 @@ no tenant / server identity in the envelope.
 This slice introduces two surfaces in `nx-gs-adapter`:
 
 - **Outbound events** — adapter-core capability `NxEvents` for in-game-fact fanout to per-family
-  Kafka topics. Phase 1 ships `events.premium` end-to-end with `PremiumPurchaseEvent` modelling
+  Kafka topics. Phase 1 ships `events.premiumpurchase` end-to-end with `PremiumPurchaseEvent` modelling
   combined item+service purchases with per-line multi-currency payments. Topic slots for
   `events.character` / `events.clan` / `events.server` are provisioned in the wire contract
   but the concrete subtypes are deferred.
@@ -53,7 +53,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
 
 - [todo] R2. `nx-gs-adapter-api.rest.MessagingTopics` POJO MUST expose:
     - `Map<String,String> getEvents()` — event-family → fully-qualified Kafka topic.
-      Phase 1 keys: `"premium"`. Phase-2 reserved keys: `"character"`, `"clan"`,
+      Phase 1 keys: `"premiumpurchase"`. Phase-2 reserved keys: `"character"`, `"clan"`,
       `"server"` (no enforcement; the platform may add or omit any key).
     - `Map<String,String> getCommands()` — command-domain → fully-qualified Kafka topic.
       Phase 1 — empty map (architectural placeholder). Phase-2 reserved keys: `"char"`,
@@ -64,12 +64,12 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
 
 - [todo] R3. `nx-gs-adapter-api` SHIPS the event-family contract:
     - Package `app.l2nx.gs.adapter.api.kafka.events` — root for all event families.
-    - Package `app.l2nx.gs.adapter.api.kafka.events.premium` — Phase-1 family:
-        - `abstract class PremiumEvent` — common base (no fields; pure marker for the
-          per-family typed publish method `NxEvents.publishPremium(PremiumEvent)`).
+    - Package `app.l2nx.gs.adapter.api.kafka.events.premiumpurchase` — Phase-1 family:
+        - `abstract class PremiumPurchaseEvent` — common base (no fields; pure marker for the
+          per-family typed publish method `NxEvents.publishPremiumPurchase(PremiumPurchaseEvent)`).
           Future subtypes `PremiumRefundEvent`, `PremiumGiftReceivedEvent` are added
           here without changing `NxEvents`.
-        - `final class PremiumPurchaseEvent extends PremiumEvent` — fields per R3.1.
+        - `final class PremiumPurchaseEvent extends PremiumPurchaseEvent` — fields per R3.1.
         - `final class PurchaseItem` — fields per R3.2.
         - `final class PurchaseService` — fields per R3.3.
         - `final class Payment` — fields per R3.4.
@@ -157,7 +157,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
 
 - [todo] R7. `app.l2nx.gs.adapter.api.spi.NxEvents` interface (new SPI, package
   `spi` to align with existing tier-1 SPIs) MUST expose:
-    - `void publishPremium(PremiumEvent event)` — Phase 1 family entrypoint.
+    - `void publishPremiumPurchase(PremiumPurchaseEvent event)` — Phase 1 family entrypoint.
       Future families add sibling methods (`publishCharacter`, `publishClan`,
       `publishServer`) — adding a method is a binary-compatible API expansion
       because tenant code calls these directly, doesn't implement them.
@@ -190,7 +190,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
 - [todo] R9. The type registry inside adapter-core MUST resolve, per concrete
   event class:
     - **Topic** — looked up by family key in `messagingTopics.events`
-      (`PremiumPurchaseEvent` → key `"premium"`).
+      (`PremiumPurchaseEvent` → key `"premiumpurchase"`).
     - **MessageType header value** — concrete class simple name
       (`"PremiumPurchaseEvent"`).
     - **Partition key extractor** — function `T -> byte[]`. Phase-1 mappings:
@@ -204,7 +204,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
     - Family in `messagingTopics.events` map missing → **family is disabled.**
       `NxEvents.publishX(...)` for that family becomes a no-op + DEBUG log
       ("events.<family> disabled — no topic configured"). Heartbeat surfaces
-      `disabledFamilies: ["premium", ...]` on the events module slot.
+      `disabledFamilies: ["premiumpurchase", ...]` on the events module slot.
     - Topic present but Kafka producer not yet ready (i.e. `publishX` called
       before `onConnect` completes) → drop + DEBUG log. Phase 1 does NOT buffer
       pre-connect events; host code is expected to wire publish hooks behind
@@ -220,10 +220,10 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
       `LevelAnswerListener`, `RecoveryPkAnswerListener`,
       `RecoveryKarmaAnswerListener`, `RecoveryVitalityAnswerListener`,
       `ReputationAnswerListener`, `AugmentationAnswerListener`, …) →
-      `publishPremium(PremiumPurchaseEvent.builder().services(...).build())`.
+      `publishPremiumPurchase(PremiumPurchaseEvent.builder().services(...).build())`.
     - Multisell custom-shop callback (custom shop entry IDs `20005`/`20011`/`…`/
       `20204` — Coin-of-Luck-priced multisells per legacy datapack) →
-      `publishPremium(PremiumPurchaseEvent.builder().items(...).build())`.
+      `publishPremiumPurchase(PremiumPurchaseEvent.builder().items(...).build())`.
     - Hook acquires the `NxEvents` facade once at adapter-bootstrap connect
       callback (host receives the connected `ConnectContext` via existing
       bohpts ↔ adapter wiring), caches it for the duration of the session.
@@ -342,7 +342,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
   semantically malformed. Producer side MUST NOT emit; if it does, consumer logs
   WARN and dedupes-by-`eventId` so the malformed envelope doesn't crash a batch.
 - **Queue full during a burst** — drop-oldest evicts the head; head was likely
-  a low-priority `ServerOnlineSnapshotEvent` from the previous tick. Premium
+  a low-priority `ServerServerOnlineSnapshotEvent` from the previous tick. Premium
   events at typical L2 server cadence (≤ 100/min) never approach the 10k cap.
 - **Clock skew producing UUIDv7 with past timestamp** — `extractCreatedAt`
   returns the literal embedded timestamp. Platform consumer is responsible for
@@ -352,7 +352,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
   acceptable for at-least-once.
 - **Adapter shuts down mid-publish** — drain timeout (5s default) cleans the
   queue; remainder dropped + counted. Platform will see a publish gap.
-- **Host calls `publishPremium(null)`** — adapter-core treats `null` as no-op
+- **Host calls `publishPremiumPurchase(null)`** — adapter-core treats `null` as no-op
   with WARN log (does not throw, never propagates to host thread).
 
 ## Open questions
@@ -365,7 +365,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
   `nx-gs-adapter-api`. The api charter forbids any runtime deps and forbids
   Java-11 syntax; the existing `nx-libs/common.UUIDv7` uses both. Hand-rolled
   port keeps zero deps and Java-8 compat.]
-- [resolved: One method per event family (`publishPremium(PremiumEvent)`) with
+- [resolved: One method per event family (`publishPremiumPurchase(PremiumPurchaseEvent)`) with
   abstract base superclass per family. Future subtypes within a family add
   zero new methods. Discoverability over a single generic `publish(NxEvent)`.]
 - [resolved: `params` shape is `Map<String,String>` on both `PurchaseItem` and

@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
-import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 
 /**
  * Default {@link NxEvents} implementation used when {@link ConnectContext} is
@@ -12,7 +12,7 @@ import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
  * <p>Package-private — host code never references this directly. The contract
  * "publish before connect → no-op + DEBUG log" is intentional; the actual
  * adapter-core implementation produces the DEBUG log when its publisher is
- * not yet ready. This fallback exists so {@code ctx.events().publishPremium(...)}
+ * not yet ready. This fallback exists so {@code ctx.events().publishX(...)}
  * never throws {@code NullPointerException} on a partially-initialized
  * context.</p>
  */
@@ -24,11 +24,11 @@ final class NoOpEvents implements NxEvents {
     }
 
     @Override
-    public void publishPremium(PremiumEvent event) {
+    public void publishPremiumPurchase(PremiumPurchaseEvent event) {
     }
 
     @Override
-    public void publishOnline(OnlineEvent event) {
+    public void publishServerOnline(ServerOnlineSnapshotEvent event) {
     }
 
     @Override

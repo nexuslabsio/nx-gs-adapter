@@ -1,13 +1,13 @@
-package app.l2nx.gs.adapter.api.kafka.events.online;
+package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 
 /**
- * Wire DTO published to the {@code online} family topic
- * ({@code <tenant>.gs.events.serveronline}) on a host-driven cadence. Carries a
- * point-in-time breakdown of game-server population by activity bucket.
+ * Wire DTO published to the {@code serveronline} family topic
+ * ({@code <tenant>.gs.events.serveronline}) on a host-driven cadence. Carries
+ * a point-in-time breakdown of game-server population by activity bucket.
  *
  * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire timestamp is
  * encoded in the upper 48 bits — extractable via
@@ -17,24 +17,24 @@ import java.util.*;
  * timestamp.</p>
  *
  * <p>{@link #getBuckets() buckets} is an open map — keys SHOULD be drawn
- * from {@link WellKnownOnlineBuckets} where the host has the corresponding
- * concept; arbitrary additional keys are permitted for host-specific
- * buckets. There is no top-level {@code total} field: buckets can overlap
- * (a fishing player typically counts in {@code FISHING}, {@code REAL}, and
- * {@code ONLINE}), so the host publishes
- * {@link WellKnownOnlineBuckets#TOTAL} as an explicit map entry when it
- * tracks a meaningful total.</p>
+ * from {@link WellKnownServerOnlineBuckets} where the host has the
+ * corresponding concept; arbitrary additional keys are permitted for
+ * host-specific buckets. There is no top-level {@code total} field: buckets
+ * can overlap (a fishing player typically counts in {@code FISHING},
+ * {@code REAL}, and {@code ONLINE}), so the host publishes
+ * {@link WellKnownServerOnlineBuckets#TOTAL} as an explicit map entry when
+ * it tracks a meaningful total.</p>
  *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
  * parameter names so Gson can deserialize without {@code @JsonProperty}.</p>
  */
-public final class OnlineSnapshotEvent extends OnlineEvent {
+public final class ServerOnlineSnapshotEvent {
 
     private final UUID eventId;
     private final Map<String, Long> buckets;
 
-    public OnlineSnapshotEvent(UUID eventId,
-                               @Nullable Map<String, Long> buckets) {
+    public ServerOnlineSnapshotEvent(UUID eventId,
+                                     @Nullable Map<String, Long> buckets) {
         this.eventId = eventId;
         this.buckets = freezeMap(buckets);
     }
@@ -53,8 +53,8 @@ public final class OnlineSnapshotEvent extends OnlineEvent {
      * map is unmodifiable; mutation attempts throw
      * {@link UnsupportedOperationException}.
      *
-     * <p>Keys: see {@link WellKnownOnlineBuckets} for the canonical set.
-     * Values: non-negative long counts.</p>
+     * <p>Keys: see {@link WellKnownServerOnlineBuckets} for the canonical
+     * set. Values: non-negative long counts.</p>
      */
     public Map<String, Long> getBuckets() {
         return buckets;
@@ -80,8 +80,8 @@ public final class OnlineSnapshotEvent extends OnlineEvent {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof OnlineSnapshotEvent)) return false;
-        OnlineSnapshotEvent that = (OnlineSnapshotEvent) o;
+        if (!(o instanceof ServerOnlineSnapshotEvent)) return false;
+        ServerOnlineSnapshotEvent that = (ServerOnlineSnapshotEvent) o;
         return Objects.equals(eventId, that.eventId)
                 && Objects.equals(buckets, that.buckets);
     }
@@ -93,7 +93,7 @@ public final class OnlineSnapshotEvent extends OnlineEvent {
 
     @Override
     public String toString() {
-        return "OnlineSnapshotEvent[eventId=" + eventId
+        return "ServerOnlineSnapshotEvent[eventId=" + eventId
                 + ", buckets=" + buckets + "]";
     }
 
@@ -111,8 +111,8 @@ public final class OnlineSnapshotEvent extends OnlineEvent {
             return this;
         }
 
-        public OnlineSnapshotEvent build() {
-            return new OnlineSnapshotEvent(eventId, buckets);
+        public ServerOnlineSnapshotEvent build() {
+            return new ServerOnlineSnapshotEvent(eventId, buckets);
         }
     }
 }

@@ -1,7 +1,7 @@
 package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
-import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.ops.EventsStats;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.commons.UUIDv7;

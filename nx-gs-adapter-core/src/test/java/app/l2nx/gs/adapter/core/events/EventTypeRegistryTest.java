@@ -1,10 +1,10 @@
 package app.l2nx.gs.adapter.core.events;
 
-import app.l2nx.gs.adapter.api.kafka.events.online.OnlineSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreTradeEvent;
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.commons.UUIDv7;
 import org.junit.jupiter.api.Test;
 
@@ -45,23 +45,23 @@ class EventTypeRegistryTest {
     }
 
     @Test
-    void knownFamilies_shouldContainPremium() {
+    void knownFamilies_shouldContainPremiumPurchase() {
         assertTrue(new EventTypeRegistry().knownFamilies().contains("premiumpurchase"));
     }
 
     @Test
-    void lookup_shouldResolveOnlineSnapshotEvent() {
-        EventTypeBinding binding = new EventTypeRegistry().lookup(OnlineSnapshotEvent.class);
+    void lookup_shouldResolveServerOnlineSnapshotEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(ServerOnlineSnapshotEvent.class);
 
         assertNotNull(binding);
         assertEquals("serveronline", binding.familyKey());
-        assertEquals("OnlineSnapshotEvent", binding.messageType());
+        assertEquals("ServerOnlineSnapshotEvent", binding.messageType());
     }
 
     @Test
-    void partitionKeyExtractor_shouldReturnNull_forOnlineSnapshotEvent() {
-        EventTypeBinding binding = new EventTypeRegistry().lookup(OnlineSnapshotEvent.class);
-        OnlineSnapshotEvent event = OnlineSnapshotEvent.builder()
+    void partitionKeyExtractor_shouldReturnNull_forServerOnlineSnapshotEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(ServerOnlineSnapshotEvent.class);
+        ServerOnlineSnapshotEvent event = ServerOnlineSnapshotEvent.builder()
                 .eventId(UUIDv7.generate())
                 .buckets(Collections.singletonMap("total", 100L))
                 .build();
@@ -70,7 +70,7 @@ class EventTypeRegistryTest {
     }
 
     @Test
-    void knownFamilies_shouldContainOnline() {
+    void knownFamilies_shouldContainServerOnline() {
         assertTrue(new EventTypeRegistry().knownFamilies().contains("serveronline"));
     }
 
