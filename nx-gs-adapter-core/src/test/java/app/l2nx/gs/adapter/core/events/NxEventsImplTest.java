@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -114,11 +115,13 @@ class NxEventsImplTest {
     @Test
     void publishOnline_shouldEnqueueIntoPublisher() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
-        ConcurrentLinkedQueue<byte[]> sentKeys = new ConcurrentLinkedQueue<byte[]>();
+        // ConcurrentLinkedQueue rejects nulls, so partition-key=null observation
+        // is recorded via a flag rather than queueing the byte[].
+        AtomicBoolean partitionKeyWasNull = new AtomicBoolean(false);
         CountDownLatch latch = new CountDownLatch(1);
         EventsPublisher.Sender sender = (record, callback) -> {
             sentValues.add(record.value());
-            sentKeys.add(record.key());
+            partitionKeyWasNull.set(record.key() == null);
             callback.onCompletion(null, null);
             latch.countDown();
         };
@@ -139,7 +142,8 @@ class NxEventsImplTest {
         assertTrue(latch.await(2, TimeUnit.SECONDS), "publishOnline did not reach sender");
         assertEquals(1, sentValues.size());
         assertEquals(event, sentValues.peek());
-        assertNull(sentKeys.peek(), "online snapshot partition key must be null (round-robin)");
+        assertTrue(partitionKeyWasNull.get(),
+                "online snapshot partition key must be null (round-robin)");
     }
 
     @Test

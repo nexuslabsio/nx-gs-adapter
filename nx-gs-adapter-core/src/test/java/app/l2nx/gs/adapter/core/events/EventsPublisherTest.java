@@ -186,6 +186,7 @@ class EventsPublisherTest {
     void currentStatus_shouldReportNoDisabledFamilies_whenAllConfigured() {
         Map<String, String> topics = new HashMap<String, String>();
         topics.put("premium", "acme.gs.events.premium");
+        topics.put("online", "acme.gs.events.online");
         publisher = new EventsPublisher(topics, noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
 
         ModuleStatus status = publisher.currentStatus();
