@@ -5,8 +5,8 @@ import org.jspecify.annotations.Nullable;
 import java.util.*;
 
 /**
- * Wire DTO published to the {@code private_store} family topic
- * ({@code <tenant>.gs.events.private_store}) when a private-store deal is
+ * Wire DTO published to the {@code privatestore} family topic
+ * ({@code <tenant>.gs.events.privatestore}) when a private-store deal is
  * finalized on the game thread. One event represents one transaction —
  * possibly multi-line if the counterparty atomically acquired several
  * positions in a single click.

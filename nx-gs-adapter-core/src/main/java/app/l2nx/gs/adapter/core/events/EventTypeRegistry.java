@@ -50,17 +50,17 @@ final class EventTypeRegistry {
         // (filter by buyerId or sellerId, sort by UUIDv7 timestamp), not a
         // partitioning concern.
         map.put(PrivateStoreTradeEvent.class, new EventTypeBinding(
-                "private_store",
+                "privatestore",
                 "PrivateStoreTradeEvent",
                 evt -> null));
         // Snapshot events partition by itemId — all updates for the same item
         // land on the same partition for ordered consumption / topic-compaction-
         // friendly "latest known book per item" caching.
         map.put(PrivateStoreSnapshotEvent.class, new EventTypeBinding(
-                "private_store",
+                "privatestore",
                 "PrivateStoreSnapshotEvent",
                 evt -> LongBytes.bigEndian(((PrivateStoreSnapshotEvent) evt).getItemId())));
-        families.add("private_store");
+        families.add("privatestore");
 
         this.bindings = Collections.unmodifiableMap(map);
         this.familyKeys = Collections.unmodifiableSet(families);

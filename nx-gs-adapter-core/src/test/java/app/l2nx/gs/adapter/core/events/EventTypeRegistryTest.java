@@ -79,7 +79,7 @@ class EventTypeRegistryTest {
         EventTypeBinding binding = new EventTypeRegistry().lookup(PrivateStoreTradeEvent.class);
 
         assertNotNull(binding);
-        assertEquals("private_store", binding.familyKey());
+        assertEquals("privatestore", binding.familyKey());
         assertEquals("PrivateStoreTradeEvent", binding.messageType());
     }
 
@@ -100,7 +100,7 @@ class EventTypeRegistryTest {
         EventTypeBinding binding = new EventTypeRegistry().lookup(PrivateStoreSnapshotEvent.class);
 
         assertNotNull(binding);
-        assertEquals("private_store", binding.familyKey());
+        assertEquals("privatestore", binding.familyKey());
         assertEquals("PrivateStoreSnapshotEvent", binding.messageType());
     }
 
@@ -122,6 +122,6 @@ class EventTypeRegistryTest {
 
     @Test
     void knownFamilies_shouldContainPrivateStore() {
-        assertTrue(new EventTypeRegistry().knownFamilies().contains("private_store"));
+        assertTrue(new EventTypeRegistry().knownFamilies().contains("privatestore"));
     }
 }

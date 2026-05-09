@@ -216,7 +216,7 @@ class NxEventsImplTest {
         };
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("private_store", "acme.gs.events.private_store"),
+                Collections.singletonMap("privatestore", "acme.gs.events.privatestore"),
                 sender, cfg(50, 500L), registry);
         publisher.start();
 
@@ -249,7 +249,7 @@ class NxEventsImplTest {
         };
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("private_store", "acme.gs.events.private_store"),
+                Collections.singletonMap("privatestore", "acme.gs.events.privatestore"),
                 sender, cfg(50, 500L), registry);
         publisher.start();
 
@@ -273,7 +273,7 @@ class NxEventsImplTest {
     void publishPrivateStore_shouldNoOp_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("private_store", "acme.gs.events.private_store"),
+                Collections.singletonMap("privatestore", "acme.gs.events.privatestore"),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
@@ -288,7 +288,7 @@ class NxEventsImplTest {
     void publishPrivateStore_shouldDrop_forUnregisteredSubtype() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
-                Collections.singletonMap("private_store", "acme.gs.events.private_store"),
+                Collections.singletonMap("privatestore", "acme.gs.events.privatestore"),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 

@@ -80,7 +80,7 @@ public interface NxEvents {
     void publishOnline(OnlineEvent event);
 
     /**
-     * Publish an event in the {@code private_store} family.
+     * Publish an event in the {@code privatestore} family.
      *
      * <p>{@link PrivateStoreEvent} is the family's abstract base; concrete
      * subtypes ({@code PrivateStoreTradeEvent} /

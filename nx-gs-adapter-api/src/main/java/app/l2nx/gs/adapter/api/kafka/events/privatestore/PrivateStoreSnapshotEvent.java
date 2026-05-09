@@ -5,8 +5,8 @@ import org.jspecify.annotations.Nullable;
 import java.util.*;
 
 /**
- * Wire DTO published to the {@code private_store} family topic
- * ({@code <tenant>.gs.events.private_store}) by a host-managed daemon when
+ * Wire DTO published to the {@code privatestore} family topic
+ * ({@code <tenant>.gs.events.privatestore}) by a host-managed daemon when
  * the order book for one {@code (itemId, side)} pair has changed since the
  * previous tick. Carries the full per-pair order book at the snapshot tick —
  * NOT a delta.

@@ -1,7 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
 /**
- * Marker base for {@code events.private_store} family DTOs. Carries no fields —
+ * Marker base for {@code events.privatestore} family DTOs. Carries no fields —
  * its sole purpose is the type bound on
  * {@code NxEvents.publishPrivateStore(PrivateStoreEvent)} so future subtypes
  * plug in without changing the publish-side SPI.
