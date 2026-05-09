@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
+import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
 
 /**
@@ -23,6 +24,9 @@ final class NoOpEvents implements NxEvents {
 
     @Override
     public void publishPremium(PremiumEvent event) {
-        // intentional no-op — see class Javadoc
+    }
+
+    @Override
+    public void publishOnline(OnlineEvent event) {
     }
 }

@@ -22,9 +22,16 @@ by the L2NX game-server adapter and its consumers. Published as
 - `app.l2nx.gs.adapter.api.kafka` — Kafka message payloads + header contract
   (`HeartbeatEvent`, `NxHeaders`)
 - `app.l2nx.gs.adapter.api.kafka.events.<family>` — outbound discrete-fact event
-  DTOs grouped by family; Phase 1 ships `events.premium` (`PremiumEvent` abstract
-  base + `PremiumPurchaseEvent` + `PurchaseItem` / `PurchaseService` / `Payment` +
-  `WellKnownServices` constants)
+  DTOs grouped by family. Shipped families:
+    - `events.premium` — `PremiumEvent` abstract base + `PremiumPurchaseEvent` +
+      `PurchaseItem` / `PurchaseService` / `Payment` + `WellKnownServices`
+      constants. Per-fact, host-pushed via `NxEvents.publishPremium`.
+    - `events.online` — `OnlineEvent` abstract base + `OnlineSnapshotEvent`
+      (UUIDv7 `eventId` + open `Map<String, Long> buckets`) +
+      `WellKnownOnlineBuckets` lower_snake_case constants (`total` /
+      `online` / `real` / `offline_trade` / `fishing` / `phantoms`).
+      Periodic snapshots, host-pushed via `NxEvents.publishOnline` on a
+      host-managed cadence.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:

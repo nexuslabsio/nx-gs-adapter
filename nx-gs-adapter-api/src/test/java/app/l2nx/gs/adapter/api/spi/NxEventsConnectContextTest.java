@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
+import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
@@ -34,6 +35,10 @@ class NxEventsConnectContextTest {
             public void publishPremium(PremiumEvent event) {
                 seen.set(event);
             }
+
+            @Override
+            public void publishOnline(OnlineEvent event) {
+            }
         };
 
         ConnectContext ctx = ConnectContext.builder()
@@ -63,6 +68,10 @@ class NxEventsConnectContextTest {
                 .events(new NxEvents() {
                     @Override
                     public void publishPremium(PremiumEvent event) {
+                    }
+
+                    @Override
+                    public void publishOnline(OnlineEvent event) {
                     }
                 })
                 .build();

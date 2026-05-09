@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.events;
 
+import app.l2nx.gs.adapter.api.kafka.events.online.OnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
 import app.l2nx.gs.commons.bytes.LongBytes;
 import org.jspecify.annotations.Nullable;
@@ -10,10 +11,6 @@ import java.util.*;
  * Hardcoded type-to-wire-metadata registry for outbound events. One entry
  * per concrete event class shipped in {@code nx-gs-adapter-api}; adding a new
  * concrete event type means appending one entry here.
- *
- * <p>Phase 1 ships exactly one binding: {@code PremiumPurchaseEvent} →
- * family {@code "premium"} / message-type {@code "PremiumPurchaseEvent"} /
- * partition-key {@code characterId} (8 raw bytes, big-endian).</p>
  *
  * <p>Not pluggable — once 3+ event families exist, this graduates to a
  * proper SPI. YAGNI for now.</p>
@@ -30,14 +27,21 @@ final class EventTypeRegistry {
 
     EventTypeRegistry() {
         Map<Class<?>, EventTypeBinding> map = new HashMap<Class<?>, EventTypeBinding>();
-        Set<String> families = new LinkedHashSet<String>();
+        Set<String> families = new LinkedHashSet<>();
 
-        // Premium family — Phase 1 single concrete subtype.
         map.put(PremiumPurchaseEvent.class, new EventTypeBinding(
                 "premium",
                 "PremiumPurchaseEvent",
                 evt -> LongBytes.bigEndian(((PremiumPurchaseEvent) evt).getCharacterId())));
         families.add("premium");
+
+        // Snapshots have no natural per-entity partition key; null → round-robin,
+        // consumers group/order by Nx-Server-Id header + UUIDv7 eventId.
+        map.put(OnlineSnapshotEvent.class, new EventTypeBinding(
+                "online",
+                "OnlineSnapshotEvent",
+                evt -> null));
+        families.add("online");
 
         this.bindings = Collections.unmodifiableMap(map);
         this.familyKeys = Collections.unmodifiableSet(families);

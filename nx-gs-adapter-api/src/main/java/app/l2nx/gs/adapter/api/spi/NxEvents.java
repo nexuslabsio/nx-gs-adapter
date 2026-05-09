@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
+import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
 
 /**
@@ -53,4 +54,27 @@ public interface NxEvents {
      *              with a WARN log entry (does not throw — game-loop safety).
      */
     void publishPremium(PremiumEvent event);
+
+    /**
+     * Publish an event in the {@code online} family.
+     *
+     * <p>{@link OnlineEvent} is the family's abstract base; the concrete
+     * subtype (Phase 1: {@code OnlineSnapshotEvent}) is reflected on the
+     * platform side via the {@code Nx-Message-Type} Kafka header — adapter-core
+     * stamps this header automatically.</p>
+     *
+     * <p>Cadence is host-managed: the host runs its own scheduler, computes
+     * a population breakdown (e.g. by walking its in-memory player set),
+     * builds an {@code OnlineSnapshotEvent} and calls this method. The
+     * adapter neither dictates the interval nor pulls — it only provides
+     * the wire path. Typical cadence is 30–60 seconds.</p>
+     *
+     * <p>Returns immediately after enqueueing. Same delivery semantics as
+     * {@link #publishPremium} — at-least-once, idempotency on UUIDv7
+     * {@code eventId}.</p>
+     *
+     * @param event non-null online event; {@code null} is treated as a no-op
+     *              with a WARN log entry (does not throw — game-loop safety).
+     */
+    void publishOnline(OnlineEvent event);
 }

@@ -4,6 +4,7 @@ import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.ErrorCode;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
 import app.l2nx.gs.adapter.api.spi.CommandHandler;
 import app.l2nx.gs.adapter.api.spi.HostExecutorTimeoutException;
@@ -59,6 +60,10 @@ class CommandsConsumerTest {
     static final class FakeNxEvents implements NxEvents {
         @Override
         public void publishPremium(PremiumEvent event) {
+        }
+
+        @Override
+        public void publishOnline(OnlineEvent event) {
         }
     }
 

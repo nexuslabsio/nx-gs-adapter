@@ -1,5 +1,8 @@
 package app.l2nx.gs.adapter.core.events;
 
+import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
+import app.l2nx.gs.adapter.api.kafka.events.online.OnlineSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.online.WellKnownOnlineBuckets;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumPurchaseEvent;
 import app.l2nx.gs.commons.UUIDv7;
@@ -11,8 +14,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class NxEventsImplTest {
 
@@ -101,6 +103,89 @@ class NxEventsImplTest {
         events.publishPremium(PremiumPurchaseEvent.builder()
                 .eventId(UUIDv7.generate())
                 .characterId(42L)
+                .build());
+
+        assertEquals(0, publisher.queueDepth(),
+                "disabled family must not enqueue an envelope");
+        assertEquals(0L, publisher.droppedTotal(),
+                "disabled family must not count toward dropped-total");
+    }
+
+    @Test
+    void publishOnline_shouldEnqueueIntoPublisher() throws InterruptedException {
+        ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
+        ConcurrentLinkedQueue<byte[]> sentKeys = new ConcurrentLinkedQueue<byte[]>();
+        CountDownLatch latch = new CountDownLatch(1);
+        EventsPublisher.Sender sender = (record, callback) -> {
+            sentValues.add(record.value());
+            sentKeys.add(record.key());
+            callback.onCompletion(null, null);
+            latch.countDown();
+        };
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("online", "acme.gs.events.online"),
+                sender, cfg(50, 500L), registry);
+        publisher.start();
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        OnlineSnapshotEvent event = OnlineSnapshotEvent.builder()
+                .eventId(UUIDv7.generate())
+                .buckets(Collections.singletonMap(WellKnownOnlineBuckets.TOTAL, 1808L))
+                .build();
+
+        events.publishOnline(event);
+
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishOnline did not reach sender");
+        assertEquals(1, sentValues.size());
+        assertEquals(event, sentValues.peek());
+        assertNull(sentKeys.peek(), "online snapshot partition key must be null (round-robin)");
+    }
+
+    @Test
+    void publishOnline_shouldNoOp_forNullEvent() {
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("online", "acme.gs.events.online"),
+                (r, c) -> {
+                }, cfg(5, 0L), registry);
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        events.publishOnline(null);
+
+        assertEquals(0, publisher.queueDepth());
+        assertEquals(0L, publisher.droppedTotal());
+    }
+
+    @Test
+    void publishOnline_shouldDrop_forUnregisteredSubtype() {
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("online", "acme.gs.events.online"),
+                (r, c) -> {
+                }, cfg(5, 0L), registry);
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        // Anonymous subtype with no registry binding.
+        events.publishOnline(new OnlineEvent() {
+        });
+
+        assertEquals(0, publisher.queueDepth());
+        assertEquals(0L, publisher.droppedTotal());
+    }
+
+    @Test
+    void publishOnline_shouldShortCircuit_whenFamilyTopicMissing() {
+        // No topic for "online" → publishOnline short-circuits BEFORE enqueueing.
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(Collections.emptyMap(),
+                (r, c) -> {
+                }, cfg(5, 0L), registry);
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        events.publishOnline(OnlineSnapshotEvent.builder()
+                .eventId(UUIDv7.generate())
+                .buckets(Collections.singletonMap(WellKnownOnlineBuckets.TOTAL, 1L))
                 .build());
 
         assertEquals(0, publisher.queueDepth(),

@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.events;
 
+import app.l2nx.gs.adapter.api.kafka.events.online.OnlineEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premium.PremiumEvent;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.log.NxLog;
@@ -31,8 +32,17 @@ final class NxEventsImpl implements NxEvents {
 
     @Override
     public void publishPremium(PremiumEvent event) {
+        dispatch(event);
+    }
+
+    @Override
+    public void publishOnline(OnlineEvent event) {
+        dispatch(event);
+    }
+
+    private void dispatch(Object event) {
         if (event == null) {
-            log.warn("publishPremium called with null event — dropping");
+            log.warn("publish called with null event — dropping");
             return;
         }
         EventTypeBinding binding = registry.lookup(event.getClass());

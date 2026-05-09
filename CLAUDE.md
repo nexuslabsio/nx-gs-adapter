@@ -30,7 +30,12 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   echoed onto reply records). Hosts the per-family event DTOs under
   `kafka.events.<family>` (Phase 1: `events.premium.PremiumPurchaseEvent` with
   multi-line items + services + per-line multi-currency `Payment`s, plus
-  `WellKnownServices` constants); the inbound-commands marker
+  `WellKnownServices` constants; `events.online.OnlineSnapshotEvent` —
+  periodic population breakdown carrying UUIDv7 `eventId` + open
+  `Map<String, Long> buckets` keyed by `WellKnownOnlineBuckets`
+  lower_snake_case constants (`total` / `online` / `real` /
+  `offline_trade` / `fishing` / `phantoms`), cadence host-managed);
+  the inbound-commands marker
   `kafka.commands.NxCommand<R>` + reply envelope `kafka.commands.CommandResult<R>`
   with structured `kafka.commands.ErrorCode` enum (`NOT_FOUND` / `INVALID_STATE` /
   `FORBIDDEN` / `RATE_LIMITED` / `UNAVAILABLE` / `VALIDATION_FAILED` /
