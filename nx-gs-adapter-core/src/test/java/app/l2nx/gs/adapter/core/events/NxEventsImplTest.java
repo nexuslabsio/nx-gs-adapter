@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreTradeEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.WellKnownServerOnlineBuckets;
 import app.l2nx.gs.commons.UUIDv7;
@@ -94,7 +93,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishServerOnline_shouldEnqueueIntoPublisher() throws InterruptedException {
+    void publishServerOnlineSnapshot_shouldEnqueueIntoPublisher() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
         // ConcurrentLinkedQueue rejects nulls, so partition-key=null observation
         // is recorded via a flag rather than queueing the byte[].
@@ -118,9 +117,9 @@ class NxEventsImplTest {
                 .buckets(Collections.singletonMap(WellKnownServerOnlineBuckets.TOTAL, 1808L))
                 .build();
 
-        events.publishServerOnline(event);
+        events.publishServerOnlineSnapshot(event);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishServerOnline did not reach sender");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishServerOnlineSnapshot did not reach sender");
         assertEquals(1, sentValues.size());
         assertEquals(event, sentValues.peek());
         assertTrue(partitionKeyWasNull.get(),
@@ -128,7 +127,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishServerOnline_shouldNoOp_forNullEvent() {
+    void publishServerOnlineSnapshot_shouldNoOp_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
                 Collections.singletonMap("serveronline", "acme.gs.events.serveronline"),
@@ -136,21 +135,21 @@ class NxEventsImplTest {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishServerOnline(null);
+        events.publishServerOnlineSnapshot(null);
 
         assertEquals(0, publisher.queueDepth());
         assertEquals(0L, publisher.droppedTotal());
     }
 
     @Test
-    void publishServerOnline_shouldShortCircuit_whenFamilyTopicMissing() {
+    void publishServerOnlineSnapshot_shouldShortCircuit_whenFamilyTopicMissing() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(Collections.emptyMap(),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishServerOnline(ServerOnlineSnapshotEvent.builder()
+        events.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent.builder()
                 .eventId(UUIDv7.generate())
                 .buckets(Collections.singletonMap(WellKnownServerOnlineBuckets.TOTAL, 1L))
                 .build());
@@ -162,7 +161,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishPrivateStore_shouldEnqueueTradeEventRoundRobin() throws InterruptedException {
+    void publishPrivateStorePurchase_shouldEnqueueRoundRobin() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
         AtomicBoolean partitionKeyWasNull = new AtomicBoolean(false);
         CountDownLatch latch = new CountDownLatch(1);
@@ -179,23 +178,23 @@ class NxEventsImplTest {
         publisher.start();
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        PrivateStoreTradeEvent event = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUIDv7.generate())
                 .storeType(PrivateStoreSide.ASK)
                 .sellerId(1L).buyerId(2L)
                 .build();
 
-        events.publishPrivateStore(event);
+        events.publishPrivateStorePurchase(event);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPrivateStore did not reach sender");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPrivateStorePurchase did not reach sender");
         assertEquals(1, sentValues.size());
         assertEquals(event, sentValues.peek());
         assertTrue(partitionKeyWasNull.get(),
-                "private-store trade partition key must be null (round-robin)");
+                "private-store purchase partition key must be null (round-robin)");
     }
 
     @Test
-    void publishPrivateStore_shouldEnqueueSnapshotEventPartitionedByItemId() throws InterruptedException {
+    void publishPrivateStoreSnapshot_shouldEnqueuePartitionedByItemId() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
         ConcurrentLinkedQueue<byte[]> sentKeys = new ConcurrentLinkedQueue<byte[]>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -218,9 +217,9 @@ class NxEventsImplTest {
                 .side(PrivateStoreSide.ASK)
                 .build();
 
-        events.publishPrivateStore(event);
+        events.publishPrivateStoreSnapshot(event);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPrivateStore did not reach sender");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPrivateStoreSnapshot did not reach sender");
         assertEquals(1, sentValues.size());
         assertEquals(event, sentValues.peek());
         assertArrayEquals(LongBytes.bigEndian(0xCAFEBABEL), sentKeys.peek(),
@@ -228,7 +227,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishPrivateStore_shouldNoOp_forNullEvent() {
+    void publishPrivateStorePurchase_shouldNoOp_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
                 Collections.singletonMap("privatestore", "acme.gs.events.privatestore"),
@@ -236,14 +235,14 @@ class NxEventsImplTest {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPrivateStore(null);
+        events.publishPrivateStorePurchase(null);
 
         assertEquals(0, publisher.queueDepth());
         assertEquals(0L, publisher.droppedTotal());
     }
 
     @Test
-    void publishPrivateStore_shouldDrop_forUnregisteredSubtype() {
+    void publishPrivateStoreSnapshot_shouldNoOp_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
                 Collections.singletonMap("privatestore", "acme.gs.events.privatestore"),
@@ -251,22 +250,21 @@ class NxEventsImplTest {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPrivateStore(new PrivateStoreEvent() {
-        });
+        events.publishPrivateStoreSnapshot(null);
 
         assertEquals(0, publisher.queueDepth());
         assertEquals(0L, publisher.droppedTotal());
     }
 
     @Test
-    void publishPrivateStore_shouldShortCircuit_whenFamilyTopicMissing() {
+    void publishPrivateStorePurchase_shouldShortCircuit_whenFamilyTopicMissing() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(Collections.emptyMap(),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPrivateStore(PrivateStoreTradeEvent.builder()
+        events.publishPrivateStorePurchase(PrivateStorePurchaseEvent.builder()
                 .eventId(UUIDv7.generate())
                 .storeType(PrivateStoreSide.ASK)
                 .sellerId(1L).buyerId(2L)

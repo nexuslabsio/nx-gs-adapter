@@ -34,15 +34,15 @@ by the L2NX game-server adapter and its consumers. Published as
       `WellKnownServerOnlineBuckets` lower_snake_case constants (`total` /
       `online` / `real` / `offline_trade` / `fishing` / `phantoms`).
       Single-event family; periodic snapshots, host-pushed via
-      `NxEvents.publishServerOnline(ServerOnlineSnapshotEvent)` on a
-      host-managed cadence.
-    - `events.privatestore` — `PrivateStoreEvent` abstract base +
-      `PrivateStoreTradeEvent` (closed-deal facts) +
-      `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
-      `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
-      `WellKnownElements` constants. Multi-event family; both subtypes
-      ride one topic, host-pushed via
-      `NxEvents.publishPrivateStore(PrivateStoreEvent)`.
+      `NxEvents.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)` on
+      a host-managed cadence.
+    - `events.privatestore` — `PrivateStorePurchaseEvent` (closed-deal facts)
+        + `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
+          `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
+          `WellKnownElements` constants. Multi-event family (no abstract base);
+          both subtypes ride one topic, host-pushed via per-subtype methods
+          `NxEvents.publishPrivateStorePurchase(PrivateStorePurchaseEvent)` /
+          `NxEvents.publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent)`.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:

@@ -1,7 +1,8 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 
 /**
@@ -11,15 +12,14 @@ import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEve
  * {@code nx-gs-adapter-core} and is NOT a {@code ServiceLoader}-discovered
  * SPI — tenants consume this interface, they do not implement it.
  *
- * <p>One method per event family. Adding a family is a binary-compatible
- * API expansion — host code calls these methods, doesn't implement the
- * interface. A family with multiple concrete subtypes (today: only
- * {@code privatestore}, carrying {@code Trade} and {@code Snapshot} events)
- * uses an abstract base bound on the publish method; a single-event family
- * (today: {@code premiumpurchase}, {@code serveronline}) takes the concrete
- * type directly. Within a multi-event family, the {@code Nx-Message-Type}
- * Kafka header (carrying the simple class name) routes subtypes on the
- * platform consumer side.</p>
+ * <p>One method per concrete event type. Adding an event type is a
+ * binary-compatible API expansion — host code calls these methods, doesn't
+ * implement the interface. Multi-event families (today: {@code privatestore},
+ * carrying snapshot + purchase events) ship one method per concrete subtype;
+ * single-event families ({@code premiumpurchase}, {@code serveronline}) take
+ * the concrete type directly. The {@code Nx-Message-Type} Kafka header
+ * (carrying the simple class name) routes subtypes on the platform consumer
+ * side.</p>
  *
  * <p><b>Game-loop safety contract.</b> Implementations MUST NOT block the
  * caller longer than enqueueing a record into a bounded queue, MUST NOT
@@ -81,40 +81,42 @@ public interface NxEvents {
      *              a no-op with a WARN log entry (does not throw —
      *              game-loop safety).
      */
-    void publishServerOnline(ServerOnlineSnapshotEvent event);
+    void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event);
 
     /**
-     * Publish an event in the {@code privatestore} family.
-     *
-     * <p>{@link PrivateStoreEvent} is the family's abstract base; concrete
-     * subtypes ({@code PrivateStoreTradeEvent} /
-     * {@code PrivateStoreSnapshotEvent}) are reflected on the platform side
-     * via the {@code Nx-Message-Type} Kafka header (carrying the simple
-     * class name) — adapter-core stamps this header automatically.</p>
-     *
-     * <p><b>Two production patterns share this entry-point.</b> Trade events
-     * are pushed by host hooks at the moment a private-store deal is
-     * finalized on the game thread (one event per closed transaction,
-     * possibly multi-line). Snapshot events are pushed by a host-managed
-     * daemon on a configured cadence — one event per
-     * {@code (itemId, side)} pair whose order book changed since the
-     * previous tick, plus one tombstone event ({@code offers=[]}) when a
+     * Publish a per-{@code (itemId, side)} order-book snapshot in the
+     * {@code privatestore} family. Pushed by a host-managed daemon on a
+     * configured cadence — one event per pair whose order book changed since
+     * the previous tick, plus one tombstone event ({@code offers=[]}) when a
      * tracked pair empties. Change-detection is the host's responsibility;
-     * the adapter only provides the wire path.</p>
+     * the adapter only provides the wire path.
      *
      * <p>Returns immediately after enqueueing. Same delivery semantics as
      * {@link #publishPremiumPurchase} — at-least-once, idempotency on
-     * UUIDv7 {@code eventId}.</p>
+     * UUIDv7 {@code eventId}. Partition key is {@code itemId} so all updates
+     * for the same item land on one partition for ordered consumption /
+     * topic-compaction-friendly "latest known book" caching.</p>
      *
-     * <p>Trade events are partitioned round-robin (no single natural
-     * per-entity key — buyer and seller are equally valid). Snapshot events
-     * are partitioned by {@code itemId} so all updates for the same item
-     * land on one partition for ordered consumption / topic-compaction-friendly
-     * "latest known book" caching.</p>
-     *
-     * @param event non-null private-store event; {@code null} is treated as a
-     *              no-op with a WARN log entry (does not throw —
-     *              game-loop safety).
+     * @param event non-null private-store snapshot event; {@code null} is
+     *              treated as a no-op with a WARN log entry (does not throw
+     *              — game-loop safety).
      */
-    void publishPrivateStore(PrivateStoreEvent event);
+    void publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent event);
+
+    /**
+     * Publish a closed-deal fact in the {@code privatestore} family. Pushed
+     * by host hooks at the moment a private-store transaction is finalized
+     * on the game thread (one event per closed deal, possibly multi-line).
+     *
+     * <p>Returns immediately after enqueueing. Same delivery semantics as
+     * {@link #publishPremiumPurchase} — at-least-once, idempotency on
+     * UUIDv7 {@code eventId}. Partition key is {@code null} (round-robin) —
+     * no single natural per-entity key (buyer and seller are equally valid);
+     * per-character history is a consumer-side query.</p>
+     *
+     * @param event non-null private-store purchase event; {@code null} is
+     *              treated as a no-op with a WARN log entry (does not throw
+     *              — game-loop safety).
+     */
+    void publishPrivateStorePurchase(PrivateStorePurchaseEvent event);
 }

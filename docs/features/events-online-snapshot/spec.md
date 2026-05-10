@@ -37,7 +37,7 @@ plugging in a snapshot-builder.
 
 - [todo] R1. `nx-gs-adapter-api.kafka.events.serveronline.ServerOnlineSnapshotEvent` MUST ship as
   the abstract base for the `online` family — empty body, `protected` no-arg
-  constructor, type-bound for `NxEvents.publishServerOnline(ServerOnlineSnapshotEvent)`. Mirrors
+  constructor, type-bound for `NxEvents.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)`. Mirrors
   `events.premiumpurchase.PremiumPurchaseEvent` exactly.
 
 - [todo] R2. `nx-gs-adapter-api.kafka.events.serveronline.ServerOnlineSnapshotEvent` MUST
@@ -79,7 +79,7 @@ plugging in a snapshot-builder.
   Adding a new constant is a non-breaking minor-version change.
 
 - [todo] R4. `nx-gs-adapter-api.spi.NxEvents` MUST gain a single new method
-  `void publishServerOnline(ServerOnlineSnapshotEvent event)` mirroring `publishPremiumPurchase` exactly:
+  `void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event)` mirroring `publishPremiumPurchase` exactly:
   null event → silent no-op + WARN log, unregistered subtype → drop + WARN,
   family disabled (no topic in `MessagingTopics.events.serveronline`) → drop + DEBUG,
   game-loop-safety contract (never blocks beyond enqueue, never throws).
@@ -91,7 +91,7 @@ plugging in a snapshot-builder.
   UUIDv7 `eventId` timestamp).
 
 - [todo] R6. `nx-gs-adapter-core.events.NxEventsImpl` MUST implement
-  `publishServerOnline(ServerOnlineSnapshotEvent)` with the same dispatch + null-check + family-disabled
+  `publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)` with the same dispatch + null-check + family-disabled
   short-circuit logic as `publishPremiumPurchase`. No new internal infrastructure —
   reuses `EventsPublisher` / `EventEnvelope` / `EventTypeRegistry` as-is.
 
@@ -112,7 +112,7 @@ plugging in a snapshot-builder.
   `isFishing`, `isFakePlayer`) and computes the wellknown buckets:
   `total`, `online`, `real`, `offline_trade`, `fishing`, `phantoms`. Builds
   `ServerOnlineSnapshotEvent` with UUIDv7 `eventId`, calls
-  `nxEvents.publishServerOnline(event)`. Any uncaught `Throwable` is logged at DEBUG
+  `nxEvents.publishServerOnlineSnapshot(event)`. Any uncaught `Throwable` is logged at DEBUG
   and swallowed — game-loop safety identical to `PremiumPublisher`.
 
   No separate `AdapterModule` registration — `events.serveronline` rides the same
@@ -148,9 +148,9 @@ plugging in a snapshot-builder.
   curve. No special-case suppression — observability prefers explicit zeros.
 - **Snapshot publish during `onDisconnect`.** Module's `stop()` cancels the
   scheduled task before `onDisconnect()` releases the handle. Race window:
-  a tick already in `run()` may call `publishServerOnline` after handle release;
+  a tick already in `run()` may call `publishServerOnlineSnapshot` after handle release;
   `NoOpEvents` swallows it (per `ConnectContext` normalization).
-- **`publishServerOnline` thrown from inside the host (e.g. snapshot-builder bug).**
+- **`publishServerOnlineSnapshot` thrown from inside the host (e.g. snapshot-builder bug).**
   Tick logs at DEBUG, skips the publish, schedules the next tick normally.
   No backoff — transient bug fixes itself on next tick.
 - **Family disabled (platform did not configure `MessagingTopics.events.serveronline`).**

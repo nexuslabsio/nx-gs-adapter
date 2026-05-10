@@ -1,7 +1,8 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import org.junit.jupiter.api.Test;
@@ -37,11 +38,15 @@ class NxEventsConnectContextTest {
             }
 
             @Override
-            public void publishServerOnline(ServerOnlineSnapshotEvent event) {
+            public void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event) {
             }
 
             @Override
-            public void publishPrivateStore(PrivateStoreEvent event) {
+            public void publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent event) {
+            }
+
+            @Override
+            public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
             }
         };
 
@@ -75,11 +80,15 @@ class NxEventsConnectContextTest {
                     }
 
                     @Override
-                    public void publishServerOnline(ServerOnlineSnapshotEvent event) {
+                    public void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event) {
                     }
 
                     @Override
-                    public void publishPrivateStore(PrivateStoreEvent event) {
+                    public void publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent event) {
+                    }
+
+                    @Override
+                    public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
                     }
                 })
                 .build();

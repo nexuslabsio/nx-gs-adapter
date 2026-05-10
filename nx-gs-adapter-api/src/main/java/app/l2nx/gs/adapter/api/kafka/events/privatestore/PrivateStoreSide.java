@@ -12,7 +12,7 @@ package app.l2nx.gs.adapter.api.kafka.events.privatestore;
  * {@code PACKAGE_SELL}). This enum describes an order's role on the order
  * book; only the two sides that produce price-discovery data are modeled.</p>
  *
- * <p>For trades on the wire ({@link PrivateStoreTradeEvent#getStoreType()}):
+ * <p>For purchases on the wire ({@link PrivateStorePurchaseEvent#getStoreType()}):
  * indicates which party opened the store that the deal closed in —
  * {@link #ASK} means the seller opened a SELL store and a buyer hit it,
  * {@link #BID} means the buyer opened a BUY store and a seller hit it. This

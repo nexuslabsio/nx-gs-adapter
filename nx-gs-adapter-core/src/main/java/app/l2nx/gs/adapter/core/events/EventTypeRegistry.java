@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreTradeEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.commons.bytes.LongBytes;
 import org.jspecify.annotations.Nullable;
@@ -45,13 +45,13 @@ final class EventTypeRegistry {
                 evt -> null));
         families.add("serveronline");
 
-        // Trade events: two parties (buyer + seller), no single natural per-entity
+        // Purchase events: two parties (buyer + seller), no single natural per-entity
         // key; null → round-robin. Per-character history is a consumer-side query
         // (filter by buyerId or sellerId, sort by UUIDv7 timestamp), not a
         // partitioning concern.
-        map.put(PrivateStoreTradeEvent.class, new EventTypeBinding(
+        map.put(PrivateStorePurchaseEvent.class, new EventTypeBinding(
                 "privatestore",
-                "PrivateStoreTradeEvent",
+                "PrivateStorePurchaseEvent",
                 evt -> null));
         // Snapshot events partition by itemId — all updates for the same item
         // land on the same partition for ordered consumption / topic-compaction-

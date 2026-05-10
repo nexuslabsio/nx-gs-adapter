@@ -22,14 +22,14 @@ import java.util.*;
  * semantics.</p>
  *
  * <p>Soft invariant: {@code lines.size() >= 1}. Producers MUST NOT emit an
- * empty trade event; the wire schema permits it, the platform consumer logs
+ * empty purchase event; the wire schema permits it, the platform consumer logs
  * and dedupes rather than rejecting.</p>
  *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
  * parameter names so Gson / Jackson can deserialize without
  * {@code @JsonProperty}.</p>
  */
-public final class PrivateStoreTradeEvent extends PrivateStoreEvent {
+public final class PrivateStorePurchaseEvent {
 
     private final UUID eventId;
     private final PrivateStoreSide storeType;
@@ -39,13 +39,13 @@ public final class PrivateStoreTradeEvent extends PrivateStoreEvent {
     private final @Nullable String buyerName;
     private final List<TradeLine> lines;
 
-    public PrivateStoreTradeEvent(UUID eventId,
-                                  PrivateStoreSide storeType,
-                                  long sellerId,
-                                  @Nullable String sellerName,
-                                  long buyerId,
-                                  @Nullable String buyerName,
-                                  @Nullable List<TradeLine> lines) {
+    public PrivateStorePurchaseEvent(UUID eventId,
+                                     PrivateStoreSide storeType,
+                                     long sellerId,
+                                     @Nullable String sellerName,
+                                     long buyerId,
+                                     @Nullable String buyerName,
+                                     @Nullable List<TradeLine> lines) {
         this.eventId = eventId;
         this.storeType = storeType;
         this.sellerId = sellerId;
@@ -64,7 +64,7 @@ public final class PrivateStoreTradeEvent extends PrivateStoreEvent {
     }
 
     /**
-     * Which side of the order book opened the store this trade closed in.
+     * Which side of the order book opened the store this purchase closed in.
      * See {@link PrivateStoreSide} for maker/taker semantics.
      */
     public PrivateStoreSide getStoreType() {
@@ -74,8 +74,8 @@ public final class PrivateStoreTradeEvent extends PrivateStoreEvent {
     /**
      * Source-side character ID of the seller (the party that delivered items
      * and received currency). Identity-by-role, not by store-opener — for an
-     * {@link PrivateStoreSide#ASK ASK} trade the seller is the store-opener;
-     * for a {@link PrivateStoreSide#BID BID} trade the seller is the taker.
+     * {@link PrivateStoreSide#ASK ASK} purchase the seller is the store-opener;
+     * for a {@link PrivateStoreSide#BID BID} purchase the seller is the taker.
      */
     public long getSellerId() {
         return sellerId;
@@ -106,7 +106,7 @@ public final class PrivateStoreTradeEvent extends PrivateStoreEvent {
     }
 
     /**
-     * Per-position breakdown of the trade. Always non-null on read;
+     * Per-position breakdown of the purchase. Always non-null on read;
      * {@code null} passed to the constructor is normalized to an empty list.
      * Soft invariant: producers populate at least one line.
      */
@@ -139,8 +139,8 @@ public final class PrivateStoreTradeEvent extends PrivateStoreEvent {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof PrivateStoreTradeEvent)) return false;
-        PrivateStoreTradeEvent that = (PrivateStoreTradeEvent) o;
+        if (!(o instanceof PrivateStorePurchaseEvent)) return false;
+        PrivateStorePurchaseEvent that = (PrivateStorePurchaseEvent) o;
         return sellerId == that.sellerId
                 && buyerId == that.buyerId
                 && Objects.equals(eventId, that.eventId)
@@ -157,7 +157,7 @@ public final class PrivateStoreTradeEvent extends PrivateStoreEvent {
 
     @Override
     public String toString() {
-        return "PrivateStoreTradeEvent[eventId=" + eventId
+        return "PrivateStorePurchaseEvent[eventId=" + eventId
                 + ", storeType=" + storeType
                 + ", sellerId=" + sellerId
                 + ", sellerName=" + sellerName
@@ -210,8 +210,8 @@ public final class PrivateStoreTradeEvent extends PrivateStoreEvent {
             return this;
         }
 
-        public PrivateStoreTradeEvent build() {
-            return new PrivateStoreTradeEvent(
+        public PrivateStorePurchaseEvent build() {
+            return new PrivateStorePurchaseEvent(
                     eventId, storeType, sellerId, sellerName, buyerId, buyerName, lines);
         }
     }

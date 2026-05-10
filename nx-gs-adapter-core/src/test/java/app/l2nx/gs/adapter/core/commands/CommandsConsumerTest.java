@@ -5,7 +5,8 @@ import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.ErrorCode;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.spi.CommandHandler;
 import app.l2nx.gs.adapter.api.spi.HostExecutorTimeoutException;
@@ -64,11 +65,15 @@ class CommandsConsumerTest {
         }
 
         @Override
-        public void publishServerOnline(ServerOnlineSnapshotEvent event) {
+        public void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event) {
         }
 
         @Override
-        public void publishPrivateStore(PrivateStoreEvent event) {
+        public void publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent event) {
+        }
+
+        @Override
+        public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
         }
     }
 

@@ -1,9 +1,9 @@
 package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreTradeEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.commons.UUIDv7;
 import org.junit.jupiter.api.Test;
@@ -75,18 +75,18 @@ class EventTypeRegistryTest {
     }
 
     @Test
-    void lookup_shouldResolvePrivateStoreTradeEvent() {
-        EventTypeBinding binding = new EventTypeRegistry().lookup(PrivateStoreTradeEvent.class);
+    void lookup_shouldResolvePrivateStorePurchaseEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(PrivateStorePurchaseEvent.class);
 
         assertNotNull(binding);
         assertEquals("privatestore", binding.familyKey());
-        assertEquals("PrivateStoreTradeEvent", binding.messageType());
+        assertEquals("PrivateStorePurchaseEvent", binding.messageType());
     }
 
     @Test
-    void partitionKeyExtractor_shouldReturnNull_forPrivateStoreTradeEvent() {
-        EventTypeBinding binding = new EventTypeRegistry().lookup(PrivateStoreTradeEvent.class);
-        PrivateStoreTradeEvent event = PrivateStoreTradeEvent.builder()
+    void partitionKeyExtractor_shouldReturnNull_forPrivateStorePurchaseEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(PrivateStorePurchaseEvent.class);
+        PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUIDv7.generate())
                 .storeType(PrivateStoreSide.ASK)
                 .sellerId(1L).buyerId(2L)

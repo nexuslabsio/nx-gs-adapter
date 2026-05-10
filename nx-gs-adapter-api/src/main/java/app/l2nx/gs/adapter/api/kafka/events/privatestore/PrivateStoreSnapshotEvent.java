@@ -37,7 +37,7 @@ import java.util.*;
  * parameter names so Gson / Jackson can deserialize without
  * {@code @JsonProperty}.</p>
  */
-public final class PrivateStoreSnapshotEvent extends PrivateStoreEvent {
+public final class PrivateStoreSnapshotEvent {
 
     private final UUID eventId;
     private final long itemId;

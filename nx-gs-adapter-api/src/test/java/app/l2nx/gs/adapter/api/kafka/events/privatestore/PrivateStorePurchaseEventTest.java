@@ -6,11 +6,11 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class PrivateStoreTradeEventTest {
+class PrivateStorePurchaseEventTest {
 
     @Test
     void getLines_shouldReturnEmptyList_whenBuilderOmits() {
-        PrivateStoreTradeEvent event = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
                 .sellerId(1L).buyerId(2L)
@@ -21,7 +21,7 @@ class PrivateStoreTradeEventTest {
 
     @Test
     void getLines_shouldReturnEmptyList_whenBuilderPassesNull() {
-        PrivateStoreTradeEvent event = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
                 .sellerId(1L).buyerId(2L)
@@ -33,7 +33,7 @@ class PrivateStoreTradeEventTest {
 
     @Test
     void getSellerName_shouldBeNullable() {
-        PrivateStoreTradeEvent event = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
                 .sellerId(1L).buyerId(2L)
@@ -45,7 +45,7 @@ class PrivateStoreTradeEventTest {
 
     @Test
     void getLines_shouldBeUnmodifiable() {
-        PrivateStoreTradeEvent event = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
                 .sellerId(1L).buyerId(2L)
@@ -61,7 +61,7 @@ class PrivateStoreTradeEventTest {
         List<TradeLine> source = new ArrayList<TradeLine>();
         source.add(stubLine(1234L, 100L));
 
-        PrivateStoreTradeEvent event = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
                 .sellerId(1L).buyerId(2L)
@@ -75,7 +75,7 @@ class PrivateStoreTradeEventTest {
 
     @Test
     void toBuilder_shouldRoundtripAllFields() {
-        PrivateStoreTradeEvent original = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent original = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.BID)
                 .sellerId(268437521L).sellerName("Hisho")
@@ -88,11 +88,11 @@ class PrivateStoreTradeEventTest {
 
     @Test
     void equals_shouldDistinguishEventId() {
-        PrivateStoreTradeEvent a = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent a = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK).sellerId(1L).buyerId(2L)
                 .build();
-        PrivateStoreTradeEvent b = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent b = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK).sellerId(1L).buyerId(2L)
                 .build();
@@ -103,9 +103,9 @@ class PrivateStoreTradeEventTest {
     @Test
     void equals_shouldDistinguishStoreType() {
         UUID id = UUID.randomUUID();
-        PrivateStoreTradeEvent ask = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent ask = PrivateStorePurchaseEvent.builder()
                 .eventId(id).storeType(PrivateStoreSide.ASK).sellerId(1L).buyerId(2L).build();
-        PrivateStoreTradeEvent bid = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent bid = PrivateStorePurchaseEvent.builder()
                 .eventId(id).storeType(PrivateStoreSide.BID).sellerId(1L).buyerId(2L).build();
 
         assertNotEquals(ask, bid);
@@ -114,7 +114,7 @@ class PrivateStoreTradeEventTest {
     @Test
     void toString_shouldRenderEventIdAndPartyIds() {
         UUID id = UUID.fromString("018f5fa3-1e3d-7000-8000-000000000000");
-        PrivateStoreTradeEvent event = PrivateStoreTradeEvent.builder()
+        PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(id).storeType(PrivateStoreSide.ASK)
                 .sellerId(11L).buyerId(22L)
                 .build();

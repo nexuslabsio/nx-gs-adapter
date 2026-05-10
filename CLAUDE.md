@@ -37,11 +37,11 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   `Map<String, Long> buckets` keyed by `WellKnownServerOnlineBuckets`
   lower_snake_case constants — `total` / `online` / `real` /
   `offline_trade` / `fishing` / `phantoms`, cadence host-managed);
-  `events.privatestore` (multi-event family: `PrivateStoreEvent` abstract
-  base + `PrivateStoreTradeEvent` for closed deals +
-  `PrivateStoreSnapshotEvent` for per-`(itemId, side)` order book, with
-  `TradeLine` / `Offer` line types, `PrivateStoreSide` enum, and
-  `WellKnownElements` constants). The inbound-commands marker
+  `events.privatestore` (multi-event family: `PrivateStorePurchaseEvent`
+  for closed deals + `PrivateStoreSnapshotEvent` for per-`(itemId, side)`
+  order book, with `TradeLine` / `Offer` line types, `PrivateStoreSide`
+  enum, and `WellKnownElements` constants — no abstract base; one publish
+  method per concrete subtype on `NxEvents`). The inbound-commands marker
   `kafka.commands.NxCommand<R>` + reply envelope `kafka.commands.CommandResult<R>`
   with structured `kafka.commands.ErrorCode` enum (`NOT_FOUND` / `INVALID_STATE` /
   `FORBIDDEN` / `RATE_LIMITED` / `UNAVAILABLE` / `VALIDATION_FAILED` /

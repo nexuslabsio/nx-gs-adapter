@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * One position of a closed {@link PrivateStoreTradeEvent}. A single trade
+ * One position of a closed {@link PrivateStorePurchaseEvent}. A single trade
  * (one buyer-click in a seller's store, or vice versa) atomically transfers
  * any number of distinct positions; each becomes a {@code TradeLine} on the
  * wire so consumers can pivot on per-item analytics without re-deriving
