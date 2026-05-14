@@ -47,30 +47,6 @@ public final class CommandsBootstrap {
     }
 
     /**
-     * Wire up the registry, the {@link NxCommands} façade, and (when
-     * {@code messagingTopics.commandsTopic} is configured) a Kafka consumer
-     * + daemon thread. Returns a {@link Started} bundle.
-     *
-     * @param messagingTopics the platform-issued addressing bundle; may be
-     *                        {@code null} (treated as commands disabled).
-     * @param kafka           platform-issued Kafka config; provides brokers,
-     *                        SASL credentials, etc.
-     * @param clientIdBase    base client id (e.g.
-     *                        {@code nx-gs-adapter-<tenant>-<server>}); the
-     *                        commands consumer appends {@code -commands}.
-     * @param hostExecutor    host's game-side {@link Executor}; may be
-     *                        {@code null} when host code has not registered
-     *                        one — handlers requiring
-     *                        {@code ctx.host().sync(...)} will then throw
-     *                        {@link IllegalStateException} on first hop.
-     * @param events          the {@link NxEvents} façade so handlers can
-     *                        publish side-effect events.
-     * @param replySender     the bridge to the actual Kafka send (production
-     *                        wires this to {@code NxKafka.sendBytesKeyRecord}).
-     * @param config          operator-tunable knobs; falls back to
-     *                        {@link CommandsConfig#defaults()} when {@code null}.
-     */
-    /**
      * Rebuild the consumer in-place behind an existing {@link NxCommands}
      * façade, preserving its registered handlers across reconnect. Modules
      * that captured {@code ctx.commands()} from an earlier {@code onConnect}
@@ -83,6 +59,7 @@ public final class CommandsBootstrap {
                                                   @Nullable MessagingTopics messagingTopics,
                                                   KafkaConfig kafka,
                                                   String clientIdBase,
+                                                  String groupId,
                                                   @Nullable Executor hostExecutor,
                                                   Executor ioExecutor,
                                                   NxEvents events,
@@ -99,13 +76,44 @@ public final class CommandsBootstrap {
             registry = new CommandTypeRegistry();
             ((NxCommandsImpl) facade).swap(registry);
         }
-        return buildConsumer(messagingTopics, kafka, clientIdBase, hostExecutor,
+        return buildConsumer(messagingTopics, kafka, clientIdBase, groupId, hostExecutor,
                 ioExecutor, events, replySender, config, registry);
     }
 
+    /**
+     * Wire up the registry, the {@link NxCommands} façade, and (when
+     * {@code messagingTopics.commandsTopic} is configured) a Kafka consumer
+     * + daemon thread. Returns a {@link Started} bundle.
+     *
+     * @param messagingTopics the platform-issued addressing bundle; may be
+     *                        {@code null} (treated as commands disabled).
+     * @param kafka           platform-issued Kafka config; provides brokers,
+     *                        SASL credentials, etc.
+     * @param clientIdBase    base client id (e.g.
+     *                        {@code nx-gs-adapter-<tenant>-<server>}); the
+     *                        commands consumer appends {@code -commands} for
+     *                        the Kafka {@code client.id} (broker logs only).
+     * @param groupId         Kafka {@code group.id} for the commands consumer.
+     *                        Lives under the per-tenant prefix
+     *                        ({@code <tenant>.gs.commands.<server>}) so the
+     *                        {@code User:<tenant>} principal's group ACL
+     *                        (prefixed on {@code <tenant>.}) covers it.
+     * @param hostExecutor    host's game-side {@link Executor}; may be
+     *                        {@code null} when host code has not registered
+     *                        one — handlers requiring
+     *                        {@code ctx.host().sync(...)} will then throw
+     *                        {@link IllegalStateException} on first hop.
+     * @param events          the {@link NxEvents} façade so handlers can
+     *                        publish side-effect events.
+     * @param replySender     the bridge to the actual Kafka send (production
+     *                        wires this to {@code NxKafka.sendBytesKeyRecord}).
+     * @param config          operator-tunable knobs; falls back to
+     *                        {@link CommandsConfig#defaults()} when {@code null}.
+     */
     public static Started start(@Nullable MessagingTopics messagingTopics,
                                 KafkaConfig kafka,
                                 String clientIdBase,
+                                String groupId,
                                 @Nullable Executor hostExecutor,
                                 Executor ioExecutor,
                                 NxEvents events,
@@ -113,7 +121,7 @@ public final class CommandsBootstrap {
                                 @Nullable CommandsConfig config) {
         CommandTypeRegistry registry = new CommandTypeRegistry();
         NxCommandsImpl commands = new NxCommandsImpl(registry);
-        CommandsConsumer consumer = buildConsumer(messagingTopics, kafka, clientIdBase,
+        CommandsConsumer consumer = buildConsumer(messagingTopics, kafka, clientIdBase, groupId,
                 hostExecutor, ioExecutor, events, replySender, config, registry);
         return new Started(commands, consumer);
     }
@@ -121,6 +129,7 @@ public final class CommandsBootstrap {
     private static @Nullable CommandsConsumer buildConsumer(@Nullable MessagingTopics messagingTopics,
                                                             KafkaConfig kafka,
                                                             String clientIdBase,
+                                                            String groupId,
                                                             @Nullable Executor hostExecutor,
                                                             Executor ioExecutor,
                                                             NxEvents events,
@@ -148,7 +157,7 @@ public final class CommandsBootstrap {
         }
 
         CommandsConfig effectiveConfig = (config != null) ? config : CommandsConfig.defaults();
-        Map<String, Object> consumerProps = buildConsumerConfig(kafka, clientIdBase, effectiveConfig);
+        Map<String, Object> consumerProps = buildConsumerConfig(kafka, clientIdBase, groupId, effectiveConfig);
         Consumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(
                 consumerProps, new ByteArrayDeserializer(), new ByteArrayDeserializer());
 
@@ -172,6 +181,7 @@ public final class CommandsBootstrap {
 
     private static Map<String, Object> buildConsumerConfig(KafkaConfig kafka,
                                                            String clientIdBase,
+                                                           String groupId,
                                                            CommandsConfig config) {
         String clientId = clientIdBase + "-commands";
         Map<String, Object> props = new LinkedHashMap<String, Object>();
@@ -183,7 +193,7 @@ public final class CommandsBootstrap {
         // Hard-pinned (security + identity + commit semantics)
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrap());
         props.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, clientId);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put("security.protocol", kafka.getSecurityProtocol());
         props.put("sasl.mechanism", kafka.getSaslMechanism());

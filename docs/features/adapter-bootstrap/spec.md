@@ -72,6 +72,14 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
       username="<saslUsername>" password="<saslPassword>";`
     - `client.id` ← `nx-gs-adapter-<tenantSlug>-<serverSlug>` — `tenantSlug` is sourced from
       `ConnectResponse.tenantSlug` (authoritative; not parsed from `platformUrl`).
+    - **Slug value-shape contract.** Both `tenantSlug` and `serverSlug` MUST be kebab-case
+      identifiers (`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`) with NO `.` characters — the adapter
+      composes resource names (Kafka `client.id`, commands `group.id` = `<tenant>.gs.commands.<server>`,
+      topic prefix `<tenant>.`) by literal interpolation, and a `.` in either slug would
+      escape the per-tenant ACL prefix and silently break authorization. Validation lives
+      platform-side: `nx-tenants` enforces kebab-case on `POST /servers` / `POST /internal/.../servers`,
+      and `nx-infra/.../create-tenant.sh` rejects non-conforming tenant slugs at SCRAM-creation
+      time. Adapter trusts these as platform invariants and does not re-validate.
     - Kafka init MUST NOT block on broker reachability — `nx-gs-kafka` is graceful when the
       broker is unreachable, returning `KafkaState.DISCONNECTED` and reconnecting in the
       background.

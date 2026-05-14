@@ -254,11 +254,17 @@ per-entity state via heartbeat enrichment).
   Phase 1 / Phase 2 MUST call `setFetchSize(...)`. The driver dialect is
   auto-detected once per entity task from `Connection.getMetaData().getURL()`
   (`JdbcDialect.detect`):
-    - **MySQL / MariaDB**: `setFetchSize(Integer.MIN_VALUE)` — the only mode
-      MySQL Connector/J honors for large result sets. Without it the driver
-      buffers the entire result set in client memory (positive `fetchSize` is
-      silently ignored). Required for the typical L2 deployment where the
-      host runs on MySQL/MariaDB and entities like `items` can hit 12M+ rows.
+    - **MySQL Connector/J** (`jdbc:mysql:`): `setFetchSize(Integer.MIN_VALUE)` —
+      the only mode MySQL Connector/J honors for large result sets. Without it
+      the driver buffers the entire result set in client memory (positive
+      `fetchSize` is silently ignored). Required for the typical L2 deployment
+      where the host runs on MySQL and entities like `items` can hit 12M+ rows.
+    - **MariaDB Connector/J** (`jdbc:mariadb:`): `setFetchSize(l2nx.cdc-engine.fetch-size)`
+      (default `10_000`). MariaDB Connector/J 3.x validates `fetchSize >= 0` and
+      throws `SQLException: invalid fetch size` on the MySQL streaming sentinel,
+      so MariaDB is split out as its own dialect. Default behavior buffers the
+      result set; add `useCursorFetch=true` to the JDBC URL for true server-side
+      cursors.
     - **Postgres** (and other drivers): `setFetchSize(l2nx.cdc-engine.fetch-size)`
       (default `10_000`) — server-side cursor batch on `autoCommit=false`
       transactions (the engine sets `autoCommit=false` inside
@@ -328,7 +334,7 @@ per-entity state via heartbeat enrichment).
   **All global engine config keys (MVP):**
 
   | Key                                              | Type           | Default                            |
-            |--------------------------------------------------|----------------|------------------------------------|
+              |--------------------------------------------------|----------------|------------------------------------|
   | `l2nx.cdc-engine.tick-interval-seconds`          | long, seconds  | 60                                 |
   | `l2nx.cdc-engine.rows-per-window`                | int            | 500_000 (cap 10_000_000)           |
   | `l2nx.cdc-engine.query-timeout-seconds`          | int, seconds   | 10                                 |

@@ -6,6 +6,8 @@ import app.l2nx.gs.db.sync.engine.JdbcDialect;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.sql.*;
 import java.util.Arrays;
@@ -96,8 +98,14 @@ class Phase1HasherTest {
         verify(ps).setLong(2, 100L);
     }
 
-    @Test
-    void hashPrimary_shouldUseStreamingFetchSize_whenDialectIsMysql() throws SQLException {
+    @ParameterizedTest
+    @CsvSource({
+            "MYSQL,    -2147483648",
+            "MARIADB,  10000",
+            "POSTGRES, 10000",
+            "OTHER,    10000",
+    })
+    void hashPrimary_shouldApplyFetchSize_perDialect(JdbcDialect dialect, int expectedFetchSize) throws SQLException {
         PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
                 Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
@@ -108,9 +116,9 @@ class Phase1HasherTest {
         when(ps.executeQuery()).thenReturn(rs);
         when(rs.next()).thenReturn(false);
 
-        new Phase1Hasher().hashPrimary(conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.MYSQL);
+        new Phase1Hasher().hashPrimary(conn, new Window(0L, 100L), primary, 5, 10_000, dialect);
 
-        verify(ps).setFetchSize(Integer.MIN_VALUE);
+        verify(ps).setFetchSize(expectedFetchSize);
     }
 
     @Test

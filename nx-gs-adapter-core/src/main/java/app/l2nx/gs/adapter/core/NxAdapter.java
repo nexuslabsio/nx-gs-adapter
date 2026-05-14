@@ -397,8 +397,11 @@ public final class NxAdapter {
         }
 
         NxEvents events = startEventsPublisher(response.getMessagingTopics());
+        // Group ID lives under the per-tenant prefix so the `User:<tenant>` SCRAM
+        // principal's group ACL (prefixed on `<tenant>.`) covers it.
+        String commandsGroupId = response.getTenantSlug() + ".gs.commands." + response.getServerSlug();
         NxCommands commands = startCommandsConsumer(response.getMessagingTopics(),
-                response.getKafka(), clientId, events);
+                response.getKafka(), clientId, commandsGroupId, events);
 
         ModuleRegistry registry = moduleRegistry;
         if (registry != null) {
@@ -487,6 +490,7 @@ public final class NxAdapter {
     private static NxCommands startCommandsConsumer(MessagingTopics messagingTopics,
                                                     app.l2nx.gs.adapter.api.rest.KafkaConfig kafka,
                                                     String clientId,
+                                                    String groupId,
                                                     NxEvents events) {
         CommandsConsumer previous = commandsConsumer;
         if (previous != null) {
@@ -501,14 +505,14 @@ public final class NxAdapter {
         NxCommands facade = commandsFacade;
         if (facade == null) {
             CommandsBootstrap.Started started = CommandsBootstrap.start(
-                    messagingTopics, kafka, clientId,
+                    messagingTopics, kafka, clientId, groupId,
                     hostExecutorRef.get(), ioExecutor, events,
                     replySender, commandsConfig);
             commandsConsumer = started.consumer();
             commandsFacade = started.commands();
             return commandsFacade;
         }
-        commandsConsumer = CommandsBootstrap.swap(facade, messagingTopics, kafka, clientId,
+        commandsConsumer = CommandsBootstrap.swap(facade, messagingTopics, kafka, clientId, groupId,
                 hostExecutorRef.get(), ioExecutor, events, replySender, commandsConfig);
         return facade;
     }

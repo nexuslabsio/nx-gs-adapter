@@ -18,8 +18,8 @@ class JdbcDialectTest {
     @CsvSource({
             "jdbc:mysql://localhost/db,                                       MYSQL",
             "jdbc:mysql:loadbalance://h1:3306/db,                             MYSQL",
-            "jdbc:mariadb://localhost/db,                                     MYSQL",
-            "JDBC:MariaDB://localhost/db,                                     MYSQL",
+            "jdbc:mariadb://localhost/db,                                     MARIADB",
+            "JDBC:MariaDB://localhost/db,                                     MARIADB",
             "jdbc:postgresql://localhost/db,                                  POSTGRES",
             "jdbc:postgres://localhost/db,                                    POSTGRES",
             "jdbc:h2:mem:test,                                                OTHER",

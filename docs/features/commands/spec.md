@@ -302,9 +302,20 @@ logic for individual command types; platform-side operators who consume reply ev
 - [todo] R16. Kafka consumer config (composed from the platform-issued `KafkaConfig`
     + `l2nx.commands.kafka.*` overrides):
         - `bootstrap.servers` = `KafkaConfig.bootstrap` (from connect response)
-        - `client.id` = `nx-gs-adapter-<tenant>-<server>-commands`
-        - `group.id` = `nx-gs-adapter-<tenant>-<server>-commands` (same value — single-consumer
-          group; per-tenant + per-server isolation comes from the tenant prefix)
+        - `client.id` = `nx-gs-adapter-<tenant>-<server>-commands` (broker logs only,
+          not ACL-checked)
+        - `group.id` = `<tenant>.gs.commands.<server>` — lives under the per-tenant
+          `<tenant>.` prefix so the `User:<tenant>` SCRAM principal's group ACL
+          (prefixed on `<tenant>.` by `nx-infra/.../create-tenant.sh`) covers it.
+          Single-consumer group; per-server isolation comes from the `<server>` suffix.
+          **Migration note:** on first redeploy after this group.id rename, an
+          adapter that previously committed offsets under the legacy group
+          (`nx-gs-adapter-<tenant>-<server>-commands`) starts fresh under the new
+          group with `auto.offset.reset=earliest` — the retained commands window
+          is replayed once. Aligns with the at-least-once contract; host handlers
+          are already expected to dedupe by `correlationId` (see "Idempotency
+          dedup on adapter side" below). The legacy group's offsets become
+          orphaned in `__consumer_offsets`.
         - `key.deserializer` / `value.deserializer` = `ByteArrayDeserializer`
         - `enable.auto.commit` = `false` (manual commit per R11)
         - `auto.offset.reset` = `earliest` (replay from beginning if offsets missing — at-least-once)

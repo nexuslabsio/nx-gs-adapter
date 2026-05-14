@@ -127,9 +127,12 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   (per-entity `EntityStats`) slots in the heartbeat. Engine config lives under
   `l2nx.cdc-engine.*` (file-first source chain) — including `workers` and
   `fetch-size` (default `10_000`). JDBC dialect is auto-detected from the
-  connection URL: MySQL/MariaDB → `Integer.MIN_VALUE` streaming fetch (row-by-row,
-  the only mode MySQL Connector/J honors for large result sets); Postgres /
-  others → `fetch-size` as a cursor-batch hint. All identifiers passed via `EntityMapping` /
+  connection URL: MySQL Connector/J (`jdbc:mysql:`) → `Integer.MIN_VALUE`
+  streaming fetch (row-by-row, the only mode it honors for large result
+  sets); MariaDB Connector/J (`jdbc:mariadb:`) → positive `fetch-size` hint
+  (3.x rejects negative fetchSize; add `useCursorFetch=true` to the URL for
+  true server-side cursors); Postgres / others → `fetch-size` as a cursor-batch hint. All identifiers passed via
+  `EntityMapping` /
   `PrimarySource` / `ChildSource` (tableName / pkColumn / fkColumn / hashedColumns)
   MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` — schema-qualified or quoted names are
   rejected at engine start. Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +

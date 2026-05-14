@@ -105,9 +105,10 @@ public final class Phase1Hasher {
     }
 
     /**
-     * MySQL Connector/J ignores positive {@code fetchSize} and buffers the
-     * whole result client-side; only {@code Integer.MIN_VALUE} switches it
-     * to streaming row-by-row. Pgjdbc and most other drivers treat
+     * MySQL Connector/J ignores positive {@code fetchSize} and only honors
+     * {@code Integer.MIN_VALUE} (streaming row-by-row). MariaDB Connector/J 3.x
+     * rejects the same sentinel ({@code SQLException: invalid fetch size}) —
+     * see {@link JdbcDialect#MARIADB}. Pgjdbc and most other drivers treat
      * positive {@code fetchSize} as a server-side cursor batch hint.
      */
     static void applyFetchSize(Statement ps, int fetchSize, JdbcDialect dialect) throws SQLException {

@@ -100,11 +100,12 @@ read by `HeartbeatService` per heartbeat tick.
           — primary + every child see the same MVCC view, so a row written
           mid-window can no longer corrupt the per-PK XOR-fold. Every
           `PreparedStatement` calls `Phase1Hasher.applyFetchSize(ps, cfg.fetchSize, dialect)`:
-          MySQL/MariaDB (detected via `JdbcDialect.detect`) gets
-          `Integer.MIN_VALUE` for row-by-row streaming (the only mode
-          Connector/J honors for large result sets); Postgres / other drivers
-          get `cfg.fetchSize` (default `10_000`) as a server-side cursor
-          batch hint. Each statement is
+          MySQL Connector/J (`jdbc:mysql:`, detected via `JdbcDialect.detect`)
+          gets `Integer.MIN_VALUE` for row-by-row streaming (the only mode it
+          honors for large result sets); MariaDB Connector/J (`jdbc:mariadb:`),
+          Postgres, and other drivers get `cfg.fetchSize` (default `10_000`)
+          as a server-side cursor batch hint (MariaDB 3.x rejects negative
+          fetchSize; add `useCursorFetch=true` to the URL for true streaming). Each statement is
           registered with the task's `StatementRegistry` so shutdown
           cancellation reaches it. Engine ({@link EntitySyncTask}) XOR-folds
           per-source contributions into a per-window aggregate
@@ -356,9 +357,11 @@ CdcEngine constructor (called by DbSyncModule.start, Phase 2)
        → cfg.workers                 = ... l2nx.cdc-engine.workers                    | max(2, min(entities, cores/2))
        → cfg.fetchSize               = ... l2nx.cdc-engine.fetch-size                 | 10_000
        → cfg.sources tagged per param (OPERATOR_OVERRIDE if present in props, else DEFAULT)
-       (NB: MySQL/MariaDB ignore positive fetchSize; the engine auto-detects
+       (NB: MySQL Connector/J ignores positive fetchSize; the engine auto-detects
         dialect via JdbcDialect.detect at first borrow and switches to
-        Integer.MIN_VALUE streaming on those drivers.)
+        Integer.MIN_VALUE streaming on `jdbc:mysql:`. MariaDB Connector/J 3.x
+        rejects negative fetchSize, so `jdbc:mariadb:` keeps the positive hint
+        — add `useCursorFetch=true` to the URL for true server-side cursors.)
   → validateIdentifiers(provider.mappings())     -- R19: ^[A-Za-z_][A-Za-z0-9_]{0,63}$
                                                    on every tableName / pkColumn / fkColumn /
                                                    hashedColumns entry; first violation →
@@ -531,13 +534,17 @@ HeartbeatService tick   [heartbeat thread]
   each window internally consistent without the long-tx penalty.
 - **Dialect-aware JDBC fetch.** `JdbcDialect.detect` reads
   `Connection.getMetaData().getURL()` once per task and routes
-  `applyFetchSize` accordingly: MySQL/MariaDB → `Integer.MIN_VALUE`
-  (row-by-row streaming, the only mode Connector/J honors for large
-  result sets — positive fetchSize is silently ignored); Postgres /
-  other → `cfg.fetchSize` as a server-side cursor batch on
-  `autoCommit=false`. Without this, a 12M-row Phase 1 scan on a
-  MySQL host buffers every row into the client heap and OOMs the JVM
-  before the snapshot map fills.
+  `applyFetchSize` accordingly: MySQL Connector/J (`jdbc:mysql:`) →
+  `Integer.MIN_VALUE` (row-by-row streaming, the only mode it honors
+  for large result sets — positive fetchSize is silently ignored);
+  MariaDB Connector/J (`jdbc:mariadb:`), Postgres, and other drivers →
+  `cfg.fetchSize` as a server-side cursor batch on `autoCommit=false`.
+  MariaDB Connector/J 3.x is split out because it validates
+  `fetchSize >= 0` and throws `SQLException: invalid fetch size` on the
+  MySQL streaming sentinel; for true streaming add `useCursorFetch=true`
+  to the JDBC URL. Without dialect-aware routing, a 12M-row Phase 1 scan
+  on a MySQL host buffers every row into the client heap and OOMs the
+  JVM before the snapshot map fills.
 - **Statement.cancel() on shutdown, not Thread.interrupt().** Most JDBC
   drivers ignore thread interruption and leave a multi-minute Phase 1
   scan running until it completes naturally. The only portable way to
