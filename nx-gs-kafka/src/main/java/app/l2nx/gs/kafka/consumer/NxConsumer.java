@@ -30,6 +30,6 @@ public interface NxConsumer {
      */
     static <T> NxConsumer create(String topic, Class<T> type, BiConsumer<T, ReplyContext> handler,
                                  NxProducer producer, Gson gson, Map<String, Object> consumerConfig) {
-        return new NxConsumerGroup<>(topic, type, handler, producer, gson, consumerConfig);
+        return new ConsumerGroup<>(topic, type, handler, producer, gson, consumerConfig);
     }
 }

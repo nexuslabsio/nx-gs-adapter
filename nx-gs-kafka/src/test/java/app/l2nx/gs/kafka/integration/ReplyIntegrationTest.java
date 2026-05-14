@@ -64,7 +64,7 @@ class ReplyIntegrationTest {
 
         // GS subscribes with reply support
         CountDownLatch handlerCalled = new CountDownLatch(1);
-        kafka.subscribe(REQUEST_TOPIC, BalanceRequest.class, (request, replyTo) -> {
+        kafka.subscribe(REQUEST_TOPIC, "g-reply", BalanceRequest.class, (request, replyTo) -> {
             replyTo.reply(new BalanceResponse(request.playerId, 5000));
             handlerCalled.countDown();
         });
@@ -106,7 +106,7 @@ class ReplyIntegrationTest {
         NxKafka kafka = buildKafka("test-reply-noop");
 
         CountDownLatch latch = new CountDownLatch(1);
-        kafka.subscribe(requestTopic, BalanceRequest.class, (request, replyTo) -> {
+        kafka.subscribe(requestTopic, "g-reply-noop", BalanceRequest.class, (request, replyTo) -> {
             assertFalse(replyTo.hasReplyTopic());
             replyTo.reply(new BalanceResponse(request.playerId, 0)); // should be no-op
             latch.countDown();

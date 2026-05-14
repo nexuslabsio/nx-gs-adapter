@@ -1,21 +1,25 @@
 package app.l2nx.gs.runtime.sync.engine;
 
 import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
+import app.l2nx.gs.commons.concurrent.DaemonThreadFactory;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import app.l2nx.gs.runtime.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.runtime.sync.engine.publish.TopicResolver;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.Executors;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Owns one {@link EntityTickLoop} per declared runtime entity. Spins up a
- * dedicated single-thread daemon scheduler per entity so a slow snapshot for
- * one entity doesn't starve the others.
+ * Owns one {@link EntityTickLoop} per declared runtime entity. All loops share
+ * a single daemon {@link ScheduledThreadPoolExecutor} sized via
+ * {@code l2nx.runtime-sync.workers} — a slow snapshot for one entity briefly
+ * occupies one worker but doesn't fork a thread per entity.
  */
 public final class RuntimeSyncEngine {
 
@@ -28,14 +32,14 @@ public final class RuntimeSyncEngine {
     private final EngineConfig config;
 
     private final List<EntityTickLoop> loops = new ArrayList<EntityTickLoop>();
-    private final List<ScheduledExecutorService> schedulers = new ArrayList<ScheduledExecutorService>();
+    private volatile ScheduledExecutorService scheduler;
 
     public RuntimeSyncEngine(List<? extends RuntimeEntityMapping<?>> mappings,
                              TopicResolver topicResolver,
                              SyncEventPublisher publisher,
                              EntityStatsTracker statsTracker,
                              EngineConfig config) {
-        this.mappings = new ArrayList<>(mappings);
+        this.mappings = new ArrayList<RuntimeEntityMapping<?>>(mappings);
         this.topicResolver = topicResolver;
         this.publisher = publisher;
         this.statsTracker = statsTracker;
@@ -43,13 +47,14 @@ public final class RuntimeSyncEngine {
     }
 
     public void start() {
+        validateMappings(mappings);
+        int workers = config.workers(mappings.size());
+        ScheduledThreadPoolExecutor pool = new ScheduledThreadPoolExecutor(workers,
+                DaemonThreadFactory.counted("nx-runtime-sync-pool-", log));
+        pool.setRemoveOnCancelPolicy(true);
+        this.scheduler = pool;
+
         for (RuntimeEntityMapping<?> mapping : mappings) {
-            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-                Thread t = new Thread(r, "nx-runtime-sync-" + mapping.entityName());
-                t.setDaemon(true);
-                return t;
-            });
-            schedulers.add(scheduler);
             EntityTickLoop loop = new EntityTickLoop(mapping, topicResolver, publisher,
                     statsTracker, config, scheduler);
             loops.add(loop);
@@ -57,6 +62,8 @@ public final class RuntimeSyncEngine {
             log.info("runtime-sync entity '{}' tick loop started ({}s interval)",
                     mapping.entityName(), config.tickIntervalSeconds());
         }
+        log.info("runtime-sync engine started: {} entities, workers={}",
+                mappings.size(), workers);
     }
 
     public void stop() {
@@ -67,15 +74,37 @@ public final class RuntimeSyncEngine {
                 log.warn("EntityTickLoop.stop threw {}", t.getClass().getName());
             }
         }
-        for (ScheduledExecutorService s : schedulers) {
+        ScheduledExecutorService s = scheduler;
+        if (s != null) {
             s.shutdownNow();
             try {
-                s.awaitTermination(2, TimeUnit.SECONDS);
+                // publish-flush is the largest in-flight wait per tick — give it room to drain.
+                long awaitSeconds = Math.max(2L, (long) config.publishFlushSeconds() + 1L);
+                if (!s.awaitTermination(awaitSeconds, TimeUnit.SECONDS)) {
+                    log.warn("runtime-sync scheduler did not terminate within {}s", awaitSeconds);
+                }
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
+            scheduler = null;
         }
         loops.clear();
-        schedulers.clear();
     }
+
+    private static void validateMappings(List<RuntimeEntityMapping<?>> mappings) {
+        Set<String> seen = new HashSet<String>();
+        for (RuntimeEntityMapping<?> m : mappings) {
+            String name = m == null ? null : m.entityName();
+            if (name == null || name.trim().isEmpty()) {
+                throw new IllegalStateException(
+                        "RuntimeEntityMapping has null/blank entityName — refusing to start runtime-sync");
+            }
+            if (!seen.add(name)) {
+                throw new IllegalStateException(
+                        "Duplicate RuntimeEntityMapping.entityName '" + name
+                                + "' — refusing to start runtime-sync");
+            }
+        }
+    }
+
 }

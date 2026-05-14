@@ -98,7 +98,7 @@ public final class ConnectFlow implements Runnable {
             // (or a downstream wiring bug) must not bring down the daemon thread.
             // Log only the exception class — message may carry the bearer token if
             // the JDK threw IllegalArgumentException from setRequestProperty.
-            log.error("Connect attempt threw {}", t.getClass().getName());
+            log.error("Connect attempt threw {}", t.getClass().getName(), t);
             emit(Outcome.TRANSIENT);
             scheduleRetry();
         }
@@ -172,13 +172,17 @@ public final class ConnectFlow implements Runnable {
     }
 
     private void scheduleRetry() {
-        int n = attempt.incrementAndGet();
+        // attempt is reset on success; absent that, cap it so a long-running
+        // outage doesn't accumulate an unbounded counter.
+        int n = attempt.updateAndGet(prev -> Math.min(prev + 1, Integer.MAX_VALUE - 1));
         Duration delay = backoff.next(n);
         try {
             scheduler.schedule(this, delay.toMillis(), TimeUnit.MILLISECONDS);
         } catch (Throwable t) {
-            // RejectedExecutionException on a shutdown scheduler — log class only.
-            log.error("Failed to schedule connect retry attempt {}: {}", n, t.getClass().getName());
+            // Scheduler is shutting down — can't retry. Surface as terminal so
+            // upstream stops waiting in REGISTERING / DEGRADED forever.
+            log.error("Failed to schedule connect retry attempt {}: {}", n, t.getClass().getName(), t);
+            emit(Outcome.FAILED);
         }
     }
 

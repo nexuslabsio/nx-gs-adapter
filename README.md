@@ -100,12 +100,29 @@ keys unset — the adapter will reuse the host's existing pool.
 keys from the same source chain (file-first, sysprop fallback). All have sane defaults
 sized for a 12M-row items table:
 
-| Key                                     | Default  | Purpose                                                    |
-|-----------------------------------------|----------|------------------------------------------------------------|
-| `l2nx.cdc-engine.tick-interval-seconds` | `60`     | Cycle period per entity                                    |
-| `l2nx.cdc-engine.rows-per-window`       | `500000` | PK-window size; large entities split into multiple windows |
-| `l2nx.cdc-engine.query-timeout-seconds` | `10`     | Per-statement JDBC timeout                                 |
-| `l2nx.cdc-engine.publish-flush-seconds` | `5`      | End-of-cycle Kafka-ack wait budget; failed PKs replay      |
+| Key                                          | Default                          | Purpose                                                           |
+|----------------------------------------------|----------------------------------|-------------------------------------------------------------------|
+| `l2nx.cdc-engine.tick-interval-seconds`      | `60`                             | Cycle period per entity                                           |
+| `l2nx.cdc-engine.rows-per-window`            | `500000`                         | PK-window size; large entities split into multiple windows        |
+| `l2nx.cdc-engine.query-timeout-seconds`      | `10`                             | Per-statement JDBC timeout                                        |
+| `l2nx.cdc-engine.publish-flush-seconds`      | `5`                              | End-of-cycle Kafka-ack wait budget; failed PKs replay             |
+| `l2nx.cdc-engine.workers`                    | `max(2, min(entities, cores/2))` | Shared engine pool size (replaces thread-per-entity)              |
+| `l2nx.cdc-engine.fetch-size`                 | `10000`                          | JDBC fetch-size hint (Postgres cursor batch; MySQL auto-uses streaming) |
+
+**Runtime-sync engine tuning (`nx-gs-runtime-sync-core`):**
+
+| Key                         | Default                          | Purpose                                              |
+|-----------------------------|----------------------------------|------------------------------------------------------|
+| `l2nx.runtime-sync.workers` | `max(2, min(entities, cores/2))` | Shared engine pool size (replaces thread-per-entity) |
+
+**Adapter IO pool (`l2nx.io.*`):** the adapter owns a shared executor (daemon
+threads `nx-io-N`) for handler/module blocking IO (JDBC, HTTP). Handlers MUST
+hop here via `ctx.io()` instead of running blocking work on the game thread or
+Kafka consumer thread.
+
+| Key               | Default           | Purpose                    |
+|-------------------|-------------------|----------------------------|
+| `l2nx.io.workers` | `max(2, cores/2)` | Adapter-owned IO pool size |
 
 ```bash
 # Option A: l2nx.properties in the JVM working directory (implicit fallback)

@@ -11,7 +11,8 @@ A command is a JSON message the platform's web side sends to the game-server cor
 asking it to **do something** — kick a player, send mail, transfer items, ban an
 account. Each command:
 
-- Implements the type-parameterized marker `app.l2nx.gs.adapter.api.kafka.commands.NxCommand<R>` where `R` is the success-payload type (use `Void` if the reply has no typed body)
+- Implements the type-parameterized marker `app.l2nx.gs.adapter.api.kafka.commands.NxCommand<R>` where `R` is the
+  success-payload type (use `Void` if the reply has no typed body)
 - Travels on a single Kafka topic `<tenant>.gs.commands` (partitioned by character id)
 - Carries two headers: `Nx-Message-Type` (the simple class name) and
   `Nx-Correlation-Id` (UUID issued by web side)
@@ -142,36 +143,46 @@ handler on charA does not block fast handler on charB because charA and charB
 hash to different partitions (and each partition gets its own consumer thread
 in a future scaling step).
 
-### When to hop to the host executor
+### When to hop, and where
 
 The Kafka consumer thread is NOT the host's game thread. Mutating game state
 from the consumer thread races against the host's own loops (packet handlers,
-AI ticks, scheduled tasks).
+AI ticks, scheduled tasks). There are three pools you can hop to, each with
+a clear role:
 
-Three rules:
+| Pool            | Accessor                               | Use for                                                                  |
+|-----------------|----------------------------------------|--------------------------------------------------------------------------|
+| Game thread     | `ctx.host().sync(...)` / `.async(...)` | Game-state mutations, packet sends, in-memory game-loop touches          |
+| Adapter IO pool | `ctx.io()` (Executor)                  | Blocking JDBC, blocking HTTP, FS calls — anything that waits on syscalls |
+| Consumer thread | (no hop)                               | Pure CPU / non-blocking work only                                        |
 
-- **Read-only operations** — `Player.getName()`, `GameObjectsStorage.getPlayer(...)`
-  for reads, querying caches that are safe to read from any thread — DO NOT hop.
-  Read on the consumer thread, return the result.
-- **State mutations** — `Player.kick()`, `Player.setNoblesse(true)`,
-  `MailManager.sendMail(...)` — MUST hop via `ctx.host().sync(() -> {...})`.
-- **DB writes / external calls** — these are typically synchronous-blocking
-  anyway (host JDBC). Run them on the consumer thread; don't burn host-executor
-  capacity. Example: `PunishmentDAO.insert(record)` — fine on consumer thread.
+Rules:
+
+- **State mutations** (`Player.kick()`, `Player.setNoblesse(true)`,
+  `MailManager.sendMail(...)`) — MUST hop via `ctx.host().sync(() -> {...})`.
+- **Blocking IO** (JDBC, HTTP, FS) — MUST hop to `ctx.io()`. Do NOT run JDBC on
+  the consumer thread (blocks the entire topic) and do NOT run JDBC via
+  `ctx.host().sync(...)` (burns game-thread capacity for IO that has nothing
+  to do with the game loop).
+- **Read-only non-blocking reads** of thread-safe caches (e.g. `PlayerCache`
+  that is safe to read from any thread) — fine to do directly on the consumer
+  thread.
 
 ```java
 static CommandResult<Void> handleSendMail(SendMailCommand cmd, CommandContext ctx) {
-    // read on consumer thread — fine
+    // thread-safe cache read — fine on consumer thread
     Player p = PlayerCache.getInstance().findById(cmd.getCharId());
     if (p == null) {
         return CommandResult.error(ErrorCode.NOT_FOUND,
                 "charId", String.valueOf(cmd.getCharId()));
     }
 
-    // db write on consumer thread — fine, JDBC blocks anyway
-    long messageId = MailDAO.insert(toRecord(cmd, p));
+    // db write — hop to the adapter IO pool, not the consumer thread
+    long messageId = CompletableFuture
+            .supplyAsync(() -> MailDAO.insert(toRecord(cmd, p)), ctx.io())
+            .join();
 
-    // game state mutation — MUST hop
+    // game state mutation — hop to the game executor
     ctx.host().sync(() -> {
         MailManager.getInstance().notifyDelivery(p, messageId);
     });
@@ -179,6 +190,12 @@ static CommandResult<Void> handleSendMail(SendMailCommand cmd, CommandContext ct
     return CommandResult.success();
 }
 ```
+
+`ctx.io()` is backed by `nx-io-N` daemon threads sized by `l2nx.io.workers`
+(default `max(2, cores/2)`). The `DeleteItemHandler` bohpts pattern is the
+canonical model: long → int wire-id bound check, `ctx.io()` for the blocking
+JDBC work (transactional with `SELECT ... FOR UPDATE` + login re-check),
+capture mutation return values, reply `INVALID_STATE` on 0-rows.
 
 ### Sync vs Async on the host executor
 
@@ -339,8 +356,12 @@ config of "we ship commands but you forgot to register" gets surfaced loudly.
 ## Idempotency
 
 Kafka offers at-least-once delivery. The adapter commits offsets per batch
-AFTER all records in the batch finish; if the JVM crashes mid-batch, redelivery
-on next start replays the partial batch.
+AFTER all records in the batch finish AND all reply sends in the batch have
+acked. If the JVM crashes mid-batch — or if the consumer is interrupted on
+shutdown while replies are still in flight — the commit is **skipped** for
+that batch and the records redeliver on next start. Manual offset commit is
+actually enforceable now: `enable.auto.commit=false` is the Kafka facade
+default.
 
 **Your handler must be idempotent.** Specifically: if `handler.handle(cmd, ctx)`
 runs twice with the same `correlationId`, the observable game state must be the
@@ -535,7 +556,8 @@ scheduler with a delay, not block.)
 
 ## Glossary
 
-- **`NxCommand<R>`** — type-parameterized marker every command DTO implements; `R` declares the success-payload type that lives in `CommandResult.getPayload()`
+- **`NxCommand<R>`** — type-parameterized marker every command DTO implements; `R` declares the success-payload type
+  that lives in `CommandResult.getPayload()`
 - **`CommandHandler<C, R>`** — SAM `(cmd, ctx) -> CommandResult<R>`
 - **`CommandContext`** — per-invocation context (correlationId, host(), events())
 - **`HostExecutor`** — wrapper around the host's game-side `Executor`

@@ -65,11 +65,12 @@ public class ReplyContext {
             }
             producer.sendRecord(record);
         } catch (Exception e) {
-            log.error("Failed to send reply to {}: {}", replyTopic, e.getMessage());
+            log.error("Failed to send reply to {}", replyTopic, e);
         }
     }
 
     private static String extractStringHeader(ConsumerRecord<?, ?> record, String key) {
+        // Spring Kafka writes these headers raw — do not JSON-parse
         Header header = record.headers().lastHeader(key);
         if (header == null || header.value() == null) {
             return null;

@@ -24,7 +24,7 @@ public final class KafkaInitializer {
 
     private static final NxLog log = NxLogFactory.getLogger(KafkaInitializer.class);
 
-    public static final String SCRAM_LOGIN_MODULE =
+    private static final String SCRAM_LOGIN_MODULE =
             "org.apache.kafka.common.security.scram.ScramLoginModule";
 
     private final KafkaFactory factory;
@@ -68,6 +68,14 @@ public final class KafkaInitializer {
     }
 
     public static String buildJaas(String username, String password) {
-        return SCRAM_LOGIN_MODULE + " required username=\"" + username + "\" password=\"" + password + "\";";
+        return SCRAM_LOGIN_MODULE + " required username=\"" + jaasEscape(username)
+                + "\" password=\"" + jaasEscape(password) + "\";";
+    }
+
+    private static String jaasEscape(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

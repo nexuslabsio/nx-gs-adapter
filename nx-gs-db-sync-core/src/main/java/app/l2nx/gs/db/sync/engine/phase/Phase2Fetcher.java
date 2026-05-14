@@ -2,10 +2,13 @@ package app.l2nx.gs.db.sync.engine.phase;
 
 import app.l2nx.gs.adapter.api.spi.ChildSource;
 import app.l2nx.gs.adapter.api.spi.PrimarySource;
+import app.l2nx.gs.db.sync.engine.JdbcDialect;
+import app.l2nx.gs.db.sync.engine.StatementRegistry;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongList;
+import org.jspecify.annotations.Nullable;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -15,48 +18,40 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Phase 2 of the CRC32 CDC protocol: fetches the actual row data for the PKs
- * whose aggregate CRC32 changed (created ∪ updated). Two variants:
+ * Phase 2: fetches row data for PKs whose aggregate CRC32 changed. PK lists
+ * are chunked at {@value #CHUNK_SIZE}; the last (smaller) chunk pads to the
+ * fixed placeholder count by repeating its final PK — IN(...) dedupes server-
+ * side, the prepared-statement string stays cache-stable across chunks.
  *
- * <ul>
- *     <li>{@link #fetchPrimary} — {@code SELECT * FROM primary WHERE pk IN
- *     (?, ?, ...)} chunked at {@value #CHUNK_SIZE}. Returns {@code Long2ObjectMap<Object>}
- *     (PK → opaque row produced by {@code primary.mapRow}).</li>
- *     <li>{@link #fetchChild} — {@code SELECT * FROM child WHERE fk IN (?, ?,
- *     ...)} chunked at {@value #CHUNK_SIZE}; rows grouped by FK. Returns
- *     {@code Long2ObjectMap<List<Object>>} (FK → list of opaque rows). FK
- *     absence means "no children for this PK" — caller substitutes an empty
- *     list when calling {@code mapEntity}.</li>
- * </ul>
- *
- * <p>DELETE PKs are NOT fetched — the engine emits a Kafka tombstone for them
- * with {@code payload=null}.</p>
- *
- * <p>PK lists are chunked at {@value #CHUNK_SIZE} entries to keep
- * {@code IN(...)} clauses below MySQL's max-prepared-stmt-arg limits and
- * to bound prepare-cache pressure (one cached plan per chunk size). The last
- * (smaller) chunk pads by repeating its final PK so the SQL string stays
- * stable across chunks (server-side prepared-statement cache hits).</p>
- *
- * <p>Phase-2 missing rows (a PK that was present in Phase 1 but disappeared
- * by the time Phase 2 runs) are a silent no-op per the resolved decision —
- * the next cycle's Phase-1 diff catches the deletion as a true DELETED and
- * emits the tombstone then. No fabricated DELETED in the same cycle.</p>
+ * <p>Phase-2 missing rows (present in Phase 1, gone now) are a silent no-op —
+ * next cycle's Phase-1 catches the deletion.</p>
  */
 public final class Phase2Fetcher {
 
     static final int CHUNK_SIZE = 1000;
 
-    public Long2ObjectMap<Object> fetchPrimary(PrimarySource<?> primary,
+    public Long2ObjectMap<Object> fetchPrimary(Connection conn,
+                                               PrimarySource<?> primary,
                                                LongList pks,
-                                               Connection conn,
-                                               int queryTimeoutSeconds) throws SQLException {
+                                               int queryTimeoutSeconds,
+                                               int fetchSize,
+                                               JdbcDialect dialect) throws SQLException {
+        return fetchPrimary(conn, primary, pks, queryTimeoutSeconds, fetchSize, dialect, null);
+    }
+
+    public Long2ObjectMap<Object> fetchPrimary(Connection conn,
+                                               PrimarySource<?> primary,
+                                               LongList pks,
+                                               int queryTimeoutSeconds,
+                                               int fetchSize,
+                                               JdbcDialect dialect,
+                                               @Nullable StatementRegistry registry) throws SQLException {
         Long2ObjectOpenHashMap<Object> result = new Long2ObjectOpenHashMap<Object>();
         if (pks == null || pks.isEmpty()) {
             return result;
         }
         String sql = buildSql(primary.tableName(), primary.pkColumn(), CHUNK_SIZE);
-        runChunkedFetch(pks, conn, queryTimeoutSeconds, sql, new RowConsumer() {
+        runChunkedFetch(conn, pks, queryTimeoutSeconds, fetchSize, dialect, sql, registry, new RowConsumer() {
             @Override
             public void accept(ResultSet rs) throws SQLException {
                 long pk = rs.getLong(primary.pkColumn());
@@ -67,23 +62,36 @@ public final class Phase2Fetcher {
         return result;
     }
 
-    public Long2ObjectMap<List<Object>> fetchChild(ChildSource<?> child,
+    public Long2ObjectMap<List<Object>> fetchChild(Connection conn,
+                                                   ChildSource<?> child,
                                                    LongList fks,
-                                                   Connection conn,
-                                                   int queryTimeoutSeconds) throws SQLException {
+                                                   int queryTimeoutSeconds,
+                                                   int fetchSize,
+                                                   JdbcDialect dialect) throws SQLException {
+        return fetchChild(conn, child, fks, queryTimeoutSeconds, fetchSize, dialect, null);
+    }
+
+    public Long2ObjectMap<List<Object>> fetchChild(Connection conn,
+                                                   ChildSource<?> child,
+                                                   LongList fks,
+                                                   int queryTimeoutSeconds,
+                                                   int fetchSize,
+                                                   JdbcDialect dialect,
+                                                   @Nullable StatementRegistry registry) throws SQLException {
         Long2ObjectOpenHashMap<List<Object>> result = new Long2ObjectOpenHashMap<List<Object>>();
         if (fks == null || fks.isEmpty()) {
             return result;
         }
         String sql = buildSql(child.tableName(), child.fkColumn(), CHUNK_SIZE);
-        runChunkedFetch(fks, conn, queryTimeoutSeconds, sql, new RowConsumer() {
+        runChunkedFetch(conn, fks, queryTimeoutSeconds, fetchSize, dialect, sql, registry, new RowConsumer() {
             @Override
             public void accept(ResultSet rs) throws SQLException {
                 long fk = rs.getLong(child.fkColumn());
                 Object row = child.mapRow(rs);
                 List<Object> bucket = result.get(fk);
                 if (bucket == null) {
-                    bucket = new ArrayList<Object>();
+                    // Presize for the common per-parent fanout.
+                    bucket = new ArrayList<Object>(8);
                     result.put(fk, bucket);
                 }
                 bucket.add(row);
@@ -92,18 +100,21 @@ public final class Phase2Fetcher {
         return result;
     }
 
-    private static void runChunkedFetch(LongList pks,
-                                        Connection conn,
+    private static void runChunkedFetch(Connection conn,
+                                        LongList pks,
                                         int queryTimeoutSeconds,
+                                        int fetchSize,
+                                        JdbcDialect dialect,
                                         String sql,
+                                        @Nullable StatementRegistry registry,
                                         RowConsumer rowConsumer) throws SQLException {
-        // Single PreparedStatement with fixed CHUNK_SIZE placeholders. Last (smaller)
-        // chunk pads by repeating its final PK — IN-set semantics dedupe, so the
-        // result is identical, but the SQL string stays constant across all chunks
-        // in this call → server-side prepared-statement cache hits every time.
-        ConsistentSnapshotTxn.runReadOnly(conn, () -> {
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (registry != null) {
+                registry.set(ps);
+            }
+            try {
                 ps.setQueryTimeout(queryTimeoutSeconds);
+                Phase1Hasher.applyFetchSize(ps, fetchSize, dialect);
                 int from = 0;
                 int total = pks.size();
                 while (from < total) {
@@ -111,9 +122,12 @@ public final class Phase2Fetcher {
                     fetchChunk(pks, from, to, ps, rowConsumer);
                     from = to;
                 }
+            } finally {
+                if (registry != null) {
+                    registry.clear();
+                }
             }
-            return null;
-        });
+        }
     }
 
     private static void fetchChunk(LongList pks,
@@ -126,7 +140,6 @@ public final class Phase2Fetcher {
         for (int i = 0; i < count; i++) {
             ps.setLong(i + 1, pks.getLong(from + i));
         }
-        // Pad to CHUNK_SIZE by repeating the last real PK — duplicates in IN(...) are deduped server-side.
         for (int i = count; i < CHUNK_SIZE; i++) {
             ps.setLong(i + 1, padPk);
         }

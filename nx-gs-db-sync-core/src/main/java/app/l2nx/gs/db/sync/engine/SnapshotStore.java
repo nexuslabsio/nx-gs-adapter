@@ -1,42 +1,38 @@
 package app.l2nx.gs.db.sync.engine;
 
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongIterator;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongSet;
+import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
+import app.l2nx.gs.db.sync.engine.window.Window;
+import it.unimi.dsi.fastutil.longs.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 
 /**
  * In-memory primitive-keyed CRC32 snapshot, one {@link Long2IntOpenHashMap} per
- * synced entity. The engine uses this to detect created / updated / deleted PKs
- * by comparing the previous-cycle snapshot against the current Phase-1 scan.
+ * synced entity. Open-hash backing keeps per-entry footprint ~16 bytes — at
+ * 6.5M+ items a tree-backed map would burn ~360 MB. Range / extreme lookups
+ * become O(N) scans but happen on a dedicated daemon thread per entity.
  *
- * <p>Open-hash map (rather than AVL tree) keeps the per-entry footprint at
- * ~16 bytes — critical at 6.5M+ items, where an AVL tree would otherwise
- * burn ~360 MB on snapshot alone. Range / extreme lookups become O(N) scans
- * (per-window {@link #keysInRange} and per-cycle {@link #minPk} /
- * {@link #maxPk}) on dedicated daemon threads — the trade is heap for CPU,
- * and on a 4 GB host heap is the constraint.</p>
+ * <p>Sentinel: {@code defaultReturnValue} is set to
+ * {@link Phase1Hasher#MISSING_HASH} so callers can compare lookup-result
+ * directly without a separate {@code containsKey} round-trip when 0 is a
+ * legitimate CRC32 value.</p>
  *
- * <p>Sentinel: {@code defaultReturnValue()} stays at the fastutil default (0).
- * Callers must use {@link #containsCrc(String, long)} before reading via
- * {@link #getCrc(String, long)} when 0 is a legitimate CRC32 value (it is).</p>
- *
- * <p>Thread safety: NOT safe for concurrent mutation. The engine spins one
- * scheduler thread per entity and ticks a single entity-task at a time; all
- * mutations for a given entity happen on its own thread.</p>
+ * <p>Thread safety: NOT safe for concurrent mutation. Engine ticks a single
+ * entity-task at a time on its own scheduler slot; all mutations for a given
+ * entity happen on that single tick.</p>
  */
 public final class SnapshotStore {
 
     private final Map<String, Long2IntOpenHashMap> byEntity = new HashMap<String, Long2IntOpenHashMap>();
+    private final Map<String, ExtremeCache> extremeCache = new HashMap<String, ExtremeCache>();
 
     public int getCrc(String entityName, long pk) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null) {
-            return 0;
+            return Phase1Hasher.MISSING_HASH;
         }
         return map.get(pk);
     }
@@ -47,27 +43,34 @@ public final class SnapshotStore {
     }
 
     public void putCrc(String entityName, long pk, int crc) {
-        mapOf(entityName).put(pk, crc);
+        Long2IntOpenHashMap map = mapOf(entityName);
+        int prior = map.put(pk, crc);
+        ExtremeCache cache = extremeCache.get(entityName);
+        if (cache != null && prior == Phase1Hasher.MISSING_HASH) {
+            cache.observePut(pk);
+        }
     }
 
     public void removeCrc(String entityName, long pk) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
-        if (map != null) {
-            map.remove(pk);
+        if (map == null) {
+            return;
+        }
+        int prior = map.remove(pk);
+        if (prior == Phase1Hasher.MISSING_HASH) {
+            return;
+        }
+        ExtremeCache cache = extremeCache.get(entityName);
+        if (cache != null) {
+            cache.observeRemove(pk);
         }
     }
 
     /**
-     * Returns the PKs in {@code [fromPk, toPk]} (closed interval, matching
-     * {@code WHERE pk BETWEEN ? AND ?}) currently stored for the entity. Used
-     * by the diff stage to know which previously-seen PKs fall in the
-     * just-scanned window — a PK in this set but missing from the current scan
-     * = DELETED.
-     *
-     * <p>Open-hash backing means this is an O(N) full-keys scan filtered by
-     * range. Called once per window per cycle; per-window result is small (one
-     * window's worth of PKs) so transient memory stays bounded by
-     * {@code rowsPerWindow}, not by total snapshot size.</p>
+     * Returns the PKs in {@code [fromPk, toPk]} (closed interval) currently
+     * stored for the entity. O(N) full-keys scan on first call per cycle;
+     * subsequent windows in the same cycle should consult
+     * {@link #bucketByWindows} for amortized O(1) per window.
      */
     public LongSet keysInRange(String entityName, long fromPk, long toPk) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
@@ -85,80 +88,154 @@ public final class SnapshotStore {
         return result;
     }
 
+    /**
+     * Single-pass bucketing of an entity's snapshot keys across an ordered
+     * window list. Returned map is keyed by window index (0..windows.size()-1)
+     * → LongSet of PKs falling inside that window. Windows must be ordered
+     * and non-overlapping (the engine constructs them that way). PKs outside
+     * every window are dropped — the planner's envelope guarantees this is
+     * never a real case, but no need to assert.
+     */
+    public Long2ObjectOpenHashMap<LongSet> bucketByWindows(String entityName, List<Window> windows) {
+        Long2ObjectOpenHashMap<LongSet> buckets = new Long2ObjectOpenHashMap<LongSet>(windows.size());
+        for (int i = 0; i < windows.size(); i++) {
+            buckets.put(i, new LongOpenHashSet());
+        }
+        Long2IntOpenHashMap map = byEntity.get(entityName);
+        if (map == null || map.isEmpty() || windows.isEmpty()) {
+            return buckets;
+        }
+        LongIterator it = map.keySet().iterator();
+        while (it.hasNext()) {
+            long pk = it.nextLong();
+            int idx = findWindow(windows, pk);
+            if (idx >= 0) {
+                buckets.get(idx).add(pk);
+            }
+        }
+        return buckets;
+    }
+
+    private static int findWindow(List<Window> windows, long pk) {
+        int lo = 0;
+        int hi = windows.size() - 1;
+        while (lo <= hi) {
+            int mid = (lo + hi) >>> 1;
+            Window w = windows.get(mid);
+            if (pk < w.fromPk()) {
+                hi = mid - 1;
+            } else if (pk > w.toPk()) {
+                lo = mid + 1;
+            } else {
+                return mid;
+            }
+        }
+        return -1;
+    }
+
     public int sizeOf(String entityName) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
         return map == null ? 0 : map.size();
     }
 
-    /**
-     * Smallest PK currently held in the snapshot for the entity, or empty if
-     * the entity has no entries (initial cold cycle, or every previously-seen
-     * PK has been published as a tombstone).
-     *
-     * <p>Open-hash backing forces an O(N) scan; called once per cycle by
-     * {@code WindowPlanner} for envelope planning (cdc-engine R2: the
-     * partitioned range covers the union of the live DB range AND the
-     * snapshot's range so deletion of the row at the current {@code MIN(pk)}
-     * still falls inside some next-cycle window).</p>
-     */
     public OptionalLong minPk(String entityName) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null || map.isEmpty()) {
             return OptionalLong.empty();
         }
-        long min = Long.MAX_VALUE;
-        LongIterator it = map.keySet().iterator();
-        while (it.hasNext()) {
-            long pk = it.nextLong();
-            if (pk < min) {
-                min = pk;
-            }
-        }
-        return OptionalLong.of(min);
+        return OptionalLong.of(cacheOf(entityName, map).min(map));
     }
 
-    /**
-     * Largest PK currently held in the snapshot for the entity, or empty if
-     * the entity has no entries. Symmetric to {@link #minPk}; together they
-     * bound the snapshot's PK envelope for the {@code WindowPlanner}
-     * (cdc-engine R2). Same O(N) cost — single scan per cycle.
-     */
     public OptionalLong maxPk(String entityName) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null || map.isEmpty()) {
             return OptionalLong.empty();
         }
-        long max = Long.MIN_VALUE;
-        LongIterator it = map.keySet().iterator();
-        while (it.hasNext()) {
-            long pk = it.nextLong();
-            if (pk > max) {
-                max = pk;
-            }
-        }
-        return OptionalLong.of(max);
+        return OptionalLong.of(cacheOf(entityName, map).max(map));
     }
 
     public void clearEntity(String entityName) {
-        Long2IntOpenHashMap map = byEntity.remove(entityName);
-        if (map != null) {
-            map.clear();
-        }
+        byEntity.remove(entityName);
+        extremeCache.remove(entityName);
     }
 
     public void clearAll() {
-        for (Long2IntOpenHashMap map : byEntity.values()) {
-            map.clear();
-        }
         byEntity.clear();
+        extremeCache.clear();
     }
 
     private Long2IntOpenHashMap mapOf(String entityName) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null) {
             map = new Long2IntOpenHashMap();
+            map.defaultReturnValue(Phase1Hasher.MISSING_HASH);
             byEntity.put(entityName, map);
         }
         return map;
+    }
+
+    private ExtremeCache cacheOf(String entityName, Long2IntOpenHashMap map) {
+        ExtremeCache cache = extremeCache.get(entityName);
+        if (cache == null) {
+            cache = new ExtremeCache();
+            extremeCache.put(entityName, cache);
+        }
+        return cache;
+    }
+
+    /**
+     * Lazy memoization of min/max PK. Insert tracks new extremes incrementally;
+     * remove of a non-extreme PK is a no-op; remove of an extreme marks dirty
+     * and the next read recomputes via one O(N) scan.
+     */
+    private static final class ExtremeCache {
+        private boolean valid;
+        private long min;
+        private long max;
+
+        void observePut(long pk) {
+            if (!valid) {
+                return;
+            }
+            if (pk < min) min = pk;
+            if (pk > max) max = pk;
+        }
+
+        void observeRemove(long pk) {
+            if (!valid) {
+                return;
+            }
+            if (pk == min || pk == max) {
+                valid = false;
+            }
+        }
+
+        long min(Long2IntOpenHashMap map) {
+            if (!valid) {
+                recompute(map);
+            }
+            return min;
+        }
+
+        long max(Long2IntOpenHashMap map) {
+            if (!valid) {
+                recompute(map);
+            }
+            return max;
+        }
+
+        private void recompute(Long2IntOpenHashMap map) {
+            long mn = Long.MAX_VALUE;
+            long mx = Long.MIN_VALUE;
+            LongIterator it = map.keySet().iterator();
+            while (it.hasNext()) {
+                long pk = it.nextLong();
+                if (pk < mn) mn = pk;
+                if (pk > mx) mx = pk;
+            }
+            min = mn;
+            max = mx;
+            valid = true;
+        }
     }
 }

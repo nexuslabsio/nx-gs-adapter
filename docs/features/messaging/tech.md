@@ -7,17 +7,33 @@
 Messaging is a built-in capability of `nx-gs-adapter-core` (not a discovered
 `AdapterModule`). It exposes one bidirectional surface to host integration code:
 `ConnectContext.events()` returns an `NxEvents` facade for outbound discrete-fact
-fanout to per-family Kafka topics. Host hooks call typed publish methods
-(`publishPremiumPurchase`, …) which enqueue into a shared bounded `ArrayBlockingQueue`
-on a single internal `nx-events-publisher` daemon thread; the daemon Gson-serializes,
-stamps `Nx-Server-Id` + `Nx-Message-Type` headers, derives a partition key from
-the event payload via a hardcoded type-registry, and hands off to the existing
-`NxKafka` producer. Auto-stamped headers are reused from
+fanout to per-family Kafka topics. The façade has stable identity across
+reconnect cycles — an internal `AtomicReference` is swapped to the live publisher
+on every reconnect, so host modules cache the reference once at `start()` and
+never re-acquire.
+
+Host hooks call typed publish methods (`publishPremiumPurchase`, …) which
+enqueue into a shared bounded `ArrayBlockingQueue` on a single internal
+`nx-events-publisher` daemon thread; the daemon Gson-serializes, stamps
+`Nx-Server-Id` + `Nx-Message-Type` headers, derives a partition key from the
+event payload via a hardcoded type-registry, and hands off to the single
+`KafkaProducer<byte[], Object>` owned by `DefaultNxProducer` (string keys are
+encoded to UTF-8 bytes at the boundary). Producer durability is wire-enforced
+— `acks=all`, `enable.idempotence=true`, `max.in.flight.requests.per.connection=5`,
+`linger.ms=10`, `compression.type=gzip`, `retries=Integer.MAX_VALUE`,
+`delivery.timeout.ms=120000` — all overridable via user properties. Producer
+close timeout is configurable via `KafkaConfig.Builder.producerCloseTimeout(Duration)`
+(default `10s`).
+
+Auto-stamped headers are reused from
 [`per-server-sync`](../per-server-sync/spec.md). Topic addressing comes from a
 new optional `messagingTopics: { events, commands }` field on `ConnectResponse`,
-parallel to the existing `syncTopics` bundle. Inbound commands are an
-architectural placeholder in Phase 1 — the wire shape and SPI are committed
-in Javadoc + an empty `commands` map; the consumer + dispatch runtime is Phase 2.
+parallel to the existing `syncTopics` bundle. Inbound commands are realized in
+the [`commands`](../commands/spec.md) slice — a `ConsumerGroup` (single
+`KafkaConsumer`, sync per-record commit after handler success, no commit on
+handler exception → at-least-once redelivery) drives the dispatch surface.
+The adapter also reuses a persistent `AdminClient` for the connect-flow Kafka
+health check — created once at init, reused.
 
 ## Structure
 
@@ -152,15 +168,24 @@ End-to-end publish (premium purchase from a community-board buy-noblesse click):
 6. Heartbeat tick (independent cadence) reads atomic counters + queue size
    into `events` slot of `HeartbeatEvent.enabledModules`.
 
-Queue-overflow path (drop-oldest):
+Queue-overflow path (default `newest` drop policy — drop incoming):
 
 1. Caller calls `publishPremiumPurchase(event)`.
-2. `EventsPublisher.enqueue` checks `queue.remainingCapacity() == 0`.
-3. If so → `queue.poll()` evicts the head, `dropped-total++`, log WARN once
-   per second (rate-limited), then `queue.offer(envelope)` (which now succeeds).
-4. Daemon thread continues draining; the previously-evicted envelope is
-   gone — it will not be retried, redelivered, or surfaced anywhere except
-   the dropped counter.
+2. `EventsPublisher.enqueue` calls `queue.offer(envelope)` non-blocking.
+3. If `offer` returns `false` → `dropped-total++`, log WARN once per second
+   (rate-limited). The envelope is dropped on the caller side, queue order
+   is preserved.
+4. Daemon thread continues draining unaffected.
+
+Queue-overflow path (opt-in `oldest` drop policy — evict head):
+
+1. Caller calls `publishPremiumPurchase(event)`.
+2. `EventsPublisher.enqueue` checks remaining capacity; on full → `queue.poll()`
+   evicts the head, `dropped-total++`, then `queue.offer(envelope)`.
+3. Under multi-producer contention `dropped-total` over-counts — the eviction
+   path increments the counter even when two enqueuers race for the same slot
+   and only one actually has its envelope dropped. Documented caveat; pick
+   `newest` if accurate accounting matters.
 
 Shutdown path:
 
@@ -201,9 +226,16 @@ Wire DTOs (Kafka payloads):
   point to publish. Called once at host's connect callback; result cached for
   the session.
 - **`NxKafka` producer** [planned] — reused via `EventsPublisher`. No new Kafka
-  init code; the producer instance built at adapter bootstrap (per
-  `adapter-bootstrap` R6) is shared. Static headers (`Nx-Server-Id`) registered
-  there auto-apply to events as well as sync records.
+  init code; the single `KafkaProducer<byte[], Object>` built at adapter
+  bootstrap (per `adapter-bootstrap` R6) is shared. Static headers
+  (`Nx-Server-Id`) registered there auto-apply to events as well as sync
+  records. The `commands` consumer surface shares producer access for reply
+  publication and uses a separate `ConsumerGroup` (renamed from
+  `NxConsumerGroup`) running with `enable.auto.commit=false` and sync per-record
+  commit after handler success — on handler exception the commit is skipped
+  and the record redelivers. Subscription is via
+  `NxKafka.subscribe(topic, groupId, ...)` — `groupId` is an explicit required
+  parameter rather than being implicit on the facade.
 - **`HeartbeatEvent.enabledModules`** [planned] — surfaces
   `{name: "events", state, stats: {queue-depth, queue-capacity, published-total,
   dropped-total, failed-total, disabled-families}}` per R14. Same envelope
@@ -239,16 +271,34 @@ Wire DTOs (Kafka payloads):
   registry then becomes a string-key bottleneck and the discovery story
   worsens.
 
-- **Decision:** Async with bounded queue + drop-oldest, never throws.
+- **Decision:** Async with bounded queue + drop-newest by default, never throws.
   **Why:** Game-loop safety is the project's highest-priority invariant
   ("Never block game-server threads" — root CLAUDE.md). Synchronous publish
   exposes the caller to Kafka producer latency (network, broker GC, leader
   reelection); even a small `RuntimeException` propagating up the L2 game
   loop is a correctness disaster. Bounded queue isolates the caller from
-  back-pressure; drop-oldest keeps the most recent (most relevant) events
-  flowing when a burst exceeds capacity. Considered: `CompletableFuture<Void>`
-  return — overkill for Java-8-bound L2 hosts, and async-with-callback
-  doesn't compose better than the heartbeat-counter observability.
+  back-pressure. `newest` is the default because it preserves queue order
+  and gives accurate `dropped-total` accounting; `oldest` remains opt-in
+  for operators who would rather keep the freshest events at the cost of
+  an over-counted dropped counter under multi-producer contention.
+  Considered: `CompletableFuture<Void>` return — overkill for Java-8-bound
+  L2 hosts, and async-with-callback doesn't compose better than the
+  heartbeat-counter observability.
+
+- **Decision:** Single `KafkaProducer<byte[], Object>` (not two — string-keyed
+    + byte-keyed).
+      **Why:** Halves `buffer.memory` (32 MiB instead of 64), halves broker
+      connections, and runs one sender I/O thread instead of two. String keys
+      encode to UTF-8 bytes at the publish boundary; cheap conversion, large
+      resource win. The previous two-producer setup is gone.
+
+- **Decision:** Producer durability defaults are wire-enforced.
+  **Why:** The at-least-once contract used to be a documentation claim that
+  callers had to keep in sync with their own producer properties. Adapter-core
+  now defaults `acks=all`, `enable.idempotence=true`, `max.in.flight=5`,
+  `linger.ms=10`, `compression=gzip`, `retries=MAX`,
+  `delivery.timeout.ms=120000` at the producer level. User properties
+  (config file or sysprops) override but the wire defaults are conservative.
 
 - **Decision:** UUIDv7 lives in `:nx-gs-commons`, hand-rolled, no fasterxml.
   **Why:** `:nx-gs-adapter-api` charter is zero-runtime-deps; `:nx-gs-commons`

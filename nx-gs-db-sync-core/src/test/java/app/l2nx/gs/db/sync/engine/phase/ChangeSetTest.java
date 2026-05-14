@@ -112,15 +112,4 @@ class ChangeSetTest {
         assertFalse(diff.isEmpty());
     }
 
-    @Test
-    void diff_shouldCarryCurrentScan_inResult() {
-        Long2IntMap scan = new Long2IntOpenHashMap();
-        scan.put(1L, 100);
-        scan.put(2L, 200);
-
-        ChangeSet diff = ChangeSet.diff(scan, new LongOpenHashSet(), new SnapshotStore(), ENTITY);
-
-        assertEquals(100, diff.currentScan().get(1L));
-        assertEquals(200, diff.currentScan().get(2L));
-    }
 }

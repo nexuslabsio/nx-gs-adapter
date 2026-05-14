@@ -5,6 +5,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 /**
  * Identity bundle handed to every {@link AdapterModule#onConnect(ConnectContext)} call
@@ -18,11 +19,13 @@ import java.util.UUID;
  * the {@link NxEvents} capability for per-family discrete-fact fanout to
  * {@code <tenant>.gs.events.<family>} topics. Phase 4 adds {@link #commands()} —
  * the {@link NxCommands} capability for registering inbound command handlers
- * dispatched off the {@code <tenant>.gs.commands} topic.</p>
+ * dispatched off the {@code <tenant>.gs.commands} topic. Phase 5 adds
+ * {@link #io()} — an adapter-owned bounded {@link Executor} for module /
+ * handler-side blocking IO (JDBC, HTTP).</p>
  *
- * <p>{@link #events()} and {@link #commands()} are excluded from
- * {@link #equals(Object)} / {@link #hashCode()} / {@link #toString()} — they
- * are service handles, not part of the value-typed identity bundle. Two
+ * <p>{@link #events()}, {@link #commands()}, and {@link #io()} are excluded
+ * from {@link #equals(Object)} / {@link #hashCode()} / {@link #toString()} —
+ * they are service handles, not part of the value-typed identity bundle. Two
  * contexts with the same identity bits compare equal regardless of which
  * implementations they wrap.</p>
  */
@@ -37,6 +40,31 @@ public final class ConnectContext {
     private final SyncTopics syncTopics;
     private final NxEvents events;
     private final NxCommands commands;
+    private final Executor io;
+
+    public ConnectContext(UUID tenantId,
+                          String tenantSlug,
+                          UUID serverId,
+                          String serverSlug,
+                          String serverName,
+                          String adapterVersion,
+                          @Nullable SyncTopics syncTopics,
+                          @Nullable NxEvents events,
+                          @Nullable NxCommands commands,
+                          @Nullable Executor io) {
+        this.tenantId = tenantId;
+        this.tenantSlug = tenantSlug;
+        this.serverId = serverId;
+        this.serverSlug = serverSlug;
+        this.serverName = serverName;
+        this.adapterVersion = adapterVersion;
+        this.syncTopics = syncTopics == null ? new SyncTopics(null, null, null) : syncTopics;
+        this.events = events == null ? NoOpEvents.INSTANCE : events;
+        this.commands = commands == null ? NoOpCommands.INSTANCE : commands;
+        // Direct-run fallback keeps ctx.io().execute(r) usable in tests / pre-wired contexts;
+        // production adapter-core injects a bounded pool.
+        this.io = io == null ? DirectExecutor.INSTANCE : io;
+    }
 
     public ConnectContext(UUID tenantId,
                           String tenantSlug,
@@ -47,21 +75,14 @@ public final class ConnectContext {
                           @Nullable SyncTopics syncTopics,
                           @Nullable NxEvents events,
                           @Nullable NxCommands commands) {
-        this.tenantId = tenantId;
-        this.tenantSlug = tenantSlug;
-        this.serverId = serverId;
-        this.serverSlug = serverSlug;
-        this.serverName = serverName;
-        this.adapterVersion = adapterVersion;
-        this.syncTopics = syncTopics == null ? new SyncTopics(null, null, null) : syncTopics;
-        this.events = events == null ? NoOpEvents.INSTANCE : events;
-        this.commands = commands == null ? NoOpCommands.INSTANCE : commands;
+        this(tenantId, tenantSlug, serverId, serverSlug, serverName, adapterVersion,
+                syncTopics, events, commands, null);
     }
 
     /**
      * Backward-compat constructor — pre-{@link NxCommands} callers continue
-     * to work and get a no-op commands façade. Phase-4 callers should use the
-     * 9-arg constructor (or, preferably, the {@link Builder}).
+     * to work and get a no-op commands façade plus the direct-run
+     * {@link #io()} fallback. New callers should prefer the {@link Builder}.
      */
     public ConnectContext(UUID tenantId,
                           String tenantSlug,
@@ -134,6 +155,20 @@ public final class ConnectContext {
         return commands;
     }
 
+    /**
+     * Adapter-owned IO executor. Use for blocking IO (JDBC, HTTP) issued from
+     * module / handler-side code. NOT the game-thread executor — modules
+     * needing game-state reads/writes go through {@link CommandContext#host()}
+     * on a per-invocation basis. Backed by a small bounded pool sized by
+     * {@code l2nx.io.workers} (default =
+     * {@code max(2, Runtime.getRuntime().availableProcessors() / 2)}); a
+     * {@code null} passed to the constructor falls back to a direct-run
+     * executor so calls remain safe in tests / pre-wired contexts.
+     */
+    public Executor io() {
+        return io;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .tenantId(tenantId)
@@ -144,7 +179,8 @@ public final class ConnectContext {
                 .adapterVersion(adapterVersion)
                 .syncTopics(syncTopics)
                 .events(events)
-                .commands(commands);
+                .commands(commands)
+                .io(io);
     }
 
     public static Builder builder() {
@@ -192,6 +228,7 @@ public final class ConnectContext {
         private @Nullable SyncTopics syncTopics;
         private @Nullable NxEvents events;
         private @Nullable NxCommands commands;
+        private @Nullable Executor io;
 
         public Builder tenantId(UUID tenantId) {
             this.tenantId = tenantId;
@@ -238,9 +275,14 @@ public final class ConnectContext {
             return this;
         }
 
+        public Builder io(@Nullable Executor io) {
+            this.io = io;
+            return this;
+        }
+
         public ConnectContext build() {
             return new ConnectContext(tenantId, tenantSlug, serverId, serverSlug,
-                    serverName, adapterVersion, syncTopics, events, commands);
+                    serverName, adapterVersion, syncTopics, events, commands, io);
         }
     }
 }

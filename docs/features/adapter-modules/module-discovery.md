@@ -62,10 +62,18 @@ Cross-references:
 - Tier 2 (db-sync `DbSchemaProvider` discovery, vanilla → client override pattern,
   multi-impl resolution scenarios):
   [`docs/features/db-sync/module-discovery.md`](../db-sync/module-discovery.md)
+- Tier 2 (runtime-sync `RuntimeStateProvider` discovery — same ServiceLoader
+  mechanics, host-provided in-memory game-state extractors):
+  [`docs/features/runtime-sync/spec.md`](../runtime-sync/spec.md)
 - Tier 3 (`JdbcConnectionSource` resolution: host SPI Path 1 + bundled-Hikari Path 2
   fallback): [`docs/features/jdbc-connection-source/spec.md`](../jdbc-connection-source/spec.md)
   (full doc; no separate `module-discovery.md` for that tier — content is already in
   spec/tech).
+
+The wire-level contract (descriptor file name = fully-qualified interface name,
+no-arg public constructor required, one impl FQN per line) is identical for
+every tier and every SPI — only the per-tier resolution rule differs (Tier 1:
+one impl per `name()` by convention; Tier 2 / Tier 3: fail-loud on >1).
 
 ---
 

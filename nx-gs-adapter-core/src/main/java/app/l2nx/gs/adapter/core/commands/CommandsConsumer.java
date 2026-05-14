@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -104,6 +105,7 @@ public final class CommandsConsumer {
     private final @Nullable String repliesTopic;
     private final HostExecutor hostExecutor;
     private final NxEvents events;
+    private final Executor ioExecutor;
     private final CommandTypeRegistry registry;
     private final Consumer<byte[], byte[]> kafkaConsumer;
     private final ReplySender replySender;
@@ -132,6 +134,7 @@ public final class CommandsConsumer {
                      @Nullable String repliesTopic,
                      HostExecutor hostExecutor,
                      NxEvents events,
+                     Executor ioExecutor,
                      CommandTypeRegistry registry,
                      Consumer<byte[], byte[]> kafkaConsumer,
                      ReplySender replySender,
@@ -141,6 +144,7 @@ public final class CommandsConsumer {
         this.repliesTopic = repliesTopic;
         this.hostExecutor = hostExecutor;
         this.events = events;
+        this.ioExecutor = ioExecutor;
         this.registry = registry;
         this.kafkaConsumer = kafkaConsumer;
         this.replySender = replySender;
@@ -154,9 +158,10 @@ public final class CommandsConsumer {
 
     /**
      * Spawn the consumer daemon and subscribe to {@code inboundTopic}.
-     * Idempotent.
+     * Idempotent. Package-private — callers go through
+     * {@link CommandsBootstrap}.
      */
-    public void start() {
+    void start() {
         if (running) {
             return;
         }
@@ -180,7 +185,7 @@ public final class CommandsConsumer {
             kafkaConsumer.wakeup();
         } catch (Throwable t) {
             log.warn("Commands consumer wakeup threw {}: {}",
-                    t.getClass().getName(), t.getMessage());
+                    t.getClass().getName(), t.getMessage(), t);
         }
         try {
             daemon.join(shutdownTimeoutMs + SHUTDOWN_GRACE_MS);
@@ -191,7 +196,7 @@ public final class CommandsConsumer {
             kafkaConsumer.close(Duration.ofMillis(SHUTDOWN_GRACE_MS));
         } catch (Throwable t) {
             log.warn("Commands consumer close threw {}: {}",
-                    t.getClass().getName(), t.getMessage());
+                    t.getClass().getName(), t.getMessage(), t);
         }
         log.info("Commands consumer stopped");
     }
@@ -237,7 +242,7 @@ public final class CommandsConsumer {
                 if (!running) {
                     return;
                 }
-                log.error("Commands consumer poll error: {} — backing off 1s", t.getClass().getName());
+                log.error("Commands consumer poll error: {} — backing off 1s", t.getClass().getName(), t);
                 sleepQuiet(1_000L);
                 continue;
             }
@@ -248,13 +253,24 @@ public final class CommandsConsumer {
             }
 
             if (!records.isEmpty()) {
-                awaitRepliesDrain();
+                boolean interrupted = awaitRepliesDrain();
+                if (interrupted) {
+                    // Drain returned early via thread interrupt; offsets MUST stay
+                    // uncommitted so the batch redelivers and replies re-emit.
+                    return;
+                }
+                // running may have been flipped to false between processRecord and
+                // this point (concurrent stop()); honor that to avoid committing
+                // records the consumer will redeliver on next start anyway.
+                if (!running) {
+                    return;
+                }
                 try {
                     kafkaConsumer.commitSync();
                 } catch (Throwable t) {
                     commitFailuresTotal.incrementAndGet();
                     log.warn("Commands consumer commit failed: {} ({}) — records will redeliver",
-                            t.getClass().getName(), t.getMessage());
+                            t.getClass().getName(), t.getMessage(), t);
                 }
             }
         }
@@ -270,10 +286,15 @@ public final class CommandsConsumer {
      *
      * <p>Skipped when {@code replyFlushTimeoutMs == 0} — interpreted as
      * "operator opts out of flushing"; the at-most-once window reopens.</p>
+     *
+     * @return {@code true} when the wait returned via thread interrupt with
+     * pending replies still outstanding — caller MUST skip the offset commit
+     * so the batch redelivers. {@code false} otherwise (drained or timed
+     * out cleanly).
      */
-    private void awaitRepliesDrain() {
+    private boolean awaitRepliesDrain() {
         if (replyFlushTimeoutMs <= 0L) {
-            return;
+            return false;
         }
         long deadline = System.currentTimeMillis() + replyFlushTimeoutMs;
         synchronized (replyDrainLock) {
@@ -287,16 +308,24 @@ public final class CommandsConsumer {
                                 + "committing offset anyway; pending sends will continue and may still "
                                 + "succeed asynchronously", leftover, replyFlushTimeoutMs);
                     }
-                    return;
+                    return false;
                 }
                 try {
                     replyDrainLock.wait(remaining);
                 } catch (InterruptedException ie) {
+                    int leftover = pendingReplies.get();
+                    running = false;
                     Thread.currentThread().interrupt();
-                    return;
+                    if (leftover > 0) {
+                        log.warn("Interrupted during reply drain; skipping offset commit so {} "
+                                + "pending record(s) will redeliver", leftover);
+                        return true;
+                    }
+                    return false;
                 }
             }
         }
+        return false;
     }
 
     // package-visible for unit tests; production callers go through pollLoop()
@@ -311,7 +340,7 @@ public final class CommandsConsumer {
             log.warn("Inbound command record missing {} header — replying UNSUPPORTED_COMMAND",
                     NxHeaders.NX_MESSAGE_TYPE);
             sendReply(correlationId, FALLBACK_REPLY_TYPE_BYTES,
-                    CommandResult.<Object>error(ErrorCode.UNSUPPORTED_COMMAND,
+                    CommandResult.error(ErrorCode.UNSUPPORTED_COMMAND,
                             "error.cause", "missing-message-type-header"));
             return;
         }
@@ -321,7 +350,7 @@ public final class CommandsConsumer {
             log.warn("No registered handler for command type {} — replying UNSUPPORTED_COMMAND",
                     messageType);
             sendReply(correlationId, computeReplyTypeBytes(messageType),
-                    CommandResult.<Object>error(ErrorCode.UNSUPPORTED_COMMAND,
+                    CommandResult.error(ErrorCode.UNSUPPORTED_COMMAND,
                             "error.cause", "unregistered-type"));
             return;
         }
@@ -333,7 +362,7 @@ public final class CommandsConsumer {
         try {
             byte[] value = record.value();
             String json = (value == null) ? "{}" : new String(value, StandardCharsets.UTF_8);
-            command = (NxCommand<?>) gson.fromJson(json, binding.commandClass());
+            command = gson.fromJson(json, binding.commandClass());
             if (command == null) {
                 throw new JsonSyntaxException("Gson returned null for non-null payload");
             }
@@ -342,14 +371,14 @@ public final class CommandsConsumer {
             log.warn("Failed to deserialize command type {} (corr={}): {}",
                     messageType, correlationId, jse.getMessage());
             sendReply(correlationId, replyTypeBytes,
-                    CommandResult.<Object>error(ErrorCode.VALIDATION_FAILED,
+                    CommandResult.error(ErrorCode.VALIDATION_FAILED,
                             "parse", String.valueOf(jse.getMessage())));
             return;
         } catch (Throwable t) {
             internalErrorsTotal.incrementAndGet();
             log.error("Unexpected deserialization failure for command type {} (corr={}): {}",
                     messageType, correlationId, t.getClass().getName(), t);
-            sendReply(correlationId, replyTypeBytes, CommandResult.<Object>builder()
+            sendReply(correlationId, replyTypeBytes, CommandResult.builder()
                     .errorCode(ErrorCode.INTERNAL_ERROR)
                     .errorDetail("error.class", t.getClass().getSimpleName())
                     .errorDetail("error.message", String.valueOf(t.getMessage()))
@@ -358,7 +387,7 @@ public final class CommandsConsumer {
         }
 
         // 3. Invoke handler — Throwable (Error) intentionally NOT caught (lets JVM-level handler take over)
-        CommandContext ctx = new CommandContextImpl(correlationId, hostExecutor, events);
+        CommandContext ctx = new CommandContextImpl(correlationId, hostExecutor, events, ioExecutor);
         @SuppressWarnings({"unchecked", "rawtypes"})
         CommandHandler handler = binding.handler();
         CommandResult<?> result;
@@ -370,7 +399,7 @@ public final class CommandsConsumer {
             internalErrorsTotal.incrementAndGet();
             log.warn("Handler for {} (corr={}) hit host-executor timeout after {}ms",
                     messageType, correlationId, hte.getTimeoutMs());
-            result = CommandResult.<Object>builder()
+            result = CommandResult.builder()
                     .errorCode(ErrorCode.UNAVAILABLE)
                     .errorDetail("error.cause", "host-executor-timeout")
                     .errorDetail("timeout.ms", String.valueOf(hte.getTimeoutMs()))
@@ -379,7 +408,7 @@ public final class CommandsConsumer {
             internalErrorsTotal.incrementAndGet();
             log.warn("Handler for {} (corr={}) threw {}: {}",
                     messageType, correlationId, re.getClass().getSimpleName(), re.getMessage(), re);
-            result = CommandResult.<Object>builder()
+            result = CommandResult.builder()
                     .errorCode(ErrorCode.INTERNAL_ERROR)
                     .errorDetail("error.class", re.getClass().getSimpleName())
                     .errorDetail("error.message", String.valueOf(re.getMessage()))
@@ -391,7 +420,7 @@ public final class CommandsConsumer {
             internalErrorsTotal.incrementAndGet();
             log.warn("Handler for {} (corr={}) returned null — auto-wrapping as INTERNAL_ERROR",
                     messageType, correlationId);
-            result = CommandResult.<Object>error(ErrorCode.INTERNAL_ERROR,
+            result = CommandResult.error(ErrorCode.INTERNAL_ERROR,
                     "error.cause", "handler-returned-null");
         } else {
             handledTotal.incrementAndGet();
@@ -422,7 +451,7 @@ public final class CommandsConsumer {
                 try {
                     if (exception != null) {
                         repliesFailedTotal.incrementAndGet();
-                        log.warn("Reply send failed for corr={}: {}", correlationId, exception.getMessage());
+                        log.warn("Reply send failed for corr={}: {}", correlationId, exception.getMessage(), exception);
                     } else {
                         repliesPublishedTotal.incrementAndGet();
                     }
@@ -445,7 +474,7 @@ public final class CommandsConsumer {
                 }
             }
             log.error("Reply send threw for corr={}: {} ({})",
-                    correlationId, t.getClass().getName(), t.getMessage());
+                    correlationId, t.getClass().getName(), t.getMessage(), t);
         }
     }
 

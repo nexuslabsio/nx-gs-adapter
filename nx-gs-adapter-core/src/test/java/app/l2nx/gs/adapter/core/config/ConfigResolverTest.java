@@ -9,11 +9,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -309,6 +307,49 @@ class ConfigResolverTest {
 
         // Blank explicit path is treated as absent → falls through to default file
         assertEquals("from-default", loaded.getProperty("k"));
+    }
+
+    @Test
+    void resolveCommandsConfig_shouldPickUpSyspropOnlyKafkaOverrides() {
+        Map<String, String> sys = new HashMap<>();
+        sys.put("l2nx.commands.kafka.max.poll.records", "25");
+        sys.put("l2nx.commands.kafka.fetch.min.bytes", "1024");
+        Supplier<Set<String>> names = () -> new LinkedHashSet<>(sys.keySet());
+
+        ConfigResolver resolver = new ConfigResolver(sys::get, names, new Properties());
+
+        Map<String, Object> overrides = resolver.resolveCommandsConfig().getKafkaOverrides();
+        assertEquals("25", overrides.get("max.poll.records"));
+        assertEquals("1024", overrides.get("fetch.min.bytes"));
+    }
+
+    @Test
+    void resolveCommandsConfig_shouldLetFilePropertiesWin_overSysprops() {
+        Map<String, String> sys = new HashMap<>();
+        sys.put("l2nx.commands.kafka.max.poll.records", "25");
+        Supplier<Set<String>> names = () -> new LinkedHashSet<>(sys.keySet());
+        Properties file = props("l2nx.commands.kafka.max.poll.records", "75");
+
+        ConfigResolver resolver = new ConfigResolver(sys::get, names, file);
+
+        Map<String, Object> overrides = resolver.resolveCommandsConfig().getKafkaOverrides();
+        assertEquals("75", overrides.get("max.poll.records"),
+                "file-supplied value must beat sysprop-supplied value");
+    }
+
+    @Test
+    void resolveIoWorkers_shouldDefaultWhenAbsent() {
+        ConfigResolver resolver = new ConfigResolver(empty(), new Properties());
+
+        assertTrue(resolver.resolveIoWorkers() >= 2,
+                "default must respect the DEFAULT_IO_WORKERS_MIN floor");
+    }
+
+    @Test
+    void resolveIoWorkers_shouldRejectNonPositive() {
+        ConfigResolver resolver = withSysprop("l2nx.io.workers", "0");
+
+        assertThrows(IllegalStateException.class, resolver::resolveIoWorkers);
     }
 
     @Test

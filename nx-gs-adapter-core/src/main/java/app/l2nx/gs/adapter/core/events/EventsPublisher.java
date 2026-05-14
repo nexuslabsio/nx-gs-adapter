@@ -26,11 +26,14 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <p>Drop policy on full queue:</p>
  * <ul>
- *     <li>{@link DropPolicy#OLDEST} (default) — evicts the head and admits
- *     the new envelope. Recent purchase events take priority over stale
- *     server-snapshot events.</li>
- *     <li>{@link DropPolicy#NEWEST} — drops the incoming envelope. Use only
- *     when oldest-events ordering is critical.</li>
+ *     <li>{@link DropPolicy#NEWEST} (default) — drops the incoming envelope
+ *     atomically via {@code queue.offer()} returning {@code false}; no
+ *     eviction race under multi-threaded producers.</li>
+ *     <li>{@link DropPolicy#OLDEST} — evicts the head and admits the new
+ *     envelope so recent facts displace stale snapshots. Head-poll and
+ *     newcomer-offer are not atomic, so concurrent producers on a full queue
+ *     may over-count {@code droppedTotal} (an enqueue can both evict a head
+ *     and lose its slot to another caller).</li>
  * </ul>
  *
  * <p>Counters expose the publisher's health via {@link #currentStatus()}
@@ -89,7 +92,7 @@ public final class EventsPublisher {
         this.sender = sender;
         this.queue = new ArrayBlockingQueue<EventEnvelope>(capacity);
         this.queueCapacity = capacity;
-        this.dropPolicy = config.getDropPolicy() != null ? config.getDropPolicy() : DropPolicy.OLDEST;
+        this.dropPolicy = config.getDropPolicy() != null ? config.getDropPolicy() : DropPolicy.NEWEST;
         this.shutdownDrainMs = Math.max(0L, config.getShutdownDrainMs());
         this.registry = registry;
         this.daemon = new Thread(SafeRunnable.wrap(this::drainLoop, log), "nx-events-publisher");
@@ -97,9 +100,10 @@ public final class EventsPublisher {
     }
 
     /**
-     * Spawn the publisher daemon. Idempotent.
+     * Spawn the publisher daemon. Idempotent. Package-private — callers go
+     * through {@link EventsBootstrap}.
      */
-    public void start() {
+    void start() {
         if (running) {
             return;
         }
@@ -167,11 +171,9 @@ public final class EventsPublisher {
      *
      * <p>State semantics: {@code ACTIVE} when the daemon is running,
      * {@code DISABLED} when it has not been started or has been stopped.
-     * TODO(messaging-r14): emit {@code DEGRADED} when the
-     * {@code failed-total / published-total} ratio exceeds an internal
-     * threshold (spec suggests ~5% over the last minute). Operators can
-     * still derive degradation from the raw counters today; the rolling-window
-     * tracking is deferred until a real ops case demands it.</p>
+     * A future enhancement may surface {@code DEGRADED} via a rolling
+     * failure-ratio window; operators derive degradation from the raw
+     * counters today.</p>
      */
     public ModuleStatus currentStatus() {
         EventsStats stats = EventsStats.builder()
@@ -275,14 +277,14 @@ public final class EventsPublisher {
             sender.send(record, (metadata, exception) -> {
                 if (exception != null) {
                     failedTotal.incrementAndGet();
-                    log.warn("Events publish failed for topic {}: {}", topic, exception.getMessage());
+                    log.warn("Events publish failed for topic {}: {}", topic, exception.getMessage(), exception);
                 } else {
                     publishedTotal.incrementAndGet();
                 }
             });
         } catch (Throwable t) {
             failedTotal.incrementAndGet();
-            log.error("Events publish threw for topic {}: {}", topic, t.getMessage());
+            log.error("Events publish threw for topic {}: {}", topic, t.getMessage(), t);
         }
     }
 

@@ -46,6 +46,28 @@ public final class EventsBootstrap {
     }
 
     /**
+     * Rebuild the publisher in-place behind a stable {@link NxEvents} façade.
+     * Used on reconnect — modules that captured {@code ctx.events()} from an
+     * earlier {@code onConnect} keep publishing into the new publisher with
+     * no re-registration.
+     */
+    public static EventsPublisher swap(NxEvents facade,
+                                       @Nullable Map<String, String> familyTopics,
+                                       EventsPublisher.Sender sender,
+                                       EventsConfig config) {
+        if (!(facade instanceof NxEventsImpl)) {
+            throw new IllegalArgumentException(
+                    "swap() requires a facade produced by EventsBootstrap.start(); got "
+                            + (facade == null ? "null" : facade.getClass().getName()));
+        }
+        EventTypeRegistry registry = new EventTypeRegistry();
+        EventsPublisher publisher = new EventsPublisher(familyTopics, sender, config, registry);
+        publisher.start();
+        ((NxEventsImpl) facade).swap(publisher, registry);
+        return publisher;
+    }
+
+    /**
      * Tuple of the wired-up publisher and its {@link NxEvents} façade.
      * {@code NxAdapter} keeps a reference to the publisher for shutdown and
      * heartbeat status; the façade goes into {@code ConnectContext.events()}.

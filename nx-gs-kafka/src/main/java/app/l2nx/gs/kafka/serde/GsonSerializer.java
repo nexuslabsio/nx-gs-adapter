@@ -20,7 +20,6 @@ public class GsonSerializer implements Serializer<Object> {
 
     @Override
     public void configure(Map<String, ?> configs, boolean isKey) {
-        // no configuration needed
     }
 
     @Override
@@ -33,6 +32,5 @@ public class GsonSerializer implements Serializer<Object> {
 
     @Override
     public void close() {
-        // nothing to close
     }
 }

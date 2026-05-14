@@ -58,12 +58,12 @@ public final class HeartbeatService {
         this.clock = clock;
     }
 
-    public void start(String tenantId,
-                      String tenantSlug,
-                      String serverId,
-                      String serverSlug,
-                      String serverName,
-                      String heartbeatTopic) {
+    public synchronized void start(String tenantId,
+                                   String tenantSlug,
+                                   String serverId,
+                                   String serverSlug,
+                                   String serverName,
+                                   String heartbeatTopic) {
         Session previous = session.getAndSet(null);
         if (previous != null) {
             previous.future.cancel(false);
@@ -81,7 +81,7 @@ public final class HeartbeatService {
         session.set(new Session(connectInstant, future));
     }
 
-    public void stop() {
+    public synchronized void stop() {
         Session current = session.getAndSet(null);
         if (current != null) {
             current.future.cancel(false);
@@ -103,7 +103,7 @@ public final class HeartbeatService {
                 modules = reported != null ? reported : Collections.emptyList();
             } catch (Throwable t) {
                 // Registry shouldn't throw, but defending the heartbeat thread is cheap.
-                log.error("ModuleRegistry.currentStatuses threw {}", t.getClass().getName());
+                log.error("ModuleRegistry.currentStatuses threw {}", t.getClass().getName(), t);
                 modules = Collections.emptyList();
             }
             HeartbeatEvent event = HeartbeatEvent.builder()
@@ -118,7 +118,7 @@ public final class HeartbeatService {
                     .build();
             publisher.send(heartbeatTopic, serverId, event);
         } catch (Throwable t) {
-            log.error("Heartbeat tick failed: {}", t.getClass().getName());
+            log.error("Heartbeat tick failed: {}", t.getClass().getName(), t);
         }
     }
 

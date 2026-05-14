@@ -12,7 +12,7 @@ import java.util.List;
  * ({@link EntityMapping#children()}); each is one isolated SQL statement
  * — the engine never composes a JOIN across primary + children.
  *
- * <p>Engine SQL (see {@code cdc-engine/spec.md} R20):</p>
+ * <p>Engine SQL:</p>
  * <ul>
  *     <li>Phase 1: {@code SELECT fkColumn,
  *     BIT_XOR(CRC32(CONCAT_WS(',', col1, col2, ...))) FROM tableName WHERE

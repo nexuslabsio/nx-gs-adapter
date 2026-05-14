@@ -109,14 +109,18 @@ Reply payload:
    non-null + positive `count`. Index-tagged details so the platform can pinpoint
    the bad line.
 3. **DAO lookup** `CharacterDAO.getByCharId(cmd.getCharId().intValue())` — runs
-   on the consumer thread deliberately (early-fail on stale charId without
-   burning a host-pool hop). The `CommandHandler` SPI permits read-only DB
-   I/O on the consumer thread. There is a TOCTOU window — the recipient could
-   be deleted between the lookup and the host-thread hop — but the resulting
-   orphan mail row is recoverable and the legacy RabbitMQ path
-   (`MailService.sendMailAndReply`) has the same race. Future maintainers
-   should NOT move this lookup inside the hop "for symmetry with
-   `DeleteItemHandler`": the early-reject behavior is the right call here.
+   on `ctx.io()` (the adapter-owned IO pool), not on the consumer thread and
+   not via `ctx.host().sync(...)`. Blocking JDBC belongs on the IO pool —
+   running it on the consumer thread blocks the topic, and running it through
+   the game executor burns capacity meant for game-state mutations. The
+   `DeleteItemHandler` pattern is the canonical model for handler IO work
+   (long → int wire-id bound check, `ctx.io()` for the JDBC, transactional
+   path with `SELECT ... FOR UPDATE` + login re-check where appropriate,
+   capture mutation return values, reply `INVALID_STATE` on 0-rows). There is
+   a TOCTOU window — the recipient could be deleted between the lookup and
+   the host-thread hop — but the resulting orphan mail row is recoverable
+   and the legacy RabbitMQ path (`MailService.sendMailAndReply`) has the
+   same race.
 4. **Map attachments** to `List<Pair<Integer, Long>>` shape that the legacy
    `MailManager` API expects.
 5. **Hop to host**: `ctx.host().sync(() -> doSend(...))`. The whole MailManager

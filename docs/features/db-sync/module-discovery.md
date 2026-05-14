@@ -17,17 +17,17 @@ of its consumers. Internally, `DbSyncModule` adds a second SPI tier
 (`DbSchemaProvider`) that schema variants per game-server fork plug into:
 
 ```
-   ┌─────────────────────────────────────┐
-   │   nx-gs-db-sync-core                │
-   │                                     │
-   │   class DbSyncModule                │
-   │     implements AdapterModule        │ ◄─── consumed by adapter-modules (Tier 1)
-   │                                     │
-   │   public interface DbSchemaProvider │ ◄─── this doc (Tier 2 SPI)
-   │     String schemaName();            │
-   │     List<TableMapping<?>> mappings()│
-   │   }                                 │
-   └──────────────┬──────────────────────┘
+   ┌──────────────────────────────────────┐
+   │   nx-gs-db-sync-core                 │
+   │                                      │
+   │   class DbSyncModule                 │
+   │     implements AdapterModule         │ ◄─── consumed by adapter-modules (Tier 1)
+   │                                      │
+   │   public interface DbSchemaProvider  │ ◄─── this doc (Tier 2 SPI, defined in
+   │     String schemaName();             │      nx-gs-adapter-api so providers
+   │     List<EntityMapping<?>> mappings()│      depend only on api)
+   │   }                                  │
+   └──────────────┬───────────────────────┘
                   ▲
                   │ implements (MVP path — direct)
                   │
@@ -71,17 +71,24 @@ runs.
 
 ## Tier 2 — `DbSchemaProvider` discovery
 
-### Interface (in `nx-gs-db-sync-core`)
+### Interface (in `nx-gs-adapter-api`)
 
 ```java
-package app.l2nx.gs.db.sync.spi;
+package app.l2nx.gs.adapter.api.spi;
 
 public interface DbSchemaProvider {
     String schemaName();                 // "l2j", "bohpts", "lucera"
 
-    List<TableMapping<?>> mappings();    // tables this provider knows about
+    List<EntityMapping<?>> mappings();   // entities this provider knows about
 }
 ```
+
+`EntityMapping<T>` declares one `PrimarySource<?>` + zero-or-more
+`ChildSource<?>` per entity (see [`db-sync` R5](./spec.md)). Every
+identifier (`tableName`, `pkColumn`, `fkColumn`, every `hashedColumns`
+entry) MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` — schema-qualified or
+quoted names are rejected at engine start (see
+[`cdc-engine` R19](../cdc-engine/spec.md)).
 
 ### Lifecycle
 
@@ -92,7 +99,7 @@ public interface DbSchemaProvider {
 [ServiceLoader.load(DbSchemaProvider.class)]   ◄─── Tier-2 discovery point
        │
        │   Same JDK machinery as Tier 1; descriptor file is:
-       │     META-INF/services/app.l2nx.gs.db.sync.spi.DbSchemaProvider
+       │     META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider
        ▼
    ┌────────────────────────┐
    │  providers.size()      │
@@ -106,9 +113,14 @@ public interface DbSchemaProvider {
 [CdcEngine constructed with the provider]
        │
        ▼
-[for each TableMapping in provider.mappings():
-       scheduler.scheduleWithFixedDelay(SafeRunnable.wrap(tick),
-                                         0, mapping.tickInterval(), ...)]
+[CdcEngine validates every SQL identifier against the bare-identifier
+ regex (^[A-Za-z_][A-Za-z0-9_]{0,63}$). Violation → STATE_FAILED.]
+       │
+       ▼
+[shared pool nx-cdc-pool-<schema>-N is built (size = l2nx.cdc-engine.workers);
+ for each EntityMapping in provider.mappings():
+       pool.scheduleWithFixedDelay(SafeRunnable.wrap(task),
+                                    0, cfg.tickInterval, ...)]
 ```
 
 ### Service descriptor in `bohpts-core` JAR (MVP)
@@ -116,7 +128,7 @@ public interface DbSchemaProvider {
 ```
 META-INF/
 └── services/
-    └── app.l2nx.gs.db.sync.spi.DbSchemaProvider
+    └── app.l2nx.gs.adapter.api.spi.DbSchemaProvider
 ```
 
 Content (single fully-qualified class name — package up to bohpts-core owner per spec
@@ -143,10 +155,10 @@ existing Gradle build produces the JAR that already contains the schema-provider
 ```java
 package l2e.gameserver.nx.db;   // example — package decision in spec Open question
 
-import app.l2nx.gs.db.sync.spi.DbSchemaProvider;
-import app.l2nx.gs.db.sync.spi.TableMapping;
+import app.l2nx.gs.adapter.api.spi.DbSchemaProvider;
+import app.l2nx.gs.adapter.api.spi.EntityMapping;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class BohptsDbSchemaProvider implements DbSchemaProvider {
@@ -157,90 +169,26 @@ public class BohptsDbSchemaProvider implements DbSchemaProvider {
     }
 
     @Override
-    public List<TableMapping<?>> mappings() {
-        return List.of(new ClanMapping());
+    public List<EntityMapping<?>> mappings() {
+        return Collections.singletonList(new ClanMapping());
     }
 }
 ```
 
-```java
-package l2e.gameserver.nx.db;
-
-import app.l2nx.gs.adapter.api.dto.ClanDto;
-import app.l2nx.gs.db.sync.spi.SyncStrategy;
-import app.l2nx.gs.db.sync.spi.TableMapping;
-
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-
-public class ClanMapping implements TableMapping<ClanDto> {
-
-    @Override
-    public String tableName() {
-        return "clan_data";
-    }
-
-    @Override
-    public String pkColumn() {
-        return "clan_id";
-    }
-
-    @Override
-    public List<String> hashedColumns() {
-        return Arrays.asList("clan_name", "clan_level", "leader_id", "ally_id");
-    }
-
-    @Override
-    public String topicSuffix() {
-        return "clans";
-    }
-
-    @Override
-    public Class<ClanDto> dtoType() {
-        return ClanDto.class;
-    }
-
-    @Override
-    public SyncStrategy strategy() {
-        return SyncStrategy.FULL_SCAN;
-    }
-
-    @Override
-    public Duration tickInterval() {
-        return Duration.ofSeconds(60);
-    }
-
-    @Override
-    public ClanDto mapRow(ResultSet rs) throws SQLException {
-        return ClanDto.builder()
-                .clanId(asString(rs.getLong("clan_id")))
-                .clanName(rs.getString("clan_name"))
-                .clanLevel(rs.getInt("clan_level"))
-                .leaderId(asNullableId(rs, "leader_id"))   // 0 → null per L2J convention
-                .allyId(asNullableId(rs, "ally_id"))
-                .build();
-    }
-
-    private static String asString(long v) {
-        return Long.toString(v);
-    }
-
-    private static String asNullableId(ResultSet rs, String col) throws SQLException {
-        long v = rs.getLong(col);
-        return rs.wasNull() || v == 0L ? null : Long.toString(v);
-    }
-}
-```
+`ClanMapping` declares a `PrimarySource<ClanRow>` over `clan_data`
+(`clan_id` PK, hashedColumns = `clan_name`, `clan_level`, `leader_id`,
+`ally_id`) and assembles `ClanDto` via `mapEntity`. Operational tuning
+(tickInterval, rowsPerWindow, queryTimeout, fetchSize, workers) is NOT on
+the mapping — it lives in `l2nx.properties` under `l2nx.cdc-engine.*`
+(see [`db-sync` spec](./spec.md) for the full key table).
 
 bohpts-core `build.gradle.kts` adds (from Maven Central):
 
 ```kotlin
 dependencies {
-    implementation("app.l2nx:nx-gs-db-sync-core:0.1.0")
-    // adapter-core + adapter-api come transitively
+    implementation("app.l2nx:nx-gs-adapter-api:0.7.0")
+    // Provider authors depend only on api; nx-gs-db-sync-core is the host's
+    // classpath responsibility (engine runtime).
 }
 ```
 
@@ -275,7 +223,7 @@ public class L2jSchemaProvider implements DbSchemaProvider {
     }
 
     @Override
-    public List<TableMapping<?>> mappings() {
+    public List<EntityMapping<?>> mappings() {
         return Arrays.asList(
                 new ClanMapping(clanTable(), clanPkColumn(), clanHashedColumns())
         );
@@ -395,7 +343,7 @@ own:
 ```kotlin
 // nx-gs-db-bohpts/build.gradle.kts
 shadowJar {
-    exclude("META-INF/services/app.l2nx.gs.db.sync.spi.DbSchemaProvider")
+    exclude("META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider")
     // own descriptor lives in src/main/resources/META-INF/services/...
 }
 ```

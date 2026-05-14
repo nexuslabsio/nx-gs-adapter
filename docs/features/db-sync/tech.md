@@ -53,7 +53,10 @@ design end-to-end.
     - `spi/EntityMapping.java` — Tier-2 SPI; one per synced entity (api/0.7.0)
     - `kafka/sync/db/SyncEvent.java` — typed wire envelope `SyncEvent<T>` with
       `String entityName`, `long pk`, `String op`, `T payload`, `long timestampEpochMs`
-      (api/0.7.0)
+      (api/0.7.0). `op=DELETED` carries `payload=null` in JSON but is NOT a Kafka
+      tombstone — db-sync topics use bounded retention, not log compaction;
+      consumers MUST handle the DELETED op explicitly (Javadoc on `SyncEvent`
+      reflects this).
     - `kafka/sync/db/ClanDto.java` — clan row DTO (Java 8 POJO, hand-written builder);
       `long clanId` / `int clanLevel` (NOT NULL columns); `Long leaderId` / `Long allyId`
       (nullable per L2J `0`-sentinel convention). Co-located with `SyncEvent<T>` under
@@ -65,8 +68,10 @@ design end-to-end.
     - `onConnect(ctx)` — gates on `ctx.syncTopics()` first (null/empty →
       `DISABLED` + WARN, no SPI lookups). Then resolves Tier-3
       `JdbcConnectionSource` (0 / >1 → `FAILED`) and runs the smoke check
-      (`setReadOnly(true)` + `isValid(5)`); pass → on track for `ACTIVE`,
-      fail → on track for `DEGRADED`. Then resolves Tier-2 `DbSchemaProvider`
+      (`isValid(5)` only — adapter no longer calls `setReadOnly(true)` on
+      borrowed connections; see `jdbc-connection-source` R3); pass → on
+      track for `ACTIVE`, fail → on track for `DEGRADED`. Then resolves
+      Tier-2 `DbSchemaProvider`
       (0 → `DISABLED`, >1 → `FAILED`, 1 → cache). On the happy path: state
       becomes `ACTIVE` if smoke passed, else `DEGRADED` (engine still runs
       so the next cycle retries borrow).
@@ -75,7 +80,9 @@ design end-to-end.
       `provider.mappings()` empty → `DISABLED`, else builds `EngineConfig`
       from `EngineConfig.productionChain()`, `TopicResolver.fromContext(ctx)`,
       `SyncEventPublisher(kafkaSender)`, and instantiates `CdcEngine` with the
-      whole bundle. `engine.start()` schedules one daemon thread per entity
+      whole bundle. `engine.start()` schedules every entity as a task on the
+      shared daemon pool `nx-cdc-pool-<schema>-N` (sized by
+      `l2nx.cdc-engine.workers`, default `max(2, min(entities, cores/2))`)
       with first-tick delay 0 (initial sync). On `Throwable` from
       `engine.start` → `FAILED`.
     - `stop()` — `engine.stop()`; cancels schedulers, awaits brief in-flight
@@ -168,7 +175,8 @@ DbSyncModule.onConnect(ctx)                           [Phase 2]
 DbSyncModule.start()                                  [Phase 2]
   → engine = new CdcEngine(provider.mappings(), jdbcConnectionSource, kafkaProducer,
                             topicResolver, configResolver)
-  → engine.start()                                    -- per-entity daemon ticks
+  → engine.start()                                    -- shared scheduler pool
+                                                         nx-cdc-pool-<schema>-N
                                                          (cdc-engine R5)
 ```
 
@@ -330,18 +338,20 @@ NxAdapter.shutdown()
   conventions); decoupling it from the schema provider lets the platform rename
   / reorganize topics without coordinated provider releases. Defensive paths are
   guarded but not expected to fire in steady-state production.
-- **Read-only is set per-borrow on every Connection, not at the pool level.** The pool is
-  owned by the host (via the Tier-3 `JdbcConnectionSource` SPI — see
-  `jdbc-connection-source` feature), so we cannot impose pool-level config. The engine
-  calls `connection.setReadOnly(true)` immediately after borrow and before any
-  Statement/PreparedStatement is created. Rationale: a `GRANT SELECT`-only MySQL user
-  is recommended at the operator side; the read-only flag is belt-and-suspenders
-  and a meaningful hint for replication routers (ProxySQL, MaxScale) that route read-only
-  connections to replicas — adapter traffic doesn't compete with the game core's writes
-  on the primary. Engine NEVER issues DDL or DML — Phase 1 + Phase 2 are pure `SELECT`.
-- **Engine-algorithm decisions (CRC32 sufficiency, fastutil RAM model, per-query consistent
-  snapshot, MIN/MAX recompute, one scheduler thread per mapping, strategy selection in
-  `EntityMapping`, all-or-nothing snapshot swap) live in
+- **Read-only enforced at the SQL level, not via `Connection.setReadOnly`.** Every
+  Phase 1 / Phase 2 query runs inside `START TRANSACTION WITH CONSISTENT SNAPSHOT,
+  READ ONLY` (see [`cdc-engine` R11](../cdc-engine/spec.md)). The engine deliberately
+  does NOT call `connection.setReadOnly(true)` on borrowed connections — the host
+  pool (Path 1) may not reset that flag on return, and other consumers borrowing
+  from the same pool would inherit it. Pool-level read-only is the host's choice
+  (see `jdbc-connection-source` for the host-pool contract: pool MUST reset
+  read-only on connection return; adapter does not enforce it at the connection
+  level). Engine NEVER issues DDL or DML — Phase 1 + Phase 2 are pure `SELECT`
+  inside read-only transactions.
+- **Engine-algorithm decisions (CRC32 sufficiency, fastutil RAM model, window-scoped
+  consistent snapshot, MIN/MAX recompute, shared scheduler pool, cursor-mode JDBC
+  fetch, Statement.cancel on shutdown, SQL identifier validation, two-pass
+  walk-in-flight, per-row snapshot swap) live in
   [`cdc-engine/tech.md`](../cdc-engine/tech.md) Decisions** to keep db-sync's design
   surface focused on module wiring + Tier-2 SPI shape.
 

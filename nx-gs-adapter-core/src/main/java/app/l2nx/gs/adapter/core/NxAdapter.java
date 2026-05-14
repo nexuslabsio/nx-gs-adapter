@@ -25,6 +25,7 @@ import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
 import app.l2nx.gs.adapter.core.lifecycle.AdapterVersion;
 import app.l2nx.gs.adapter.core.lifecycle.StartupBanner;
 import app.l2nx.gs.adapter.core.modules.ModuleRegistry;
+import app.l2nx.gs.commons.concurrent.DaemonThreadFactory;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.KafkaState;
@@ -33,10 +34,7 @@ import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
 import java.util.*;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -80,6 +78,14 @@ public final class NxAdapter {
     private static volatile EventsConfig eventsConfig;
     private static volatile CommandsConsumer commandsConsumer;
     private static volatile CommandsConfig commandsConfig;
+    // Adapter-owned bounded pool for handler/module IO (JDBC/HTTP); never use
+    // ForkJoinPool.commonPool — host JVM may share it.
+    private static volatile ExecutorService ioExecutor;
+    // Stable cross-reconnect façades so modules that captured ctx.events() /
+    // ctx.commands() during an earlier onConnect keep working after a fresh
+    // connect cycle swaps the underlying publisher/consumer.
+    private static volatile NxEvents eventsFacade;
+    private static volatile NxCommands commandsFacade;
     private static final AtomicReference<Executor> hostExecutorRef = new AtomicReference<Executor>();
 
     private NxAdapter() {
@@ -98,7 +104,7 @@ public final class NxAdapter {
      * {@code ctx.host().sync(...)} / {@code .async(...)} hops. MUST be called
      * before {@link #start()} when {@code commandsTopic} is configured.
      *
-     * <p>Typical bohpts wiring:</p>
+     * <p>Typical host wiring:</p>
      * <pre>
      *   NxAdapter.hostExecutor(task -&gt; ThreadPoolManager.getInstance().executeGeneral(task));
      *   NxAdapter.start();
@@ -157,6 +163,9 @@ public final class NxAdapter {
         connectScheduler = scheduler;
         ScheduledExecutorService hbScheduler = createHeartbeatScheduler();
         heartbeatScheduler = hbScheduler;
+        if (ioExecutor == null) {
+            ioExecutor = createIoExecutor(config.getIoWorkers());
+        }
         adapterVersion = config.getAdapterVersion();
         eventsConfig = config.getEvents();
         commandsConfig = config.getCommands();
@@ -207,9 +216,17 @@ public final class NxAdapter {
         }
         ScheduledExecutorService hbExec = heartbeatScheduler;
         if (hbExec != null) {
-            // No awaitTermination — a late tick that races past cancel is absorbed by
-            // defaultPublisher's KafkaException catch and HeartbeatService.tick's Throwable catch.
-            hbExec.shutdownNow();
+            // Let an in-flight tick complete its publish rather than interrupting
+            // it mid-send (shutdownNow would surface as a noisy WakeupException).
+            hbExec.shutdown();
+            try {
+                if (!hbExec.awaitTermination(2L, TimeUnit.SECONDS)) {
+                    hbExec.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                hbExec.shutdownNow();
+            }
             heartbeatScheduler = null;
         }
         ScheduledExecutorService connect = connectScheduler;
@@ -223,7 +240,7 @@ public final class NxAdapter {
             try {
                 registry.shutdown();
             } catch (Throwable t) {
-                log.error("ModuleRegistry.shutdown threw {}", t.getClass().getName());
+                log.error("ModuleRegistry.shutdown threw {}", t.getClass().getName(), t);
             }
             moduleRegistry = null;
         }
@@ -236,9 +253,23 @@ public final class NxAdapter {
             try {
                 cmds.stop();
             } catch (Throwable t) {
-                log.error("CommandsConsumer.stop threw {}", t.getClass().getName());
+                log.error("CommandsConsumer.stop threw {}", t.getClass().getName(), t);
             }
             commandsConsumer = null;
+        }
+
+        ExecutorService io = ioExecutor;
+        if (io != null) {
+            io.shutdown();
+            try {
+                if (!io.awaitTermination(5L, TimeUnit.SECONDS)) {
+                    io.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                io.shutdownNow();
+            }
+            ioExecutor = null;
         }
 
         EventsPublisher pub = eventsPublisher;
@@ -246,7 +277,7 @@ public final class NxAdapter {
             try {
                 pub.stop();
             } catch (Throwable t) {
-                log.error("EventsPublisher.stop threw {}", t.getClass().getName());
+                log.error("EventsPublisher.stop threw {}", t.getClass().getName(), t);
             }
             eventsPublisher = null;
         }
@@ -259,26 +290,25 @@ public final class NxAdapter {
         } catch (KafkaException notConfigured) {
             // Adapter never reached initKafka — nothing to shut down.
         } catch (Throwable t) {
-            log.error("NxKafka.shutdown threw {}", t.getClass().getName());
+            log.error("NxKafka.shutdown threw {}", t.getClass().getName(), t);
         }
 
         transition(AdapterState.CLOSED);
     }
 
     private static ScheduledExecutorService createConnectScheduler() {
-        return Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "nx-adapter-connect");
-            t.setDaemon(true);
-            return t;
-        });
+        return Executors.newSingleThreadScheduledExecutor(
+                DaemonThreadFactory.named("nx-adapter-connect", log));
     }
 
     private static ScheduledExecutorService createHeartbeatScheduler() {
-        return Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "nx-adapter-heartbeat");
-            t.setDaemon(true);
-            return t;
-        });
+        return Executors.newSingleThreadScheduledExecutor(
+                DaemonThreadFactory.named("nx-adapter-heartbeat", log));
+    }
+
+    private static ExecutorService createIoExecutor(int workers) {
+        return Executors.newFixedThreadPool(workers,
+                DaemonThreadFactory.counted("nx-io-", log));
     }
 
     private static HeartbeatService.KafkaPublisher defaultPublisher() {
@@ -300,7 +330,7 @@ public final class NxAdapter {
         } catch (Throwable t) {
             // JVM already shutting down or host SecurityManager disallows hooks; the
             // adapter still runs, operators just won't get auto-shutdown on JVM exit.
-            log.warn("Failed to register JVM shutdown hook: {}", t.getClass().getName());
+            log.warn("Failed to register JVM shutdown hook: {}", t.getClass().getName(), t);
         }
     }
 
@@ -332,6 +362,11 @@ public final class NxAdapter {
     }
 
     private static void initKafka(KafkaInitializer init, ConnectResponse response) {
+        // Test paths can drive initKafka directly without going through start();
+        // prime a small IO pool so ConnectContext.io() and CommandContext.io() are usable.
+        if (ioExecutor == null) {
+            ioExecutor = createIoExecutor(AdapterConfig.defaultIoWorkers());
+        }
         String clientId = "nx-gs-adapter-" + response.getTenantSlug() + "-" + response.getServerSlug();
         Map<String, byte[]> staticHeaders = buildStaticHeaders(response.getServerId());
         KafkaState postBuild;
@@ -357,7 +392,7 @@ public final class NxAdapter {
                         response.getServerName(),
                         heartbeatTopic);
             } catch (Throwable t) {
-                log.error("HeartbeatService.start threw {}", t.getClass().getName());
+                log.error("HeartbeatService.start threw {}", t.getClass().getName(), t);
             }
         }
 
@@ -379,10 +414,11 @@ public final class NxAdapter {
                         .syncTopics(response.getSyncTopics())
                         .events(events)
                         .commands(commands)
+                        .io(ioExecutor)
                         .build();
                 registry.connect(ctx);
             } catch (Throwable t) {
-                log.error("ModuleRegistry connect threw {}", t.getClass().getName());
+                log.error("ModuleRegistry connect threw {}", t.getClass().getName(), t);
             }
         }
 
@@ -409,28 +445,36 @@ public final class NxAdapter {
      * publisher still spins up so the heartbeat slot is populated; every
      * {@code publishX} call short-circuits as a no-op + DEBUG log without
      * burning queue capacity.
+     *
+     * <p>The façade is stable across reconnects — on a second handshake the
+     * underlying publisher is swapped behind the same {@link NxEvents}
+     * instance so modules that captured {@code ctx.events()} earlier keep
+     * publishing into the live publisher with no re-binding.</p>
      */
     private static NxEvents startEventsPublisher(MessagingTopics messagingTopics) {
-        // Stop a publisher inherited from a previous connect cycle so the daemon thread
-        // is replaced cleanly on reconnect.
         EventsPublisher previous = eventsPublisher;
         if (previous != null) {
             try {
                 previous.stop();
             } catch (Throwable t) {
-                log.error("EventsPublisher.stop on reconnect threw {}", t.getClass().getName());
+                log.error("EventsPublisher.stop on reconnect threw {}", t.getClass().getName(), t);
             }
         }
         Map<String, String> familyTopics = messagingTopics != null
                 ? messagingTopics.getEvents()
                 : Collections.emptyMap();
         EventsConfig cfg = eventsConfig != null ? eventsConfig : EventsConfig.defaults();
-        EventsBootstrap.Started started = EventsBootstrap.start(
-                familyTopics,
-                (record, callback) -> NxKafka.instance().sendBytesKeyRecord(record, callback),
-                cfg);
-        eventsPublisher = started.publisher();
-        return started.events();
+        EventsPublisher.Sender sender = (record, callback) ->
+                NxKafka.instance().sendBytesKeyRecord(record, callback);
+        NxEvents facade = eventsFacade;
+        if (facade == null) {
+            EventsBootstrap.Started started = EventsBootstrap.start(familyTopics, sender, cfg);
+            eventsPublisher = started.publisher();
+            eventsFacade = started.events();
+            return eventsFacade;
+        }
+        eventsPublisher = EventsBootstrap.swap(facade, familyTopics, sender, cfg);
+        return facade;
     }
 
     /**
@@ -444,26 +488,29 @@ public final class NxAdapter {
                                                     app.l2nx.gs.adapter.api.rest.KafkaConfig kafka,
                                                     String clientId,
                                                     NxEvents events) {
-        // Stop a consumer inherited from a previous connect cycle so the daemon thread
-        // is replaced cleanly on reconnect.
         CommandsConsumer previous = commandsConsumer;
         if (previous != null) {
             try {
                 previous.stop();
             } catch (Throwable t) {
-                log.error("CommandsConsumer.stop on reconnect threw {}", t.getClass().getName());
+                log.error("CommandsConsumer.stop on reconnect threw {}", t.getClass().getName(), t);
             }
         }
-        CommandsBootstrap.Started started = CommandsBootstrap.start(
-                messagingTopics,
-                kafka,
-                clientId,
-                hostExecutorRef.get(),
-                events,
-                (record, callback) -> NxKafka.instance().sendBytesKeyRecord(record, callback),
-                commandsConfig);
-        commandsConsumer = started.consumer();
-        return started.commands();
+        CommandsConsumer.ReplySender replySender = (record, callback) ->
+                NxKafka.instance().sendBytesKeyRecord(record, callback);
+        NxCommands facade = commandsFacade;
+        if (facade == null) {
+            CommandsBootstrap.Started started = CommandsBootstrap.start(
+                    messagingTopics, kafka, clientId,
+                    hostExecutorRef.get(), ioExecutor, events,
+                    replySender, commandsConfig);
+            commandsConsumer = started.consumer();
+            commandsFacade = started.commands();
+            return commandsFacade;
+        }
+        commandsConsumer = CommandsBootstrap.swap(facade, messagingTopics, kafka, clientId,
+                hostExecutorRef.get(), ioExecutor, events, replySender, commandsConfig);
+        return facade;
     }
 
     /**
@@ -489,14 +536,14 @@ public final class NxAdapter {
             try {
                 all.add(pub.currentStatus());
             } catch (Throwable t) {
-                log.error("EventsPublisher.currentStatus threw {}", t.getClass().getName());
+                log.error("EventsPublisher.currentStatus threw {}", t.getClass().getName(), t);
             }
         }
         if (cmds != null) {
             try {
                 all.add(cmds.currentStatus());
             } catch (Throwable t) {
-                log.error("CommandsConsumer.currentStatus threw {}", t.getClass().getName());
+                log.error("CommandsConsumer.currentStatus threw {}", t.getClass().getName(), t);
             }
         }
         return all;
@@ -549,6 +596,15 @@ public final class NxAdapter {
         kafkaFactoryOverride = factory;
     }
 
+    /**
+     * Test seam — installs an externally managed IO executor so tests
+     * exercising {@link #simulateInitKafkaForTesting} skip the production
+     * pool spin-up. The caller owns lifecycle.
+     */
+    static void setIoExecutorForTesting(ExecutorService executor) {
+        ioExecutor = executor;
+    }
+
     static void resetForTesting() {
         Thread hook = shutdownHook;
         if (hook != null) {
@@ -589,7 +645,7 @@ public final class NxAdapter {
             try {
                 cmds.stop();
             } catch (Throwable t) {
-                log.error("CommandsConsumer.stop in resetForTesting threw {}", t.getClass().getName());
+                log.error("CommandsConsumer.stop in resetForTesting threw {}", t.getClass().getName(), t);
             }
             commandsConsumer = null;
         }
@@ -598,10 +654,22 @@ public final class NxAdapter {
             try {
                 pub.stop();
             } catch (Throwable t) {
-                log.error("EventsPublisher.stop in resetForTesting threw {}", t.getClass().getName());
+                log.error("EventsPublisher.stop in resetForTesting threw {}", t.getClass().getName(), t);
             }
             eventsPublisher = null;
         }
+        ExecutorService io = ioExecutor;
+        if (io != null) {
+            io.shutdownNow();
+            try {
+                io.awaitTermination(1L, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            ioExecutor = null;
+        }
+        eventsFacade = null;
+        commandsFacade = null;
         eventsConfig = null;
         commandsConfig = null;
         hostExecutorRef.set(null);

@@ -172,16 +172,21 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
 - [todo] R8. `nx-gs-adapter-core` MUST implement an internal `EventsPublisher`:
     - One bounded `ArrayBlockingQueue<EventEnvelope>` shared across all event
       families. Default capacity `10000`. Configurable via `l2nx.events.queue-capacity`.
-    - One daemon thread `nx-events-publisher` (SafeRunnable-wrapped) that drains
-      the queue: for each envelope, resolve `(topic, messageType, partitionKey)`
-      via a hardcoded type-registry, Gson-serialize, and call
-      `kafkaProducer.send(record, callback)`.
-    - Drop policy on full queue: `oldest` (default) — evicts the head to make
-      room for the new envelope. Configurable via `l2nx.events.drop-policy`
-      (`oldest` | `newest`).
+    - One daemon thread `nx-events-publisher` (uncaught-handler installed,
+      `Throwable` caught in the drain loop) that drains the queue: for each
+      envelope, resolve `(topic, messageType, partitionKey)` via a hardcoded
+      type-registry, Gson-serialize, and call `kafkaProducer.send(record, callback)`.
+    - Drop policy on full queue: `newest` (default) — rejects the incoming
+      envelope so queue order is preserved. `oldest` (evict head) remains
+      configurable via `l2nx.events.drop-policy` (`oldest` | `newest`) but
+      over-counts `dropped-total` under multi-producer contention because the
+      displaced envelope is counted on the eviction path even when concurrent
+      enqueuers race for the same slot.
     - Shutdown drain: `stop()` signals the publisher thread, drains up to
       `l2nx.events.shutdown-drain-timeout-ms` (default `5000`) before yielding.
-      Remaining envelopes are logged as drop-on-shutdown counter.
+      Remaining envelopes are logged as drop-on-shutdown counter. Coordinated
+      with the JVM shutdown hook via a `CountDownLatch` so the app-initiated
+      shutdown path and the hook caller don't double-close the producer.
     - Per-callback bookkeeping: increment `published-total` on ack-success,
       `failed-total` on ack-failure (Kafka producer error). Publisher thread
       itself never fails — `Throwable` from serialization or `send()` is caught,
@@ -341,9 +346,12 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
 - **Both `items` and `services` empty on a `PremiumPurchaseEvent`** — wire-valid,
   semantically malformed. Producer side MUST NOT emit; if it does, consumer logs
   WARN and dedupes-by-`eventId` so the malformed envelope doesn't crash a batch.
-- **Queue full during a burst** — drop-oldest evicts the head; head was likely
-  a low-priority `ServerServerOnlineSnapshotEvent` from the previous tick. Premium
-  events at typical L2 server cadence (≤ 100/min) never approach the 10k cap.
+- **Queue full during a burst** — default `newest` policy rejects the incoming
+  envelope and increments `dropped-total`, preserving queue order. `oldest`
+  (opt-in) evicts the head; under multi-producer contention the eviction path
+  over-counts `dropped-total` because concurrent enqueuers race for the same
+  slot. Premium events at typical L2 server cadence (≤ 100/min) never approach
+  the 10k cap.
 - **Clock skew producing UUIDv7 with past timestamp** — `extractCreatedAt`
   returns the literal embedded timestamp. Platform consumer is responsible for
   detecting "unrealistic" timestamps; adapter does not normalize.
@@ -386,9 +394,13 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
 - [assumed: Heartbeat `events` slot uses module-name `"events"`. Collision
   with a future user-discovered `AdapterModule` named `"events"` is a packaging
   bug. Reserved name like the existing `db-sync` / `runtime-sync` are.]
-- [assumed: Per-family Kafka producer config (acks / retries / linger.ms /
-  compression) is the same as existing sync-event publishes. Not differentiated
-  in Phase 1.]
+- [resolved: Per-family Kafka producer config is shared. Adapter-core wires
+  at-least-once durability defaults into the single producer: `acks=all`,
+  `enable.idempotence=true`, `max.in.flight.requests.per.connection=5`,
+  `linger.ms=10`, `compression.type=gzip`, `retries=Integer.MAX_VALUE`,
+  `delivery.timeout.ms=120000`. All overridable via user properties (config
+  file or system properties). The at-least-once contract is enforced at the
+  producer level, not merely claimed in docs.]
 
 ## Links
 

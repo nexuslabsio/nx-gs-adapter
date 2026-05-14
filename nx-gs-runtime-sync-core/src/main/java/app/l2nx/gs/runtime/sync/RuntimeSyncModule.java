@@ -6,7 +6,6 @@ import app.l2nx.gs.adapter.api.spi.AdapterModule;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
 import app.l2nx.gs.adapter.api.spi.RuntimeStateProvider;
-import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
@@ -54,6 +53,7 @@ public final class RuntimeSyncModule implements AdapterModule {
     private volatile ConnectContext context;
     private volatile EntityStatsTracker statsTracker;
     private volatile RuntimeSyncEngine engine;
+    private volatile List<RuntimeEntityMapping<?>> cachedMappings;
 
     public RuntimeSyncModule() {
         this(RuntimeSyncModule::loadProviders,
@@ -102,9 +102,10 @@ public final class RuntimeSyncModule implements AdapterModule {
             return;
         }
         RuntimeStateProvider resolved = providers.get(0);
+        List<RuntimeEntityMapping<?>> mappings = snapshotMappings(resolved);
         log.info("RuntimeStateProvider resolved: schemaName={}, mappings={}",
-                resolved.schemaName(),
-                resolved.mappings() == null ? 0 : resolved.mappings().size());
+                resolved.schemaName(), mappings.size());
+        this.cachedMappings = mappings;
         this.provider = resolved;
         this.statsTracker = new EntityStatsTracker();
         state = STATE_ACTIVE;
@@ -118,12 +119,13 @@ public final class RuntimeSyncModule implements AdapterModule {
         RuntimeStateProvider p = provider;
         ConnectContext ctx = context;
         EntityStatsTracker tracker = statsTracker;
-        if (p == null || ctx == null || tracker == null) {
-            log.error("runtime-sync.start: missing dependency (provider/context/tracker) — staying {}", state);
+        List<RuntimeEntityMapping<?>> mappings = cachedMappings;
+        if (p == null || ctx == null || tracker == null || mappings == null) {
+            log.error("runtime-sync.start: missing dependency (provider/context/tracker/mappings) — staying {}",
+                    state);
             return;
         }
-        List<? extends RuntimeEntityMapping<?>> mappings = p.mappings();
-        if (mappings == null || mappings.isEmpty()) {
+        if (mappings.isEmpty()) {
             log.warn("RuntimeStateProvider {} returned no mappings — runtime-sync DISABLED.", p.schemaName());
             state = STATE_DISABLED;
             return;
@@ -164,6 +166,7 @@ public final class RuntimeSyncModule implements AdapterModule {
         context = null;
         statsTracker = null;
         engine = null;
+        cachedMappings = null;
     }
 
     @Override
@@ -193,6 +196,18 @@ public final class RuntimeSyncModule implements AdapterModule {
                 .build();
     }
 
+    private static List<RuntimeEntityMapping<?>> snapshotMappings(RuntimeStateProvider provider) {
+        List<? extends RuntimeEntityMapping<?>> raw = provider.mappings();
+        if (raw == null || raw.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<RuntimeEntityMapping<?>> copy = new ArrayList<RuntimeEntityMapping<?>>(raw.size());
+        for (RuntimeEntityMapping<?> m : raw) {
+            copy.add(m);
+        }
+        return Collections.unmodifiableList(copy);
+    }
+
     private static List<RuntimeStateProvider> loadProviders() {
         ClassLoader saved = Thread.currentThread().getContextClassLoader();
         try {
@@ -211,10 +226,14 @@ public final class RuntimeSyncModule implements AdapterModule {
     private static void sendViaNxKafka(String topic, byte[] key, Object value, Callback callback) {
         try {
             NxKafka.instance().send(topic, key, value, callback);
-        } catch (KafkaException notConfigured) {
-            log.warn("NxKafka not configured — runtime-sync send dropped (topic={})", topic);
+        } catch (Throwable senderFailure) {
+            log.warn("NxKafka send threw {} — runtime-sync send dropped (topic={})",
+                    senderFailure.getClass().getName(), topic);
             try {
-                callback.onCompletion(null, notConfigured);
+                callback.onCompletion(null,
+                        senderFailure instanceof Exception
+                                ? (Exception) senderFailure
+                                : new RuntimeException(senderFailure));
             } catch (Throwable t) {
                 log.warn("KafkaSender callback threw {}", t.getClass().getName());
             }
@@ -230,7 +249,6 @@ public final class RuntimeSyncModule implements AdapterModule {
         return sb.toString();
     }
 
-    // Test-only — exposed for assertions, mirrors db-sync's package-private state hooks.
     String stateForTesting() {
         return state;
     }

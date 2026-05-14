@@ -35,8 +35,10 @@ per-entity state via heartbeat enrichment).
     > `PoolStats` / `EntityStats` / `EntityState` / `ChangesSummary` types — the engine
     > populates `Stats.entities[]` per cycle.
 > - [`jdbc-connection-source`](../jdbc-connection-source/spec.md) provides
-    > `JdbcConnectionSource` — the engine borrows connections through it; per-borrow
-    > `setReadOnly(true)`.
+    > `JdbcConnectionSource` — the engine borrows connections through it. The engine
+    > does NOT call `setReadOnly(true)` on borrowed connections; read-only is enforced
+    > at the SQL level via `START TRANSACTION ... READ ONLY` (see Single Consistent
+    > Snapshot below).
 
 **Must:**
 
@@ -46,13 +48,25 @@ per-entity state via heartbeat enrichment).
   naturally. An entity is composed of one **primary source** (drives windowing +
   identity) and zero-or-more **child sources** (each carries an FK back to the
   primary's PK). Per cycle, per window:
+    - **Single consistent snapshot per window (Phase 1).** Primary + every child
+      for one window share ONE borrowed `Connection` and ONE `START TRANSACTION
+      WITH CONSISTENT SNAPSHOT, READ ONLY`. The transaction is opened once
+      before the primary query, every child runs against the same MVCC view,
+      and the transaction is committed (or rolled back) once the diff stage
+      finishes. Earlier per-query transactions left a race window between
+      primary and child scans — rows written mid-window could be primary-hashed
+      pre-write and child-hashed post-write, corrupting the per-PK aggregate
+      CRC and emitting false UPDATED events on the next cycle. Phase 2 runs in
+      its own (separate) `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ
+      ONLY` — fresh post-Phase-1 data is intentional (a row deleted between
+      phases is a silent no-op for the current cycle and detected next cycle).
     - **Phase 1 (detect) — primary:** `SELECT <pkColumn>, CRC32(CONCAT_WS(',',
       col1, col2, ...)) FROM <primary.tableName> WHERE <pkColumn> BETWEEN ? AND ?`.
       MySQL computes hashes server-side; engine reads PK as `long` and CRC32 as
       `int` into a fastutil `Long2IntOpenHashMap` (`primaryHash`).
     - **Phase 1 (detect) — each child source:** `SELECT <fkColumn>,
       BIT_XOR(CRC32(CONCAT_WS(',', col1, col2, ...))) FROM <child.tableName>
-      WHERE <fkColumn> BETWEEN ? AND ? GROUP BY <fkColumn>` (R20). Returns
+      WHERE <fkColumn> BETWEEN ? AND ? GROUP BY <fkColumn>`. Returns
       FK → XOR-aggregated CRC32 of every child row that belongs to the parent
       PK. `BIT_XOR` is order-insensitive and associative — child row order
       does not affect the aggregate.
@@ -161,27 +175,49 @@ per-entity state via heartbeat enrichment).
   One map per `EntityMapping`, lifetime = adapter lifetime. Wiped on
   `DbSyncModule.onDisconnect`. Open-hash (rather than AVL tree) is required
   so the per-entry footprint stays at ~16 B — at items scale (6.5M+ rows)
-  this is ~100 MB resident vs ~360 MB the AVL tree would burn. The trade is
-  CPU: per-window `keysInRange(from, to)` becomes an O(N) filtered key
-  scan, and the R2 envelope rule's `minPk` / `maxPk` become single O(N)
-  scans — but each is called once per window or once per cycle on the
-  entity's daemon thread (~150 ms / cycle of full-map walks at 6.5M),
-  always dwarfed by the JDBC scans they bracket. On a 4 GB host JVM, heap
-  is the binding constraint, not CPU.
+  this is ~100 MB resident vs ~360 MB the AVL tree would burn.
   `fastutil-core` (~3 MB JAR; primitive maps only — full `fastutil` ~21 MB
   is NOT pulled) is added as a runtime dep on `nx-gs-db-sync-core`.
+
+  **Hash sentinel.** Each map is initialised with
+  `defaultReturnValue(Integer.MIN_VALUE)` and the same constant is exposed as
+  `SnapshotStore.MISSING_HASH`. Removes the historical "is `0` an absent key
+  or a real CRC32 of `0x00000000`" ambiguity at the type level — callers
+  compare against `MISSING_HASH` instead of `containsKey`-guarding every
+  read.
+
+  **`keysInRange` performance.** A naive O(N) full-key scan per window blew
+  up at 12M rows × 24 windows (~288M iterations per cycle). The store now
+  buckets PKs into the current plan's windows in one pass at top-of-cycle
+  (binary search on sorted boundaries) — total per-cycle work is O(N log W)
+  where W = window count, i.e. ~N total iterations.
+  `minPk` / `maxPk` are tracked incrementally on every `putCrc` /
+  `removeCrc` with lazy memoization, so the R2 envelope read is O(1)
+  amortised. No more per-cycle O(N) min/max scans.
     - SC2. For 12M entries, RAM occupancy of one snapshot stays under 200 MB measured via
       `Runtime.totalMemory() - Runtime.freeMemory()` delta around the snapshot population.
 
-- [wip] R5. The engine MUST run each `EntityMapping` on a daemon
-  `ScheduledExecutorService` with **one thread per entity**:
-    - Thread name: `nx-cdc-{schemaName}-{entityName}`
+- [wip] R5. The engine MUST run every `EntityMapping` on a single SHARED
+  `ScheduledThreadPoolExecutor` (NOT one daemon thread per entity):
+    - Pool size = `l2nx.cdc-engine.workers` (default `max(2, min(entities,
+      cores/2))`); per-entity threads scaled poorly at 10+ entities on hosts
+      with 4-core JVM allowances.
+    - Thread factory produces daemon threads named
+      `nx-cdc-pool-<schemaName>-<N>` with an uncaughtExceptionHandler that
+      logs and continues (the pool itself is non-fatal — an entity error
+      never tears down the worker).
     - First tick fires immediately after `DbSyncModule.start` (initial sync — see R7);
       subsequent ticks at the engine-global tick interval from
       `l2nx.cdc-engine.tick-interval-seconds` (R15) — every entity ticks at the same
-      cadence
-    - Tick wrapped in `SafeRunnable` (reused from adapter-bootstrap) so an uncaught
-      throwable does not cancel the schedule
+      cadence, scheduled as separate tasks onto the shared pool via
+      `scheduleWithFixedDelay`.
+    - **Overlap guard.** Each task carries an `AtomicBoolean ticking` — when
+      a previous tick is still in flight (e.g. a 12M-row entity that ran
+      longer than `tick-interval-seconds`), the next fire is skipped with a
+      single WARN log line. Without this guard, slow entities would pile up
+      tasks in the pool queue and starve other entities.
+    - Tick body wrapped in `SafeRunnable` so an uncaught throwable does not
+      cancel the schedule.
 
 - [wip] R6. **Cycle order — provider list.** When `DbSyncModule` configures the
   engine with `provider.mappings()`, the engine launches one scheduler thread per
@@ -214,6 +250,28 @@ per-entity state via heartbeat enrichment).
   (or, if it was the last window, the next tick), and the snapshot for the affected
   window is NOT advanced.
 
+  **Dialect-aware fetch.** Every `Statement` / `PreparedStatement` opened by
+  Phase 1 / Phase 2 MUST call `setFetchSize(...)`. The driver dialect is
+  auto-detected once per entity task from `Connection.getMetaData().getURL()`
+  (`JdbcDialect.detect`):
+    - **MySQL / MariaDB**: `setFetchSize(Integer.MIN_VALUE)` — the only mode
+      MySQL Connector/J honors for large result sets. Without it the driver
+      buffers the entire result set in client memory (positive `fetchSize` is
+      silently ignored). Required for the typical L2 deployment where the
+      host runs on MySQL/MariaDB and entities like `items` can hit 12M+ rows.
+    - **Postgres** (and other drivers): `setFetchSize(l2nx.cdc-engine.fetch-size)`
+      (default `10_000`) — server-side cursor batch on `autoCommit=false`
+      transactions (the engine sets `autoCommit=false` inside
+      `ConsistentSnapshotTxn`).
+
+  **Statement cancellation on shutdown.** Every open `Statement` is registered
+  in a per-task `StatementRegistry`; `CdcEngine.stop()` walks the active tasks
+  and calls `Statement.cancel()` on each tracked statement to actually
+  interrupt the JDBC query (most JDBC drivers ignore `Thread.interrupt()`, so
+  thread interruption alone leaves a multi-minute Phase 1 scan running until
+  it completes naturally). `awaitTermination` failures during pool shutdown
+  are logged WARN; the pool is then `shutdownNow()`-ed.
+
 - [done] R10. The engine MUST publish per-entity operational state on every cycle into
   `ModuleStatus.Stats.entities[]` (defined in `adapter-modules`). Each `EntityStats`
   entry carries:
@@ -233,14 +291,27 @@ per-entity state via heartbeat enrichment).
       every `currentStatuses()` invocation returns a fully populated, consistent
       `entities` list.
 
-- [wip] R11. **Per-query InnoDB consistent snapshot** — every Phase 1 query (full scan
-  or window) and every Phase 2 chunk MUST execute inside its own transaction opened with
-  `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY` (or equivalent
-  `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ` + first SELECT semantics on
-  MariaDB / MySQL). Transaction is committed (no rollback path needed) immediately
-  after the result set is drained. Rationale: Phase 1's scan over a 12M-row table can
-  take 20–40s; without a consistent snapshot, the scan mixes pre/post-update versions
-  of rows and produces false-positive diffs.
+- [wip] R11. **Window-scoped InnoDB consistent snapshot.** Per cycle, per
+  window, primary + ALL children execute inside ONE
+  `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY` on a single
+  borrowed `Connection` (or equivalent `SET TRANSACTION ISOLATION LEVEL
+  REPEATABLE READ` + first-SELECT semantics on MariaDB / MySQL). The
+  transaction is committed once the diff stage finishes. Phase 2 for the
+  same window opens its own (separate) consistent-snapshot transaction —
+  intentional: Phase 2 fetches post-Phase-1 row state, and a row deleted
+  between phases is a silent no-op for the current cycle (the next cycle's
+  Phase 1 detects the deletion).
+
+  The Phase-1 transaction wrapper catches `Throwable` (SQL / Runtime /
+  Error paths) and rolls back before rethrowing the original exception, so
+  a buggy CRC fold or fastutil OOM does not leave a half-open MVCC view
+  on the host DB.
+
+  Rationale: Phase 1's scan over a 12M-row table can take 20–40s; without
+  a consistent snapshot, the scan mixes pre/post-update versions of rows
+  and produces false-positive diffs. Per-query transactions left a
+  primary↔child race that produced spurious UPDATED events on the next
+  cycle — fixed by sharing one transaction across all sources of a window.
 
 - [wip] R15. **Engine config from `l2nx.properties` only — no provider-side
   declarations.** All engine runtime parameters (cadence, window size, timeouts)
@@ -256,17 +327,22 @@ per-entity state via heartbeat enrichment).
 
   **All global engine config keys (MVP):**
 
-  | Key                                          | Type           | Default   |
-        |----------------------------------------------|----------------|-----------|
-  | `l2nx.cdc-engine.tick-interval-seconds`      | long, seconds  | 60        |
-  | `l2nx.cdc-engine.rows-per-window`            | int            | 500_000   |
-  | `l2nx.cdc-engine.query-timeout-seconds`      | int, seconds   | 10        |
-  | `l2nx.cdc-engine.publish-flush-seconds`      | int, seconds   | 5         |
+  | Key                                              | Type           | Default                            |
+            |--------------------------------------------------|----------------|------------------------------------|
+  | `l2nx.cdc-engine.tick-interval-seconds`          | long, seconds  | 60                                 |
+  | `l2nx.cdc-engine.rows-per-window`                | int            | 500_000 (cap 10_000_000)           |
+  | `l2nx.cdc-engine.query-timeout-seconds`          | int, seconds   | 10                                 |
+  | `l2nx.cdc-engine.publish-flush-seconds`          | int, seconds   | 5                                  |
+  | `l2nx.cdc-engine.workers`                        | int            | `max(2, min(entities, cores/2))`   |
+  | `l2nx.cdc-engine.fetch-size`                     | int            | 10_000                             |
 
   Every entity ticks at the same `tick-interval-seconds`, every entity uses the
   same `rows-per-window` partition size, every Phase 1 / Phase 2 query uses the
   same `query-timeout-seconds`. No per-entity overrides, no provider-supplied
-  defaults.
+  defaults. `rows-per-window` is hard-capped at `10_000_000` — operator
+  misconfiguration (e.g. `1_000_000_000`) would defeat the windowing math and
+  reintroduce the OOM the design avoids; values above the cap throw
+  `IllegalStateException` at engine start.
 
   **Resolution is one-shot at engine start** — values are cached as `EngineConfig`
   for the lifetime of the engine. Operator changes to `l2nx.properties` require
@@ -306,6 +382,21 @@ per-entity state via heartbeat enrichment).
     - SC5. Engine-level config line carries an explicit `[operator-override |
       default]` source tag per parameter — operators can audit "what is actually
       running" without reading code.
+
+- [wip] R19. **SQL identifier validation at engine start.** Every provider-
+  supplied identifier — `PrimarySource.tableName` / `pkColumn` / every entry
+  in `hashedColumns`, plus `ChildSource.tableName` / `fkColumn` / every entry
+  in `hashedColumns` — MUST match the regex
+  `^[A-Za-z_][A-Za-z0-9_]{0,63}$`. Schema-qualified names (`db.tbl`),
+  back-tick-quoted names, dots, hyphens, spaces, and any whitespace are
+  REJECTED. Validation runs once at `CdcEngine.start()`; a single invalid
+  identifier transitions the engine to `STATE_FAILED` and prevents tasks
+  from being scheduled. Rationale: the engine interpolates these
+  identifiers directly into Phase 1 / Phase 2 SQL (`CRC32(CONCAT_WS(',',
+  <hashedColumns>))`, `BETWEEN ? AND ?` against `<pkColumn>`, etc.) —
+  parameter binding only covers literal values. Treat this as a contract
+  for `DbSchemaProvider` authors: declare bare identifiers, never quote or
+  qualify.
 
 - [wip] R20. **Multi-source entity assembly.** An `EntityMapping<T>` declares one
   `PrimarySource` and zero-or-more `ChildSource`s; each source is a separate
@@ -370,14 +461,28 @@ per-entity state via heartbeat enrichment).
       consumers that need to react to deletions and see when they happened.
 
 - [wip] R13. The engine SHOULD NOT block waiting for Kafka acks per row. `NxKafka.send`
-  returns immediately; the engine moves to the next row/window. A per-cycle
+  returns immediately; the engine moves to the next row/window. A per-window
   `Long2ObjectMap<Future<RecordMetadata>>` keyed by PK tracks every in-flight send.
-  At the end of a cycle the engine walks the map with a short flush budget
-  (`l2nx.cdc-engine.publish-flush-seconds`, default 5s). Per-row outcome:
-  succeeded → advance `SnapshotStore` for that PK (R1 last bullet); failed /
-  timed-out → leave snapshot untouched, next cycle's Phase-1 diff replays the
-  publish. No retry logic in the engine itself; producer-side retries are
-  nx-gs-kafka's concern.
+  At end-of-window the engine walks the map with a flush budget
+  (`l2nx.cdc-engine.publish-flush-seconds`, default 5s) in TWO passes:
+    1. First pass — iterate every in-flight future, call `Future.isDone()`
+       (non-blocking). Done-and-acked futures classify as success and the
+       per-PK snapshot advance happens immediately; done-and-failed futures
+       are recorded for replay next cycle.
+    2. Second pass — for futures still pending, wait with the remaining
+       portion of the shared deadline via `f.get(remainingNs,
+       NANOSECONDS)`. Each pending future blocks at most until the budget
+       expires.
+
+  Two passes avoid head-of-line blocking: previously, one slow ack at the
+  head of the queue could starve later already-acked publishes against the
+  shared budget. The done-first pass drains the easy outcomes immediately,
+  the deadline-bounded pass cleans up the rest.
+
+  Per-row outcome: succeeded → advance `SnapshotStore` for that PK (R1 last
+  bullet); failed / timed-out → leave snapshot untouched, next cycle's
+  Phase-1 diff replays the publish. No retry logic in the engine itself;
+  producer-side retries are nx-gs-kafka's concern.
 
 **Could:**
 
@@ -536,22 +641,24 @@ per-entity state via heartbeat enrichment).
   on a 4 GB heap this cost ~360 MB resident on snapshot alone — combined
   with cycle-resident `inFlight` accumulators (pre-fix, see R1 above) it
   pushed the host JVM into OOM. Switched to `Long2IntOpenHashMap`: ~16 B
-  per entry (~100 MB at 6.5M) at the cost of O(N) `keysInRange` /
-  `minPk` / `maxPk`. Each is called once per window or once per cycle on
-  the entity's daemon thread; the ~150 ms / cycle of full-map walks is
-  always dwarfed by the JDBC scans they bracket. The earlier "open-hash
-  goes quadratic at items scale" concern was scoped to the cycle-level
-  flush design — once R1's per-window flush bounds the in-flight window
-  to `rowsPerWindow`, total per-cycle full-map walks stay at one per
-  window (13 at default `rowsPerWindow=500_000` for items), not one per
-  PK. R4's wording above is updated accordingly.]
-- [NEEDS CLARIFICATION: code defines `WindowPlanner.MAX_WINDOWS_PER_PLAN = 1_000_000`
-  as a sanity cap — protects host JVM from OOM when MIN/MAX span the full BIGINT
-  range and `rowsPerWindow` is misconfigured. Plan size > cap throws
-  `IllegalStateException` (engine catches and marks the entity DEGRADED). No R
-  describes this safety net; should be promoted to a Must (sized constraint on
-  the planning step) or left as an internal guard?
-  ref: `nx-gs-db-sync-core/.../engine/window/WindowPlanner.java`]
+  per entry (~100 MB at 6.5M). Per-cycle `keysInRange` work is now O(N
+  log W) via top-of-cycle bucketing by window (binary search on plan
+  boundaries); `minPk` / `maxPk` are tracked incrementally on every
+  `putCrc` / `removeCrc` with lazy memoization. Total per-cycle iteration
+  drops from ~288M (naive O(N) × W) to ~N at items scale. Default-return
+  sentinel `Integer.MIN_VALUE` exposed as `MISSING_HASH` removes the
+  hash=0 / "absent key" ambiguity at the type level. The earlier
+  "open-hash goes quadratic at items scale" concern was scoped to the
+  cycle-level flush design — once per-window flush bounds the in-flight
+  window to `rowsPerWindow`, total per-cycle work stays at O(N log W).
+  R4's wording above is updated accordingly.]
+- [resolved: `WindowPlanner.MAX_WINDOWS_PER_PLAN = 1_000_000` sanity cap on
+  the planning step plus the new `rowsPerWindow ≤ 10_000_000` engine-config
+  cap together protect the host JVM from pathological PK ranges and
+  operator misconfiguration. Plan size > cap throws `IllegalStateException`
+  (engine catches and marks the entity DEGRADED). Not promoted to a
+  numbered Must — it's an internal safety net on top of the operator-
+  visible `rows-per-window` knob.]
 - [NEEDS CLARIFICATION: R15 says config is "read via `ConfigResolver` from
   `adapter-bootstrap`", but `:nx-gs-db-sync-core` cannot depend on
   `:nx-gs-adapter-core` (api-only contract). Code instead has a tiny
@@ -579,6 +686,7 @@ per-entity state via heartbeat enrichment).
   `EntityMapping` shape; this engine consumes them
 - Sibling feature (Tier-3 SPI):
   [`docs/features/jdbc-connection-source/spec.md`](../jdbc-connection-source/spec.md) —
-  engine borrows `Connection`s through the SPI; per-borrow `setReadOnly(true)`
+  engine borrows `Connection`s through the SPI; read-only enforced via SQL
+  `START TRANSACTION ... READ ONLY`, not via `Connection.setReadOnly`
 - fastutil project: https://fastutil.di.unimi.it/ — `it.unimi.dsi:fastutil-core`
   artifact (~3 MB primitive-maps subset)

@@ -11,7 +11,7 @@ import java.util.List;
  * cycle) and entity identity (every entity DTO is keyed by the primary's
  * {@code long} PK).
  *
- * <p>Engine SQL (see {@code cdc-engine/spec.md} R1):</p>
+ * <p>Engine SQL:</p>
  * <ul>
  *     <li>Phase 1: {@code SELECT pkColumn, CRC32(CONCAT_WS(',', col1, col2,
  *     ...)) FROM tableName WHERE pkColumn BETWEEN ? AND ?}.</li>

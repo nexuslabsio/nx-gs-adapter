@@ -140,6 +140,13 @@ logic for individual command types; platform-side operators who consume reply ev
     - `UUID correlationId()` — the inbound `Nx-Correlation-Id`, useful for log tagging.
     - `HostExecutor host()` — the host's Executor wrapper for game-state hops.
     - `NxEvents events()` — handler MAY publish side-effect events during processing.
+    - `Executor io()` — adapter-owned IO pool for blocking JDBC / HTTP work
+      inside handlers. Backed by `nx-io-N` daemon threads sized by
+      `l2nx.io.workers` (default `max(2, cores/2)`). Handlers MUST hop to
+      `ctx.io()` for blocking IO instead of running JDBC on the consumer
+      thread or burning game-thread capacity via `ctx.host().sync(...)`.
+      `ctx.host().sync(...)` is reserved for game-state mutations that
+      must run on the game loop.
 
 - [todo] R8. `nx-gs-adapter-api.spi.HostExecutor` MUST expose:
     ```java
@@ -180,23 +187,39 @@ logic for individual command types; platform-side operators who consume reply ev
 - [todo] R10. `nx-gs-adapter-api.spi.ConnectContext` MUST expose `NxCommands commands()`
   accessor — symmetric to existing `events()`. Returned facade is non-null; when
   `commandsTopic` is unconfigured, the facade still accepts `on(...)` calls (so host code
-  can call it unconditionally) but no consumer thread runs.
+  can call it unconditionally) but no consumer thread runs. `ConnectContext` also
+  exposes `Executor io()` (module-level) returning the adapter-owned IO pool so
+  module code (non-handler) can dispatch blocking IO without burning the game-thread
+  executor.
+
+  `NxCommandsImpl` façade identity is **stable across reconnect cycles**: the
+  façade handed out from `ConnectContext.commands()` survives platform handshake
+  re-rolls — an internal `AtomicReference` is swapped to the live consumer instance
+  on every reconnect. Handler registry survives reconnect too: handlers registered
+  via `ctx.commands().on(...)` persist across reconnect cycles without re-registration.
+  Closes the reconnect race where a host that cached the façade after the first
+  `onConnect` would have continued to call a dead consumer.
 
 - [todo] R11. `nx-gs-adapter-core` MUST implement an internal `CommandsConsumer`:
     - One bounded `KafkaConsumer<byte[], byte[]>` polling `commandsTopic` from a single
-      daemon thread `nx-commands-consumer` (SafeRunnable-wrapped). Phase-2 START is
-      single-threaded across all assigned partitions; multi-thread (one-per-partition)
-      is a follow-up scaling step.
+      daemon thread `nx-commands-consumer` (uncaught-handler installed, `Throwable`
+      caught in the poll loop). Phase-2 START is single-threaded across all
+      assigned partitions; multi-thread (one-per-partition) is a follow-up scaling
+      step.
     - Manual offset management: `consumer.poll(...)` → process each record sequentially
-      (no auto-commit) → await per-batch reply-flush gate → `consumer.commitSync()`
-      after the batch. The reply-flush gate (controlled by
+      → await per-batch reply-flush gate → `consumer.commitSync()` after the batch.
+      `enable.auto.commit=false` is enforced at the Kafka facade level (the messaging
+      slice flipped the default), so manual-commit semantics are now actually
+      enforceable. The reply-flush gate (controlled by
       `l2nx.commands.reply-flush-timeout-ms`, default 5000) blocks the consumer
       thread until every reply send issued during the batch has fired its
       Kafka producer callback (success OR failure), bounding the at-most-once
-      reply window: if the JVM dies before the gate clears, the batch stays
-      uncommitted, records redeliver, handlers re-emit (idempotency on the host
-      side is required). Setting `reply-flush-timeout-ms=0` opts out — replies
-      become at-most-once on JVM crash.
+      reply window. `CommandsConsumer.awaitRepliesDrain` returns `boolean`:
+      `true` on drained-cleanly, `false` on interrupted-with-pending-replies.
+      On `false` the consumer **skips** `commitSync` for the batch so unacked
+      replies redeliver on next start — this closes a window in the
+      at-least-once contract under shutdown. Setting `reply-flush-timeout-ms=0`
+      opts out — replies become at-most-once on JVM crash.
     - Per-record dispatch:
         1. Read `Nx-Message-Type` header → lookup binding in `CommandTypeRegistry`
         2. Read `Nx-Correlation-Id` header → capture for reply
@@ -233,9 +256,9 @@ logic for individual command types; platform-side operators who consume reply ev
 - [todo] R13. Reply path MUST publish directly via the existing
   {@code NxKafka.sendBytesKeyRecord(record, callback)} producer. The Kafka producer's
   internal record-accumulator absorbs back-pressure; we do NOT route replies through the
-  events publisher's bounded queue — the events queue's drop-oldest policy makes sense
-  for stale snapshots but is wrong for command replies (a dropped reply means web-side
-  timeout, no semantic recovery). Reply construction:
+  events publisher's bounded queue — the events queue's drop policy (whether `newest`
+  or `oldest`) makes sense for stale snapshots but is wrong for command replies (a
+  dropped reply means web-side timeout, no semantic recovery). Reply construction:
     - `key = longBytesBe(corrId.getMostSignificantBits())` (so replies for the same
       correlation hash are co-located on a partition — useful for tooling)
     - `headers: Nx-Server-Id` (auto via static-headers), `Nx-Correlation-Id` (= inbound
@@ -373,9 +396,14 @@ logic for individual command types; platform-side operators who consume reply ev
   offset committed. Stacktrace logged at WARN. Redelivery (via Kafka rebalance) is an
   ops-recovery path — the same exception will fire and yield the same error reply, so
   redelivery is not a useful retry.
-- **Reply-publisher queue full** — reply is dropped (per existing events-publisher
-  drop-oldest policy). Web side observes timeout → republishes command with same
-  correlationId. Handler must be idempotent.
+- **Reply producer back-pressure** — replies go directly through the Kafka
+  producer's internal record accumulator (per R13), not the events bounded
+  queue. If the accumulator saturates, `send(...)` will block on the producer
+  thread up to `delivery.timeout.ms`; the per-batch reply-flush gate
+  (R11/`l2nx.commands.reply-flush-timeout-ms`) then bounds how long the
+  consumer waits before deciding to skip the offset commit. On gate timeout
+  the batch is **not** committed → records redeliver → handlers re-emit
+  (idempotency required on the host side).
 - **`commandsTopic` configured but `commandsRepliesTopic` is null** — handlers run
   fully, replies are ATTEMPTED to publish but the publisher detects the missing topic
   and increments `replies-failed-total` + DEBUG log. Web side never sees a reply →

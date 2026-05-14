@@ -103,8 +103,9 @@ class ConnectFlowTest {
         assertEquals(retryExpected ? 1 : 0, scheduler.captured.size(),
                 "retry-scheduled for " + label);
         if (retryExpected) {
-            assertEquals(30_000L, scheduler.captured.get(0).delayMillis,
-                    "first-retry delay for " + label);
+            long delay = scheduler.captured.get(0).delayMillis;
+            assertTrue(delay >= 22_500L && delay <= 37_500L,
+                    "first-retry delay for " + label + " out of ±25% jitter window: " + delay);
         }
     }
 
@@ -157,7 +158,9 @@ class ConnectFlowTest {
 
         assertEquals(Arrays.asList(ConnectFlow.Outcome.STARTING, ConnectFlow.Outcome.TRANSIENT), outcomes);
         assertEquals(1, scheduler.captured.size());
-        assertEquals(30_000L, scheduler.captured.get(0).delayMillis);
+        long delay = scheduler.captured.get(0).delayMillis;
+        assertTrue(delay >= 22_500L && delay <= 37_500L,
+                "first-retry delay out of ±25% jitter window: " + delay);
     }
 
     @Test
@@ -177,11 +180,14 @@ class ConnectFlowTest {
         flow.run();
 
         assertEquals(5, scheduler.captured.size());
-        assertEquals(30_000L, scheduler.captured.get(0).delayMillis);
-        assertEquals(60_000L, scheduler.captured.get(1).delayMillis);
-        assertEquals(120_000L, scheduler.captured.get(2).delayMillis);
-        assertEquals(300_000L, scheduler.captured.get(3).delayMillis);
-        assertEquals(300_000L, scheduler.captured.get(4).delayMillis);
+        long[] bases = {30_000L, 60_000L, 120_000L, 300_000L, 300_000L};
+        for (int i = 0; i < 5; i++) {
+            long q = bases[i] / 4;
+            long ms = scheduler.captured.get(i).delayMillis;
+            assertTrue(ms >= bases[i] - q && ms <= bases[i] + q,
+                    "step " + i + " (base " + bases[i] + ") emitted " + ms
+                            + ", out of ±25% jitter window");
+        }
     }
 
     @Test
@@ -317,6 +323,29 @@ class ConnectFlowTest {
 
         assertEquals(Arrays.asList(ConnectFlow.Outcome.STARTING, ConnectFlow.Outcome.TRANSIENT), outcomes);
         assertEquals(1, scheduler.captured.size());
+    }
+
+    @Test
+    void run_shouldEmitFailedOutcome_whenSchedulerRejectsRetry() {
+        wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
+                .willReturn(aResponse().withStatus(503)));
+
+        java.util.concurrent.ScheduledExecutorService rejecting = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        rejecting.shutdownNow();
+        AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
+        ConnectFlow flow = new ConnectFlow(cfg,
+                new HttpURLConnectionConnectClient(),
+                new DefaultBackoffSchedule(),
+                rejecting,
+                outcomes::add);
+
+        flow.run();
+
+        // STARTING → TRANSIENT → FAILED — scheduler.schedule throws so the retry
+        // path can't recover; flow signals terminal failure.
+        assertEquals(Arrays.asList(ConnectFlow.Outcome.STARTING,
+                ConnectFlow.Outcome.TRANSIENT,
+                ConnectFlow.Outcome.FAILED), outcomes);
     }
 
     private static final class ThrowingConnectClient implements ConnectClient {

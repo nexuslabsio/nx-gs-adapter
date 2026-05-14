@@ -71,12 +71,19 @@ stats — enriched per-tick by querying each discovered module's current status.
 - **`ConnectContext`** (R2) — immutable identity bundle passed to
   `onConnect`. Phase 1 fields: `tenantId` (UUID), `tenantSlug`, `serverId` (UUID),
   `serverSlug`, `serverName`, `adapterVersion`. Hand-written builder + final
-  fields. Phase 2 (api/0.6.0) extends with:
+  fields. Phase 2 (api/0.6.0+) extends with:
     - `Map<String, String> syncTopics()` — per-entity Kafka topic names from
       `ConnectResponse.syncTopics` (see
       [`adapter-bootstrap` R16](../adapter-bootstrap/spec.md)); keyed by
       `entityName`. Immutable view; consumed by `db-sync` (`DbSyncModule.onConnect`)
       and forwarded into `cdc-engine`'s `TopicResolver`.
+    - `NxEvents events()` and `NxCommands commands()` — façades for the built-in
+      outbound-events + inbound-commands surfaces. Both have stable identity
+      across reconnect cycles (internal `AtomicReference` swap), so modules
+      acquire them once at `onConnect` and cache for the JVM lifetime.
+    - `Executor io()` — adapter-owned IO pool (`nx-io-N` daemon threads,
+      `l2nx.io.workers`) for blocking IO from module code (non-handler).
+      Handler-scoped equivalent lives on `CommandContext.io()`.
     - `AdapterConfig` (read-only operator config view) and `EventPublisher` SAM
       for Kafka publish — kept out of Phase 1 to keep the SPI minimal and
       `nx-gs-kafka` out of the api artifact.
@@ -250,6 +257,15 @@ NxAdapter.shutdown()
   bootstrap are the modules that ever run. Simpler than tracking dynamic
   registration; matches the "drop a JAR on classpath, restart, done" operator
   experience.
+
+- **Reconnect cycle: façades persist; identity is stable.** When the adapter
+  re-handshakes (creds rotation, transient platform unavailability), the
+  `NxEvents` / `NxCommands` façades exposed via `ConnectContext` are NOT
+  re-issued. The same façade instance has its internal `AtomicReference`
+  swapped to the live publisher / consumer pair, so module code that cached
+  `ctx.events()` or `ctx.commands()` in `onConnect` continues working without
+  re-acquiring. Handler registry survives reconnect too — handlers registered
+  via `ctx.commands().on(...)` persist across reconnect cycles.
 - **Single-impl-per-classpath.** No `>1 same module name` resolution rule — modules
   have unique names by convention; if two `AdapterModule` impls share a name, that's
   a packaging bug surfaced via the heartbeat (both appear with the same name) but

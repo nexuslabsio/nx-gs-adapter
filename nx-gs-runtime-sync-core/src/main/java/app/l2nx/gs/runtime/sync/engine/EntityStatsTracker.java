@@ -10,18 +10,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Holds the latest {@link EntityStats} per entity. Writers are
- * {@link EntityTickLoop}s (one thread per entity); readers are heartbeat
- * threads. Mirror of the {@code db-sync} tracker — same heartbeat surface so
- * operators see both modules side-by-side under
- * {@code ModuleStatus.stats.entities}.
+ * {@link EntityTickLoop}s; readers are heartbeat threads. Mirror of the
+ * {@code db-sync} tracker — same heartbeat surface so operators see both
+ * modules side-by-side under {@code ModuleStatus.stats.entities}.
  */
 public final class EntityStatsTracker {
 
     private final Map<String, EntityStats> latest = new ConcurrentHashMap<String, EntityStats>();
     private final Map<String, AtomicInteger> errorCounters = new ConcurrentHashMap<String, AtomicInteger>();
+    private final Map<String, AtomicLong> failedAcks = new ConcurrentHashMap<String, AtomicLong>();
+    private final Map<String, AtomicLong> timedOutAcks = new ConcurrentHashMap<String, AtomicLong>();
     private final Map<String, Integer> entityOrder = new ConcurrentHashMap<String, Integer>();
     private final AtomicInteger orderCursor = new AtomicInteger(0);
 
@@ -35,6 +37,10 @@ public final class EntityStatsTracker {
             counter.set(0);
             errors = 0;
         }
+        failedAcks.computeIfAbsent(entityName, k -> new AtomicLong(0L))
+                .set(cycle.failedAcks());
+        timedOutAcks.computeIfAbsent(entityName, k -> new AtomicLong(0L))
+                .set(cycle.timedOutAcks());
         EntityStats stats = EntityStats.builder()
                 .name(entityName)
                 .state(cycle.state())
@@ -74,9 +80,21 @@ public final class EntityStatsTracker {
         return counter == null ? 0 : counter.get();
     }
 
+    public long failedAcks(String entityName) {
+        AtomicLong v = failedAcks.get(entityName);
+        return v == null ? 0L : v.get();
+    }
+
+    public long timedOutAcks(String entityName) {
+        AtomicLong v = timedOutAcks.get(entityName);
+        return v == null ? 0L : v.get();
+    }
+
     public void clear() {
         latest.clear();
         errorCounters.clear();
+        failedAcks.clear();
+        timedOutAcks.clear();
         entityOrder.clear();
         orderCursor.set(0);
     }

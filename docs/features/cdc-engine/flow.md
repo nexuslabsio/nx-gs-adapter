@@ -23,15 +23,16 @@ Plain block diagrams. See [`spec.md`](./spec.md) for requirements,
 │                                       ││           ▼                     │  │
 │                                       ││   ┌──────────────────────────┐  │  │
 │                                       ││   │       CdcEngine          │  │  │
-│                                       ││   │  one daemon thread       │  │  │
-│                                       ││   │  per entity:             │  │  │
-│                                       ││   │  nx-cdc-{schema}-{name}  │  │  │
+│                                       ││   │  shared daemon pool:     │  │  │
+│                                       ││   │  nx-cdc-pool-<schema>-N  │  │  │
+│                                       ││   │  size = workers config   │  │  │
 │                                       ││   └──┬───────────────────────┘  │  │
-│                                       ││      │ schedules tick           │  │
+│                                       ││      │ scheduleWithFixedDelay   │  │
 │                                       ││      ▼                          │  │
 │                                       ││   ┌──────────────────────────┐  │  │
 │                                       ││   │     EntitySyncTask       │  │  │
 │                                       ││   │  one per EntityMapping   │  │  │
+│                                       ││   │  AtomicBoolean ticking   │  │  │
 │                                       ││   └─┬───────┬───────┬────────┘  │  │
 │                                       ││     │       │       │           │  │
 │                                       ││     ▼       ▼       ▼           │  │
@@ -65,6 +66,12 @@ discovers `JdbcConnectionSource` + `DbSchemaProvider` independently.
 ```
 ┌─────────────────────────── EntitySyncTask.runCycle() ──────────────────────────┐
 │                                                                                 │
+│  ┌─────────────────┐  already        ┌────────────────┐                         │
+│  │ ticking.CAS     │ ───────────────▶│  WARN + skip   │    overlap guard:       │
+│  │ false → true    │                 │  (no record)   │    previous tick busy   │
+│  └────────┬────────┘                 └────────────────┘                         │
+│           │ acquired                                                            │
+│           ▼                                                                     │
 │  ┌─────────────────┐  no topic       ┌────────────────┐                         │
 │  │ TopicResolver   │ ───────────────▶│  DEGRADED      │ ─▶ recordCycleResult    │
 │  │ resolveTopic    │                 │  no publish    │    (skip rest)          │
@@ -79,44 +86,58 @@ discovers `JdbcConnectionSource` + `DbSchemaProvider` independently.
 │           ▼                                                                     │
 │  ┌─────────────────┐                                                            │
 │  │ WindowPlanner   │  SELECT MIN(pk), MAX(pk) FROM <table>                      │
-│  │ plan(...)       │  → List<Window>  (chunks of rowsPerWindow)                 │
+│  │ plan(...)       │  + snapshot.minPk/maxPk (O(1), incrementally tracked)      │
+│  │                 │  → List<Window>  (chunks of rowsPerWindow)                 │
 │  └────────┬────────┘                                                            │
+│           │                                                                     │
+│           ▼                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐        │
+│  │ snapshot.bucketByWindows(plan)                                      │        │
+│  │ one pass over snapshot + binary search on plan boundaries           │        │
+│  │ → per-window cache for O(1) keysInRange lookups inside the loop     │        │
+│  └─────────────────────────────────────────────────────────────────────┘        │
 │           │                                                                     │
 │           ▼   ┌─────────────────────── for each Window ────────────────────┐    │
 │           ╰─▶ │                                                            │    │
-│               │  ┌──────────────────┐                                      │    │
-│               │  │ Phase1Hasher     │  START TX WITH CONSISTENT SNAPSHOT,  │    │
-│               │  │ hash(window)     │       READ ONLY                      │    │
-│               │  │                  │  SELECT pk, CRC32(CONCAT_WS(...))    │    │
-│               │  │                  │  WHERE pk BETWEEN ? AND ?            │    │
-│               │  └────────┬─────────┘  → Long2IntMap currentScan           │    │
-│               │           │                                                │    │
-│               │           ▼                                                │    │
-│               │  ┌──────────────────┐  ┌──────────────────┐                │    │
-│               │  │ ChangeSet.diff   │◀─│ SnapshotStore    │ prev CRCs      │    │
-│               │  │                  │  │ keysInRange(...) │ in window      │    │
-│               │  │ → created   set  │  │ (O(N) scan       │                │    │
-│               │  │ → updated   set  │  │  filtered by     │                │    │
-│               │  │ → deleted   set  │  │  [from, to])     │                │    │
-│               │  └────────┬─────────┘  └──────────────────┘                │    │
+│               │  ┌──── Phase 1: ONE consistent-snapshot txn ───────────┐   │    │
+│               │  │ ConsistentSnapshotTxn.runReadOnly(conn, () -> {     │   │    │
+│               │  │   START TX WITH CONSISTENT SNAPSHOT, READ ONLY      │   │    │
+│               │  │                                                     │   │    │
+│               │  │   Phase1Hasher.hashPrimary(w, ...)                  │   │    │
+│               │  │     SELECT pk, CRC32(...) BETWEEN ? AND ?           │   │    │
+│               │  │     setFetchSize(cfg.fetchSize)  ← cursor mode      │   │    │
+│               │  │     registered in StatementRegistry                 │   │    │
+│               │  │                                                     │   │    │
+│               │  │   for each ChildSource:                             │   │    │
+│               │  │     Phase1Hasher.hashChild(w, ...)                  │   │    │
+│               │  │       SELECT fk, BIT_XOR(CRC32(...)) GROUP BY fk    │   │    │
+│               │  │     XOR-fold into currentScan keyed by primary PK   │   │    │
+│               │  │                                                     │   │    │
+│               │  │   ChangeSet.diff(currentScan,                       │   │    │
+│               │  │                  snapshot.keysInRange(w))           │   │    │
+│               │  │ })  COMMIT (or rollback on Throwable)               │   │    │
+│               │  └─────────────────────────────────────────────────────┘   │    │
 │               │           │                                                │    │
 │               │           ▼  (created ∪ updated)                           │    │
-│               │  ┌──────────────────┐                                      │    │
-│               │  │ Phase2Fetcher    │  SELECT * WHERE pk IN (?,...,?)      │    │
-│               │  │ fetch(...)       │  chunks of 1000, last padded         │    │
-│               │  │                  │  → Long2ObjectMap<pk, DTO>           │    │
-│               │  └────────┬─────────┘                                      │    │
-│               │           │                                                │    │
-│               │           ▼                                                │    │
-│               │  ┌──────────────────┐                                      │    │
-│               │  │ SyncEventPublisher                                      │    │
-│               │  │ per-PK publish:  │                                      │    │
-│               │  │  • CREATED → SyncEvent(payload=DTO)                     │    │
-│               │  │  • UPDATED → SyncEvent(payload=DTO)                     │    │
-│               │  │  • DELETED → null (tombstone)                           │    │
-│               │  │ key = 8-byte big-endian pk                              │    │
-│               │  │ returns Future<RecordMetadata>                          │    │
-│               │  └────────┬─────────┘                                      │    │
+│               │  ┌──── Phase 2: SEPARATE consistent-snapshot txn ────┐     │    │
+│               │  │  ConsistentSnapshotTxn.runReadOnly(conn, () -> {  │     │    │
+│               │  │    START TX WITH CONSISTENT SNAPSHOT, READ ONLY   │     │    │
+│               │  │    (fresh post-Phase-1 view — intentional;        │     │    │
+│               │  │     row deleted between phases = silent no-op,    │     │    │
+│               │  │     detected next cycle)                          │     │    │
+│               │  │                                                   │     │    │
+│               │  │    Phase2Fetcher.fetchPrimary / fetchChild        │     │    │
+│               │  │      SELECT * WHERE pk IN (?,...,?) chunks=1000   │     │    │
+│               │  │      setFetchSize + StatementRegistry             │     │    │
+│               │  │                                                   │     │    │
+│               │  │    SyncEventPublisher per pk:                     │     │    │
+│               │  │      CREATED / UPDATED → SyncEvent(payload=DTO)   │     │    │
+│               │  │      DELETED           → SyncEvent(payload=null)  │     │    │
+│               │  │                          (NOT a Kafka tombstone — │     │    │
+│               │  │                          bounded retention topic) │     │    │
+│               │  │      key = 8-byte big-endian pk                   │     │    │
+│               │  │  })  COMMIT                                       │     │    │
+│               │  └───────────────────────────────────────────────────┘     │    │
 │               │           │                                                │    │
 │               │           ▼                                                │    │
 │               │   inFlight: Long2ObjectMap<pk, Future>  (window-scoped)    │    │
@@ -124,19 +145,22 @@ discovers `JdbcConnectionSource` + `DbSchemaProvider` independently.
 │               │                                                            │    │
 │               │           ▼                                                │    │
 │               │  ┌──────────────────────────────────────────────────────┐  │    │
-│               │  │ walkInFlightAndAdvance — budget = publishFlushSeconds │  │    │
+│               │  │ walkInFlightAndAdvance — TWO PASSES                   │  │    │
+│               │  │  budget = publishFlushSeconds                        │  │    │
 │               │  │                                                      │  │    │
-│               │  │  for each (pk, future) in inFlight:                  │  │    │
-│               │  │    ok       → SnapshotStore advance:                 │  │    │
-│               │  │                 create/update → putCrc + count++     │  │    │
-│               │  │                 delete        → removeCrc + count++  │  │    │
-│               │  │    pending  → wait remainingNs (per shared deadline) │  │    │
+│               │  │  pass 1 — drain isDone() (cheap, non-blocking):      │  │    │
+│               │  │    ok       → SnapshotStore advance                  │  │    │
 │               │  │    failed   → leave snapshot untouched → replay      │  │    │
-│               │  │                next cycle, one summary log per cycle │  │    │
+│               │  │                                                      │  │    │
+│               │  │  pass 2 — for still-pending: f.get(remainingNs, NS)  │  │    │
+│               │  │    same per-PK outcomes; deadline shared across all  │  │    │
+│               │  │                                                      │  │    │
+│               │  │  done-first ordering avoids HoL blocking on a slow   │  │    │
+│               │  │  ack starving later already-acked publishes          │  │    │
 │               │  └──────────────────────────────────────────────────────┘  │    │
 │               │  inFlight + pending* now GC-eligible — capping cycle-     │    │
 │               │  resident heap at one window's worth, not the whole       │    │
-│               │  cycle's. (R1 per-window flush.)                           │    │
+│               │  cycle's. (per-window flush.)                              │    │
 │               │                                                            │    │
 │               └──────────────── next window ───────────────────────────────┘    │
 │                                                                                 │
@@ -234,6 +258,32 @@ EntityState (per-entity, surfaced in Stats.entities[])
    DEGRADED ──── any clean cycle ─╯
       │
       │ consecutiveErrors keeps climbing if errors persist
+```
+
+## Shutdown / cancellation path
+
+```
+CdcEngine.stop()
+  │
+  ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  for each EntitySyncTask:                                                   │
+│    task.statementRegistry().cancelAll()                                     │
+│       └─▶ for each tracked Statement: Statement.cancel()                    │
+│                                                                             │
+│  Thread.interrupt() alone is ignored by most JDBC drivers — a 12M-row       │
+│  Phase 1 scan would otherwise keep running until natural completion.        │
+│  Statement.cancel() is the portable way to actually abort an in-flight      │
+│  query.                                                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+  │
+  ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  pool.shutdown()                                                            │
+│  pool.awaitTermination(drainBudget, SECONDS)                                │
+│    ├─ success → done                                                        │
+│    └─ timeout → WARN; pool.shutdownNow()                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Window planning at scale (bohpts x20 reference)

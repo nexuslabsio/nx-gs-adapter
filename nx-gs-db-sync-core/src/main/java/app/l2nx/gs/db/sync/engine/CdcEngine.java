@@ -2,6 +2,7 @@ package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.commons.concurrent.DaemonThreadFactory;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
@@ -14,18 +15,18 @@ import app.l2nx.gs.log.NxLogFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 /**
- * Top-level orchestrator: spawns one daemon scheduler thread per entity, fires
- * the first tick immediately (initial sync), schedules subsequent ticks at
- * {@link EngineConfig#tickIntervalSeconds()}. Per-tick work is delegated to
- * {@link EntitySyncTask}; results land in {@link EntityStatsTracker}.
- *
- * <p>Lifecycle is owned by {@code DbSyncModule}: {@link #start} once on
- * connect, {@link #stop} once on disconnect. Idempotent.</p>
+ * Top-level orchestrator. Maintains one shared scheduler pool sized by
+ * {@code l2nx.cdc-engine.workers}; schedules one tick per entity at
+ * {@link EngineConfig#tickIntervalSeconds()}. A per-entity {@code ticking}
+ * guard prevents overlapping ticks when a previous one ran long.
  */
 public final class CdcEngine {
 
@@ -44,10 +45,12 @@ public final class CdcEngine {
     private final String schemaName;
     private final Function<String, String> configOverrideSource;
 
-    private final List<ScheduledExecutorService> schedulers = new ArrayList<ScheduledExecutorService>();
+    private final List<EntitySyncTask> tasks = new ArrayList<EntitySyncTask>();
     private final List<ScheduledFuture<?>> futures = new ArrayList<ScheduledFuture<?>>();
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean stopped = new AtomicBoolean(false);
+
+    private volatile ScheduledThreadPoolExecutor scheduler;
 
     public CdcEngine(String schemaName,
                      List<? extends EntityMapping<?>> mappings,
@@ -82,33 +85,48 @@ public final class CdcEngine {
         }
         ConfigResolutionLogger.log(log, config, mappings, topicResolver, configOverrideSource);
 
+        int poolSize = resolvePoolSize(config.workers(), mappings.size());
+        ScheduledThreadPoolExecutor pool = new ScheduledThreadPoolExecutor(
+                poolSize, DaemonThreadFactory.counted("nx-cdc-pool-" + schemaName + "-", log));
+        pool.setRemoveOnCancelPolicy(true);
+        this.scheduler = pool;
+
         for (EntityMapping<?> mapping : mappings) {
             String topic = topicResolver.resolveTopic(mapping.entityName());
             if (topic == null) {
                 statsTracker.recordCycleResult(mapping.entityName(), CycleResult.degraded(0L));
             }
-            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
-                    threadFactory(schemaName, mapping.entityName()));
-            schedulers.add(scheduler);
 
             EntitySyncTask task = new EntitySyncTask(
                     mapping, jdbcSource, snapshot,
                     windowPlanner, phase1Hasher, phase2Fetcher,
                     publisher, topicResolver, config);
+            tasks.add(task);
 
+            final AtomicBoolean ticking = new AtomicBoolean(false);
+            final String entity = mapping.entityName();
             Runnable tick = SafeRunnable.wrap(() -> {
-                CycleResult result = task.runCycle();
-                statsTracker.recordCycleResult(mapping.entityName(), result);
+                if (!ticking.compareAndSet(false, true)) {
+                    log.warn("Entity {} previous tick still running — skipping this scheduled cycle", entity);
+                    return;
+                }
+                try {
+                    CycleResult result = task.runCycle();
+                    statsTracker.recordCycleResult(entity, result);
+                } finally {
+                    ticking.set(false);
+                }
             }, log);
 
-            ScheduledFuture<?> handle = scheduler.scheduleWithFixedDelay(
+            ScheduledFuture<?> handle = pool.scheduleWithFixedDelay(
                     tick,
-                    0L,
+                    config.tickIntervalSeconds(),
                     config.tickIntervalSeconds(),
                     TimeUnit.SECONDS);
             futures.add(handle);
         }
-        log.info("CdcEngine started: {} entities, schemaName={}", mappings.size(), schemaName);
+        log.info("CdcEngine started: {} entities, schemaName={}, poolSize={}",
+                mappings.size(), schemaName, poolSize);
     }
 
     public void stop() {
@@ -119,15 +137,28 @@ public final class CdcEngine {
             handle.cancel(false);
         }
         futures.clear();
-        for (ScheduledExecutorService scheduler : schedulers) {
-            scheduler.shutdownNow();
+        ScheduledThreadPoolExecutor pool = scheduler;
+        if (pool != null) {
+            pool.shutdownNow();
+            // Cancel any blocked-in-JDBC statements that shutdownNow couldn't interrupt.
+            for (EntitySyncTask t : tasks) {
+                try {
+                    t.cancelCurrentStatement();
+                } catch (Throwable ignore) {
+                    // best-effort
+                }
+            }
             try {
-                scheduler.awaitTermination(2L, TimeUnit.SECONDS);
+                boolean terminated = pool.awaitTermination(2L, TimeUnit.SECONDS);
+                if (!terminated) {
+                    log.warn("CdcEngine pool did not terminate within 2s — daemon threads will exit on JVM shutdown");
+                }
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
         }
-        schedulers.clear();
+        scheduler = null;
+        tasks.clear();
         snapshot.clearAll();
         log.info("CdcEngine stopped");
     }
@@ -137,22 +168,22 @@ public final class CdcEngine {
     }
 
     /**
-     * Test seam — submits one synchronous tick for each entity. Used by
-     * tests that prefer not to deal with the scheduler timing.
+     * Test seam — submits one synchronous tick for each entity via the
+     * shared scheduler pool.
      */
     public List<Future<?>> tickOnceSynchronously() {
         if (!started.get()) {
             throw new IllegalStateException("CdcEngine not started");
         }
+        ScheduledThreadPoolExecutor pool = scheduler;
+        if (pool == null) {
+            throw new IllegalStateException("CdcEngine scheduler not available");
+        }
         List<Future<?>> futureList = new ArrayList<Future<?>>();
-        for (int i = 0; i < schedulers.size(); i++) {
-            ScheduledExecutorService scheduler = schedulers.get(i);
-            EntityMapping<?> mapping = mappings.get(i);
-            EntitySyncTask task = new EntitySyncTask(
-                    mapping, jdbcSource, snapshot,
-                    windowPlanner, phase1Hasher, phase2Fetcher,
-                    publisher, topicResolver, config);
-            futureList.add(scheduler.submit(() -> {
+        for (int i = 0; i < tasks.size(); i++) {
+            final EntitySyncTask task = tasks.get(i);
+            final EntityMapping<?> mapping = mappings.get(i);
+            futureList.add(pool.submit(() -> {
                 CycleResult result = task.runCycle();
                 statsTracker.recordCycleResult(mapping.entityName(), result);
             }));
@@ -160,11 +191,18 @@ public final class CdcEngine {
         return futureList;
     }
 
-    private static ThreadFactory threadFactory(String schema, String entity) {
-        return r -> {
-            Thread t = new Thread(r, "nx-cdc-" + schema + "-" + entity);
-            t.setDaemon(true);
-            return t;
-        };
+    static int resolvePoolSize(int configuredWorkers, int entities) {
+        if (configuredWorkers > 0) {
+            return configuredWorkers;
+        }
+        int cores = Runtime.getRuntime().availableProcessors() / 2;
+        if (cores < 2) {
+            cores = 2;
+        }
+        if (entities <= 0) {
+            return 2;
+        }
+        return Math.max(2, Math.min(entities, cores));
     }
+
 }

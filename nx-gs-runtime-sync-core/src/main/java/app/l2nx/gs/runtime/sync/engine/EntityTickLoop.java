@@ -1,6 +1,5 @@
 package app.l2nx.gs.runtime.sync.engine;
 
-import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
 import app.l2nx.gs.adapter.api.spi.RuntimeRow;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
@@ -8,20 +7,18 @@ import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import app.l2nx.gs.runtime.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.runtime.sync.engine.publish.TopicResolver;
-import it.unimi.dsi.fastutil.longs.Long2LongMap;
-import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import org.apache.kafka.clients.producer.RecordMetadata;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * One daemon loop per declared runtime entity. Each tick:
+ * One tick loop per declared runtime entity. Dispatched onto a shared scheduler
+ * pool. Each tick:
  *
  * <ol>
  *     <li>Call {@code mapping.snapshot()} → {@code Iterable<RuntimeRow<T>>}.</li>
@@ -38,22 +35,27 @@ import java.util.concurrent.*;
  *     {@code prev} only for PKs whose ack arrived (failed publishes replay
  *     next tick).</li>
  * </ol>
- *
- * <p>All exception handling at this boundary — host JVM threads must not see
- * exceptions out of runtime-sync (per spec R8).</p>
  */
 public final class EntityTickLoop {
+
+    /**
+     * Sentinel — fastutil's default-return-value collides with a legit hash of 0.
+     */
+    static final long MISSING_HASH = Long.MIN_VALUE;
 
     private static final NxLog log = NxLogFactory.getLogger(EntityTickLoop.class);
 
     private final RuntimeEntityMapping<Object> mapping;
+    private final String entityName;
     private final TopicResolver topicResolver;
     private final SyncEventPublisher publisher;
     private final EntityStatsTracker statsTracker;
     private final EngineConfig config;
     private final ScheduledExecutorService scheduler;
+    private final AtomicBoolean ticking = new AtomicBoolean(false);
+    private final AtomicBoolean running = new AtomicBoolean(false);
 
-    private volatile Long2LongMap prevSnapshot = new Long2LongOpenHashMap();
+    private volatile Long2LongMap prevSnapshot = newHashMap(0);
     private volatile ScheduledFuture<?> future;
 
     @SuppressWarnings("unchecked")
@@ -64,6 +66,7 @@ public final class EntityTickLoop {
                           EngineConfig config,
                           ScheduledExecutorService scheduler) {
         this.mapping = (RuntimeEntityMapping<Object>) mapping;
+        this.entityName = mapping.entityName();
         this.topicResolver = topicResolver;
         this.publisher = publisher;
         this.statsTracker = statsTracker;
@@ -72,9 +75,12 @@ public final class EntityTickLoop {
     }
 
     public void start() {
-        Runnable tick = SafeRunnable.wrap(this::tick, log);
-        // First tick fires after one full interval so the engine doesn't pile work onto
-        // adapter bootstrap; subsequent ticks every tickIntervalSeconds.
+        if (!running.compareAndSet(false, true)) {
+            log.warn("entity '{}' tick loop already started — ignoring", entityName);
+            return;
+        }
+        Runnable tick = SafeRunnable.wrap(this::guardedTick, log);
+        // First tick fires after one interval — keep boot quiet, then settle into cadence.
         future = scheduler.scheduleWithFixedDelay(tick,
                 config.tickIntervalSeconds(),
                 config.tickIntervalSeconds(),
@@ -82,76 +88,100 @@ public final class EntityTickLoop {
     }
 
     public void stop() {
-        ScheduledFuture<?> running = future;
-        if (running != null) {
-            running.cancel(false);
+        running.set(false);
+        ScheduledFuture<?> handle = future;
+        if (handle != null) {
+            handle.cancel(false);
         }
         future = null;
     }
 
+    void guardedTick() {
+        if (!running.get()) {
+            return;
+        }
+        if (!ticking.compareAndSet(false, true)) {
+            log.warn("entity '{}' tick still running — skipping scheduled tick (consider raising tick-interval)",
+                    entityName);
+            return;
+        }
+        try {
+            tick();
+        } finally {
+            ticking.set(false);
+        }
+    }
+
     void tick() {
         long start = System.currentTimeMillis();
-        String topic = topicResolver.resolveTopic(mapping.entityName());
+        String topic = topicResolver.resolveTopic(entityName);
         if (topic == null) {
-            log.warn("no runtime topic for entity '{}', skipping tick", mapping.entityName());
-            statsTracker.recordCycleResult(mapping.entityName(),
+            log.warn("no runtime topic for entity '{}', skipping tick", entityName);
+            statsTracker.recordCycleResult(entityName,
                     CycleResult.degraded(System.currentTimeMillis() - start));
             return;
         }
 
-        Long2LongMap currentSnapshot = new Long2LongOpenHashMap();
+        Long2LongMap currentSnapshot = newHashMap(0);
         Long2ObjectMap<Object> dtosByPk = new Long2ObjectOpenHashMap<Object>();
         Iterable<RuntimeRow<Object>> rows;
         try {
             rows = mapping.snapshot();
         } catch (Throwable t) {
             log.error("entity '{}' snapshot threw {}: {}",
-                    mapping.entityName(), t.getClass().getName(), t.getMessage());
-            statsTracker.recordCycleResult(mapping.entityName(),
+                    entityName, t.getClass().getName(), t.getMessage());
+            statsTracker.recordCycleResult(entityName,
                     CycleResult.degraded(System.currentTimeMillis() - start));
             return;
         }
         if (rows == null) {
-            log.warn("entity '{}' snapshot returned null — treating as empty",
-                    mapping.entityName());
+            log.warn("entity '{}' snapshot returned null — treating as empty", entityName);
             rows = java.util.Collections.emptyList();
         }
-        for (RuntimeRow<Object> row : rows) {
-            if (row == null) continue;
-            long pk = row.getPk();
-            Object dto = row.getDto();
-            long hash;
-            try {
-                hash = mapping.hash(dto);
-            } catch (Throwable t) {
-                log.warn("entity '{}' hash(pk={}) threw {} — skipping row",
-                        mapping.entityName(), pk, t.getClass().getName());
-                continue;
+        try {
+            for (RuntimeRow<Object> row : rows) {
+                if (row == null) continue;
+                long pk = row.getPk();
+                Object dto = row.getDto();
+                long hash;
+                try {
+                    hash = mapping.hash(dto);
+                } catch (Throwable t) {
+                    log.warn("entity '{}' hash(pk={}) threw {} — skipping row",
+                            entityName, pk, t.getClass().getName());
+                    continue;
+                }
+                currentSnapshot.put(pk, hash);
+                dtosByPk.put(pk, dto);
             }
-            currentSnapshot.put(pk, hash);
-            dtosByPk.put(pk, dto);
+        } catch (Throwable iterFailure) {
+            log.warn("entity '{}' snapshot iteration failed: {}", entityName,
+                    iterFailure.getClass().getName(), iterFailure);
+            statsTracker.recordCycleResult(entityName,
+                    CycleResult.degraded(System.currentTimeMillis() - start));
+            return;
         }
 
         Long2LongMap prev = prevSnapshot;
         Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight =
                 new Long2ObjectOpenHashMap<CompletableFuture<RecordMetadata>>();
         // Pre-size to currentSnapshot — final occupancy cannot exceed it.
-        Long2LongMap nextPrev = new Long2LongOpenHashMap(currentSnapshot.size());
+        Long2LongMap nextPrev = newHashMap(currentSnapshot.size());
         long created = 0L;
         long updated = 0L;
 
-        // Single pass: classify each pk as NEW / CHANGED / unchanged.
-        // - NEW / CHANGED → publish, future enters inFlight (advances nextPrev only on ack)
-        // - unchanged     → carry hash forward into nextPrev directly (no Kafka traffic)
+        // Single pass: classify each pk as NEW / CHANGED / unchanged via one
+        // prev.get() (MISSING_HASH sentinel disambiguates absence from hash=0).
         LongIterator it = currentSnapshot.keySet().iterator();
         while (it.hasNext()) {
             long pk = it.nextLong();
             long currentHash = currentSnapshot.get(pk);
+            long prevHash = prev.get(pk);
             String op;
-            if (!prev.containsKey(pk)) {
+            if (prevHash == MISSING_HASH) {
                 op = SyncEventPublisher.OP_CREATED;
                 created++;
-            } else if (prev.get(pk) != currentHash) {
+            } else if (prevHash != currentHash) {
                 op = SyncEventPublisher.OP_UPDATED;
                 updated++;
             } else {
@@ -163,41 +193,119 @@ public final class EntityTickLoop {
             inFlight.put(pk, f);
         }
 
-        // Walk acks: failed publishes leave prev untouched for that pk → replayed
-        // on next tick (at-least-once).
-        long flushDeadlineMs = System.currentTimeMillis() + config.publishFlushSeconds() * 1000L;
-        ObjectIterator<Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>>> ackIt =
-                inFlight.long2ObjectEntrySet().iterator();
-        while (ackIt.hasNext()) {
-            Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>> e = ackIt.next();
-            long pk = e.getLongKey();
-            CompletableFuture<RecordMetadata> f = e.getValue();
-            long remaining = Math.max(0L, flushDeadlineMs - System.currentTimeMillis());
-            try {
-                f.get(remaining, TimeUnit.MILLISECONDS);
-                nextPrev.put(pk, currentSnapshot.get(pk));
-            } catch (TimeoutException timeout) {
-                log.warn("entity '{}' publish timed out for pk={} — replay next tick",
-                        mapping.entityName(), pk);
-                if (prev.containsKey(pk)) {
-                    nextPrev.put(pk, prev.get(pk));
-                }
-            } catch (Throwable t) {
-                log.warn("entity '{}' publish failed for pk={}: {} — replay next tick",
-                        mapping.entityName(), pk, t.getClass().getName());
-                if (prev.containsKey(pk)) {
-                    nextPrev.put(pk, prev.get(pk));
-                }
-            }
-        }
+        long[] ackResult = walkInFlight(inFlight, prev, nextPrev, currentSnapshot);
+        long failedAcks = ackResult[0];
+        long timedOutAcks = ackResult[1];
+
         prevSnapshot = nextPrev;
 
         long duration = System.currentTimeMillis() - start;
-        statsTracker.recordCycleResult(mapping.entityName(),
-                new CycleResult(EntityState.HEALTHY, duration, created, updated, currentSnapshot.size()));
+        long rowCount = currentSnapshot.size();
+        CycleResult result;
+        if (failedAcks + timedOutAcks > 0L) {
+            result = CycleResult.degraded(duration, created, updated, rowCount, failedAcks, timedOutAcks);
+        } else {
+            result = CycleResult.healthy(duration, created, updated, rowCount);
+        }
+        statsTracker.recordCycleResult(entityName, result);
     }
 
-    // Test seam — drives one tick on the calling thread.
+    /**
+     * Drains already-done futures cheaply on the first pass, then deadline-waits
+     * pending ones for the remainder of {@code publishFlushSeconds}. Failed
+     * publishes carry the previous hash forward so replay happens next tick
+     * (at-least-once contract).
+     */
+    private long[] walkInFlight(Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
+                                Long2LongMap prev,
+                                Long2LongMap nextPrev,
+                                Long2LongMap currentSnapshot) {
+        long failedAcks = 0L;
+        long timedOutAcks = 0L;
+        if (inFlight.isEmpty()) {
+            return new long[]{0L, 0L};
+        }
+
+        // Pass 1: drain already-done — no blocking, just classify.
+        Long2ObjectMap<CompletableFuture<RecordMetadata>> pending =
+                new Long2ObjectOpenHashMap<CompletableFuture<RecordMetadata>>();
+        ObjectIterator<Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>>> it =
+                inFlight.long2ObjectEntrySet().iterator();
+        while (it.hasNext()) {
+            Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>> e = it.next();
+            long pk = e.getLongKey();
+            CompletableFuture<RecordMetadata> f = e.getValue();
+            if (!f.isDone()) {
+                pending.put(pk, f);
+                continue;
+            }
+            if (f.isCompletedExceptionally()) {
+                failedAcks++;
+                carryPrev(prev, nextPrev, pk);
+            } else {
+                nextPrev.put(pk, currentSnapshot.get(pk));
+            }
+        }
+
+        // Pass 2: deadline-bounded wait for the rest.
+        if (!pending.isEmpty()) {
+            long deadlineNanos = System.nanoTime()
+                    + TimeUnit.SECONDS.toNanos(config.publishFlushSeconds());
+            ObjectIterator<Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>>> pendIt =
+                    pending.long2ObjectEntrySet().iterator();
+            while (pendIt.hasNext()) {
+                Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>> e = pendIt.next();
+                long pk = e.getLongKey();
+                CompletableFuture<RecordMetadata> f = e.getValue();
+                long remaining = Math.max(0L, deadlineNanos - System.nanoTime());
+                try {
+                    f.get(remaining, TimeUnit.NANOSECONDS);
+                    nextPrev.put(pk, currentSnapshot.get(pk));
+                } catch (TimeoutException timeout) {
+                    timedOutAcks++;
+                    carryPrev(prev, nextPrev, pk);
+                } catch (InterruptedException ie) {
+                    // Shutdown signal — stop walking and let the scheduler tear down.
+                    Thread.currentThread().interrupt();
+                    timedOutAcks++;
+                    carryPrev(prev, nextPrev, pk);
+                    break;
+                } catch (ExecutionException ex) {
+                    failedAcks++;
+                    carryPrev(prev, nextPrev, pk);
+                } catch (Throwable t) {
+                    failedAcks++;
+                    carryPrev(prev, nextPrev, pk);
+                }
+            }
+        }
+        if (failedAcks > 0L) {
+            log.warn("entity '{}' {} publish failures — replay next tick",
+                    entityName, failedAcks);
+        }
+        if (timedOutAcks > 0L) {
+            log.warn("entity '{}' {} publishes still pending past flush deadline ({}s) — replay next tick",
+                    entityName, timedOutAcks, config.publishFlushSeconds());
+        }
+        return new long[]{failedAcks, timedOutAcks};
+    }
+
+    private static void carryPrev(Long2LongMap prev, Long2LongMap nextPrev, long pk) {
+        long prior = prev.get(pk);
+        if (prior != MISSING_HASH) {
+            nextPrev.put(pk, prior);
+        }
+    }
+
+    private static Long2LongOpenHashMap newHashMap(int initialCapacity) {
+        Long2LongOpenHashMap map = initialCapacity > 0
+                ? new Long2LongOpenHashMap(initialCapacity)
+                : new Long2LongOpenHashMap();
+        map.defaultReturnValue(MISSING_HASH);
+        return map;
+    }
+
+    // Test seam — exposes the post-tick snapshot keys.
     List<Long> currentSnapshotKeysForTesting() {
         Long2LongMap snap = prevSnapshot;
         List<Long> result = new ArrayList<Long>(snap.size());

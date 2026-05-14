@@ -2,6 +2,7 @@ package app.l2nx.gs.kafka;
 
 import com.google.gson.Gson;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +20,7 @@ public final class KafkaConfig {
     private final long connectTimeoutMs;
     private final boolean reconnect;
     private final long reconnectIntervalMs;
+    private final Duration producerCloseTimeout;
     private final Map<String, Object> properties;
     private final Map<String, byte[]> producerStaticHeaders;
     private final Gson gson;
@@ -30,6 +32,7 @@ public final class KafkaConfig {
         this.connectTimeoutMs = builder.connectTimeoutMs;
         this.reconnect = builder.reconnect;
         this.reconnectIntervalMs = builder.reconnectIntervalMs;
+        this.producerCloseTimeout = builder.producerCloseTimeout;
         this.properties = Collections.unmodifiableMap(new HashMap<>(builder.properties));
         this.producerStaticHeaders = Collections.unmodifiableMap(new HashMap<>(builder.producerStaticHeaders));
         this.gson = builder.gson;
@@ -54,6 +57,10 @@ public final class KafkaConfig {
 
     public long getReconnectIntervalMs() {
         return reconnectIntervalMs;
+    }
+
+    public Duration getProducerCloseTimeout() {
+        return producerCloseTimeout;
     }
 
     public Map<String, Object> getProperties() {
@@ -100,6 +107,7 @@ public final class KafkaConfig {
         private long connectTimeoutMs = 5000;
         private boolean reconnect = true;
         private long reconnectIntervalMs = 30000;
+        private Duration producerCloseTimeout = Duration.ofSeconds(10);
         private final Map<String, Object> properties = new HashMap<>();
         private final Map<String, byte[]> producerStaticHeaders = new HashMap<>();
         private Gson gson = new Gson();
@@ -145,6 +153,21 @@ public final class KafkaConfig {
          */
         public Builder reconnectInterval(long interval, TimeUnit unit) {
             this.reconnectIntervalMs = unit.toMillis(interval);
+            return this;
+        }
+
+        /**
+         * Bounded wait for the producer to flush in-flight records on shutdown.
+         * Default: 10 seconds. Prevents the JVM shutdown hook from hanging when
+         * the broker is unreachable.
+         *
+         * <p>Operators using {@code nx-gs-adapter-core}'s commands engine MUST
+         * keep this {@code >=} {@code l2nx.commands.reply-flush-timeout-ms +
+         * l2nx.events.shutdown-drain-timeout-ms} — otherwise in-flight reply /
+         * event drains will be truncated mid-send during shutdown.</p>
+         */
+        public Builder producerCloseTimeout(Duration timeout) {
+            this.producerCloseTimeout = timeout;
             return this;
         }
 
@@ -202,8 +225,17 @@ public final class KafkaConfig {
             if (connectTimeoutMs <= 0) {
                 throw new KafkaException("Connect timeout must be positive");
             }
+            if (connectTimeoutMs > 60_000) {
+                throw new KafkaException("Connect timeout must not exceed 60s");
+            }
             if (reconnectIntervalMs <= 0) {
                 throw new KafkaException("Reconnect interval must be positive");
+            }
+            if (reconnectIntervalMs > 5L * 60L * 1000L) {
+                throw new KafkaException("Reconnect interval must not exceed 5min");
+            }
+            if (producerCloseTimeout == null || producerCloseTimeout.isNegative() || producerCloseTimeout.isZero()) {
+                throw new KafkaException("Producer close timeout must be positive");
             }
             if (gson == null) {
                 throw new KafkaException("Gson must not be null");

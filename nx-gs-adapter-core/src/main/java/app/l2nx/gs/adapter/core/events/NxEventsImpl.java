@@ -8,10 +8,18 @@ import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 /**
  * Adapter-core implementation of {@link NxEvents}. Stateless façade — every
  * {@code publishX} method resolves the registered binding for the concrete
  * payload class and enqueues into the shared {@link EventsPublisher}.
+ *
+ * <p>The façade survives reconnect: {@code NxAdapter} caches a single
+ * {@code NxEventsImpl} per JVM and calls {@link #swap(EventsPublisher, EventTypeRegistry)}
+ * to retarget it at a freshly built publisher. Modules that captured
+ * {@code ctx.events()} from an earlier {@code onConnect} keep working
+ * without re-registration.</p>
  *
  * <p>{@code null} payloads are swallowed with a WARN log (game-loop safety —
  * never throws to the caller).</p>
@@ -24,12 +32,17 @@ final class NxEventsImpl implements NxEvents {
 
     private static final NxLog log = NxLogFactory.getLogger(NxEventsImpl.class);
 
-    private final EventsPublisher publisher;
-    private final EventTypeRegistry registry;
+    private final AtomicReference<EventsPublisher> publisherRef;
+    private final AtomicReference<EventTypeRegistry> registryRef;
 
     NxEventsImpl(EventsPublisher publisher, EventTypeRegistry registry) {
-        this.publisher = publisher;
-        this.registry = registry;
+        this.publisherRef = new AtomicReference<EventsPublisher>(publisher);
+        this.registryRef = new AtomicReference<EventTypeRegistry>(registry);
+    }
+
+    void swap(EventsPublisher next, EventTypeRegistry nextRegistry) {
+        publisherRef.set(next);
+        registryRef.set(nextRegistry);
     }
 
     @Override
@@ -55,6 +68,12 @@ final class NxEventsImpl implements NxEvents {
     private void dispatch(Object event) {
         if (event == null) {
             log.warn("publish called with null event — dropping");
+            return;
+        }
+        EventsPublisher publisher = publisherRef.get();
+        EventTypeRegistry registry = registryRef.get();
+        if (publisher == null || registry == null) {
+            log.debug("publish called before publisher wired — dropping");
             return;
         }
         EventTypeBinding binding = registry.lookup(event.getClass());

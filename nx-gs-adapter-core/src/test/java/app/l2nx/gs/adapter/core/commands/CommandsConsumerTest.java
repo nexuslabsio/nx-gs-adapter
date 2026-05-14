@@ -94,6 +94,7 @@ class CommandsConsumerTest {
                 repliesTopic,
                 new HostExecutorImpl(Runnable::run, 1000L),
                 new FakeNxEvents(),
+                Runnable::run,
                 registry,
                 mockConsumer,
                 sender,
@@ -291,6 +292,23 @@ class CommandsConsumerTest {
 
         assertEquals(1L, consumer.repliesFailedTotal());
         assertEquals(0L, consumer.repliesPublishedTotal());
+    }
+
+    @Test
+    void processRecord_shouldExposeIoExecutor_viaCtxIo() {
+        AtomicBoolean ioObserved = new AtomicBoolean(false);
+        registry.register(FakeCommand.class, (cmd, ctx) -> {
+            // Touch ctx.io() so any null/wrong wiring throws synchronously.
+            ctx.io().execute(() -> ioObserved.set(true));
+            return CommandResult.success();
+        });
+        CommandsConsumer consumer = build("out");
+
+        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
+                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+
+        assertTrue(ioObserved.get(),
+                "ctx.io().execute() must run on the supplied executor (direct-run double)");
     }
 
     @Test

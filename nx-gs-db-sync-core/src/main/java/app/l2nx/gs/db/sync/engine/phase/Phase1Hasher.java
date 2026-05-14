@@ -2,94 +2,120 @@ package app.l2nx.gs.db.sync.engine.phase;
 
 import app.l2nx.gs.adapter.api.spi.ChildSource;
 import app.l2nx.gs.adapter.api.spi.PrimarySource;
+import app.l2nx.gs.db.sync.engine.JdbcDialect;
+import app.l2nx.gs.db.sync.engine.StatementRegistry;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import org.jspecify.annotations.Nullable;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.List;
 
 /**
- * Phase 1 of the CRC32 CDC protocol. Two windowed-query variants:
+ * Phase 1 of the CRC32 CDC protocol. {@link #hashPrimary} returns (PK → CRC32);
+ * {@link #hashChild} returns (parent PK → XOR-aggregate CRC32) — XOR is order-
+ * insensitive so child row order has no bearing on the hash.
  *
- * <ul>
- *     <li>{@link #hashPrimary} — {@code SELECT pk, CRC32(CONCAT_WS(',',
- *     col1, col2, ...)) FROM primary WHERE pk BETWEEN ? AND ?}. Returns a
- *     {@code Long2IntMap} of (PK → primary CRC32).</li>
- *     <li>{@link #hashChild} — {@code SELECT fk,
- *     BIT_XOR(CRC32(CONCAT_WS(',', col1, col2, ...))) FROM child WHERE fk
- *     BETWEEN ? AND ? GROUP BY fk}. Returns (parent PK → XOR-aggregate of
- *     every child row's CRC32 belonging to that parent). The XOR aggregate
- *     is order-insensitive, so child row order in the source has no
- *     bearing on the hash; engine XOR-folds the result into the per-PK
- *     aggregate built from primary + every other child.</li>
- * </ul>
- *
- * <p>Each scan runs inside an InnoDB consistent snapshot
- * ({@code START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY}) so the
- * window observes a coherent view even if writes land mid-scan. The
- * transaction commits as soon as the result is drained — no locks held
- * into the next window.</p>
- *
- * <p>{@code SET TRANSACTION READ ONLY} is set explicitly via the
- * {@link Connection#setReadOnly(boolean) setReadOnly(true)} hint applied by
- * the engine before borrow. The {@code WITH CONSISTENT SNAPSHOT} keyword
- * ensures the snapshot is established at transaction start, not on first
- * read, eliminating phantom anomalies between MIN/MAX planning and actual
- * scan.</p>
- *
- * <p>Collision risk for child {@code BIT_XOR(CRC32(...))} aggregates: two
- * child rows with identical CRC32 inside the same FK group cancel out in
- * XOR. Probability per pair is {@code ~1/2^32}; per-cycle change-miss
- * probability for an entity with N child rows is bounded by
- * {@code N(N-1)/2 × 1/2^32}. Acceptable for game-data eventual
- * consistency; a row-count guard ({@code XOR COUNT(*)}) is documented in
- * tech.md Decisions but deferred until a real collision surfaces.</p>
+ * <p>Both variants run against a {@link Connection} already inside the
+ * caller's consistent-snapshot transaction. The engine opens one
+ * transaction per window for primary + every child to keep the entire
+ * window-CRC bit-exact under concurrent writes.</p>
  */
 public final class Phase1Hasher {
 
-    public Long2IntMap hashPrimary(Window window,
+    /**
+     * Sentinel marking "no entry" — distinct from a legit CRC32 of 0.
+     */
+    public static final int MISSING_HASH = Integer.MIN_VALUE;
+
+    public Long2IntMap hashPrimary(Connection conn,
+                                   Window window,
                                    PrimarySource<?> primary,
-                                   Connection conn,
-                                   int queryTimeoutSeconds) throws SQLException {
+                                   int queryTimeoutSeconds,
+                                   int fetchSize,
+                                   JdbcDialect dialect) throws SQLException {
+        return hashPrimary(conn, window, primary, queryTimeoutSeconds, fetchSize, dialect, null);
+    }
+
+    public Long2IntMap hashPrimary(Connection conn,
+                                   Window window,
+                                   PrimarySource<?> primary,
+                                   int queryTimeoutSeconds,
+                                   int fetchSize,
+                                   JdbcDialect dialect,
+                                   @Nullable StatementRegistry registry) throws SQLException {
         String sql = buildPrimarySql(primary);
-        return runHashQuery(window, sql, conn, queryTimeoutSeconds);
+        return runHashQuery(conn, window, sql, queryTimeoutSeconds, fetchSize, dialect, registry);
     }
 
-    public Long2IntMap hashChild(Window window,
+    public Long2IntMap hashChild(Connection conn,
+                                 Window window,
                                  ChildSource<?> child,
-                                 Connection conn,
-                                 int queryTimeoutSeconds) throws SQLException {
-        String sql = buildChildSql(child);
-        return runHashQuery(window, sql, conn, queryTimeoutSeconds);
+                                 int queryTimeoutSeconds,
+                                 int fetchSize,
+                                 JdbcDialect dialect) throws SQLException {
+        return hashChild(conn, window, child, queryTimeoutSeconds, fetchSize, dialect, null);
     }
 
-    private static Long2IntMap runHashQuery(Window window,
+    public Long2IntMap hashChild(Connection conn,
+                                 Window window,
+                                 ChildSource<?> child,
+                                 int queryTimeoutSeconds,
+                                 int fetchSize,
+                                 JdbcDialect dialect,
+                                 @Nullable StatementRegistry registry) throws SQLException {
+        String sql = buildChildSql(child);
+        return runHashQuery(conn, window, sql, queryTimeoutSeconds, fetchSize, dialect, registry);
+    }
+
+    private static Long2IntMap runHashQuery(Connection conn,
+                                            Window window,
                                             String sql,
-                                            Connection conn,
-                                            int queryTimeoutSeconds) throws SQLException {
-        return ConsistentSnapshotTxn.runReadOnly(conn, () -> {
-            Long2IntOpenHashMap result = new Long2IntOpenHashMap();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                                            int queryTimeoutSeconds,
+                                            int fetchSize,
+                                            JdbcDialect dialect,
+                                            @Nullable StatementRegistry registry) throws SQLException {
+        Long2IntOpenHashMap result = new Long2IntOpenHashMap();
+        result.defaultReturnValue(MISSING_HASH);
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (registry != null) {
+                registry.set(ps);
+            }
+            try {
                 ps.setQueryTimeout(queryTimeoutSeconds);
+                applyFetchSize(ps, fetchSize, dialect);
                 ps.setLong(1, window.fromPk());
                 ps.setLong(2, window.toPk());
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         long pk = rs.getLong(1);
-                        // CRC32 / BIT_XOR(CRC32) in MySQL return BIGINT UNSIGNED
-                        // (0..2^32-1); narrow to int — same bytes, comparison is
-                        // bit-exact.
+                        // CRC32 / BIT_XOR(CRC32) returns BIGINT UNSIGNED; narrow to int — bit-exact.
                         int crc = (int) rs.getLong(2);
                         result.put(pk, crc);
                     }
                 }
+            } finally {
+                if (registry != null) {
+                    registry.clear();
+                }
             }
-            return result;
-        });
+        }
+        return result;
+    }
+
+    /**
+     * MySQL Connector/J ignores positive {@code fetchSize} and buffers the
+     * whole result client-side; only {@code Integer.MIN_VALUE} switches it
+     * to streaming row-by-row. Pgjdbc and most other drivers treat
+     * positive {@code fetchSize} as a server-side cursor batch hint.
+     */
+    static void applyFetchSize(Statement ps, int fetchSize, JdbcDialect dialect) throws SQLException {
+        if (dialect == JdbcDialect.MYSQL) {
+            ps.setFetchSize(Integer.MIN_VALUE);
+        } else {
+            ps.setFetchSize(fetchSize);
+        }
     }
 
     static String buildPrimarySql(PrimarySource<?> primary) {

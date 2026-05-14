@@ -143,6 +143,43 @@ class HeartbeatServiceTest {
     }
 
     @Test
+    void startAndStop_shouldBeMutuallyExclusive_underConcurrentCallers() throws Exception {
+        HeartbeatService service = new HeartbeatService(publisher, scheduler, "1.2.3",
+                () -> moduleStatuses.get(), clock());
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(8);
+        try {
+            java.util.concurrent.CountDownLatch gate = new java.util.concurrent.CountDownLatch(1);
+            java.util.List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
+            for (int i = 0; i < 32; i++) {
+                final boolean doStart = (i % 2 == 0);
+                futures.add(pool.submit(() -> {
+                    try {
+                        gate.await();
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    if (doStart) {
+                        service.start("t", "ts", "s", "ss", "sn", "topic");
+                    } else {
+                        service.stop();
+                    }
+                }));
+            }
+            gate.countDown();
+            for (java.util.concurrent.Future<?> f : futures) {
+                f.get(5, TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        // Service must remain in a coherent state — no exception leaked, final
+        // stop quiesces cleanly.
+        service.stop();
+    }
+
+    @Test
     void tick_shouldKeepRunning_afterPublisherThrows() {
         ToggleablePublisher toggleable = new ToggleablePublisher();
         HeartbeatService service = new HeartbeatService(toggleable, scheduler, "1.2.3", () -> moduleStatuses.get(), clock());

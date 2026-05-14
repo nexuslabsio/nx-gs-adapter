@@ -33,7 +33,6 @@ public class GsonDeserializer<T> implements Deserializer<T> {
 
     @Override
     public void configure(Map<String, ?> configs, boolean isKey) {
-        // no configuration needed
     }
 
     @Override
@@ -46,6 +45,5 @@ public class GsonDeserializer<T> implements Deserializer<T> {
 
     @Override
     public void close() {
-        // nothing to close
     }
 }

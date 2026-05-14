@@ -10,10 +10,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class SnapshotStoreTest {
 
     @Test
-    void getCrc_shouldReturnZero_whenEntityUnknown() {
+    void getCrc_shouldReturnMissingSentinel_whenEntityUnknown() {
         SnapshotStore store = new SnapshotStore();
 
-        assertEquals(0, store.getCrc("clan", 1L));
+        assertEquals(app.l2nx.gs.db.sync.engine.phase.Phase1Hasher.MISSING_HASH,
+                store.getCrc("clan", 1L));
         assertFalse(store.containsCrc("clan", 1L));
     }
 

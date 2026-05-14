@@ -14,36 +14,10 @@ import java.util.List;
 import java.util.OptionalLong;
 
 /**
- * Plans a per-cycle list of PK windows for one entity. Runs
- * {@code SELECT MIN(pk), MAX(pk) FROM <primary.tableName>} once, reads
- * {@link SnapshotStore#minPk}/{@link SnapshotStore#maxPk} for the same entity,
- * computes the envelope {@code [min(MIN_db, MIN_snap), max(MAX_db, MAX_snap)]}
- * and ceil-divides it into chunks of {@code <= rowsPerWindow} width.
- *
- * <p>Envelope rationale (cdc-engine R2): when the row at the current
- * {@code MIN(pk)} or {@code MAX(pk)} is deleted, the DB range shrinks below
- * (or above) the deleted PK; partitioning the shrunken range alone leaves
- * the deleted PK outside every next-cycle window and its tombstone never
- * fires. Including the snapshot's PK extremes in the envelope keeps every
- * PK ever seen in scope until its tombstone is published and its CRC removed
- * — converging back to {@code [MIN_db, MAX_db]} once the drift drains.</p>
- *
- * <p>Degenerate cases:</p>
- * <ul>
- *     <li>Both DB and snapshot empty (cold start + empty primary table) —
- *     returns empty list. Engine treats as "no work this cycle".</li>
- *     <li>One side empty — the other drives the envelope (initial cycle uses
- *     {@code [MIN_db, MAX_db]}; a fully-drained DB with leftover snapshot
- *     uses {@code [MIN_snap, MAX_snap]} so all leftover PKs get tombstone
- *     events on the next cycle).</li>
- *     <li>Range fits in one window
- *     ({@code maxEnv - minEnv + 1 <= rowsPerWindow}) — single-window list.</li>
- *     <li>Single PK ({@code minEnv == maxEnv}) — single window
- *     {@code [pk, pk]}.</li>
- * </ul>
- *
- * <p>Window boundaries are recomputed at every cycle so PK growth is
- * naturally absorbed; there is no caching across cycles.</p>
+ * Plans a per-cycle list of PK windows for one entity. Runs MIN/MAX over the
+ * primary table once, unions with the snapshot's PK envelope so a deletion of
+ * the current MIN or MAX still falls inside some next-cycle window, then
+ * ceil-divides into chunks of {@code <= rowsPerWindow} width.
  */
 public final class WindowPlanner {
 

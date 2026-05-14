@@ -47,7 +47,7 @@ class NxConsumerIntegrationTest {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<TestEvent> received = new AtomicReference<>();
 
-        kafka.subscribe(topic, TestEvent.class, event -> {
+        kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> {
             received.set(event);
             latch.countDown();
         });
@@ -67,7 +67,7 @@ class NxConsumerIntegrationTest {
 
         CountDownLatch latch = new CountDownLatch(3);
 
-        kafka.subscribe(topic, TestEvent.class, event -> latch.countDown());
+        kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> latch.countDown());
 
         publishJson(topic, "{\"name\":\"a\",\"score\":1}");
         publishJson(topic, "{\"name\":\"b\",\"score\":2}");
@@ -81,11 +81,11 @@ class NxConsumerIntegrationTest {
         String topic = "test.consumer.dup";
         NxKafka kafka = buildKafka("test-consumer-dup");
 
-        kafka.subscribe(topic, TestEvent.class, event -> {
+        kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> {
         });
 
         assertThrows(KafkaException.class,
-                () -> kafka.subscribe(topic, TestEvent.class, event -> {
+                () -> kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> {
                 }));
     }
 
@@ -96,7 +96,7 @@ class NxConsumerIntegrationTest {
 
         CountDownLatch latch = new CountDownLatch(1);
 
-        kafka.subscribe(topic, TestEvent.class, event -> latch.countDown());
+        kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> latch.countDown());
 
         publishJson(topic, "{\"name\":\"first\",\"score\":1}");
         assertTrue(latch.await(10, TimeUnit.SECONDS), "First message not received");
@@ -105,7 +105,7 @@ class NxConsumerIntegrationTest {
 
         // After unsubscribe, can subscribe again
         CountDownLatch latch2 = new CountDownLatch(1);
-        kafka.subscribe(topic, TestEvent.class, event -> latch2.countDown());
+        kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> latch2.countDown());
 
         publishJson(topic, "{\"name\":\"second\",\"score\":2}");
         assertTrue(latch2.await(10, TimeUnit.SECONDS), "Second message not received after resubscribe");
@@ -118,7 +118,7 @@ class NxConsumerIntegrationTest {
 
         CountDownLatch latch = new CountDownLatch(1);
 
-        kafka.subscribe(topic, TestEvent.class, event -> latch.countDown());
+        kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> latch.countDown());
 
         // Send invalid JSON, then valid
         publishJson(topic, "not-json");
@@ -132,8 +132,8 @@ class NxConsumerIntegrationTest {
         NxKafka kafka = buildKafka("test-consumer-shutdown");
 
         CountDownLatch latch = new CountDownLatch(1);
-        kafka.subscribe("test.consumer.shut1", TestEvent.class, event -> latch.countDown());
-        kafka.subscribe("test.consumer.shut2", TestEvent.class, event -> {
+        kafka.subscribe("test.consumer.shut1", "g-shut", TestEvent.class, event -> latch.countDown());
+        kafka.subscribe("test.consumer.shut2", "g-shut", TestEvent.class, event -> {
         });
 
         publishJson("test.consumer.shut1", "{\"name\":\"p\",\"score\":1}");

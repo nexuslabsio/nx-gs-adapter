@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -116,5 +117,21 @@ public interface NxProducer {
     static NxProducer create(Map<String, Object> config, Gson gson,
                              Map<String, byte[]> staticHeaders) {
         return new DefaultNxProducer(config, gson, staticHeaders);
+    }
+
+    /**
+     * Creates a new producer with a bounded close timeout. The timeout caps how
+     * long {@link #close()} blocks waiting for in-flight records to flush —
+     * critical for JVM shutdown when the broker is unreachable.
+     *
+     * @param config        Kafka producer configuration properties
+     * @param gson          Gson instance for value serialization
+     * @param staticHeaders headers added to every {@link ProducerRecord} before send
+     * @param closeTimeout  bounded wait for in-flight flush on close
+     * @return a new producer instance
+     */
+    static NxProducer create(Map<String, Object> config, Gson gson,
+                             Map<String, byte[]> staticHeaders, Duration closeTimeout) {
+        return new DefaultNxProducer(config, gson, staticHeaders, closeTimeout);
     }
 }

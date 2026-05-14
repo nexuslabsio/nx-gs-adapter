@@ -3,6 +3,7 @@ package app.l2nx.gs.kafka;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -67,6 +68,39 @@ class KafkaConfigTest {
                 .connectTimeout(2, TimeUnit.SECONDS)
                 .reconnectInterval(1, TimeUnit.MINUTES)
                 .reconnect(false)
+                .build();
+
+        assertNotNull(kafka);
+    }
+
+    @Test
+    void build_shouldReject_whenConnectTimeoutExceedsBound() {
+        KafkaConfig.Builder builder = NxKafka.configure()
+                .brokers("localhost:19999")
+                .connectTimeout(2, TimeUnit.MINUTES)
+                .reconnect(false);
+
+        assertThrows(KafkaException.class, builder::build);
+    }
+
+    @Test
+    void build_shouldReject_whenReconnectIntervalExceedsBound() {
+        KafkaConfig.Builder builder = NxKafka.configure()
+                .brokers("localhost:19999")
+                .connectTimeout(1, TimeUnit.SECONDS)
+                .reconnectInterval(10, TimeUnit.MINUTES)
+                .reconnect(false);
+
+        assertThrows(KafkaException.class, builder::build);
+    }
+
+    @Test
+    void build_shouldAccept_customProducerCloseTimeout() {
+        NxKafka kafka = NxKafka.configure()
+                .brokers("localhost:19999")
+                .connectTimeout(1, TimeUnit.SECONDS)
+                .reconnect(false)
+                .producerCloseTimeout(Duration.ofSeconds(2))
                 .build();
 
         assertNotNull(kafka);

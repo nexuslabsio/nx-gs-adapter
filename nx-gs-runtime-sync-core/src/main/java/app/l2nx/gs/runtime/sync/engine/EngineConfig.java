@@ -31,16 +31,23 @@ public final class EngineConfig {
 
     public static final String KEY_TICK_INTERVAL_SECONDS = "l2nx.runtime-sync.tick-interval-seconds";
     public static final String KEY_PUBLISH_FLUSH_SECONDS = "l2nx.runtime-sync.publish-flush-seconds";
+    public static final String KEY_WORKERS = "l2nx.runtime-sync.workers";
 
     public static final int DEFAULT_TICK_INTERVAL_SECONDS = 10;
     public static final int DEFAULT_PUBLISH_FLUSH_SECONDS = 5;
 
     private final int tickIntervalSeconds;
     private final int publishFlushSeconds;
+    private final Integer workersOverride;
 
     public EngineConfig(int tickIntervalSeconds, int publishFlushSeconds) {
+        this(tickIntervalSeconds, publishFlushSeconds, null);
+    }
+
+    public EngineConfig(int tickIntervalSeconds, int publishFlushSeconds, Integer workersOverride) {
         this.tickIntervalSeconds = tickIntervalSeconds;
         this.publishFlushSeconds = publishFlushSeconds;
+        this.workersOverride = workersOverride;
     }
 
     public int tickIntervalSeconds() {
@@ -49,6 +56,26 @@ public final class EngineConfig {
 
     public int publishFlushSeconds() {
         return publishFlushSeconds;
+    }
+
+    /**
+     * Resolves the shared scheduler pool size. If the operator set
+     * {@code l2nx.runtime-sync.workers} explicitly, use it; otherwise derive
+     * {@code max(2, min(entityCount, cores/2))} so a 1-entity adapter still
+     * gets two threads (tick + room for an overrun warning) and a wide adapter
+     * never out-allocates half the host's cores.
+     */
+    public int workers(int entityCount) {
+        if (workersOverride != null) {
+            return workersOverride;
+        }
+        int half = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
+        int bounded = Math.min(Math.max(1, entityCount), half);
+        return Math.max(2, bounded);
+    }
+
+    public Integer workersOverride() {
+        return workersOverride;
     }
 
     public static EngineConfig defaults() {
@@ -65,9 +92,11 @@ public final class EngineConfig {
     }
 
     public static EngineConfig from(Function<String, String> source) {
+        Integer workers = optionalPositiveInt(source, KEY_WORKERS);
         return new EngineConfig(
                 positiveInt(source, KEY_TICK_INTERVAL_SECONDS, DEFAULT_TICK_INTERVAL_SECONDS),
-                positiveInt(source, KEY_PUBLISH_FLUSH_SECONDS, DEFAULT_PUBLISH_FLUSH_SECONDS));
+                positiveInt(source, KEY_PUBLISH_FLUSH_SECONDS, DEFAULT_PUBLISH_FLUSH_SECONDS),
+                workers);
     }
 
     static Function<String, String> fileFirstChain(Properties fileProps,
@@ -133,23 +162,44 @@ public final class EngineConfig {
         return parsed;
     }
 
+    private static Integer optionalPositiveInt(Function<String, String> source, String key) {
+        String raw = source.apply(key);
+        if (raw == null || raw.trim().isEmpty()) {
+            return null;
+        }
+        int parsed;
+        try {
+            parsed = Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException(
+                    "Invalid '" + key + "' value '" + raw + "': not an integer", e);
+        }
+        if (parsed <= 0) {
+            throw new IllegalStateException(
+                    "Invalid '" + key + "' value " + parsed + ": must be > 0");
+        }
+        return parsed;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof EngineConfig)) return false;
         EngineConfig that = (EngineConfig) o;
         return tickIntervalSeconds == that.tickIntervalSeconds
-                && publishFlushSeconds == that.publishFlushSeconds;
+                && publishFlushSeconds == that.publishFlushSeconds
+                && Objects.equals(workersOverride, that.workersOverride);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tickIntervalSeconds, publishFlushSeconds);
+        return Objects.hash(tickIntervalSeconds, publishFlushSeconds, workersOverride);
     }
 
     @Override
     public String toString() {
         return "EngineConfig[tickIntervalSeconds=" + tickIntervalSeconds
-                + ", publishFlushSeconds=" + publishFlushSeconds + "]";
+                + ", publishFlushSeconds=" + publishFlushSeconds
+                + ", workersOverride=" + workersOverride + "]";
     }
 }

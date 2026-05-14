@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Resolves adapter configuration from a two-source chain (per key), file-first:
@@ -46,6 +47,7 @@ public final class ConfigResolver {
     static final String KEY_SERVER_KEY = "l2nx.gs-key";
     static final String KEY_PLATFORM_URL = "l2nx.platform-url";
     static final String KEY_ENABLED = "l2nx.enabled";
+    static final String KEY_IO_WORKERS = "l2nx.io.workers";
 
     static final String KEY_KAFKA_BATCH_SIZE = "l2nx.kafka.producer.batch.size";
     static final String KEY_KAFKA_LINGER_MS = "l2nx.kafka.producer.linger.ms";
@@ -65,14 +67,24 @@ public final class ConfigResolver {
     private static final int SERVER_KEY_LENGTH = 38;
 
     private final Function<String, String> sysprops;
+    private final Supplier<Set<String>> syspropNames;
     private final Properties fileProps;
 
     public ConfigResolver() {
-        this(System::getProperty, loadFileProperties(System::getProperty));
+        this(System::getProperty,
+                () -> new LinkedHashSet<String>(System.getProperties().stringPropertyNames()),
+                loadFileProperties(System::getProperty));
     }
 
     ConfigResolver(Function<String, String> sysprops, Properties fileProps) {
+        this(sysprops, Collections::emptySet, fileProps);
+    }
+
+    ConfigResolver(Function<String, String> sysprops,
+                   Supplier<Set<String>> syspropNames,
+                   Properties fileProps) {
         this.sysprops = sysprops;
+        this.syspropNames = syspropNames;
         this.fileProps = fileProps;
     }
 
@@ -81,11 +93,22 @@ public final class ConfigResolver {
         String platformUrl = resolvePlatformUrl();
         String adapterVersion = resolveAdapterVersion();
         boolean enabled = resolveEnabled();
+        int ioWorkers = resolveIoWorkers();
         Map<String, Object> kafkaProducerOverrides = resolveKafkaProducerOverrides();
         EventsConfig events = resolveEventsConfig();
         CommandsConfig commands = resolveCommandsConfig();
         return new AdapterConfig(serverKey, platformUrl, adapterVersion, enabled,
-                kafkaProducerOverrides, events, commands);
+                ioWorkers, kafkaProducerOverrides, events, commands);
+    }
+
+    public int resolveIoWorkers() {
+        int value = resolveInt(KEY_IO_WORKERS, AdapterConfig.defaultIoWorkers());
+        if (value < 1) {
+            throw new IllegalStateException(
+                    "Invalid value for '" + KEY_IO_WORKERS + "': "
+                            + value + " (expected positive integer)");
+        }
+        return value;
     }
 
     public EventsConfig resolveEventsConfig() {
@@ -143,8 +166,6 @@ public final class ConfigResolver {
 
     private Map<String, Object> resolveCommandsKafkaOverrides() {
         Map<String, Object> overrides = new LinkedHashMap<String, Object>();
-        // Walk file properties and sysprops to collect any l2nx.commands.kafka.* keys.
-        // File properties win where keys collide (consistent with resolveString precedence).
         for (String name : fileProps.stringPropertyNames()) {
             if (name.startsWith(KEY_COMMANDS_KAFKA_PREFIX) && name.length() > KEY_COMMANDS_KAFKA_PREFIX.length()) {
                 String kafkaKey = name.substring(KEY_COMMANDS_KAFKA_PREFIX.length());
@@ -154,14 +175,29 @@ public final class ConfigResolver {
                 }
             }
         }
-        // Sysprop overrides — only fill in keys not already taken by file.
-        // Cannot enumerate sysprops via a Function<String,String>, so this branch
-        // only sees keys the file declared; sysprop-only keys require placement
-        // in the properties file (acceptable — config-file is the preferred medium).
-        return overrides.isEmpty() ? Collections.<String, Object>emptyMap() : overrides;
+        // File wins where keys collide — only fill in sysprop-only keys here.
+        for (String name : enumerateSyspropNames()) {
+            if (!name.startsWith(KEY_COMMANDS_KAFKA_PREFIX) || name.length() == KEY_COMMANDS_KAFKA_PREFIX.length()) {
+                continue;
+            }
+            String kafkaKey = name.substring(KEY_COMMANDS_KAFKA_PREFIX.length());
+            if (overrides.containsKey(kafkaKey)) {
+                continue;
+            }
+            String value = sysprops.apply(name);
+            if (value != null && !value.trim().isEmpty()) {
+                overrides.put(kafkaKey, value.trim());
+            }
+        }
+        return overrides.isEmpty() ? Collections.emptyMap() : overrides;
     }
 
-    private int resolveInt(String key, int defaultValue) {
+    private Set<String> enumerateSyspropNames() {
+        Set<String> names = syspropNames.get();
+        return names != null ? names : Collections.emptySet();
+    }
+
+    public int resolveInt(String key, int defaultValue) {
         Optional<String> raw = resolveString(key);
         if (!raw.isPresent()) {
             return defaultValue;

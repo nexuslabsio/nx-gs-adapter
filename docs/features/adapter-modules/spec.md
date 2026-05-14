@@ -58,6 +58,16 @@ heartbeat consumers (read enriched `enabledModules`).
     - operator config access (read-only `AdapterConfig` view — same `l2nx.*` chain
       as adapter-bootstrap) and Kafka publish capability (narrow `EventPublisher`
       SAM — keeps `nx-gs-adapter-api` free of `nx-gs-kafka` dependency).
+    - `NxEvents events()` and `NxCommands commands()` accessors for the
+      built-in messaging surfaces. Both façades have **stable identity across
+      reconnect cycles** — an internal `AtomicReference` is swapped to the
+      live implementation on every reconnect, so module code acquired in
+      `onConnect(ctx)` may continue using cached references after a
+      disconnect/reconnect cycle without re-acquiring.
+    - `Executor io()` — adapter-owned IO pool (`nx-io-N` daemon threads,
+      sized by `l2nx.io.workers`, default `max(2, cores/2)`) for blocking
+      JDBC / HTTP / FS calls from module code (non-handler). Symmetric with
+      the handler-scoped `CommandContext.io()`.
 
   Phase 1 modules MUST NOT publish events or consult config — those capabilities
   ship intentionally later. `syncTopics` arrives in api/0.6.0 alongside the

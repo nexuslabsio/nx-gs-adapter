@@ -57,7 +57,10 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   acquired via `ConnectContext.commands()`), `CommandHandler<C, R>` SAM,
   `CommandContext` (per-invocation correlationId / host() / events()),
   `HostExecutor` (game-thread hop helper with `sync(Runnable)` / `<T> sync(Supplier<T>)`
-  / `async(Runnable)`).
+  / `async(Runnable)`). Both contexts also surface an adapter-owned IO `Executor`
+  via `ConnectContext.io()` (module-level) and `CommandContext.io()` (handler-level)
+  for blocking IO (JDBC, HTTP) — handlers MUST hop here instead of running JDBC on
+  the game thread or the Kafka consumer thread.
 - `:nx-gs-commons` — shared utilities for adapter modules and tenant providers:
   `concurrent.SafeRunnable` (exception-swallowing Runnable wrapper), `hash.Fnv1a64`
   (FNV-1a 64-bit hash), `Nulls` (sentinel-to-null), `jdbc.JdbcNulls` (null-aware
@@ -76,54 +79,99 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   module discovery, lifecycle. Hosts the built-in `NxEvents` capability — bounded-queue
     + daemon-thread fan-out (`events.EventsPublisher`, `events.NxEventsImpl`,
       `events.EventTypeRegistry`) reading per-family topic addressing from
-      `ConnectResponse.messagingTopics.events`. Heartbeat surfaces an `events` module
-      slot (`queue-depth`, `published-total`, `dropped-total`, `failed-total`,
-      `disabled-families`) via `ModuleStatus.Stats.events`. Also hosts the built-in
-      `NxCommands` capability — single Kafka consumer + dispatch table
-      (`commands.CommandsConsumer`, `commands.NxCommandsImpl`,
-      `commands.CommandTypeRegistry`) reading inbound topic from
-      `MessagingTopics.commandsTopic` and publishing replies to
-      `MessagingTopics.commandsRepliesTopic` via the existing producer.
-      Manual offset commit per batch; handler `RuntimeException` auto-wraps as
-      `INTERNAL_ERROR` reply. Heartbeat surfaces a `commands` module slot
-      (`consumed-total` / `handled-total` / `unsupported-total` /
-      `validation-failed-total` / `internal-errors-total` /
-      `replies-published-total` / `replies-failed-total` /
-      `commit-failures-total` / `registered-types`) via
-      `ModuleStatus.Stats.commands`. Host registers its game-thread `Executor`
-      via static `NxAdapter.hostExecutor(Executor)` BEFORE `start()`; the
-      adapter wraps it as `HostExecutor` for handler-side
-      `ctx.host().sync(...)` / `.async(...)` hops. Engine configs under
-      `l2nx.events.*` (queue-capacity / drop-policy / shutdown-drain-timeout-ms)
-      and `l2nx.commands.*` (poll-timeout-ms / shutdown-timeout-ms /
-      kafka.<prop>); both file-first source chain. Depends on
-      `:nx-gs-adapter-api` + `:nx-gs-kafka` + `:nx-gs-commons` + `gson`.
+      `ConnectResponse.messagingTopics.events`. Default `drop-policy` is `newest`
+      (drop incoming on overflow — preserves queue order). `oldest` (evict head)
+      remains an option but over-counts `dropped-total` under multi-producer
+      contention because the displaced envelope is counted on the eviction path
+      even when concurrent enqueuers race for the same slot. Heartbeat surfaces an
+      `events` module slot (`queue-depth`, `published-total`, `dropped-total`,
+      `failed-total`, `disabled-families`) via `ModuleStatus.Stats.events`. The
+      `NxEvents` façade handed out via `ConnectContext.events()` survives reconnect
+      — an `AtomicReference` inside the façade is swapped to the live publisher on
+      every reconnect cycle, so host modules cache the reference once at `start()`
+      and never re-acquire. Also hosts the built-in `NxCommands` capability —
+      single Kafka consumer + dispatch table (`commands.CommandsConsumer`,
+      `commands.NxCommandsImpl`, `commands.CommandTypeRegistry`) reading inbound
+      topic from `MessagingTopics.commandsTopic` and publishing replies to
+      `MessagingTopics.commandsRepliesTopic` via the existing producer. Manual
+      offset commit per batch; handler `RuntimeException` auto-wraps as
+      `INTERNAL_ERROR` reply. The `NxCommands` façade follows the same
+      survive-reconnect pattern (AtomicReference swap on reconnect). Heartbeat
+      surfaces a `commands` module slot (`consumed-total` / `handled-total` /
+      `unsupported-total` / `validation-failed-total` / `internal-errors-total` /
+      `replies-published-total` / `replies-failed-total` / `commit-failures-total`
+      / `registered-types`) via `ModuleStatus.Stats.commands`. Host registers its
+      game-thread `Executor` via static `NxAdapter.hostExecutor(Executor)` BEFORE
+      `start()`; the adapter wraps it as `HostExecutor` for handler-side
+      `ctx.host().sync(...)` / `.async(...)` hops. The adapter also owns a shared
+      IO pool (`nx-io-N` daemon threads, sized by `l2nx.io.workers`, default
+      `max(2, cores/2)`) surfaced via `ConnectContext.io()` and
+      `CommandContext.io()` — handlers doing JDBC/HTTP MUST hop here. Connect-flow
+      retry uses ±25% jitter on the configured interval to avoid thundering-herd
+      reconnect on platform recovery. Heartbeat start/stop is `synchronized` so
+      reconnect concurrent with shutdown cannot leave a scheduler running. Engine
+      configs under `l2nx.events.*` (queue-capacity / drop-policy /
+      shutdown-drain-timeout-ms) and `l2nx.commands.*` (poll-timeout-ms /
+      shutdown-timeout-ms / kafka.<prop>); both file-first source chain. Depends
+      on `:nx-gs-adapter-api` + `:nx-gs-kafka` + `:nx-gs-commons` + `gson`.
       Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
 - `:nx-gs-db-sync-core` — DB-sync `AdapterModule` shipped to Maven Central. Owns the
-  CRC32 two-phase CDC engine (one daemon thread per entity, server-side CRC32 hashing,
-  per-row snapshot swap on Kafka ack) and resolves the Tier-2 `DbSchemaProvider` SPI
-  (defined in `nx-gs-adapter-api` so client providers depend only on the api artifact).
-  Reads its per-entity Kafka topics from `ctx.syncTopics().db()` (db namespace of
-  the namespaced `SyncTopics` bundle). Surfaces both `pool` (from
-  `JdbcConnectionSource.stats()`) and `entities` (per-entity `EntityStats`) slots in
-  the heartbeat. Engine config lives under `l2nx.cdc-engine.*` (file-first source
-  chain). Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` + `:nx-gs-commons` +
-  `fastutil-core` + `gson`. Package root `app.l2nx.gs.db.sync`. `:nx-gs-log`
-  shadow-included.
+  CRC32 two-phase CDC engine (shared bounded pool — `l2nx.cdc-engine.workers` daemon
+  threads, default `max(2, min(entities, cores/2))` — replaces the legacy
+  thread-per-entity model; entities are scheduled as tasks onto the pool, server-side
+  CRC32 hashing, per-row snapshot swap on Kafka ack) and resolves the Tier-2
+  `DbSchemaProvider` SPI (defined in `nx-gs-adapter-api` so client providers depend
+  only on the api artifact). Reads its per-entity Kafka topics from
+  `ctx.syncTopics().db()` (db namespace of the namespaced `SyncTopics` bundle).
+  Surfaces both `pool` (from `JdbcConnectionSource.stats()`) and `entities`
+  (per-entity `EntityStats`) slots in the heartbeat. Engine config lives under
+  `l2nx.cdc-engine.*` (file-first source chain) — including `workers` and
+  `fetch-size` (default `10_000`). JDBC dialect is auto-detected from the
+  connection URL: MySQL/MariaDB → `Integer.MIN_VALUE` streaming fetch (row-by-row,
+  the only mode MySQL Connector/J honors for large result sets); Postgres /
+  others → `fetch-size` as a cursor-batch hint. All identifiers passed via `EntityMapping` /
+  `PrimarySource` / `ChildSource` (tableName / pkColumn / fkColumn / hashedColumns)
+  MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` — schema-qualified or quoted names are
+  rejected at engine start. Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +
+  `:nx-gs-commons` + `fastutil-core` + `gson`. Package root `app.l2nx.gs.db.sync`.
+  `:nx-gs-log` shadow-included.
 - `:nx-gs-runtime-sync-core` — Runtime-sync `AdapterModule` shipped to Maven Central.
-  Owns the in-memory snapshot+diff engine (one daemon thread per entity, FNV-1a
-  64-bit hashing in Java, replay-on-failed-publish per the at-least-once contract)
-  and resolves the Tier-2 `RuntimeStateProvider` SPI for in-memory game-server
-  stores. Reads per-entity topics from `ctx.syncTopics().runtime()`. No tombstone
-  on logout — `db-sync` owns "permanently gone" semantics. Engine config lives
-  under `l2nx.runtime-sync.*` (per-module — independent of `l2nx.cdc-engine.*`
-  because the two engines have different tick cadences). Depends on
-  `:nx-gs-adapter-api` + `:nx-gs-kafka` + `:nx-gs-commons` + `fastutil-core` +
-  `gson`. Package root `app.l2nx.gs.runtime.sync`. `:nx-gs-log` shadow-included.
+  Owns the in-memory snapshot+diff engine (shared bounded pool —
+  `l2nx.runtime-sync.workers` daemon threads, default `max(2, min(entities,
+  cores/2))` — replaces the legacy thread-per-entity model; FNV-1a 64-bit hashing
+  in Java, replay-on-failed-publish per the at-least-once contract) and resolves
+  the Tier-2 `RuntimeStateProvider` SPI for in-memory game-server stores. Reads
+  per-entity topics from `ctx.syncTopics().runtime()`. No tombstone on logout —
+  `db-sync` owns "permanently gone" semantics. Engine config lives under
+  `l2nx.runtime-sync.*` (per-module — independent of `l2nx.cdc-engine.*` because
+  the two engines have different tick cadences). Depends on `:nx-gs-adapter-api` +
+  `:nx-gs-kafka` + `:nx-gs-commons` + `fastutil-core` + `gson`. Package root
+  `app.l2nx.gs.runtime.sync`. `:nx-gs-log` shadow-included.
 - `:nx-gs-log` — internal logging facade (`app.l2nx.gs.log`). NOT published; classes are bundled
   into `:nx-gs-commons`, `:nx-gs-kafka`, `:nx-gs-adapter-core`, `:nx-gs-db-sync-core`,
   and `:nx-gs-runtime-sync-core` jars at build time. Auto-detects SLF4J via reflection,
   falls back to console output. Library code never imports SLF4J directly.
+
+## Threading model
+
+Adapter-owned threads (all daemon — never block JVM exit):
+
+| Thread name              | Count        | Purpose                                               |
+|--------------------------|--------------|-------------------------------------------------------|
+| `nx-adapter-connect`     | 1            | `POST /connect` + reconnect retries (±25% jitter)     |
+| `nx-adapter-heartbeat`   | 1            | Periodic heartbeat POSTs                              |
+| `nx-gs-kafka-shutdown`   | 1            | JVM shutdown hook                                     |
+| `nx-gs-kafka-health`     | 1            | Persistent `AdminClient.describeCluster` health ticks |
+| `nx-events-publisher`    | 1            | Bounded-queue fan-out for `NxEvents`                  |
+| `nx-commands-consumer`   | 1            | Kafka poll + dispatch for `NxCommands`                |
+| `nx-io-N`                | configurable | Adapter-owned IO pool (`ctx.io()` for JDBC/HTTP hops) |
+| `nx-cdc-pool-<schema>-N` | configurable | Shared CDC engine pool (db-sync, all entities)        |
+| `nx-runtime-sync-pool-N` | configurable | Shared runtime-sync engine pool (all entities)        |
+| Kafka producer I/O       | 1            | Internal to `KafkaProducer` (kafka-clients-managed)   |
+
+Pool sizing keys: `l2nx.io.workers`, `l2nx.cdc-engine.workers`,
+`l2nx.runtime-sync.workers` (all default `max(2, cores/2)` or
+`max(2, min(entities, cores/2))` for engines).
 
 ## Constraints
 

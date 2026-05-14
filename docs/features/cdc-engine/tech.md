@@ -7,8 +7,9 @@
 
 The engine lives inside `:nx-gs-db-sync-core` under `app.l2nx.gs.db.sync.engine`. It is
 wired by `DbSyncModule` once `provider.mappings()` is available (Phase 2): one
-`EntitySyncTask` instance per `EntityMapping`, each running on its own daemon
-`ScheduledExecutorService`. The task implements the CRC32 two-phase protocol on every
+`EntitySyncTask` instance per `EntityMapping`, all scheduled onto a single shared
+`ScheduledThreadPoolExecutor` (`nx-cdc-pool-<schema>-N`, daemon, sized by
+`l2nx.cdc-engine.workers`). The task implements the CRC32 two-phase protocol on every
 tick — always in PK-windowed mode — walking N windows back-to-back inside a single
 tick (where N is derived from `rowsPerWindow` config and the entity's PK range). It
 holds a fastutil `Long2IntOpenHashMap` snapshot per entity and publishes `SyncEvent`s
@@ -19,32 +20,65 @@ read by `HeartbeatService` per heartbeat tick.
 ## Structure
 
 - `nx-gs-db-sync-core/src/main/java/app/l2nx/gs/db/sync/engine/`
-    - `CdcEngine.java` — orchestrator: spawns one
-      `Executors.newSingleThreadScheduledExecutor` per entity, schedules
-      `EntitySyncTask` ticks, surfaces `EntityStats` via
-      `EntityStatsTracker` (R5, R6, R10, R15, R16)
+    - `CdcEngine.java` — orchestrator: builds ONE shared
+      `ScheduledThreadPoolExecutor` sized by `l2nx.cdc-engine.workers`
+      (default `max(2, min(entities, cores/2))`) with daemon thread factory
+      `nx-cdc-pool-<schema>-N` + uncaughtExceptionHandler. Schedules each
+      `EntitySyncTask` as a separate task on the shared pool. Validates
+      every provider-supplied SQL identifier against
+      `^[A-Za-z_][A-Za-z0-9_]{0,63}$` at start; any violation → engine
+      `STATE_FAILED`, no tasks scheduled. Surfaces `EntityStats` via
+      `EntityStatsTracker` (R5, R6, R10, R15, R16, R19). `stop()` walks
+      every task's `StatementRegistry` and calls `Statement.cancel()` to
+      interrupt JDBC queries (Thread.interrupt is ignored by most drivers),
+      then `awaitTermination` on the pool — failures logged WARN before
+      `shutdownNow()`.
     - `EngineConfig.java` — immutable value bag
       `{tickIntervalSeconds, rowsPerWindow, queryTimeoutSeconds,
-      publishFlushSeconds}`; `productionChain()` resolves file (path from
-      `-Dl2nx.config-file` or cwd `l2nx.properties`) + sysprop fallback (R15)
+      publishFlushSeconds, workers, fetchSize}`;
+      `productionChain()` resolves file (path from `-Dl2nx.config-file` or
+      cwd `l2nx.properties`) + sysprop fallback (R15). `rowsPerWindow`
+      hard-capped at 10_000_000 sanity bound (rejected at engine start).
+    - `StatementRegistry.java` — per-task tracker of open `Statement`s;
+      registered on creation, deregistered on close. `cancelAll()` invoked
+      by `CdcEngine.stop()` to interrupt in-flight JDBC queries via
+      `Statement.cancel()`.
+    - `ConsistentSnapshotTxn.java` — per-window transaction wrapper. Opens
+      `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY` on the
+      borrowed connection, runs the supplied closure (primary hash + every
+      child hash + diff), commits on success. Catches `Throwable` (SQL /
+      Runtime / Error paths), rolls back, and rethrows the original
+      exception so partial MVCC state never leaks back to the host DB.
     - `ConfigResolutionLogger.java` — single static helper invoked once at
       `CdcEngine.start()`; emits engine globals + per-entity topic resolution
       with `[operator-override | default]` source tags (R16)
-    - `EntitySyncTask.java` — per-entity `Runnable`. One cycle = borrow → plan
-      (with snapshot envelope) → for-each-window {Phase1 primary + per-child
-      hash, XOR-fold, diff → Phase2 primary + per-child fetch, mapEntity assemble
-      → publish per PK → walk `Long2ObjectMap<pk, Future>` for THIS window,
-      advance snapshot for acked PKs} (R1, R2, R5, R7, R9, R20). Per-window
-      flush keeps cycle-resident memory bounded by `rowsPerWindow` rather
-      than total snapshot size — at 6.5M items × default 500K window the
-      peak `inFlight` / `pending*` heap drops from ~500 MB (cycle-level
-      flush) to ~40 MB (window-level)
-    - `SnapshotStore.java` — `Long2IntOpenHashMap` per entity. Open-hash
-      chosen over AVL tree so the per-entry footprint stays at ~16 bytes;
-      at 6.5M items this is ~100 MB resident vs ~360 MB the AVL tree would
-      hold. `keysInRange` becomes O(N) (filtered scan) but only one window's
-      worth of PKs materializes at a time, and `minPk` / `maxPk` are O(N)
-      single scans called once per cycle by `WindowPlanner` (R2, R4)
+    - `EntitySyncTask.java` — `Runnable` scheduled onto the shared pool. One
+      cycle = borrow → plan (with snapshot envelope) → bucket snapshot PKs
+      into the plan's windows (one pass, binary search) → for-each-window
+      {ONE consistent-snapshot transaction wraps Phase1 primary + per-child
+      hash, XOR-fold, diff → separate Phase2 transaction wraps primary +
+      per-child fetch, mapEntity assemble → publish per PK → two-pass walk
+      of `Long2ObjectMap<pk, Future>` for THIS window (done-first then
+      deadline-bounded for pending), advance snapshot for acked PKs}
+      (R1, R2, R5, R7, R9, R11, R20). Carries an `AtomicBoolean ticking`
+      overlap guard so a slow tick does not pile up tasks in the shared
+      pool; carries a `StatementRegistry` so `CdcEngine.stop()` can
+      cancel in-flight queries. Per-window flush keeps cycle-resident
+      memory bounded by `rowsPerWindow` — at 6.5M items × default 500K
+      window the peak `inFlight` / `pending*` heap drops from ~500 MB
+      (cycle-level flush) to ~40 MB (window-level).
+    - `SnapshotStore.java` — `Long2IntOpenHashMap` per entity, initialised
+      with `defaultReturnValue(Integer.MIN_VALUE)` so the constant
+      `MISSING_HASH = Integer.MIN_VALUE` cleanly distinguishes "absent
+      key" from a real CRC32 of `0x00000000`. Open-hash chosen over AVL
+      tree so the per-entry footprint stays at ~16 bytes; at 6.5M items
+      this is ~100 MB resident vs ~360 MB the AVL tree would hold.
+      `keysInRange` runs O(N log W) per cycle via top-of-cycle
+      `bucketByWindows(plan)` (one pass over the snapshot, binary search
+      on plan boundaries) — drops 12M × 24-window from ~288M iterations
+      to ~N. `minPk` / `maxPk` are tracked incrementally on `putCrc` /
+      `removeCrc` with lazy memoization; the R2 envelope read is O(1)
+      amortised (R2, R4).
     - `EntityStatsTracker.java` — `ConcurrentHashMap<String, EntityStats>` +
       per-entity `AtomicInteger` consecutiveErrors. `recordCycleResult`
       writes `entityOrder` first then `latest` so a heartbeat reader between
@@ -61,11 +95,20 @@ read by `HeartbeatService` per heartbeat tick.
           CRC32(CONCAT_WS(...)) FROM primary WHERE pk BETWEEN ? AND ?` →
           `Long2IntMap`; `hashChild(window, childSource, conn, ...)` runs
           `SELECT fk, BIT_XOR(CRC32(CONCAT_WS(...))) FROM child WHERE fk
-          BETWEEN ? AND ? GROUP BY fk` → `Long2IntMap`. Both inside
-          `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`. Manual
-          autocommit save/restore + rollback-on-throw. Engine
-          ({@link EntitySyncTask}) XOR-folds per-source contributions into
-          a per-window aggregate `currentScan` (R1, R11, R20)
+          BETWEEN ? AND ? GROUP BY fk` → `Long2IntMap`. Both share ONE
+          window-scoped `ConsistentSnapshotTxn` opened by `EntitySyncTask`
+          — primary + every child see the same MVCC view, so a row written
+          mid-window can no longer corrupt the per-PK XOR-fold. Every
+          `PreparedStatement` calls `Phase1Hasher.applyFetchSize(ps, cfg.fetchSize, dialect)`:
+          MySQL/MariaDB (detected via `JdbcDialect.detect`) gets
+          `Integer.MIN_VALUE` for row-by-row streaming (the only mode
+          Connector/J honors for large result sets); Postgres / other drivers
+          get `cfg.fetchSize` (default `10_000`) as a server-side cursor
+          batch hint. Each statement is
+          registered with the task's `StatementRegistry` so shutdown
+          cancellation reaches it. Engine ({@link EntitySyncTask}) XOR-folds
+          per-source contributions into a per-window aggregate
+          `currentScan` (R1, R11, R20).
         - `Phase2Fetcher.java` — two methods: `fetchPrimary(primarySource,
           pks, conn, ...)` runs `SELECT * FROM primary WHERE pk IN (...)`
           chunked at 1000 → `Long2ObjectMap<Object>` (PK → opaque primary
@@ -74,7 +117,11 @@ read by `HeartbeatService` per heartbeat tick.
           `Long2ObjectMap<List<Object>>` (FK → child rows). Single
           `PreparedStatement` per call reused across chunks; last
           (smaller) chunk pads by repeating its final PK so the SQL string
-          stays stable across chunks (server-side prep cache hit) (R1, R11, R20)
+          stays stable across chunks (server-side prep cache hit). The
+          whole Phase 2 for a window runs inside its OWN
+          `ConsistentSnapshotTxn` — intentionally fresher than Phase 1
+          (post-Phase-1 row state). `setFetchSize` + `StatementRegistry`
+          registration identical to Phase 1 (R1, R11, R20).
         - `ChangeSet.java` — diff stage: walks `currentScan` (aggregate CRC
           across primary + children) against `SnapshotStore` +
           `prevKeysInRange`, partitions PKs into `created/updated/deleted`
@@ -110,24 +157,35 @@ read by `HeartbeatService` per heartbeat tick.
 
 ## Key components
 
-- **`CdcEngine`** (R5, R6, R10, R15, R16) — orchestrator owned by
+- **`CdcEngine`** (R5, R6, R10, R15, R16, R19) — orchestrator owned by
   `DbSyncModule`. Constructor receives `provider.mappings()` + `JdbcConnectionSource` +
-  Kafka producer + `ConfigResolver`. Builds an immutable `EngineConfig` once (resolves
-  the R15 chain for every mapping). Holds a `Map<EntityMapping<?>, EntitySyncTask>`
-  (provider-list order preserved via `LinkedHashMap`) and a single
-  `ScheduledExecutorService` with one thread per mapping. `start()` emits the R16
-  startup log via `ConfigResolutionLogger`, then schedules each `EntitySyncTask` with
-  first-tick delay 0 using the resolved tick interval per mapping. `stop()` cancels
-  schedulers and drains in-flight ticks. Exposes `List<EntityStats> currentEntityStats()`
-  for heartbeat enrichment — reads from a single `volatile` reference rebuilt at the
-  end of every cycle by each task.
+  Kafka producer + `ConfigResolver`. Builds an immutable `EngineConfig` once
+  (resolves the R15 chain). Validates every SQL identifier on every
+  `PrimarySource` / `ChildSource` against `^[A-Za-z_][A-Za-z0-9_]{0,63}$`
+  — first violation transitions the engine to `STATE_FAILED` and aborts
+  scheduling. Holds a `Map<EntityMapping<?>, EntitySyncTask>` (provider-list
+  order preserved via `LinkedHashMap`) and a single shared
+  `ScheduledThreadPoolExecutor` sized by `l2nx.cdc-engine.workers` (daemon
+  thread factory `nx-cdc-pool-<schema>-N` with uncaughtExceptionHandler).
+  `start()` emits the R16 startup log via `ConfigResolutionLogger`, then
+  schedules each `EntitySyncTask` as a separate task on the shared pool
+  with first-tick delay 0 and `scheduleWithFixedDelay` at
+  `tickInterval`. `stop()` walks every task's `StatementRegistry` calling
+  `Statement.cancel()` (Thread.interrupt is ignored by most JDBC drivers
+  — only `Statement.cancel()` actually aborts a running query), then
+  `awaitTermination` on the pool (failures logged WARN before
+  `shutdownNow`). Exposes `List<EntityStats> currentEntityStats()` for
+  heartbeat enrichment — reads from a single `volatile` reference rebuilt
+  at the end of every cycle by each task.
 - **`EngineConfig`** (R15) — immutable value bag carrying ONLY engine-
   level globals from `l2nx.properties`:
   ```java
-  Duration tickInterval;        // l2nx.cdc-engine.tick-interval-seconds | default 60s
-  int rowsPerWindow;            // l2nx.cdc-engine.rows-per-window       | default 500_000
-  Duration queryTimeout;        // l2nx.cdc-engine.query-timeout-seconds | default 10s
-  Duration publishFlush;        // l2nx.cdc-engine.publish-flush-seconds | default 5s
+  Duration tickInterval;            // l2nx.cdc-engine.tick-interval-seconds      | default 60s
+  int rowsPerWindow;                // l2nx.cdc-engine.rows-per-window            | default 500_000 (cap 10_000_000)
+  Duration queryTimeout;            // l2nx.cdc-engine.query-timeout-seconds      | default 10s
+  Duration publishFlush;            // l2nx.cdc-engine.publish-flush-seconds      | default 5s
+  int workers;                      // l2nx.cdc-engine.workers                    | default max(2, min(entities, cores/2))
+  int fetchSize;                    // l2nx.cdc-engine.fetch-size                 | default 10_000
   EnumMap<EngineParam, SourceTag> sources;   // OPERATOR_OVERRIDE | DEFAULT per param,
                                              // for ConfigResolutionLogger
   ```
@@ -146,24 +204,40 @@ read by `HeartbeatService` per heartbeat tick.
   `CdcEngine.start()`. Reads `EngineConfig`, formats the structured log block, emits
   via `NxLog` at `INFO` level on logger `app.l2nx.gs.db.sync.engine.CdcEngine`. Single
   call site; no state.
-- **`EntitySyncTask`** (R1, R2, R5, R7, R9) — per-entity `Runnable`. On
-  each tick:
-    1. `WindowPlanner.recomputeBoundaries(mapping, rowsPerWindow)` — runs
-       `SELECT MIN(<pk>), MAX(<pk>) FROM <tableName>`, computes `windowCount =
-       max(1, ceil(pkRange / rowsPerWindow))`, returns ordered list of
-       `[fromPk, toPk]` boundaries
-    2. For each window in order: `Phase1Hasher.hash` (bounded by `[from, to]`) →
-       `SnapshotStore.diff` for that PK range → if non-empty change set →
-       `Phase2Fetcher.fetch` for `created ∪ updated` → `SyncEventPublisher.publish`
-       per row + per deleted PK → `SnapshotStore.swapWindow(from, to, currentWindow)`
-    3. After all windows: build a new `EntityStats`, atomically replace the
-       published snapshot
-       Wrapped in `SafeRunnable` so any throwable is caught, the entity state transitions
-       to `DEGRADED`, and the schedule continues. Small entities (rowCount ≤
-       rowsPerWindow) yield exactly 1 window — no separate code path.
-- **`Phase1Hasher`** (R1, R11, R20) — opens
-  `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY`. Two windowed-query
-  variants:
+- **`EntitySyncTask`** (R1, R2, R5, R7, R9, R11) — `Runnable` scheduled on
+  the shared pool. Each task carries an `AtomicBoolean ticking` overlap
+  guard: if a previous tick is still in flight when the next fire arrives
+  (slow Phase 1 on a 12M-row entity, say), the new fire short-circuits
+  with a single WARN log so the shared pool does not pile up tasks.
+  Tracks open statements via a `StatementRegistry` for shutdown
+  cancellation. On each tick:
+    1. `WindowPlanner.plan(mapping, conn, snapshot, cfg.rowsPerWindow)` —
+       runs `SELECT MIN(<pk>), MAX(<pk>) FROM <tableName>`, reads the
+       snapshot's incrementally-tracked `minPk` / `maxPk` (O(1)),
+       computes the envelope and partitions into `[fromPk, toPk]` windows.
+    2. `snapshot.bucketByWindows(plan)` — one pass over the snapshot
+       buckets PKs into the plan's windows (binary search) so per-window
+       `keysInRange` lookups become O(1) hash hits instead of O(N)
+       scans.
+    3. For each window in order: ONE `ConsistentSnapshotTxn` wraps
+       `Phase1Hasher.hashPrimary` + every `Phase1Hasher.hashChild`,
+       XOR-fold into `currentScan`, run `ChangeSet.diff` → if non-empty
+       change set, a SEPARATE Phase 2 transaction wraps
+       `Phase2Fetcher.fetchPrimary` + every `Phase2Fetcher.fetchChild`
+       and the `mapEntity` assemble → `SyncEventPublisher.publish` per
+       row + per deleted PK → two-pass walk of the per-window
+       `Long2ObjectMap<pk, Future>` (done-first then deadline-bounded
+       for pending) → advance `SnapshotStore` for acked PKs only.
+    4. After all windows: build a new `EntityStats`, atomically replace
+       the published snapshot.
+       Wrapped in `SafeRunnable` so any throwable is caught, the entity
+       state transitions to `DEGRADED`, and the schedule continues. Small
+       entities (rowCount ≤ rowsPerWindow) yield exactly 1 window — no
+       separate code path.
+- **`Phase1Hasher`** (R1, R11, R20) — runs INSIDE a window-scoped
+  `ConsistentSnapshotTxn` owned by `EntitySyncTask` (primary + every
+  child for the window share one MVCC view; the transaction commits
+  after the diff stage). Two windowed-query variants:
     - `hashPrimary(window, primary, conn, ...)`: `SELECT <pkColumn>,
       CRC32(CONCAT_WS(',', <hashedColumns>)) FROM <primary.tableName>
       WHERE <pkColumn> BETWEEN ? AND ?`. Reads PK via `rs.getLong(1)` and
@@ -179,11 +253,16 @@ read by `HeartbeatService` per heartbeat tick.
       happens at fold time in `EntitySyncTask`.
 
   Both calls `Statement.setQueryTimeout` from
-  `l2nx.cdc-engine.query-timeout-seconds`. Closes resultset / statement
-  in try-with-resources. The transaction commits as soon as the result is
-  drained.
+  `l2nx.cdc-engine.query-timeout-seconds` and
+  `Statement.setFetchSize(cfg.fetchSize)` so the driver streams rows in
+  cursor mode (default batch 10_000). Each statement is registered with
+  the task's `StatementRegistry` so `CdcEngine.stop()` can cancel it.
+  Closes resultset / statement in try-with-resources. The window-scoped
+  transaction commits in `ConsistentSnapshotTxn` once the diff stage
+  finishes.
 
-- **`Phase2Fetcher`** (R1, R11, R20) — two chunked-IN variants:
+- **`Phase2Fetcher`** (R1, R11, R20) — runs INSIDE a SEPARATE
+  `ConsistentSnapshotTxn` (post-Phase-1 fresh view). Two chunked-IN variants:
     - `fetchPrimary(primary, pks, conn, ...)`: `SELECT * FROM
       <primary.tableName> WHERE <pkColumn> IN (?, ?, ...)` chunked at 1000.
       Returns `Long2ObjectMap<Object>` (PK → opaque row produced by
@@ -195,21 +274,27 @@ read by `HeartbeatService` per heartbeat tick.
       possibly-empty list of child rows). FK absence in the result map
       means "no children for this PK" — caller substitutes `emptyList()`.
 
-  Per-chunk transaction = `START TRANSACTION WITH CONSISTENT SNAPSHOT,
-  READ ONLY`. PKs/FKs bound via `setLong(...)`.
+  All Phase 2 statements share the SEPARATE consistent-snapshot transaction
+  opened for the window (not Phase 1's). PKs/FKs bound via `setLong(...)`.
+  Statements use `setFetchSize` + are registered with `StatementRegistry`
+  for shutdown cancellation, same as Phase 1.
 
-- **`SnapshotStore`** (R4, R2) — wraps a `Long2IntOpenHashMap` per entity.
-  Thread-confined to the task thread (no synchronization needed). Provides
-  `keysInRange(entity, fromPk, toPk)` for the diff stage and
-  `minPk(entity)` / `maxPk(entity)` `OptionalLong` accessors for the
-  envelope rule. All three are O(N) full-key scans on the hash map — called
-  once per window (`keysInRange`) or once per cycle (`minPk` / `maxPk`) on
-  the entity's daemon thread; the trade-off is heap (open-hash ~16 B/entry
-  vs AVL-tree ~56 B/entry — at 6.5M items: ~100 MB vs ~360 MB) for CPU
-  (~150ms / cycle of full-map walks). `containsCrc` / `getCrc` for diff
-  lookups; `putCrc` / `removeCrc` for per-row snapshot advance. Wiped on
-  `DbSyncModule.onDisconnect`. NO RAM cap enforcement — operator sizes the
-  host JVM to fit the configured entities.
+- **`SnapshotStore`** (R4, R2) — wraps a `Long2IntOpenHashMap` per entity,
+  initialised with `defaultReturnValue(Integer.MIN_VALUE)` and exposing
+  `MISSING_HASH = Integer.MIN_VALUE` as a public constant (caller compares
+  against it instead of `containsKey`-guarding every read). Thread-confined
+  to the task thread (no synchronization needed). Provides
+  `bucketByWindows(plan)` (called once per cycle, fills a per-window
+  `Long2IntMap` cache via one pass over the snapshot + binary search on
+  plan boundaries) and `keysInRange(entity, fromPk, toPk)` for the diff
+  stage (reads from the per-cycle cache, O(1) per window). `minPk` /
+  `maxPk` are tracked incrementally on `putCrc` / `removeCrc` with lazy
+  memoization — O(1) amortised. Trade-off is heap (open-hash ~16 B/entry
+  vs AVL-tree ~56 B/entry — at 6.5M items: ~100 MB vs ~360 MB) for CPU.
+  `containsCrc` / `getCrc` for diff lookups; `putCrc` / `removeCrc` for
+  per-row snapshot advance. Wiped on `DbSyncModule.onDisconnect`. NO RAM
+  cap enforcement — operator sizes the host JVM to fit the configured
+  entities.
 - **`ChangeSet`** (R1) — value bag with three `LongSet` (fastutil
   `LongOpenHashSet`). Computed in one pass over the previous-window PKs ∪ current-
   window PKs.
@@ -244,11 +329,18 @@ read by `HeartbeatService` per heartbeat tick.
   construction. Kafka key is the row's `long` PK (8 bytes via `LongSerializer`);
   topic is resolved once per entity at engine start via `TopicResolver` (delivered
   via `ConnectResponse.syncTopics`) and stored in the entity's `ResolvedEntityConfig`;
-  value is Gson-serialized `SyncEvent { entityName, pk: long, op, payload, timestamp }`.
-  Async send via `NxKafka.send` — does not block. Tracks per-cycle
-  `CompletableFuture`s in a list; at end of cycle waits with
-  `l2nx.cdc-engine.publish-flush-seconds` (default 5s) for all sends to ack. Any
-  failure short-circuits the snapshot swap (R13).
+  value is Gson-serialized `SyncEvent { entityName, pk: long, op, payload, timestamp }`
+  — `op=DELETED` carries `payload=null` in the JSON envelope but the
+  envelope itself is a non-null Kafka value (not a tombstone — db-sync
+  topics use bounded retention, not log compaction). Async send via
+  `NxKafka.send` — does not block. Tracks per-window in-flight
+  `Future<RecordMetadata>`s in a `Long2ObjectMap` keyed by PK; at
+  end-of-window the engine walks the map in TWO passes (done-first via
+  `isDone()`, then deadline-bounded `f.get(remainingNs, NANOSECONDS)` for
+  pending) under the `l2nx.cdc-engine.publish-flush-seconds` (default 5s)
+  shared budget. Per-PK successful publishes advance the snapshot; failed
+  / timed-out PKs leave the snapshot untouched and replay on the next
+  cycle (R13).
 
 ## Data flows
 
@@ -257,16 +349,23 @@ read by `HeartbeatService` per heartbeat tick.
 ```
 CdcEngine constructor (called by DbSyncModule.start, Phase 2)
   → EngineConfig cfg = resolveEngineConfig(configResolver)
-       → cfg.tickInterval   = configResolver.optDuration("l2nx.cdc-engine.tick-interval-seconds")
-                                  .orElse(Duration.ofSeconds(60))
-       → cfg.rowsPerWindow  = configResolver.optInt("l2nx.cdc-engine.rows-per-window")
-                                  .orElse(500_000)
-       → cfg.queryTimeout   = configResolver.optDuration("l2nx.cdc-engine.query-timeout-seconds")
-                                  .orElse(Duration.ofSeconds(10))
-       → cfg.publishFlush   = configResolver.optDuration("l2nx.cdc-engine.publish-flush-seconds")
-                                  .orElse(Duration.ofSeconds(5))
+       → cfg.tickInterval            = ... l2nx.cdc-engine.tick-interval-seconds      | 60s
+       → cfg.rowsPerWindow           = ... l2nx.cdc-engine.rows-per-window            | 500_000 (cap 10_000_000)
+       → cfg.queryTimeout            = ... l2nx.cdc-engine.query-timeout-seconds      | 10s
+       → cfg.publishFlush            = ... l2nx.cdc-engine.publish-flush-seconds      | 5s
+       → cfg.workers                 = ... l2nx.cdc-engine.workers                    | max(2, min(entities, cores/2))
+       → cfg.fetchSize               = ... l2nx.cdc-engine.fetch-size                 | 10_000
        → cfg.sources tagged per param (OPERATOR_OVERRIDE if present in props, else DEFAULT)
+       (NB: MySQL/MariaDB ignore positive fetchSize; the engine auto-detects
+        dialect via JdbcDialect.detect at first borrow and switches to
+        Integer.MIN_VALUE streaming on those drivers.)
+  → validateIdentifiers(provider.mappings())     -- R19: ^[A-Za-z_][A-Za-z0-9_]{0,63}$
+                                                   on every tableName / pkColumn / fkColumn /
+                                                   hashedColumns entry; first violation →
+                                                   STATE_FAILED
   → entityTopics = unmodifiableCopy(ctx.syncTopics())   -- snapshot from connect-response
+  → pool = new ScheduledThreadPoolExecutor(cfg.workers, nxCdcPoolFactory)
+            with uncaughtExceptionHandler
 
 CdcEngine.start()
   → ConfigResolutionLogger.log(cfg, provider.mappings(), entityTopics)
@@ -277,7 +376,13 @@ CdcEngine.start()
             stats.markDegraded(mapping.entityName(), "no topic in connect response")
             continue                            -- R17: permanent DEGRADED, no schedule
         }
-        scheduler.scheduleWithFixedDelay(taskFor(mapping, topic), 0, cfg.tickInterval, ...)
+        pool.scheduleWithFixedDelay(taskFor(mapping, topic), 0, cfg.tickInterval, ...)
+
+CdcEngine.stop()
+  → for each task: task.statementRegistry().cancelAll()   -- Statement.cancel on
+                                                            in-flight JDBC queries
+  → pool.shutdown(); awaitTermination(...)
+  → on timeout: WARN, pool.shutdownNow()
 ```
 
 Sample log output (R16):
@@ -298,42 +403,54 @@ INFO  CdcEngine [audit] → topic=<missing — entity DEGRADED>
 ### 1. Cycle (multi-source windowed strategy)
 
 ```
-EntitySyncTask.run()  [scheduler thread, daemon]
+EntitySyncTask.run()  [shared pool worker, daemon]
+  → if (!ticking.compareAndSet(false, true)) {
+       WARN "previous tick still running, skipping"; return
+    }
   → cycleStart = System.nanoTime()
-  → try {
+  → try (Connection conn = jdbcSource.getConnection()) {
       windows = WindowPlanner.plan(mapping, conn, snapshot, cfg.rowsPerWindow)
                           -- envelope [min(minDb, minSnap), max(maxDb, maxSnap)]
+                          -- minPk/maxPk read in O(1) (incrementally tracked)
+      snapshot.bucketByWindows(windows)           -- one pass, binary search;
+                                                    populates per-window cache for
+                                                    O(1) keysInRange lookups
       totalCreated = totalUpdated = totalDeleted = 0
       for (Window w : windows) {
-          // Phase 1 — primary
-          Long2IntMap currentScan = Phase1Hasher.hashPrimary(w, primary, conn)
-          // Phase 1 — each child, XOR-fold into currentScan keyed by primary PK
-          for (ChildSource c : children) {
-              Long2IntMap childHash = Phase1Hasher.hashChild(w, c, conn)
-              for (entry in childHash) {
-                  if (currentScan.containsKey(entry.fk)) {
-                      currentScan.put(entry.fk, currentScan.get(entry.fk) ^ entry.xorCrc)
-                  }
-                  -- orphan FKs (no primary row) dropped silently
-              }
-          }
-          ChangeSet diff = ChangeSet.diff(currentScan, snapshot.keysInRange(...), snapshot, entity)
-          if (!diff.empty()) {
-              // Phase 2 — primary + each child
-              Long2ObjectMap<Object> primaryRows = Phase2Fetcher.fetchPrimary(primary, createdUpdated, conn)
-              Map<String, Long2ObjectMap<List<Object>>> childRowsByTable = {}
+          // Phase 1 — ONE consistent-snapshot txn covers primary + every child
+          ConsistentSnapshotTxn.runReadOnly(conn, () -> {
+              Long2IntMap currentScan = Phase1Hasher.hashPrimary(w, primary, conn)
               for (ChildSource c : children) {
-                  childRowsByTable.put(c.tableName(),
-                          Phase2Fetcher.fetchChild(c, createdUpdated, conn))
+                  Long2IntMap childHash = Phase1Hasher.hashChild(w, c, conn)
+                  for (entry in childHash) {
+                      if (currentScan.get(entry.fk) != MISSING_HASH) {
+                          currentScan.put(entry.fk, currentScan.get(entry.fk) ^ entry.xorCrc)
+                      }
+                      -- orphan FKs (no primary row) dropped silently
+                  }
               }
-              // Assemble + publish
-              for pk in createdUpdated:
-                  Map<String, List<Object>> children = collect(childRowsByTable, pk)
-                  T dto = mapping.mapEntity(primaryRows.get(pk), children)
-                  publish(op, pk, dto)
-              for pk in diff.deleted:
-                  publish(DELETED, pk, null)
-              walkInFlightAndAdvance(...)        -- per-PK snapshot swap on Kafka ack
+              return ChangeSet.diff(currentScan, snapshot.keysInRange(w), snapshot, entity)
+          })
+          if (!diff.empty()) {
+              // Phase 2 — SEPARATE consistent-snapshot txn (fresh post-Phase-1 view)
+              ConsistentSnapshotTxn.runReadOnly(conn, () -> {
+                  Long2ObjectMap<Object> primaryRows = Phase2Fetcher.fetchPrimary(primary, createdUpdated, conn)
+                  Map<String, Long2ObjectMap<List<Object>>> childRowsByTable = {}
+                  for (ChildSource c : children) {
+                      childRowsByTable.put(c.tableName(),
+                              Phase2Fetcher.fetchChild(c, createdUpdated, conn))
+                  }
+                  for pk in createdUpdated:
+                      Map<String, List<Object>> children = collect(childRowsByTable, pk)
+                      T dto = mapping.mapEntity(primaryRows.get(pk), children)
+                      publish(op, pk, dto)              -- async, future captured per PK
+                  for pk in diff.deleted:
+                      publish(DELETED, pk, null)
+              })
+              walkInFlightAndAdvance(...)         -- two-pass per-window flush:
+                                                    1. drain Future.isDone() (cheap)
+                                                    2. f.get(remainingNs, NS) for pending
+                                                    -- per-PK snapshot swap on Kafka ack
           }
           totalCreated += diff.created.size()
           totalUpdated += diff.updated.size()
@@ -344,6 +461,7 @@ EntitySyncTask.run()  [scheduler thread, daemon]
       stats.markDegraded(t)                         -- snapshot NOT advanced for the
                                                     -- failing window
     } finally {
+      ticking.set(false)
       stats.lastCycleDurationMs = (System.nanoTime() - cycleStart) / 1_000_000
       engine.publishStatsSnapshot()                 -- atomic List<EntityStats> rebuild
     }
@@ -396,14 +514,36 @@ HeartbeatService tick   [heartbeat thread]
   for stringification, but those schema shapes are explicit Non-goals in MVP. When
   they arrive, a parallel String-PK / composite-PK wire variant is added — not a
   premature stringification of the long-PK happy path.
-- **Per-query consistent snapshot, NOT per-cycle.** Each Phase 1 query and each
-  Phase 2 chunk runs in its own `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ
-  ONLY`. Wrapping the whole entity cycle (N×Phase 1 windows + N×Phase 2 chunks) in
-  one REPEATABLE READ would hold a multi-second-to-multi-minute transaction on the
-  host DB, growing InnoDB's undo log and slowing the game core's writes — the
-  explicit Non-goal in `db-sync` (eventual consistency wins). Per-query snapshot
-  keeps each individual scan internally consistent (no torn rows mid-Phase-1)
-  without the long-tx penalty.
+- **Per-window consistent snapshot for Phase 1, SEPARATE per-window
+  transaction for Phase 2.** Primary + every child for one window share
+  ONE `START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY` so the
+  per-PK XOR-fold sees a single MVCC view. Per-query transactions
+  (earlier design) left a race window between the primary scan and the
+  child scans: a row written mid-window could be primary-hashed pre-
+  write and child-hashed post-write, producing spurious UPDATED events
+  on the next cycle. Phase 2 runs in its OWN consistent-snapshot
+  transaction — intentionally fresh: a row deleted between phases is a
+  silent no-op for this cycle and detected next cycle. Wrapping the
+  whole entity cycle (N×Phase 1 windows + N×Phase 2 chunks) in one
+  REPEATABLE READ would hold a multi-second-to-multi-minute transaction
+  on the host DB, growing InnoDB's undo log and slowing the game core's
+  writes — the explicit Non-goal in `db-sync`. Per-window snapshot keeps
+  each window internally consistent without the long-tx penalty.
+- **Dialect-aware JDBC fetch.** `JdbcDialect.detect` reads
+  `Connection.getMetaData().getURL()` once per task and routes
+  `applyFetchSize` accordingly: MySQL/MariaDB → `Integer.MIN_VALUE`
+  (row-by-row streaming, the only mode Connector/J honors for large
+  result sets — positive fetchSize is silently ignored); Postgres /
+  other → `cfg.fetchSize` as a server-side cursor batch on
+  `autoCommit=false`. Without this, a 12M-row Phase 1 scan on a
+  MySQL host buffers every row into the client heap and OOMs the JVM
+  before the snapshot map fills.
+- **Statement.cancel() on shutdown, not Thread.interrupt().** Most JDBC
+  drivers ignore thread interruption and leave a multi-minute Phase 1
+  scan running until it completes naturally. The only portable way to
+  abort an in-flight JDBC query is `Statement.cancel()`, which the
+  engine wires via a per-task `StatementRegistry` walked by
+  `CdcEngine.stop()`.
 - **MIN/MAX recompute at start of every cycle, NOT cached at connect.** Cached
   boundaries miss rows inserted above the prior MAX — for an auto-increment PK like
   `items.id` this is a constant correctness bug (every game-server tick produces new
@@ -442,11 +582,32 @@ HeartbeatService tick   [heartbeat thread]
   observed; if M21 e2e or M22 manual smoke surfaces collisions, the guard
   is purely additive on the wire (snapshot CRC values change once on
   rollout, behaves like an initial-sync replay for affected entities).
-- **One scheduler thread per `EntityMapping`.** Thread-confined `SnapshotStore`
-  removes the need for any synchronization on the per-entity state. N daemon
-  threads for N entities; with ~5 entities per provider this is negligible. A
-  shared-pool alternative would force defensive locking on every snapshot access
-  path.
+- **Shared `ScheduledThreadPoolExecutor`, NOT thread-per-entity.** Earlier
+  design ran one daemon thread per `EntityMapping`; at 10+ entities on
+  hosts with 4-core JVM allowances this scaled poorly (kernel scheduling
+  thrash, GC root-set bloat). The shared pool is sized by
+  `l2nx.cdc-engine.workers` (default `max(2, min(entities, cores/2))`)
+  with daemon factory `nx-cdc-pool-<schema>-N`. Per-entity state stays
+  thread-confined in practice via the `AtomicBoolean ticking` overlap
+  guard — a task that runs longer than `tick-interval-seconds` skips its
+  next fire with a WARN instead of running two ticks concurrently for
+  the same entity. The guard also prevents slow entities from piling
+  tasks in the pool queue and starving other entities.
+- **SQL identifier validation at engine start.** Engine interpolates
+  provider-supplied identifiers directly into SQL (`CRC32(CONCAT_WS(',',
+  <hashedColumns>))`, `BETWEEN ? AND ?` against `<pkColumn>`, etc.);
+  parameter binding only covers literal values. A single regex check
+  (`^[A-Za-z_][A-Za-z0-9_]{0,63}$`) at `CdcEngine.start()` is enough to
+  enforce "bare identifier" contract for `DbSchemaProvider` authors —
+  schema-qualified, back-tick-quoted, or hyphenated names are rejected
+  with `STATE_FAILED`. Cheap, fail-loud.
+- **Two-pass walk-in-flight.** End-of-window publish-flush walks the
+  in-flight `Long2ObjectMap` in two passes: first `Future.isDone()` to
+  drain easy outcomes, then deadline-bounded `f.get(remainingNs, NS)`
+  for pending. Single-pass blocking on each future in order could let
+  one slow ack at the head of the queue starve later already-acked
+  publishes against the shared `publishFlushSeconds` budget; two
+  passes guarantee the budget covers actual pending work, not bookkeeping.
 - **Sequential cycle order from provider list.** Engine launches one task per
   mapping in the order returned by `provider.mappings()`. Each task runs
   independently on its own thread; entities on different threads can overlap.

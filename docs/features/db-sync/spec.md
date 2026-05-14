@@ -63,14 +63,16 @@ module authors (datapack sync, metrics).
   chain in the `jdbc-connection-source` feature (Phase 1: Path 1 host SPI only / Phase 3:
   add Path 2 bundled-Hikari fallback / FAILED if neither). The engine itself does NOT
   distinguish the path — it just borrows. **Phase 1**: a single smoke check on
-  `onConnect` — borrow once, `setReadOnly(true)`, `isValid(5)`, close. Success → module
-  state `ACTIVE`; smoke fails → `DEGRADED`. **Phase 2**: every CDC query calls
-  `setReadOnly(true)` immediately after borrow (belt-and-suspenders with `GRANT SELECT`
-  recommendation). No DDL or DML is ever issued. Connections are returned via
-  `try-with-resources`.
-    - SC3. Engine performs `setReadOnly(true)` per-borrow regardless of pool-level
-      configuration — works identically across Path 1 (host pool, may or may not be
-      pool-level read-only) and Path 2 (bundled pool, pool-level read-only is set).
+  `onConnect` — borrow once, `isValid(5)`, close. Success → module state `ACTIVE`;
+  smoke fails → `DEGRADED`. **Phase 2**: read-only enforcement is at the SQL level
+  (`START TRANSACTION ... READ ONLY` wrapping every Phase 1 / Phase 2 query — see
+  [`cdc-engine` R11](../cdc-engine/spec.md)); the engine does NOT call
+  `setReadOnly(true)` on the borrowed connection (the host pool may not reset it on
+  return, and consumers borrowing from the same pool would inherit the flag). No DDL
+  or DML is ever issued. Connections are returned via `try-with-resources`.
+    - SC3. Engine relies on `START TRANSACTION ... READ ONLY` per window, not on
+      connection-level `setReadOnly`. Pool-level read-only is the host's choice (see
+      `jdbc-connection-source` for the host-pool contract).
 
 - [done] R3. **[Phase 2]** `nx-gs-db-sync-core` MUST consume the Tier-2 SPI
   `DbSchemaProvider` (defined in `nx-gs-adapter-api` package
@@ -160,6 +162,39 @@ module authors (datapack sync, metrics).
 > (cdc-engine R7) are owned by the engine slice. db-sync wires the engine with the
 > resolved `DbSchemaProvider` at Phase 2 start. Numbers R6 / R7 / R8 are intentionally
 > left as gaps here — not reused per the SpecKit "deleted numbers stay deleted" rule.
+
+> **Engine configuration knobs (relayed from
+> [`cdc-engine` R15](../cdc-engine/spec.md)).** All keys live under
+> `l2nx.cdc-engine.*` in the operator's `l2nx.properties`; resolved one-shot at
+> module start. Operators of db-sync deployments tune these without touching
+> the schema provider:
+>
+> | Key                                              | Type           | Default                            |
+> |--------------------------------------------------|----------------|------------------------------------|
+> | `l2nx.cdc-engine.tick-interval-seconds`          | long, seconds  | 60                                 |
+> | `l2nx.cdc-engine.rows-per-window`                | int            | 500_000 (cap 10_000_000)           |
+> | `l2nx.cdc-engine.query-timeout-seconds`          | int, seconds   | 10                                 |
+> | `l2nx.cdc-engine.publish-flush-seconds`          | int, seconds   | 5                                  |
+> | `l2nx.cdc-engine.workers`                        | int            | `max(2, min(entities, cores/2))`   |
+> | `l2nx.cdc-engine.fetch-size`                     | int            | 10_000                             |
+>
+> `workers` sizes the shared CDC scheduler pool (daemon threads
+> `nx-cdc-pool-<schema>-N`) — replaces the legacy thread-per-entity model.
+> `fetch-size` is a fetch-size hint for Postgres / other drivers. JDBC dialect
+> is auto-detected from `Connection.getMetaData().getURL()` at engine start:
+> MySQL/MariaDB hosts switch to `Integer.MIN_VALUE` row-by-row streaming (the
+> only mode Connector/J honors for large result sets — positive `fetch-size`
+> is silently ignored there); Postgres uses `fetch-size` as a server-side
+> cursor batch.
+
+> **`DbSchemaProvider` identifier contract.** Every SQL identifier returned
+> from `PrimarySource` / `ChildSource` — `tableName`, `pkColumn`, `fkColumn`,
+> every entry in `hashedColumns` — MUST match the regex
+> `^[A-Za-z_][A-Za-z0-9_]{0,63}$`. Bare identifiers only — schema-qualified
+> names (`db.tbl`), back-tick-quoted names, hyphens, spaces, dots are
+> REJECTED at engine start (the engine transitions to `STATE_FAILED`).
+> See [`cdc-engine` R19](../cdc-engine/spec.md) for the rationale (engine
+> interpolates these into SQL; parameter binding only covers literals).
 
 - [done] R9. **[Phase 1: module-level only / Phase 2: per-table]** db-sync engine MUST NOT
   propagate exceptions to host-JVM threads. **Phase 1**: only module-level handling —
@@ -304,7 +339,8 @@ module authors (datapack sync, metrics).
   `information_schema`. `EntityMapping` is the source of truth.
 - **Composite PKs** — single-column PK assumption. Entities with multi-column PKs
   are out of scope for MVP; can be added as `CompositeEntityMapping` later.
-- **DML** on the host DB — read-only. Hikari pool is `setReadOnly(true)`, MySQL user is
+- **DML** on the host DB — read-only. Read-only is enforced at the SQL level via
+  `START TRANSACTION ... READ ONLY` (every Phase 1 / Phase 2 query), MySQL user is
   expected to have `GRANT SELECT` only.
 - **Backfill control from platform** — no operator-triggered "resync from scratch".
   Snapshot is wiped on `onDisconnect` and rebuilt on next `onConnect`.
@@ -381,6 +417,12 @@ module authors (datapack sync, metrics).
 - [assumed: SyncEvent send semantics — events are fire-and-forget; if Kafka send fails
   (broker unreachable) the engine logs and moves on. Snapshot is NOT advanced for failed
   publishes, so the next tick re-detects the same diff and retries. Eventual consistency.]
+- [resolved: `op=DELETED` carries `payload=null` in the JSON envelope but is NOT a
+  Kafka tombstone — db-sync topics use bounded retention, not log compaction, so the
+  value-null tombstone optimisation doesn't apply. Consumers MUST handle the
+  `DELETED` op explicitly; the Kafka value is a non-null JSON envelope carrying
+  entityName + pk + op + null payload + timestamp. Reflected in the `SyncEvent`
+  Javadoc.]
 
 ## Links
 

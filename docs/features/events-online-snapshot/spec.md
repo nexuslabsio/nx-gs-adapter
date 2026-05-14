@@ -150,6 +150,12 @@ plugging in a snapshot-builder.
   scheduled task before `onDisconnect()` releases the handle. Race window:
   a tick already in `run()` may call `publishServerOnlineSnapshot` after handle release;
   `NoOpEvents` swallows it (per `ConnectContext` normalization).
+- **Reconnect mid-tick.** The `NxEvents` façade handed to the module via
+  `ConnectContext.events()` has stable identity across reconnect cycles —
+  the adapter swaps an internal `AtomicReference` to the live publisher on
+  every reconnect, so a snapshot built before reconnect and published after
+  lands on the freshly-reconnected producer without the module re-acquiring
+  the handle.
 - **`publishServerOnlineSnapshot` thrown from inside the host (e.g. snapshot-builder bug).**
   Tick logs at DEBUG, skips the publish, schedules the next tick normally.
   No backoff — transient bug fixes itself on next tick.

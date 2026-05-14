@@ -66,11 +66,14 @@ state, siege participants, raid boss vitals).
 - [done] R4. `RuntimeEntityMapping<T>` interface MUST describe ONE runtime entity and
   expose:
     - `String entityName()` — domain identifier in singular form (`"character"`,
-      `"party"`, …). Used as the lookup key into `ConnectResponse.syncTopics.runtime`
-      to resolve the Kafka topic. Surfaced through heartbeat as `EntityStats.name`.
-      **Entity name MAY collide with a `db-sync` entity of the same name** —
-      namespace separation in `syncTopics` (`db.character` vs `runtime.character`)
-      is sufficient.
+      `"party"`, …). MUST be non-null, non-blank, and unique across all mappings
+      returned by `RuntimeStateProvider.mappings()` — duplicates cause the module
+      to transition to `STATE_FAILED` at engine start with an actionable ERROR
+      listing the offending names. Used as the lookup key into
+      `ConnectResponse.syncTopics.runtime` to resolve the Kafka topic. Surfaced
+      through heartbeat as `EntityStats.name`. **Entity name MAY collide with a
+      `db-sync` entity of the same name** — namespace separation in `syncTopics`
+      (`db.character` vs `runtime.character`) is sufficient.
     - `Class<T> dtoType()` — DTO class for serialization. Concrete, non-parameterized
       (Gson serializes the typed payload slot directly).
     - `Iterable<RuntimeRow<T>> snapshot()` — produces a one-shot snapshot of the
@@ -91,23 +94,41 @@ state, siege participants, raid boss vitals).
       ignored — e.g. high-frequency micro-jitter on coordinates can be quantized
       before hashing). Engine treats the hash as opaque.
 
-- [done] R5. The runtime engine MUST run one daemon thread per declared
-  `RuntimeEntityMapping`, ticking at a configurable interval. Per-tick semantics:
-    1. Call `mapping.snapshot()` → `Iterable<RuntimeRow<T>>`
+- [done] R5. The runtime engine MUST schedule one tick task per declared
+  `RuntimeEntityMapping` onto a shared bounded thread pool, ticking at a
+  configurable interval. Per-tick semantics:
+    1. Call `mapping.snapshot()` → `Iterable<RuntimeRow<T>>`. The iteration is
+       wrapped in `try/catch (Throwable)` — a misbehaving provider (e.g.
+       `ConcurrentModificationException` from a live map view) results in
+       `CycleResult.degraded(elapsed)` + WARN log; the scheduler task survives
+       and the entity transitions to `DEGRADED` until the next clean tick.
     2. For each row: compute `mapping.hash(row.dto)`, store in a fresh
-       `Long2LongMap<pk, hash>` (fastutil)
+       `Long2LongOpenHashMap<pk, hash>` (fastutil) whose `defaultReturnValue`
+       is `Long.MIN_VALUE` (the `MISSING_HASH` sentinel — removes the
+       hash=0 / absent ambiguity that arose when a provider legitimately
+       returned `0L` from `mapping.hash(dto)`)
     3. Diff against the previous tick's snapshot:
-        - **NEW** (pk in current, not in prev) → publish `SyncEvent.create(pk, dto)`
+        - **NEW** (pk in current, not in prev — `prev.get(pk) == MISSING_HASH`)
+          → publish `SyncEvent.create(pk, dto)`
         - **CHANGED** (pk in both, hash differs) → publish `SyncEvent.update(pk, dto)`
         - **GONE** (pk in prev, not in current) → **silently drop** from snapshot
           tracking. **No tombstone is emitted.** `db-sync` owns "this entity
           permanently no longer exists" semantics; runtime "absence" is transient
           (logout / disconnect / zone change) and the previous published value is
           treated by platform consumers as the last-known live state.
-    4. Replace prev = current ONLY for pks whose publish was acked (Kafka producer
+    4. Walk in-flight futures — done futures are drained first, then deadline-bounded
+       wait for pending (parity with `db-sync` to prevent head-of-line block on a
+       single slow ack). Ack-walk respects thread interrupt and breaks early on
+       shutdown.
+    5. Replace prev = current ONLY for pks whose publish was acked (Kafka producer
        callback succeeded). Failed/timed-out publishes leave the previous hash in
        place — replayed on the next tick. Same at-least-once semantics as
-       [`cdc-engine`](../cdc-engine/spec.md).
+       [`cdc-engine`](../cdc-engine/spec.md). `failedAcks` / `timedOutAcks` counters
+       are tallied per cycle and surfaced through `EntityStatsTracker` so Kafka
+       outages are visible on the heartbeat per-entity slot.
+    6. `CycleResult` reports `DEGRADED` (not `HEALTHY`) when any publish future
+       failed or timed out — the prior behaviour of always reporting `HEALTHY`
+       regardless of Kafka health hid platform-side outages.
 
     - SC2. Tick interval default = 10s. Override via
       `l2nx.runtime-sync.tick-interval-seconds`. Per-entity granularity is NOT in
@@ -118,6 +139,18 @@ state, siege participants, raid boss vitals).
       engines have different tick cadences and platform-side latency budgets;
       sharing one knob would force operators to compromise. Unacked pks roll
       over to next tick.
+    - SC5. Worker pool size is configured via `l2nx.runtime-sync.workers` (default
+      `max(2, min(entities, cores/2))`). A `ScheduledThreadPoolExecutor` with
+      `nx-runtime-sync-pool-N` daemon threads + an uncaughtExceptionHandler runs
+      every entity's tick task; `setRemoveOnCancelPolicy(true)` keeps the work
+      queue clean on entity teardown. A per-entity `AtomicBoolean ticking` guard
+      causes overlapping ticks (when a cycle exceeds the tick interval) to be
+      skipped with a WARN rather than queued, preventing pool exhaustion under
+      back-pressure. Replaces the legacy thread-per-entity model.
+    - SC6. Engine `stop()` budget for `awaitTermination` is
+      `max(2, publishFlushSeconds + 1)` seconds — the prior fixed 2s was too
+      short to drain in-flight publishes once `publishFlushSeconds` grew, racing
+      shutdown against tail latency.
 
 - [done] R6. The runtime engine treats `mapping.hash(dto)` return value as **opaque** —
   it is compared as a long for "changed" detection only; the algorithm is the
@@ -212,11 +245,13 @@ state, siege participants, raid boss vitals).
   `{name: "runtime-sync", state: ACTIVE/DEGRADED/...,
   stats: {entities: List<EntityStats>}}`. Per-entity `EntityStats`:
   `{name, state, rowCount, lastTickEpochMs, lastTickDurationMs, lastTickChanges,
-  consecutiveErrors}`. Same shape as `db-sync` per [`cdc-engine`
-  R10](../cdc-engine/spec.md) — operators see both modules side-by-side in heartbeat.
+  failedAcks, timedOutAcks, consecutiveErrors}`. Same shape as `db-sync` per
+  [`cdc-engine` R10](../cdc-engine/spec.md) — operators see both modules
+  side-by-side in heartbeat.
     - SC4. `rowCount` = size of last successful snapshot (number of online entities for
       character); `lastTickChanges` = NEW + CHANGED count (GONE excluded since not
-      published).
+      published). `failedAcks` / `timedOutAcks` surface Kafka tail-health per
+      entity — non-zero values flip the entity slot's `state` to `DEGRADED`.
 
 **Could:**
 
@@ -289,6 +324,21 @@ state, siege participants, raid boss vitals).
   `l2nx.cdc-engine.publish-flush-seconds`. Per R5 SC3. Engines have different tick
   cadences (10s runtime vs 60s cdc) and the flush window should track that, not be
   shared.]
+- [resolved: thread-per-entity replaced with a shared bounded pool
+  (`ScheduledThreadPoolExecutor`) sized by `l2nx.runtime-sync.workers`
+  (default `max(2, min(entities, cores/2))`). Per R5 SC5. Scales to multi-entity
+  configs (party, siege, raid-boss, …) without spawning N daemon threads;
+  per-entity overlap is guarded by `AtomicBoolean ticking` → skip+WARN on
+  overlap.]
+- [resolved: `provider.mappings()` is invoked exactly once per `onConnect` and
+  cached for the lifetime of the connection (was previously called twice — once
+  for the start-up log, once for engine wiring — which surprised providers that
+  materialized the list on each call). Cache cleared on `onDisconnect`.]
+- [resolved: duplicate `entityName()` values across a single
+  `RuntimeStateProvider.mappings()` list are rejected at engine start with the
+  module transitioning to `STATE_FAILED`. Distinct from the cross-module
+  `db-sync.character` vs `runtime-sync.character` collision which is allowed by
+  design (namespaced topics).]
 
 ## Links
 

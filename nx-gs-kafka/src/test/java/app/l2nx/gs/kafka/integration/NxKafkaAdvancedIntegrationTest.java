@@ -89,7 +89,7 @@ class NxKafkaAdvancedIntegrationTest {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<DateEvent> received = new AtomicReference<>();
 
-        kafka.subscribe(topic, DateEvent.class, event -> {
+        kafka.subscribe(topic, "g-gson-consumer", DateEvent.class, event -> {
             received.set(event);
             latch.countDown();
         });

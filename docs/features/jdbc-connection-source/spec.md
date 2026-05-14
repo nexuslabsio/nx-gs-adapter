@@ -82,13 +82,31 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
   The host's explicit registration is a stronger signal than fallback config — easier
   to reason about than "config wins, SPI wins" tie-breaking.
 
-- [done] R3. Every consumer of `JdbcConnectionSource.getConnection()` MUST call
-  `connection.setReadOnly(true)` immediately after borrow, **before** any
-  `Statement` / `PreparedStatement` is created. Per-borrow enforcement is required because
-  the pool is host-owned — the adapter cannot impose pool-level configuration. A buggy
-  consumer that forgets the call still cannot mutate the host DB at the SQL level if the
-  operator granted `SELECT` only at the MySQL user level (recommended), so this is
-  belt-and-suspenders, not the only safety net.
+- [done] R3. **Host-pool contract.** The pool exposed via the SPI is host-owned;
+  the adapter does NOT impose connection-level configuration. Specifically:
+    - The adapter does NOT call `Connection.setReadOnly(true)` on borrowed
+      connections. CDC engine enforces read-only at the SQL level via
+      `START TRANSACTION ... READ ONLY` (see
+      [`cdc-engine` R11](../cdc-engine/spec.md)). Providers MAY call
+      `Connection.setReadOnly(true)` themselves as defense-in-depth (explicit
+      "adapter doesn't modify host data" signal) — the bohpts reference
+      `BohptsJdbcConnectionSource` does so. This is safe with mainstream
+      pools (HikariCP, DBCP2) that reset the dirty `readOnly` flag on
+      connection return; verify your pool's reset semantics before adopting
+      the pattern. Providers MUST NOT assume the adapter itself will enforce
+      read-only at the connection level.
+    - The host pool MUST reset connection-level state (`readOnly`,
+      `autoCommit`, isolation level, schema, etc.) on connection return.
+      Adapter-side code mutates `autoCommit` while wrapping queries in
+      `START TRANSACTION ... READ ONLY`; the pool is responsible for
+      restoring defaults so subsequent borrowers see a clean connection.
+    - The host pool MUST size at least `entityCount` connections. Each
+      per-entity tick borrows independently from the pool (one borrow per
+      tick per entity, returned at end-of-tick); a pool sized for the
+      host-game-server's own concurrency alone can deadlock the CDC engine
+      when every entity is scheduled to tick in the same window.
+    - A `GRANT SELECT`-only MySQL user is still recommended as
+      defence-in-depth.
 
 - [done] R4. Consumers MUST close the borrowed `Connection` via `try-with-resources` (or
   equivalent finally-close) at the end of every query. Provider impls do NOT need to

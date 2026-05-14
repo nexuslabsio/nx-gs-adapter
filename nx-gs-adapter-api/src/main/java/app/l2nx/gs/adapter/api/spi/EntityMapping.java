@@ -16,7 +16,7 @@ import java.util.Map;
  * the primary's CRC32 is XOR-folded with each child's
  * {@code BIT_XOR(CRC32(...))} aggregate to produce the entity's per-PK
  * aggregate CRC. Orphan child rows (FK with no matching primary row) are
- * dropped silently. See {@code cdc-engine/spec.md} R1 + R20 for details.</p>
+ * dropped silently.</p>
  *
  * <p>This interface describes ONLY the schema shape ("what to sync"). All
  * operational parameters (cadence, window size, timeouts) come from

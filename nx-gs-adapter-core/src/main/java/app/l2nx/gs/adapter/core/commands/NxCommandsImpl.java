@@ -6,11 +6,19 @@ import app.l2nx.gs.adapter.api.spi.NxCommands;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 /**
  * Adapter-core implementation of {@link NxCommands}. Forwards every
  * {@code on(...)} call to {@link CommandTypeRegistry#register}; logs WARN on
  * duplicate-class re-registration to surface "two modules accidentally claim
  * the same handler" misconfigurations.
+ *
+ * <p>The façade survives reconnect: {@code NxAdapter} caches a single
+ * instance per JVM and calls {@link #swap(CommandTypeRegistry)} to retarget
+ * the underlying registry. Modules that captured {@code ctx.commands()} from
+ * an earlier {@code onConnect} keep working without re-acquiring the
+ * façade.</p>
  *
  * <p>Package-private. External callers acquire an {@link NxCommands} handle
  * via {@code ConnectContext.commands()} — they never see this class directly.</p>
@@ -19,10 +27,18 @@ final class NxCommandsImpl implements NxCommands {
 
     private static final NxLog log = NxLogFactory.getLogger(NxCommandsImpl.class);
 
-    private final CommandTypeRegistry registry;
+    private final AtomicReference<CommandTypeRegistry> registryRef;
 
     NxCommandsImpl(CommandTypeRegistry registry) {
-        this.registry = registry;
+        this.registryRef = new AtomicReference<CommandTypeRegistry>(registry);
+    }
+
+    void swap(CommandTypeRegistry next) {
+        registryRef.set(next);
+    }
+
+    CommandTypeRegistry peekRegistry() {
+        return registryRef.get();
     }
 
     @Override
@@ -33,6 +49,12 @@ final class NxCommandsImpl implements NxCommands {
         }
         if (handler == null) {
             log.warn("commands.on({}, null) — ignoring", type.getSimpleName());
+            return;
+        }
+        CommandTypeRegistry registry = registryRef.get();
+        if (registry == null) {
+            log.warn("commands.on({}, ...) called before consumer wired — dropping",
+                    type.getSimpleName());
             return;
         }
         boolean overwrote = registry.register(type, handler);

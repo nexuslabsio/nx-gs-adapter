@@ -3,14 +3,8 @@ package app.l2nx.gs.db.sync;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
-import app.l2nx.gs.adapter.api.spi.AdapterModule;
-import app.l2nx.gs.adapter.api.spi.ConnectContext;
-import app.l2nx.gs.adapter.api.spi.DbSchemaProvider;
-import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
-import app.l2nx.gs.db.sync.engine.CdcEngine;
-import app.l2nx.gs.db.sync.engine.EngineConfig;
-import app.l2nx.gs.db.sync.engine.EntityStatsTracker;
-import app.l2nx.gs.db.sync.engine.SnapshotStore;
+import app.l2nx.gs.adapter.api.spi.*;
+import app.l2nx.gs.db.sync.engine.*;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
 import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
@@ -36,16 +30,20 @@ import java.util.function.Supplier;
  *     <li>{@code ctx.syncTopics()} — empty/null → DISABLED + WARN.</li>
  *     <li>Tier-3 SPI {@link JdbcConnectionSource} via {@link ServiceLoader} —
  *     0 → FAILED, &gt;1 → FAILED, 1 → cached + smoke-checked. Smoke check
- *     failure → DEGRADED but engine still runs (so the next cycle retries).</li>
+ *     failure → DEGRADED but engine still runs.</li>
  *     <li>Tier-2 SPI {@link DbSchemaProvider} via {@link ServiceLoader} —
- *     0 → DISABLED + WARN, &gt;1 → FAILED, 1 → cached.</li>
+ *     0 → DISABLED + WARN, &gt;1 → FAILED, 1 → cached. Every identifier in
+ *     every {@link PrimarySource} / {@link ChildSource} is validated against
+ *     {@code [A-Za-z_][A-Za-z0-9_]{0,63}} before engine start; an invalid
+ *     name throws and the module enters FAILED.</li>
  * </ol>
  *
- * <p>State surfaces in {@link #currentStatus()} for heartbeat enrichment.</p>
- *
- * <p>Discovered via
- * {@code META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule} —
- * the public no-arg constructor is what {@link ServiceLoader} invokes.</p>
+ * <p>SPI Javadoc note for providers: every identifier returned from
+ * {@code primary().tableName()}, {@code primary().pkColumn()}, every entry
+ * in {@code hashedColumns()}, and the same trio on {@code children()} must
+ * match {@code [A-Za-z_][A-Za-z0-9_]{0,63}}. Schema-qualified names,
+ * back-ticked names, and SQL metacharacters are rejected — the engine
+ * interpolates these tokens into SQL without quoting.</p>
  */
 public final class DbSyncModule implements AdapterModule {
 
@@ -121,7 +119,7 @@ public final class DbSyncModule implements AdapterModule {
         }
         if (jdbcImpls.size() > 1) {
             log.error("Multiple JdbcConnectionSource impls on classpath: [{}]. db-sync FAILED.",
-                    namesOf(jdbcImpls));
+                    classNamesOf(jdbcImpls));
             state = STATE_FAILED;
             return;
         }
@@ -167,13 +165,28 @@ public final class DbSyncModule implements AdapterModule {
             log.error("db-sync.start: missing dependency (provider/source/context/tracker) — staying {}", state);
             return;
         }
-        List<? extends app.l2nx.gs.adapter.api.spi.EntityMapping<?>> mappings = p.mappings();
+        List<? extends EntityMapping<?>> mappings = p.mappings();
         if (mappings == null || mappings.isEmpty()) {
             log.warn("DbSchemaProvider {} returned no mappings — db-sync DISABLED.", p.schemaName());
             state = STATE_DISABLED;
             return;
         }
-        EngineConfig config = EngineConfig.from(configSource);
+        try {
+            validateIdentifiers(mappings);
+        } catch (IllegalStateException invalidIdentifier) {
+            log.error("DbSchemaProvider {} returned an invalid identifier: {}",
+                    p.schemaName(), invalidIdentifier.getMessage());
+            state = STATE_FAILED;
+            return;
+        }
+        EngineConfig config;
+        try {
+            config = EngineConfig.from(configSource);
+        } catch (IllegalStateException badConfig) {
+            log.error("Invalid cdc-engine config: {}", badConfig.getMessage());
+            state = STATE_FAILED;
+            return;
+        }
         TopicResolver resolver = TopicResolver.fromContext(ctx);
         SyncEventPublisher publisher = new SyncEventPublisher(kafkaSender);
 
@@ -193,7 +206,6 @@ public final class DbSyncModule implements AdapterModule {
         this.engine = built;
         try {
             built.start();
-            // Engine started — preserve any DEGRADED/ACTIVE state set by onConnect.
         } catch (Throwable t) {
             log.error("CdcEngine.start threw {}: {} — db-sync FAILED",
                     t.getClass().getName(), t.getMessage());
@@ -222,6 +234,8 @@ public final class DbSyncModule implements AdapterModule {
         context = null;
         statsTracker = null;
         engine = null;
+        // Reset state so a fresh handshake re-enters the state machine cleanly without a process restart.
+        state = STATE_INIT;
     }
 
     @Override
@@ -263,6 +277,33 @@ public final class DbSyncModule implements AdapterModule {
                 .state(state)
                 .stats(stats)
                 .build();
+    }
+
+    static void validateIdentifiers(List<? extends EntityMapping<?>> mappings) {
+        for (EntityMapping<?> mapping : mappings) {
+            String entity = mapping.entityName();
+            PrimarySource<?> primary = mapping.primary();
+            SqlIdent.validate(primary.tableName(), "entity '" + entity + "' primary.tableName");
+            SqlIdent.validate(primary.pkColumn(), "entity '" + entity + "' primary.pkColumn");
+            List<String> primaryHashed = primary.hashedColumns();
+            if (primaryHashed != null) {
+                for (String col : primaryHashed) {
+                    SqlIdent.validate(col, "entity '" + entity + "' primary.hashedColumns entry");
+                }
+            }
+            if (mapping.children() != null) {
+                for (ChildSource<?> child : mapping.children()) {
+                    SqlIdent.validate(child.tableName(), "entity '" + entity + "' child.tableName");
+                    SqlIdent.validate(child.fkColumn(), "entity '" + entity + "' child.fkColumn");
+                    List<String> childHashed = child.hashedColumns();
+                    if (childHashed != null) {
+                        for (String col : childHashed) {
+                            SqlIdent.validate(col, "entity '" + entity + "' child.hashedColumns entry");
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private static boolean performSmokeCheck(JdbcConnectionSource src) {
@@ -311,18 +352,19 @@ public final class DbSyncModule implements AdapterModule {
             try {
                 callback.onCompletion(null, notConfigured);
             } catch (Throwable t) {
-                log.warn("KafkaSender callback threw {}", t.getClass().getName());
+                log.warn("KafkaSender callback threw {} — publisher future will not complete",
+                        t.getClass().getName());
+            }
+        } catch (Throwable senderFailure) {
+            log.warn("NxKafka.send threw {} — invoking callback exceptionally", senderFailure.getClass().getName());
+            try {
+                callback.onCompletion(null,
+                        senderFailure instanceof Exception ? (Exception) senderFailure
+                                : new RuntimeException(senderFailure));
+            } catch (Throwable t) {
+                log.warn("KafkaSender callback threw {} after upstream failure", t.getClass().getName());
             }
         }
-    }
-
-    private static String namesOf(List<JdbcConnectionSource> impls) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < impls.size(); i++) {
-            if (i > 0) sb.append(", ");
-            sb.append(impls.get(i).getClass().getName());
-        }
-        return sb.toString();
     }
 
     private static <T> String classNamesOf(List<T> impls) {

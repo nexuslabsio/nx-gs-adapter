@@ -5,14 +5,21 @@
 ## Overview
 
 Runtime sync is a sibling adapter module to `db-sync`, shipped as the
-`nx-gs-runtime-sync-core` artifact. It runs one daemon thread per declared
-`RuntimeEntityMapping`, ticks at a configurable interval (default 10s), pulls a
-`Iterable<RuntimeRow>` snapshot from a Tier-2 `RuntimeStateProvider` SPI implemented in
-the host JAR, computes an FNV-1a 64-bit hash per row, diffs against the previous tick's
-hash map, and publishes NEW + CHANGED rows as `SyncEvent<T>` to the per-entity Kafka
-topic resolved from `ConnectResponse.syncTopics.runtime[entityName]`. GONE rows are
-silently dropped (no tombstone) — `db-sync` owns "permanently gone" semantics. MVP
-entity is `character` (vitals + position) against bohpts.
+`nx-gs-runtime-sync-core` artifact. It schedules one tick task per declared
+`RuntimeEntityMapping` onto a shared bounded `ScheduledThreadPoolExecutor`
+(`nx-runtime-sync-pool-N`, sized by `l2nx.runtime-sync.workers`), ticks at a
+configurable interval (default 10s), pulls a `Iterable<RuntimeRow>` snapshot from a
+Tier-2 `RuntimeStateProvider` SPI implemented in the host JAR, computes an FNV-1a
+64-bit hash per row, diffs against the previous tick's hash map (whose
+`defaultReturnValue` is the `MISSING_HASH = Long.MIN_VALUE` sentinel so a legitimate
+`0L` hash cannot be confused with absence), and publishes NEW + CHANGED rows as
+`SyncEvent<T>` to the per-entity Kafka topic resolved from
+`ConnectResponse.syncTopics.runtime[entityName]`. GONE rows are silently dropped (no
+tombstone) — `db-sync` owns "permanently gone" semantics. `CycleResult` reports
+`DEGRADED` whenever any publish future failed or timed out; `failedAcks` /
+`timedOutAcks` counters surface on the per-entity heartbeat slot so Kafka outages
+are visible to operators. MVP entity is `character` (vitals + position) against
+bohpts.
 
 ## Structure
 
@@ -47,18 +54,39 @@ Bohpts-side (in `bohpts-core` repo, not this monorepo):
 
 ## Key components
 
-- **RuntimeSyncModule** [planned] (implements R1) — `AdapterModule` entry point.
-  Resolves `RuntimeStateProvider` via ServiceLoader at `start()`, validates the topic map
-  on `onConnect` (per R7), spins up one `EntityTickLoop` per declared
-  `RuntimeEntityMapping`, surfaces module health on heartbeat (R12).
-- **EntityTickLoop** [planned] (implements R5, R8) — daemon-thread per entity. Each tick:
-  call `mapping.snapshot()`, hash each row via `mapping.hash(dto)` into a fresh
-  `Long2LongMap`, diff vs previous, publish via `SyncEventPublisher`, swap in only the
-  acked subset of the new snapshot. All exception handling at this boundary.
-- **SyncEventPublisher** [planned] — wraps `NxKafka` producer. Reuses the same
+- **RuntimeSyncModule** [done] (implements R1) — `AdapterModule` entry point.
+  Resolves `RuntimeStateProvider` via ServiceLoader at `start()`, calls
+  `provider.mappings()` exactly once on `onConnect` and caches the result (was
+  previously called twice — once for the log, once for wiring), validates the
+  topic map and mapping uniqueness, schedules per-entity tick tasks on the shared
+  pool, surfaces module health on heartbeat. Cached mappings are cleared on
+  `onDisconnect`.
+- **Shared scheduler pool** [done] (implements R5 SC5) —
+  `ScheduledThreadPoolExecutor` sized by `l2nx.runtime-sync.workers`
+  (default `max(2, min(entities, cores/2))`). Threads named
+  `nx-runtime-sync-pool-N`, daemon, with a module-wide uncaughtExceptionHandler.
+  `setRemoveOnCancelPolicy(true)` so cancelled per-entity tasks are evicted
+  immediately. Replaces the legacy thread-per-entity model.
+- **EntityTickTask** [done] (implements R5, R8) — `Runnable` scheduled at fixed
+  rate per entity. Per-entity `AtomicBoolean ticking` guard — if the previous
+  tick is still running when the next fires, the new tick is skipped with a
+  WARN (rather than queued, which would exhaust the pool under back-pressure).
+  Body: call `mapping.snapshot()` inside `try/catch (Throwable)` (a buggy
+  provider degrades the entity for one tick instead of killing the scheduler
+  task), hash each row via `mapping.hash(dto)` into a fresh
+  `Long2LongOpenHashMap` with `defaultReturnValue(Long.MIN_VALUE)`, diff vs
+  previous, publish via `SyncEventPublisher`, walk in-flight futures
+  (done-first drain, deadline-bounded wait on pending, respects interrupt),
+  swap in only the acked subset of the new snapshot. `CycleResult.degraded`
+  is returned on any publish failure / timeout so the heartbeat reflects
+  Kafka tail-health.
+- **SyncEventPublisher** [done] — wraps `NxKafka` producer. Reuses the same
   `inFlight`-future + flush-at-tick-end mechanism `db-sync` has on a per-window basis;
   runtime-sync has no windows, so the equivalent flush boundary is the tick itself
   (parallel implementation, not literal reuse — module isolation).
+- **EntityStatsTracker** [done] — accumulates per-cycle counters
+  (`failedAcks`, `timedOutAcks`, `lastTickChanges`, etc.) into the heartbeat
+  per-entity slot.
 - **Fnv1a64** (implements R6) — `app.l2nx.gs.commons.hash.Fnv1a64` from published
   `:nx-gs-commons` artifact. Public API: `long start()`, `long mix(long state, long
   value)` / `mix(state, int)` / `mix(state, boolean)` / `mix(state, CharSequence)`.
@@ -83,26 +111,41 @@ Bohpts-side (in `bohpts-core` repo, not this monorepo):
 
 End-to-end per tick (one entity, e.g. `character`):
 
-1. `EntityTickLoop` wakes (every 10s by default)
-2. Calls `mapping.snapshot()` → `Iterable<RuntimeRow<CharacterRuntimeDto>>`
+1. Tick task fires (scheduled-at-fixed-rate on the shared pool, every 10s by
+   default). If `AtomicBoolean ticking` is already set → skip+WARN and exit.
+2. Calls `mapping.snapshot()` inside `try/catch (Throwable)` →
+   `Iterable<RuntimeRow<CharacterRuntimeDto>>`
    (bohpts impl: `new ArrayList<>(GameObjectsStorage.getPlayers())`, filtered by
-   `player.isOnline()`)
+   `player.isOnline()`). On throw → `CycleResult.degraded(elapsed)` + WARN, no
+   publishes, entity transitions to `DEGRADED` for this tick.
 3. For each `RuntimeRow{pk, dto}`:
     - Compute `hash = mapping.hash(dto)` (FNV-1a 64-bit over vitals + coords)
-    - Insert `{pk → hash}` into `currentSnapshot: Long2LongMap`
-4. Diff `currentSnapshot` vs `prevSnapshot`:
-    - PK in current, not in prev → emit `SyncEvent.create(pk, dto)`
+    - Insert `{pk → hash}` into `currentSnapshot: Long2LongOpenHashMap` whose
+      `defaultReturnValue` is `MISSING_HASH = Long.MIN_VALUE`
+4. Diff `currentSnapshot` vs `prevSnapshot` (both share the `MISSING_HASH`
+   sentinel — absence and a legitimate `0L` hash are now distinguishable):
+    - `prev.get(pk) == MISSING_HASH` → emit `SyncEvent.create(pk, dto)`
     - PK in both, hashes differ → emit `SyncEvent.update(pk, dto)`
     - PK in prev, not in current → no-op (drop silently from tracking)
 5. For each emit: `SyncEventPublisher.publish(topic, pk, event)` → returns
    `CompletableFuture<Void>`; future enters `inFlight: Map<pk, Future>`
-6. Wait up to `publish-flush-seconds` for futures
+6. Walk in-flight: drain done futures first, then deadline-bounded wait on the
+   pending tail up to `publish-flush-seconds`. Respects thread interrupt and
+   breaks early on shutdown.
 7. For each acked future → write `{pk → hash}` from `currentSnapshot` into the
-   "carrier-forward" snapshot for next cycle. Failed futures: leave previous
-   `prevSnapshot[pk]` (if any) untouched → forces replay next tick
+   "carrier-forward" snapshot for next cycle. Failed/timed-out futures: leave
+   previous `prevSnapshot[pk]` (if any) untouched → forces replay next tick,
+   increment `failedAcks` / `timedOutAcks` counters.
 8. Replace `prevSnapshot = carrierForward`
 9. Update heartbeat stats: `lastTickEpochMs`, `lastTickDurationMs`,
-   `lastTickChanges = NEW + CHANGED`, `rowCount = currentSnapshot.size()`
+   `lastTickChanges = NEW + CHANGED`, `rowCount = currentSnapshot.size()`,
+   `failedAcks`, `timedOutAcks`. `CycleResult` is `DEGRADED` if either ack
+   counter is non-zero, otherwise `HEALTHY`.
+
+Shutdown: `stop()` cancels scheduled tasks and waits up to
+`max(2, publishFlushSeconds + 1)` seconds on `awaitTermination` so in-flight
+publishes can drain (the prior fixed 2s lost data once `publishFlushSeconds`
+grew past it).
 
 ## Data model
 
@@ -196,6 +239,36 @@ Wire DTO (Kafka payload):
   require a write path on disconnect (operator-hostile during shutdown) and a recovery
   path on next start. Reconnect-and-re-sync is acceptable: first tick after reconnect
   publishes everything as NEW, ~10k events on the wire, finishes in seconds.
+
+- **Decision:** Shared bounded thread pool (`ScheduledThreadPoolExecutor`) over
+  thread-per-entity.
+  **Why:** As more runtime entities ship (party, siege, raid-boss, …) the
+  thread-per-entity model wastes daemon threads on cheap entities and concentrates
+  scheduling logic per loop. The shared pool sized by `l2nx.runtime-sync.workers`
+  (default `max(2, min(entities, cores/2))`) scales naturally, plays well with
+  `setRemoveOnCancelPolicy(true)` for clean teardown, and the per-entity
+  `AtomicBoolean ticking` guard turns overlapping ticks into observable
+  skip-with-WARN rather than silent queue growth.
+
+- **Decision:** `MISSING_HASH = Long.MIN_VALUE` sentinel for the hash map's
+  `defaultReturnValue`.
+  **Why:** `Long2LongOpenHashMap.get(absentKey)` returns `0L` by default —
+  collides with a legitimate `0L` hash from a provider. `Long.MIN_VALUE` is
+  outside the practical FNV-1a output range and gives a single, unambiguous
+  test for absence (`prev.get(pk) == MISSING_HASH` → NEW).
+
+- **Decision:** `provider.mappings()` is invoked once per `onConnect` and
+  cached.
+  **Why:** The earlier code called it twice — once for the start-up log,
+  once for engine wiring — which surprised providers that materialized the
+  list eagerly on each call (e.g. read live game state). Single call +
+  cache keeps the contract simple and predictable.
+
+- **Decision:** Uniqueness validation on `entityName()` at engine start.
+  **Why:** A provider declaring two mappings with the same `entityName`
+  would clobber each other's `prevSnapshot` / topic mapping silently. Fail
+  loudly at startup (module → `STATE_FAILED`) so the operator fixes the
+  classpath rather than chasing missing data.
 
 ## Extension points
 

@@ -57,6 +57,12 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
       drives `DEGRADED`. Pre-first-ACTIVE the adapter is still inside its handshake loop and
       a transient failure is not yet a "degraded" condition — it's a "not yet up" condition.
     - SC3. Backoff schedule for retryable failures: 30s → 1m → 2m → 5m capped.
+      Each scheduled delay is jittered by ±25% so a fleet-wide platform recovery
+      does not produce a thundering herd of simultaneous reconnects. The retry
+      attempt counter is capped (no unbounded growth in the `AtomicInteger`).
+      A `RejectedExecutionException` from the connect scheduler (e.g. scheduler
+      shutdown racing with reschedule) emits `Outcome.FAILED` rather than
+      being silently logged.
 - [done] R6. Adapter MUST initialize Kafka producer via `nx-gs-kafka` after a successful `/connect`,
   composing builder properties from `ConnectResponse.kafka`:
     - `bootstrap.servers` ← `kafka.bootstrap`
@@ -123,6 +129,45 @@ ConfigWatcher, MetricsPusher) полагаются на готовый bootstrap
   Platform-side (`nx-tenants`) builds `syncTopics` from per-server entity-sync
   configuration; coordinated atomic upgrade with the adapter — no production
   consumers yet so wire-shape extension is safe.
+
+- [done] R18. **Threading model — adapter-owned daemon threads.** Every long-running
+  unit of work runs on an adapter-owned daemon thread with an
+  `uncaughtExceptionHandler` installed:
+    - `nx-adapter-connect` — POST `/connect` retry loop (single-threaded
+      `ScheduledExecutorService`)
+    - `nx-adapter-heartbeat` — 60s heartbeat scheduler (single-threaded
+      `ScheduledExecutorService`)
+    - `nx-adapter-shutdown` — JVM shutdown hook delegating to `shutdown()`
+    - `nx-events-publisher` — bounded-queue drainer for outbound events
+      (see [`messaging`](../messaging/spec.md))
+    - `nx-commands-consumer` — single Kafka consumer + dispatch
+      (see [`commands`](../commands/spec.md))
+    - `nx-io-N` — adapter-owned IO pool surfaced via `ConnectContext.io()` /
+      `CommandContext.io()` for blocking JDBC / HTTP from module code and
+      command handlers
+    - per-entity engine threads (e.g. `nx-cdc-<entity>`) — owned by sync modules
+
+  `Throwable` (not just `Exception`) is caught at every poll-loop / tick-loop
+  / scheduler-task boundary. `Thread.setUncaughtExceptionHandler` is installed
+  everywhere so an escaped throwable still routes through `NxLog` instead of
+  the JVM's default handler. Heartbeat start/stop are `synchronized` so a
+  reconnect cycle concurrent with shutdown cannot leave the heartbeat scheduler
+  running.
+
+- [done] R19. **`l2nx.io.workers` config key.** Resolves the size of the
+  adapter-owned IO pool (`nx-io-N` daemon threads) surfaced via
+  `ConnectContext.io()` / `CommandContext.io()`. Default `max(2, cores/2)`.
+  Same file-first source chain as the other `l2nx.*` keys.
+
+- [done] R20. **JAAS password escaping.** Adapter-core escapes `\` and `"` in
+  SCRAM `saslUsername` / `saslPassword` before interpolating them into the
+  `sasl.jaas.config` value. Closes a Kafka-init-failure path where credentials
+  containing escape-significant characters produced a malformed JAAS string.
+
+- [done] R21. **HTTP response body cap unit rename.**
+  `HttpURLConnectionConnectClient.MAX_RESPONSE_BODY_BYTES` renamed to
+  `MAX_RESPONSE_BODY_CHARS` — the cap is char-counted (UTF-16 code units in
+  the buffer), the previous name implied bytes. Pure rename, no behavior change.
 
 - [done] R14. Adapter MUST resolve an `enabled` flag (boolean) from the same two-source
   chain (key `l2nx.enabled`), defaulting to `false`. When `enabled=false`:

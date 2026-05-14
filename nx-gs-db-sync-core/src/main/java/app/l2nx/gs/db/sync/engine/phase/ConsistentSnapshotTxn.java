@@ -1,5 +1,8 @@
 package app.l2nx.gs.db.sync.engine.phase;
 
+import app.l2nx.gs.log.NxLog;
+import app.l2nx.gs.log.NxLogFactory;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -7,46 +10,64 @@ import java.sql.Statement;
 /**
  * Wraps an SQL action in {@code START TRANSACTION WITH CONSISTENT SNAPSHOT,
  * READ ONLY}. Saves and restores the connection's prior autoCommit; rolls
- * back on any {@link SQLException} thrown by the action and rethrows;
+ * back on any {@link Throwable} from the action and rethrows the original;
  * commits otherwise.
- *
- * <p>Used by {@link Phase1Hasher} (per-window CRC scan) and
- * {@link Phase2Fetcher} (per-chunk row fetch). Per-query snapshots are an
- * explicit cdc-engine design decision (see spec.md Decisions): each phase /
- * each child source / each chunk runs its own short transaction so the
- * host DB never holds a multi-minute undo log on the adapter's behalf.</p>
  */
-final class ConsistentSnapshotTxn {
+public final class ConsistentSnapshotTxn {
+
+    private static final NxLog log = NxLogFactory.getLogger(ConsistentSnapshotTxn.class);
 
     private ConsistentSnapshotTxn() {
     }
 
-    static <T> T runReadOnly(Connection conn, SqlAction<T> action) throws SQLException {
+    public static <T> T runReadOnly(Connection conn, SqlAction<T> action) throws SQLException {
+        return runReadOnly(conn, ignored -> action.run());
+    }
+
+    public static <T> T runReadOnly(Connection conn, ConnectionAction<T> action) throws SQLException {
         boolean priorAutoCommit = conn.getAutoCommit();
         try {
             conn.setAutoCommit(false);
             try (Statement init = conn.createStatement()) {
                 init.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY");
             }
-            T result = action.run();
+            T result = action.run(conn);
             conn.commit();
             return result;
-        } catch (SQLException e) {
+        } catch (Throwable t) {
             try {
                 conn.rollback();
-            } catch (SQLException ignored) {
+            } catch (Exception rollbackError) {
+                // Swallow rollback failure to preserve the original exception's type and cause chain.
             }
-            throw e;
+            if (t instanceof SQLException) {
+                throw (SQLException) t;
+            }
+            if (t instanceof RuntimeException) {
+                throw (RuntimeException) t;
+            }
+            if (t instanceof Error) {
+                throw (Error) t;
+            }
+            // Checked non-SQLException — wrap to satisfy the signature.
+            throw new SQLException(t);
         } finally {
             try {
                 conn.setAutoCommit(priorAutoCommit);
-            } catch (SQLException ignored) {
+            } catch (Throwable restoreError) {
+                log.warn("Failed to restore autoCommit={} after consistent-snapshot txn: {}",
+                        priorAutoCommit, restoreError);
             }
         }
     }
 
     @FunctionalInterface
-    interface SqlAction<T> {
+    public interface SqlAction<T> {
         T run() throws SQLException;
+    }
+
+    @FunctionalInterface
+    public interface ConnectionAction<T> {
+        T run(Connection conn) throws SQLException;
     }
 }

@@ -1,29 +1,26 @@
 package app.l2nx.gs.db.sync.engine.phase;
 
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
-import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.longs.Long2IntMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 
 /**
  * Diff result of a single window's Phase-1 scan: PKs partitioned into
  * created (new in this scan), updated (CRC32 differs from snapshot), and
  * deleted (in snapshot for this window's PK range, missing in current scan).
- *
- * <p>The {@code currentScan} field carries the just-read CRC32 values keyed
- * by PK so {@link app.l2nx.gs.db.sync.engine.EntitySyncTask} can advance the
- * snapshot per-PK once Kafka acks the publish.</p>
  */
 public final class ChangeSet {
 
     private final LongSet created;
     private final LongSet updated;
     private final LongSet deleted;
-    private final Long2IntMap currentScan;
 
-    public ChangeSet(LongSet created, LongSet updated, LongSet deleted, Long2IntMap currentScan) {
+    public ChangeSet(LongSet created, LongSet updated, LongSet deleted) {
         this.created = created;
         this.updated = updated;
         this.deleted = deleted;
-        this.currentScan = currentScan;
     }
 
     public LongSet created() {
@@ -36,10 +33,6 @@ public final class ChangeSet {
 
     public LongSet deleted() {
         return deleted;
-    }
-
-    public Long2IntMap currentScan() {
-        return currentScan;
     }
 
     public boolean isEmpty() {
@@ -72,13 +65,11 @@ public final class ChangeSet {
         for (Long2IntMap.Entry e : currentScan.long2IntEntrySet()) {
             long pk = e.getLongKey();
             int newCrc = e.getIntValue();
-            if (snapshot.containsCrc(entityName, pk)) {
-                int prevCrc = snapshot.getCrc(entityName, pk);
-                if (prevCrc != newCrc) {
-                    updated.add(pk);
-                }
-            } else {
+            int prevCrc = snapshot.getCrc(entityName, pk);
+            if (prevCrc == Phase1Hasher.MISSING_HASH) {
                 created.add(pk);
+            } else if (prevCrc != newCrc) {
+                updated.add(pk);
             }
         }
 
@@ -89,9 +80,6 @@ public final class ChangeSet {
                 deleted.add(pk);
             }
         }
-        Long2IntOpenHashMap copy = currentScan instanceof Long2IntOpenHashMap
-                ? (Long2IntOpenHashMap) currentScan
-                : new Long2IntOpenHashMap(currentScan);
-        return new ChangeSet(created, updated, deleted, copy);
+        return new ChangeSet(created, updated, deleted);
     }
 }

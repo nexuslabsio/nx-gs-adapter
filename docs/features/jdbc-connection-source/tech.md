@@ -93,9 +93,15 @@ field at all.
   the type ships.
 - **`BohptsJdbcConnectionSource`** (R5) — bohpts reference impl, lives in
   bohpts-core source tree under `l2e.gameserver.l2nx`. Body of `getConnection()`
-  borrows from `DatabaseFactory.getInstance()` and calls `setReadOnly(true)` on the
-  borrowed connection (provider-side belt-and-suspenders; closes on failure to avoid
-  leak). `stats()` overrides the default with `PoolStats.builder()
+  borrows from `DatabaseFactory.getInstance()` and flips `setReadOnly(true)` on
+  the borrowed Connection as defense-in-depth (closes the connection and
+  rethrows on `SQLException`). HikariCP resets the dirty `readOnly` flag back
+  to the pool default on connection return, so the flag does NOT leak to the
+  host's own subsequent borrowers. This is belt-and-suspenders on top of the
+  SQL-level `START TRANSACTION ... READ ONLY` the CDC engine issues (R3 +
+  cdc-engine R11) — explicit signal to the host that the adapter does not
+  modify host data through this source. `stats()` overrides the default with
+  `PoolStats.builder()
   .active(DatabaseFactory.getBusyConnectionCount())
   .idle(DatabaseFactory.getIdleConnectionCount()).build()` — `total` and `waiting`
   left null because `DatabaseFactory` does not expose
@@ -112,7 +118,8 @@ Phase 1 (current):
 DbSyncModule.onConnect(ctx)
   → ServiceLoader.load(JdbcConnectionSource.class) with TCCL save/restore
   → providers.size():
-       1 → cache as `this.source`; smoke-check (setReadOnly + isValid(5)) →
+       1 → cache as `this.source`; smoke-check (isValid(5) — adapter no longer
+           calls setReadOnly on the borrowed connection; see R3) →
            ACTIVE on success / DEGRADED on failure (source kept so stats() still surfaces)
        0 → log ERROR ("no JdbcConnectionSource SPI registered — register one via
            META-INF/services/... — see jdbc-connection-source feature docs"); state = FAILED
@@ -132,15 +139,24 @@ Phase 3 will add the bundled-Hikari fallback:
 ### 2. Per-borrow lifecycle (every Phase 1 / Phase 2 query)
 
 ```
-engine code (e.g. Phase1Hasher.hash)
+engine code (EntitySyncTask cycle)
   → try (Connection c = source.getConnection()) {
-        c.setReadOnly(true);                          // R3: per-borrow enforcement
-        try (PreparedStatement ps = c.prepareStatement("SELECT ...");
-             ResultSet rs = ps.executeQuery()) {
-            // read
+        // Adapter does NOT call c.setReadOnly(true) — would leak the flag back
+        // to other consumers of the host pool. Read-only is SQL-level via
+        // START TRANSACTION ... READ ONLY in ConsistentSnapshotTxn (cdc-engine R11).
+        try (Statement guard = c.createStatement()) {
+            guard.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY");
         }
+        try (PreparedStatement ps = c.prepareStatement("SELECT ...")) {
+            ps.setFetchSize(cfg.fetchSize);            // cursor mode (cdc-engine R9)
+            try (ResultSet rs = ps.executeQuery()) {
+                // read
+            }
+        }
+        c.commit();
     }                                                 // R4: try-with-resources close
   → connection returned to host's pool
+  → host pool MUST reset readOnly / autoCommit / isolation on return (R3)
 ```
 
 ### 3. Heartbeat enrichment (R7, optional)
@@ -166,9 +182,10 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
   the service descriptor. Depends on `app.l2nx:nx-gs-adapter-core:0.3.1` +
   `nx-gs-db-sync-core:0.1.0`. NOT a separately published artifact.
 - **`db-sync` feature** — first consumer. R2 of db-sync invokes
-  `JdbcConnectionSourceLoader.load()` at `onConnect`; per-borrow `setReadOnly(true)` is
-  R3 of db-sync (cross-referenced) plus R3 here (the SPI-level contract that consumers
-  MUST satisfy).
+  `JdbcConnectionSourceLoader.load()` at `onConnect`. The adapter does NOT call
+  `setReadOnly` per borrow — the host-pool contract (R3 here) keeps the pool's
+  state-reset responsibility on the host, and the CDC engine enforces read-only
+  at the SQL level (`START TRANSACTION ... READ ONLY`).
 - **Bohpts `l2e.gameserver.database.DatabaseFactory`** (R5) — the singleton bohpts
   uses internally; bohpts' `JdbcConnectionSource` impl wraps it. We do NOT touch
   `DatabaseFactory` itself — only call its public `getConnection()` /
@@ -214,13 +231,26 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
   natural for the bohpts case where `DatabaseFactory.getConnection()` is already the
   one-line implementation. If a consumer ever needs the full `DataSource` surface, that
   consumer can wrap an `JdbcConnectionSource` into a tiny `DataSource` adapter locally.
-- **Per-borrow `setReadOnly(true)`, not pool-level.** Pool config is host-owned; we
-  cannot impose pool-level read-only without instantiating our own pool (defeats the
-  whole point). Per-borrow is portable across all pool implementations — every
-  `Connection` impl supports `setReadOnly(boolean)` per the JDBC spec. Performance impact
-  is negligible (one method call per borrow). Treating this as a CONSUMER obligation (R3)
-  rather than something the SPI does internally keeps the SPI dumb and avoids
-  decorator-stacking.
+- **Read-only enforced at SQL level by the engine; provider-level `setReadOnly`
+  is an optional defense-in-depth signal.** The CDC engine (adapter side) does
+  NOT call `Connection.setReadOnly(true)` on borrowed connections. Read-only is
+  enforced via `START TRANSACTION ... READ ONLY` inside every Phase 1 / Phase 2
+  transaction (see [`cdc-engine` R11](../cdc-engine/spec.md)) — SQL-level
+  enforcement is scoped to the transaction only, no leakage. **Providers MAY
+  call `Connection.setReadOnly(true)` themselves** as an explicit "we don't
+  modify your data" signal to the host; the bohpts reference impl does
+  exactly that (R5). HikariCP and other mainstream pools reset the dirty
+  `readOnly` flag back to the pool default on return, so the flag does not
+  leak to subsequent host borrowers. The host-pool contract (R3) requires the
+  pool to reset connection state on return,
+  but the adapter does not depend on it for read-only correctness.
+- **Host pool must size at least `entityCount` connections.** Each per-entity
+  CDC tick borrows independently; entities scheduled to tick in the same window
+  contend for connections. A pool sized for the host game-server's own
+  concurrency alone (e.g. 2-4 connections for a small server) can deadlock the
+  engine when every entity ticks together. Documented as a hard contract on
+  Path-1 providers (R3) rather than enforced at the adapter level — sizing the
+  host's pool is the host's decision; the adapter only states the minimum.
 - **Single-impl assumption with fail-loud on multi-impl.** Mirrors the Tier-2
   `DbSchemaProvider` discovery rule. Operator deployments naturally have one provider
   (host JVM ships its own; vanilla modules + bohpts modules don't co-exist in the same

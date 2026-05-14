@@ -87,8 +87,9 @@ class NxProducerIntegrationTest {
                 .connectTimeout(2, TimeUnit.SECONDS)
                 .reconnect(false)
                 .property("max.block.ms", 1000)
-                .property("delivery.timeout.ms", 1000)
+                .property("delivery.timeout.ms", 2000)
                 .property("request.timeout.ms", 1000)
+                .property("linger.ms", 0)
                 .build();
 
         // Should not throw — errors are logged internally

@@ -14,11 +14,9 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -37,7 +35,7 @@ import java.util.function.Consumer;
  * kafka.send("bohpts.x20.purchased", new PurchaseEvent(playerId, itemId, price));
  *
  * // Subscribe to messages
- * kafka.subscribe("bohpts.x20.purchased", PurchaseEvent.class, event -> {
+ * kafka.subscribe("bohpts.x20.purchased", "bohpts-x20", PurchaseEvent.class, event -> {
  *     gameServer.enqueue(() -> handleEvent(event));
  * });
  *
@@ -59,9 +57,12 @@ public final class NxKafka {
     private final Consumer<KafkaState> stateChangeListener;
     private final ScheduledExecutorService scheduler;
     private final Thread shutdownHook;
+    private final ReentrantReadWriteLock sendLock = new ReentrantReadWriteLock();
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
     private volatile KafkaState state;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private volatile AdminClient adminClient;
 
     private NxKafka(KafkaConfig config) {
         this.config = config;
@@ -69,21 +70,20 @@ public final class NxKafka {
         this.state = KafkaState.CREATED;
         this.stateChangeListener = config.getStateChangeListener();
 
-        // Register JVM shutdown hook BEFORE starting scheduler
         shutdownHook = new Thread(this::doShutdown, "nx-gs-kafka-shutdown");
         Runtime.getRuntime().addShutdownHook(shutdownHook);
 
-        // Initial connection attempt
+        this.adminClient = createAdminClient();
         tryConnect();
 
-        // Create producer (KafkaProducer handles retries internally, works even when disconnected)
         this.producer = createProducer();
 
-        // Start background health check scheduler
         if (config.isReconnect()) {
             scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "nx-gs-kafka-health");
                 t.setDaemon(true);
+                t.setUncaughtExceptionHandler((thr, ex) ->
+                        log.error("Uncaught exception on scheduler thread {}", thr.getName(), ex));
                 return t;
             });
             scheduler.scheduleWithFixedDelay(
@@ -149,7 +149,16 @@ public final class NxKafka {
             log.warn("Cannot send to {}: NxKafka is shut down", topic);
             return;
         }
-        producer.send(topic, message);
+        sendLock.readLock().lock();
+        try {
+            if (closed.get()) {
+                log.warn("Cannot send to {}: NxKafka is shut down", topic);
+                return;
+            }
+            producer.send(topic, message);
+        } finally {
+            sendLock.readLock().unlock();
+        }
     }
 
     /**
@@ -166,7 +175,16 @@ public final class NxKafka {
             log.warn("Cannot send to {}: NxKafka is shut down", topic);
             return;
         }
-        producer.send(topic, key, message);
+        sendLock.readLock().lock();
+        try {
+            if (closed.get()) {
+                log.warn("Cannot send to {}: NxKafka is shut down", topic);
+                return;
+            }
+            producer.send(topic, key, message);
+        } finally {
+            sendLock.readLock().unlock();
+        }
     }
 
     /**
@@ -189,7 +207,15 @@ public final class NxKafka {
         if (rejectIfClosed(topic, callback)) {
             return;
         }
-        producer.send(topic, message, callback);
+        sendLock.readLock().lock();
+        try {
+            if (rejectIfClosed(topic, callback)) {
+                return;
+            }
+            producer.send(topic, message, callback);
+        } finally {
+            sendLock.readLock().unlock();
+        }
     }
 
     /**
@@ -206,7 +232,15 @@ public final class NxKafka {
         if (rejectIfClosed(topic, callback)) {
             return;
         }
-        producer.send(topic, key, message, callback);
+        sendLock.readLock().lock();
+        try {
+            if (rejectIfClosed(topic, callback)) {
+                return;
+            }
+            producer.send(topic, key, message, callback);
+        } finally {
+            sendLock.readLock().unlock();
+        }
     }
 
     /**
@@ -225,7 +259,15 @@ public final class NxKafka {
         if (rejectIfClosed(topic, callback)) {
             return;
         }
-        producer.send(topic, key, message, callback);
+        sendLock.readLock().lock();
+        try {
+            if (rejectIfClosed(topic, callback)) {
+                return;
+            }
+            producer.send(topic, key, message, callback);
+        } finally {
+            sendLock.readLock().unlock();
+        }
     }
 
     /**
@@ -241,7 +283,15 @@ public final class NxKafka {
         if (rejectIfClosed(record.topic(), callback)) {
             return;
         }
-        producer.sendBytesKeyRecord(record, callback);
+        sendLock.readLock().lock();
+        try {
+            if (rejectIfClosed(record.topic(), callback)) {
+                return;
+            }
+            producer.sendBytesKeyRecord(record, callback);
+        } finally {
+            sendLock.readLock().unlock();
+        }
     }
 
     /**
@@ -257,7 +307,7 @@ public final class NxKafka {
         try {
             callback.onCompletion(null, new KafkaException("NxKafka is shut down"));
         } catch (Exception e) {
-            log.error("Callback error for topic {}: {}", topic, e.getMessage());
+            log.error("Callback error for topic {}", topic, e);
         }
         return true;
     }
@@ -267,19 +317,20 @@ public final class NxKafka {
      * Creates a dedicated daemon thread with a poll loop for this topic.
      *
      * <pre>{@code
-     * kafka.subscribe("bohpts.x20.purchased", PurchaseEvent.class, event -> {
+     * kafka.subscribe("bohpts.x20.purchased", "bohpts-x20", PurchaseEvent.class, event -> {
      *     gameServer.enqueue(() -> shop.handlePurchase(event));
      * });
      * }</pre>
      *
      * @param topic   Kafka topic name
+     * @param groupId Kafka consumer group id (required, non-empty)
      * @param type    message class for Gson deserialization
      * @param handler invoked for each message on the consumer thread
      * @param <T>     message type
      * @throws KafkaException if already subscribed to this topic or NxKafka is shut down
      */
-    public <T> void subscribe(String topic, Class<T> type, Consumer<T> handler) {
-        subscribe(topic, type, (message, replyTo) -> handler.accept(message));
+    public <T> void subscribe(String topic, String groupId, Class<T> type, Consumer<T> handler) {
+        subscribe(topic, groupId, type, (message, replyTo) -> handler.accept(message));
     }
 
     /**
@@ -288,29 +339,33 @@ public final class NxKafka {
      * Use {@link ReplyContext#reply(Object)} to send responses back to the requester.
      *
      * <pre>{@code
-     * kafka.subscribe("gs.char.info.request", CharInfoRequest.class, (request, replyTo) -> {
+     * kafka.subscribe("gs.char.info.request", "gs-char-info", CharInfoRequest.class, (request, replyTo) -> {
      *     CharInfo info = gameServer.getCharInfo(request.getCharId());
      *     replyTo.reply(info);
      * });
      * }</pre>
      *
      * @param topic   Kafka topic name
+     * @param groupId Kafka consumer group id (required, non-empty)
      * @param type    message class for Gson deserialization
      * @param handler invoked for each message with a {@link ReplyContext} on the consumer thread
      * @param <T>     message type
      * @throws KafkaException if already subscribed to this topic or NxKafka is shut down
      */
-    public <T> void subscribe(String topic, Class<T> type, BiConsumer<T, ReplyContext> handler) {
+    public <T> void subscribe(String topic, String groupId, Class<T> type, BiConsumer<T, ReplyContext> handler) {
+        if (groupId == null || groupId.isEmpty()) {
+            throw new KafkaException("groupId must be non-empty");
+        }
         if (closed.get()) {
             throw new KafkaException("Cannot subscribe: NxKafka is shut down");
         }
-        Map<String, Object> consumerConfig = createConsumerConfig(topic);
+        Map<String, Object> consumerConfig = createConsumerConfig(topic, groupId);
         NxConsumer group = NxConsumer.create(topic, type, handler, producer, config.getGson(), consumerConfig);
         if (consumers.putIfAbsent(topic, group) != null) {
             group.stop();
             throw new KafkaException("Already subscribed to topic: " + topic);
         }
-        log.info("Subscribed to topic {}", topic);
+        log.info("Subscribed to topic {} with groupId {}", topic, groupId);
     }
 
     /**
@@ -339,37 +394,51 @@ public final class NxKafka {
      * stops the health-check scheduler, closes the producer, and clears
      * the singleton instance.
      * Also registered as a JVM shutdown hook, so explicit calls are optional.
-     * Safe to call multiple times.
+     * Safe to call multiple times — concurrent callers await the first call's completion.
      */
     public void shutdown() {
-        if (closed.get()) {
-            return;
-        }
         try {
             Runtime.getRuntime().removeShutdownHook(shutdownHook);
         } catch (IllegalStateException e) {
-            // JVM is already shutting down
+            // JVM is already shutting down — hook is firing or already fired.
         }
         doShutdown();
+        try {
+            shutdownLatch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void doShutdown() {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        changeState(KafkaState.CLOSED);
+        try {
+            sendLock.writeLock().lock();
+            try {
+                changeState(KafkaState.CLOSED);
 
-        if (scheduler != null) {
-            scheduler.shutdownNow();
-        }
-        for (NxConsumer group : consumers.values()) {
-            group.stop();
-        }
-        consumers.clear();
-        producer.close();
+                if (scheduler != null) {
+                    scheduler.shutdownNow();
+                }
+                for (NxConsumer group : consumers.values()) {
+                    group.stop();
+                }
+                consumers.clear();
+                closeAdminClient();
+                if (producer != null) {
+                    producer.close();
+                }
 
-        log.info("NxKafka shut down");
-        instance = null;
+                log.info("NxKafka shut down");
+                instance = null;
+            } finally {
+                sendLock.writeLock().unlock();
+            }
+        } finally {
+            shutdownLatch.countDown();
+        }
     }
 
     private void changeState(KafkaState newState) {
@@ -382,47 +451,79 @@ public final class NxKafka {
             try {
                 stateChangeListener.accept(newState);
             } catch (Exception e) {
-                log.error("State change listener error: {}", e.getMessage());
+                log.error("State change listener error", e);
             }
         }
     }
 
-    private Map<String, Object> createConsumerConfig(String topic) {
+    private Map<String, Object> createConsumerConfig(String topic, String groupId) {
         Map<String, Object> props = new HashMap<>();
-        // Defaults — overridable by user properties
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.putAll(config.getProperties());
-        // Internal settings — not overridable
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, config.getBrokers());
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, config.getClientId());
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.CLIENT_ID_CONFIG, config.getClientId() + "-consumer-" + topic);
         return props;
     }
 
     private NxProducer createProducer() {
         Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
+        props.put(ProducerConfig.LINGER_MS_CONFIG, "10");
+        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "gzip");
+        props.put(ProducerConfig.RETRIES_CONFIG, Integer.toString(Integer.MAX_VALUE));
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, "120000");
         props.putAll(config.getProperties());
-        // Internal settings — not overridable
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, config.getBrokers());
         props.put(ProducerConfig.CLIENT_ID_CONFIG, config.getClientId() + "-producer");
-        return NxProducer.create(props, config.getGson(), config.getProducerStaticHeaders());
+        return NxProducer.create(props, config.getGson(), config.getProducerStaticHeaders(),
+                config.getProducerCloseTimeout());
     }
 
-    private void tryConnect() {
-        if (closed.get()) {
-            return;
-        }
-
+    private AdminClient createAdminClient() {
         Map<String, Object> adminConfig = new HashMap<>();
         adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, config.getBrokers());
         adminConfig.put(AdminClientConfig.CLIENT_ID_CONFIG, config.getClientId() + "-admin");
         adminConfig.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, (int) config.getConnectTimeoutMs());
         adminConfig.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, (int) config.getConnectTimeoutMs());
         adminConfig.putAll(config.getProperties());
+        try {
+            return AdminClient.create(adminConfig);
+        } catch (Exception e) {
+            log.warn("Failed to create AdminClient for {}", config.getBrokers(), e);
+            return null;
+        }
+    }
 
-        try (AdminClient admin = AdminClient.create(adminConfig)) {
-            DescribeClusterResult result = admin.describeCluster();
+    private void closeAdminClient() {
+        AdminClient local = adminClient;
+        if (local == null) {
+            return;
+        }
+        adminClient = null;
+        try {
+            local.close();
+        } catch (Exception e) {
+            log.warn("Error closing AdminClient", e);
+        }
+    }
+
+    private void tryConnect() {
+        if (closed.get()) {
+            return;
+        }
+        if (adminClient == null) {
+            adminClient = createAdminClient();
+            if (adminClient == null) {
+                changeState(KafkaState.DISCONNECTED);
+                return;
+            }
+        }
+        try {
+            DescribeClusterResult result = adminClient.describeCluster();
             String clusterId = result.clusterId().get(config.getConnectTimeoutMs(), TimeUnit.MILLISECONDS);
             int brokerCount = result.nodes().get(config.getConnectTimeoutMs(), TimeUnit.MILLISECONDS).size();
 
@@ -433,7 +534,7 @@ public final class NxKafka {
         } catch (Exception e) {
             if (!closed.get()) {
                 changeState(KafkaState.DISCONNECTED);
-                log.warn("Failed to connect to Kafka at {}: {}", config.getBrokers(), e.getMessage(), e);
+                log.warn("Failed to connect to Kafka at {}", config.getBrokers(), e);
             }
         }
     }

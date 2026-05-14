@@ -53,10 +53,31 @@ by the L2NX game-server adapter and its consumers. Published as
   `CommandsStats`)
 - `app.l2nx.gs.adapter.api.spi` — SPIs: Tier-1 `AdapterModule`, Tier-2
   `DbSchemaProvider` / `RuntimeStateProvider`, Tier-3 `JdbcConnectionSource`,
-  context bundle `ConnectContext`, capabilities `NxEvents` and `NxCommands`
-  (consumed by host hooks; implementations live in adapter-core), per-invocation
-  `CommandContext` + handler SAM `CommandHandler<C, R>` + game-thread hop helper
-  `HostExecutor`
+  context bundle `ConnectContext` (now includes `io()` returning an
+  adapter-owned `java.util.concurrent.Executor` for module-level blocking IO),
+  capabilities `NxEvents` and `NxCommands` (consumed by host hooks;
+  implementations live in adapter-core), per-invocation `CommandContext`
+  (also exposes `io()` for handler-level blocking IO hops) + handler SAM
+  `CommandHandler<C, R>` + game-thread hop helper `HostExecutor`
+
+## Contracts worth calling out
+
+- **`ConnectContext.io()` / `CommandContext.io()` (binary-breaking for external
+  implementers).** `CommandContext.io()` is `abstract` on the interface; any
+  external implementer (test doubles, alternate adapters) MUST implement it.
+  `ConnectContext` gained an `io` field + getter and now has a 10-arg canonical
+  constructor with a 9-arg back-compat constructor preserved for sources that
+  built it positionally. Callers MUST hop blocking IO (JDBC, HTTP) onto these
+  executors instead of running on the game thread or the Kafka consumer thread.
+- **`SyncEvent` DELETED payload.** `payload=null` on `DELETED` ops no longer
+  claims Kafka-tombstone semantics: topics use bounded retention, not log
+  compaction, so consumers MUST explicitly handle the `DELETED` op (do not
+  rely on the null-value tombstone protocol).
+- **Identifier validation.** Any SQL identifier passed via `EntityMapping`,
+  `PrimarySource`, or `ChildSource` (tableName / pkColumn / fkColumn /
+  hashedColumns) MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`. Schema-qualified
+  names (`schema.table`), quoted identifiers, and anything outside that pattern
+  are rejected at engine start — no runtime quoting / escaping is performed.
 
 ## Constraints
 

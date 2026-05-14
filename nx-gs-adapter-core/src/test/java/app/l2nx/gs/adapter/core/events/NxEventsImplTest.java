@@ -276,7 +276,55 @@ class NxEventsImplTest {
                 "disabled family must not count toward dropped-total");
     }
 
+    @Test
+    void swap_shouldRetargetFacade_atNewPublisher() throws InterruptedException {
+        // Old publisher captures via captured1 sender.
+        ConcurrentLinkedQueue<Object> captured1 = new ConcurrentLinkedQueue<Object>();
+        CountDownLatch latch1 = new CountDownLatch(1);
+        EventsPublisher.Sender sender1 = (record, callback) -> {
+            captured1.add(record.value());
+            callback.onCompletion(null, null);
+            latch1.countDown();
+        };
+        EventTypeRegistry registry1 = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("premiumpurchase", "topic-a"),
+                sender1, cfg(50, 200L), registry1);
+        publisher.start();
+        NxEventsImpl events = new NxEventsImpl(publisher, registry1);
+
+        // Old publisher receives the first event.
+        events.publishPremiumPurchase(PremiumPurchaseEvent.builder()
+                .eventId(UUIDv7.generate()).characterId(1L).build());
+        assertTrue(latch1.await(2, TimeUnit.SECONDS));
+        assertEquals(1, captured1.size());
+
+        // Stop old and start a new publisher; swap the facade onto it.
+        publisher.stop();
+        ConcurrentLinkedQueue<Object> captured2 = new ConcurrentLinkedQueue<Object>();
+        CountDownLatch latch2 = new CountDownLatch(1);
+        EventsPublisher.Sender sender2 = (record, callback) -> {
+            captured2.add(record.value());
+            callback.onCompletion(null, null);
+            latch2.countDown();
+        };
+        EventTypeRegistry registry2 = new EventTypeRegistry();
+        EventsPublisher next = new EventsPublisher(
+                Collections.singletonMap("premiumpurchase", "topic-b"),
+                sender2, cfg(50, 200L), registry2);
+        next.start();
+        events.swap(next, registry2);
+        publisher = next; // ensure tearDown stops it
+
+        events.publishPremiumPurchase(PremiumPurchaseEvent.builder()
+                .eventId(UUIDv7.generate()).characterId(2L).build());
+
+        assertTrue(latch2.await(2, TimeUnit.SECONDS), "swapped publisher did not receive event");
+        assertEquals(1, captured2.size(), "swapped event must hit the new publisher only");
+        assertEquals(1, captured1.size(), "old publisher must not see new event");
+    }
+
     private static EventsConfig cfg(int capacity, long shutdownDrainMs) {
-        return new EventsConfig(capacity, EventsPublisher.DropPolicy.OLDEST, shutdownDrainMs);
+        return new EventsConfig(capacity, EventsPublisher.DropPolicy.NEWEST, shutdownDrainMs);
     }
 }

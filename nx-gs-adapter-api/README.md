@@ -16,8 +16,16 @@ the network between the adapter and any consumer that speaks its protocol.
 ## Contents
 
 - `app.l2nx.gs.adapter.api.rest.*` — REST request / response DTOs (`ConnectRequest`,
-  `ConnectResponse`, `KafkaConfig`, `Topics` — the wire shape of the adapter handshake)
-- `app.l2nx.gs.adapter.api.kafka.*` (planned, future minor) — Kafka message payloads. Will land
-  here once a paired consumer needs a shared compile-time type
-- `app.l2nx.gs.adapter.api.spi.*` (planned) — `AdapterModule` SPI loaded via `ServiceLoader`
+  `ConnectResponse`, `KafkaConfig`, `SyncTopics`, `MessagingTopics` — the wire shape of the
+  adapter handshake)
+- `app.l2nx.gs.adapter.api.kafka.*` — Kafka message payloads + header contract (`NxHeaders`),
+  per-family event DTOs under `kafka.events.<family>`, inbound command marker
+  `kafka.commands.NxCommand` + reply envelope `CommandResult` + `ErrorCode`, operational
+  telemetry under `kafka.ops`
+- `app.l2nx.gs.adapter.api.spi.*` — `AdapterModule` SPI (Tier-1) + `DbSchemaProvider` /
+  `RuntimeStateProvider` (Tier-2) + `JdbcConnectionSource` (Tier-3), plus context bundles
+  (`ConnectContext` / `CommandContext`, both exposing `io()` for blocking-IO hops),
+  capabilities (`NxEvents`, `NxCommands`), and helpers (`CommandHandler`, `HostExecutor`)
+
+See [`CLAUDE.md`](./CLAUDE.md) for the per-package detail.
 

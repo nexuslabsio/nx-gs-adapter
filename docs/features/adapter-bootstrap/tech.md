@@ -32,13 +32,19 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       manifest's `Implementation-Version` (with `unknown` fallback); used
       by the banner before the config resolver runs
     - `connect/ConnectFlow.java` [done] — POST `/connect` lifecycle, status-code dispatch,
-      retry-with-backoff via `AtomicInteger` attempt counter; `sanitize()` redacts
-      `Bearer <token>` patterns from log messages
+      retry-with-backoff via `AtomicInteger` attempt counter (capped — no unbounded
+      growth); each scheduled delay is jittered ±25% (`BackoffSchedule.next` value
+      ± `0.25 * value`) to avoid fleet-wide thundering herd on platform recovery;
+      `RejectedExecutionException` from the scheduler emits `Outcome.FAILED` rather
+      than being logged silently; `sanitize()` redacts `Bearer <token>` patterns
+      from log messages
     - `connect/ConnectClient.java` [done] — interface; implementations encode transport /
       parse failures as `ConnectResult` rather than throwing
     - `connect/HttpURLConnectionConnectClient.java` [done] — JDK-only impl: Bearer auth,
-      `Connection: close`, 5s/10s timeouts, `BufferedWriter`-wrapped output, 1 MiB hard
-      cap on response body (host-JVM OOM defense), UTF-8 char-array read
+      `Connection: close`, 5s/10s timeouts, `BufferedWriter`-wrapped output, 1 Mi hard
+      cap on response body via the `MAX_RESPONSE_BODY_CHARS` constant (renamed from
+      `MAX_RESPONSE_BODY_BYTES` — counted in UTF-16 code units, not bytes; pure
+      rename, no behavior change), UTF-8 char-array read
     - `connect/ConnectResult.java` [done] — typed result envelope (success / httpError /
       ioFailure)
     - `connect/ErrorEnvelope.java` [done] — wire-shape `{code, message}` Gson-deserialized
@@ -49,7 +55,13 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
     - `kafka/KafkaInitializer.java` [done] — composes `NxKafka` builder properties
       (`security.protocol`, `sasl.mechanism`, `sasl.jaas.config` templated against
       `ScramLoginModule`) from `ConnectResponse.kafka` and delegates to a `KafkaFactory`;
-      escapes `\` / `"` in credentials before inlining into the JAAS string
+      escapes `\` and `"` in `saslUsername` / `saslPassword` before interpolation into
+      the JAAS config string — closes a Kafka-init-failure path where credentials
+      containing escape-significant characters produced a malformed JAAS value. Also
+      wires the at-least-once producer durability defaults (`acks=all`,
+      `enable.idempotence=true`, `max.in.flight=5`, `linger.ms=10`,
+      `compression=gzip`, `retries=MAX`, `delivery.timeout.ms=120000`) — all
+      overridable via user properties.
     - `kafka/KafkaFactory.java` [done] — interface (test seam over the
       `NxKafka.configure().build()` singleton); contract returns post-build `KafkaState`
       and forwards a state-change listener
@@ -59,14 +71,25 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
       idempotent
     - `heartbeat/HeartbeatService.java` [done] — `ScheduledExecutorService`-driven 60s
       loop; tick wrapped in `SafeRunnable` so a runaway throwable can't cancel the
-      schedule. `KafkaPublisher` interface is the test seam over
+      schedule. `start(...)` and `stop()` are `synchronized` so a reconnect cycle
+      cannot leave a scheduler running concurrent with shutdown.
+      `KafkaPublisher` interface is the test seam over
       `NxKafka.instance().send(topic, key, payload)`. `start(serverId, topic)`
       captures `connectInstant` fresh each call, so uptime is session-scoped
       (resets on reconnect)
     - `concurrent/SafeRunnable.java` [done] — static `wrap(Runnable, NxLog)`
       helper that swallows `Throwable` from the delegate. Applied at every
       adapter daemon-thread entry point (connect submit, heartbeat tick,
-      shutdown hook)
+      shutdown hook). `Thread.setUncaughtExceptionHandler` is also installed
+      on every adapter-owned thread so an escaped throwable still routes
+      through `NxLog` instead of the JVM default handler. Poll/tick loops
+      catch `Throwable` (not just `Exception`).
+    - `io/IoPool.java` [done] — adapter-owned daemon executor (`nx-io-N`
+      threads) sized by `l2nx.io.workers` (default `max(2, cores/2)`).
+      Surfaced via `ConnectContext.io()` and `CommandContext.io()` for
+      blocking IO (JDBC, HTTP, FS) from module code and command handlers —
+      handlers MUST NOT do blocking IO on the consumer thread or via
+      `ctx.host().sync(...)`.
     - heartbeat wire type lives in `nx-gs-adapter-api`
       (`app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent`) — adapter-bootstrap
       `0.1.0` shipped fields `serverId`, `adapterVersion`, `uptime` only;
@@ -300,8 +323,34 @@ Lifecycle FSM (`AdapterState`) — единственный шарящийся s
   wait on platform availability — host JVM continues booting normally even if `/connect`
   fails. Status surfaced via `state()` / `onStateChange`.
 - **All daemon threads catch `Throwable`.** Game-server stability dominates — uncaught
-  exceptions in adapter threads must NEVER bring down the host JVM. Same philosophy as
-  `nx-gs-kafka`.
+  exceptions in adapter threads must NEVER bring down the host JVM. Every poll/tick
+  loop catches `Throwable` (not just `Exception`), and every adapter-owned thread
+  has a `Thread.setUncaughtExceptionHandler` installed that routes through `NxLog`.
+  Same philosophy as `nx-gs-kafka`.
+
+- **Adapter-owned threading inventory.** Every long-running unit of work lives on
+  an adapter-owned daemon thread, named so operators can identify owners from
+  thread dumps:
+    - `nx-adapter-connect` — connect retry loop
+    - `nx-adapter-heartbeat` — 60s heartbeat scheduler
+    - `nx-adapter-shutdown` — JVM shutdown hook
+    - `nx-events-publisher` — events bounded-queue drainer
+    - `nx-commands-consumer` — commands Kafka consumer
+    - `nx-io-N` — shared IO pool (`l2nx.io.workers`)
+    - `nx-cdc-<entity>` — per-entity CDC engine threads (owned by sync modules)
+
+- **Backoff jitter.** Each retry delay is jittered by ±25% to avoid fleet-wide
+  thundering-herd reconnect storms on platform recovery. The attempt counter is
+  also capped — no unbounded growth.
+
+- **`RejectedExecutionException` from the connect scheduler emits
+  `Outcome.FAILED`.** Previously logged-and-ignored, which masked a real
+  shutdown-race condition. Surfacing it as `FAILED` lets the orchestrator
+  observe and react.
+
+- **Heartbeat start/stop is `synchronized`.** A reconnect cycle concurrent with
+  shutdown could otherwise leave the scheduler running while the rest of the
+  adapter tears down.
 - **`NxAdapter.start()` never throws into the host JVM either.** Config-resolution errors
   bubble out of `ConfigResolver` as `IllegalStateException` (its private contract), but
   are caught once at the `start()` boundary, logged via `NxLog`, and surface as state

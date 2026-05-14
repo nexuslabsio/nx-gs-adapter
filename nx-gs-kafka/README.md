@@ -93,8 +93,9 @@ NxKafka.instance().send("my.topic", playerId, event, (metadata, exception) -> {
 
 <!-- @formatter:off -->
 ```java
-// Subscribe — creates a dedicated daemon thread per topic
-NxKafka.instance().subscribe("my.topic", MyEvent.class, event -> {
+// Subscribe — creates a dedicated daemon thread per topic.
+// groupId is REQUIRED — pick a stable identifier for the consumer group.
+NxKafka.instance().subscribe("my.topic", "my-server.events", MyEvent.class, event -> {
     // Runs on NxKafka thread — dispatch to game thread if needed
     gameServer.enqueue(() -> handleEvent(event));
 });
@@ -103,6 +104,11 @@ NxKafka.instance().subscribe("my.topic", MyEvent.class, event -> {
 NxKafka.instance().unsubscribe("my.topic");
 ```
 <!-- @formatter:on -->
+
+Manual offset commit — the consumer commits the offset synchronously after the
+handler returns normally. If the handler throws, the offset is NOT committed and
+the record is redelivered on the next poll / on JVM restart. Make handlers
+idempotent.
 
 ### Request-Reply (Spring Kafka compatible)
 
@@ -157,9 +163,10 @@ A JVM shutdown hook is also registered automatically.
 NxKafka kafka = NxKafka.configure()
     .brokers("kafka1:9092,kafka2:9092")       // required
     .clientId("bohpts-x20")                   // optional, default: nx-gs-kafka
-    .connectTimeout(5, TimeUnit.SECONDS)      // optional, default: 5s
+    .connectTimeout(5, TimeUnit.SECONDS)      // optional, default: 5s, max: 60s
     .reconnect(true)                          // optional, default: true
-    .reconnectInterval(30, TimeUnit.SECONDS)  // optional, default: 30s
+    .reconnectInterval(30, TimeUnit.SECONDS)  // optional, default: 30s, max: 5min
+    .producerCloseTimeout(Duration.ofSeconds(10))  // optional, default: 10s
     .gson(customGson)                         // optional, default: new Gson()
     .onStateChange(state -> log.info("Kafka state: {}", state))  // optional
     .property("security.protocol", "SASL_SSL") // any kafka-clients property
@@ -168,6 +175,24 @@ NxKafka kafka = NxKafka.configure()
 <!-- @formatter:on -->
 
 All standard `kafka-clients` properties can be passed via `.property(key, value)`.
+
+### Producer durability defaults
+
+The library pins durability-relevant producer defaults; per-property overrides via
+`.property(...)` still win on a per-key basis:
+
+| Property                                  | Default             |
+|-------------------------------------------|---------------------|
+| `acks`                                    | `all`               |
+| `enable.idempotence`                      | `true`              |
+| `max.in.flight.requests.per.connection`   | `5`                 |
+| `linger.ms`                               | `10`                |
+| `compression.type`                        | `gzip`              |
+| `retries`                                 | `Integer.MAX_VALUE` |
+| `delivery.timeout.ms`                     | `120000`            |
+
+Consumer side: `enable.auto.commit=false` is pinned — commits happen synchronously
+after handler success.
 
 The custom `Gson` instance is used for both producer serialization and consumer deserialization.
 The `onStateChange` callback is invoked on state transitions (CONNECTED ↔ DISCONNECTED, → CLOSED) —

@@ -70,22 +70,69 @@ public final class CommandsBootstrap {
      * @param config          operator-tunable knobs; falls back to
      *                        {@link CommandsConfig#defaults()} when {@code null}.
      */
+    /**
+     * Rebuild the consumer in-place behind an existing {@link NxCommands}
+     * façade, preserving its registered handlers across reconnect. Modules
+     * that captured {@code ctx.commands()} from an earlier {@code onConnect}
+     * keep working with no re-registration.
+     *
+     * <p>Caller MUST stop the previous {@link CommandsConsumer} first — this
+     * method only creates the new one.</p>
+     */
+    public static @Nullable CommandsConsumer swap(NxCommands facade,
+                                                  @Nullable MessagingTopics messagingTopics,
+                                                  KafkaConfig kafka,
+                                                  String clientIdBase,
+                                                  @Nullable Executor hostExecutor,
+                                                  Executor ioExecutor,
+                                                  NxEvents events,
+                                                  CommandsConsumer.ReplySender replySender,
+                                                  @Nullable CommandsConfig config) {
+        if (!(facade instanceof NxCommandsImpl)) {
+            throw new IllegalArgumentException(
+                    "swap() requires a facade produced by CommandsBootstrap.start(); got "
+                            + (facade == null ? "null" : facade.getClass().getName()));
+        }
+        // Reuse the existing registry so previously registered handlers survive.
+        CommandTypeRegistry registry = ((NxCommandsImpl) facade).peekRegistry();
+        if (registry == null) {
+            registry = new CommandTypeRegistry();
+            ((NxCommandsImpl) facade).swap(registry);
+        }
+        return buildConsumer(messagingTopics, kafka, clientIdBase, hostExecutor,
+                ioExecutor, events, replySender, config, registry);
+    }
+
     public static Started start(@Nullable MessagingTopics messagingTopics,
                                 KafkaConfig kafka,
                                 String clientIdBase,
                                 @Nullable Executor hostExecutor,
+                                Executor ioExecutor,
                                 NxEvents events,
                                 CommandsConsumer.ReplySender replySender,
                                 @Nullable CommandsConfig config) {
         CommandTypeRegistry registry = new CommandTypeRegistry();
         NxCommandsImpl commands = new NxCommandsImpl(registry);
+        CommandsConsumer consumer = buildConsumer(messagingTopics, kafka, clientIdBase,
+                hostExecutor, ioExecutor, events, replySender, config, registry);
+        return new Started(commands, consumer);
+    }
 
+    private static @Nullable CommandsConsumer buildConsumer(@Nullable MessagingTopics messagingTopics,
+                                                            KafkaConfig kafka,
+                                                            String clientIdBase,
+                                                            @Nullable Executor hostExecutor,
+                                                            Executor ioExecutor,
+                                                            NxEvents events,
+                                                            CommandsConsumer.ReplySender replySender,
+                                                            @Nullable CommandsConfig config,
+                                                            CommandTypeRegistry registry) {
         String inboundTopic = (messagingTopics != null) ? messagingTopics.getCommandsTopic() : null;
         String repliesTopic = (messagingTopics != null) ? messagingTopics.getCommandsRepliesTopic() : null;
 
         if (inboundTopic == null || inboundTopic.isEmpty()) {
             log.info("Commands surface disabled — MessagingTopics.commandsTopic is unconfigured");
-            return new Started(commands, null);
+            return null;
         }
 
         if (repliesTopic == null || repliesTopic.isEmpty()) {
@@ -113,13 +160,14 @@ public final class CommandsBootstrap {
                 repliesTopic,
                 hostExec,
                 events,
+                ioExecutor,
                 registry,
                 kafkaConsumer,
                 replySender,
                 gson,
                 effectiveConfig);
         consumer.start();
-        return new Started(commands, consumer);
+        return consumer;
     }
 
     private static Map<String, Object> buildConsumerConfig(KafkaConfig kafka,

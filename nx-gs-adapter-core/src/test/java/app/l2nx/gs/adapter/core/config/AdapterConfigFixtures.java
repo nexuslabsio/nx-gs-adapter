@@ -20,11 +20,13 @@ public final class AdapterConfigFixtures {
 
     public static AdapterConfig enabled(String platformUrl) {
         return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, true,
+                AdapterConfig.defaultIoWorkers(),
                 Collections.emptyMap(), EventsConfig.defaults(), CommandsConfig.defaults());
     }
 
     public static AdapterConfig disabled(String platformUrl) {
         return new AdapterConfig(VALID_SERVER_KEY, platformUrl, DEFAULT_VERSION, false,
+                AdapterConfig.defaultIoWorkers(),
                 Collections.emptyMap(), EventsConfig.defaults(), CommandsConfig.defaults());
     }
 }

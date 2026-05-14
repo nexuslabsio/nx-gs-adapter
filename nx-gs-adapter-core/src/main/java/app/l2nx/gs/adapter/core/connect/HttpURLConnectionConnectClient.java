@@ -28,9 +28,13 @@ public final class HttpURLConnectionConnectClient implements ConnectClient {
     private static final int CONNECT_TIMEOUT_MS = 5_000;
     private static final int READ_TIMEOUT_MS = 10_000;
     /**
-     * Hard cap on response body size — guards the host JVM from OOM on a runaway response.
+     * Hard cap on response body size in CHARACTERS — guards the host JVM
+     * from OOM on a runaway response. Counted via {@link StringBuilder#length()};
+     * the underlying byte count can exceed this for non-ASCII payloads
+     * (max 4× under UTF-8). Renamed from MAX_RESPONSE_BODY_BYTES to be
+     * honest about the unit; the cap value is unchanged.
      */
-    static final int MAX_RESPONSE_BODY_BYTES = 1 << 20; // 1 MiB
+    static final int MAX_RESPONSE_BODY_CHARS = 1 << 20; // 1 MiB chars
 
     private final Gson gson = new Gson();
 
@@ -115,8 +119,8 @@ public final class HttpURLConnectionConnectClient implements ConnectClient {
             StringBuilder sb = new StringBuilder();
             int read;
             while ((read = r.read(buf)) != -1) {
-                if (sb.length() + read > MAX_RESPONSE_BODY_BYTES) {
-                    throw new IOException("connect: response body exceeds " + MAX_RESPONSE_BODY_BYTES + " bytes");
+                if (sb.length() + read > MAX_RESPONSE_BODY_CHARS) {
+                    throw new IOException("connect: response body exceeds " + MAX_RESPONSE_BODY_CHARS + " chars");
                 }
                 sb.append(buf, 0, read);
             }

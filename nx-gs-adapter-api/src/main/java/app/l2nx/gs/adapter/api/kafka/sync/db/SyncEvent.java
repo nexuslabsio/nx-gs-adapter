@@ -38,11 +38,12 @@ import java.util.Objects;
  *     {@code "UPDATED"}, {@code "DELETED"}. String (not enum) keeps the platform
  *     consumer decoupled from JVM enum ordinals; consumers SHOULD treat unknown
  *     values defensively for forward-compat.</li>
- *     <li>{@code payload} — the row DTO. {@code null} for {@code DELETED}
- *     (tombstone semantics): the topic is log-compacted with the row's PK as the
- *     Kafka key, so a null payload deletes the compacted entry. Equality
- *     comparison (and hashing) of {@code SyncEvent} delegates to {@code T.equals}
- *     / {@code T.hashCode} — DTO authors MUST implement value semantics on their
+ *     <li>{@code payload} — the row DTO. {@code null} for {@code DELETED}.
+ *     Topics use bounded retention (typically ≤1 day), not log compaction, so
+ *     consumers must explicitly handle the {@code DELETED} op rather than
+ *     treating null-value tombstones as signal. Equality comparison (and
+ *     hashing) of {@code SyncEvent} delegates to {@code T.equals} /
+ *     {@code T.hashCode} — DTO authors MUST implement value semantics on their
  *     payload classes if downstream code compares {@code SyncEvent}s.</li>
  *     <li>{@code timestampEpochMs} — engine-side {@code System.currentTimeMillis()}
  *     at publish time. Epoch milliseconds keep the wire shape primitive

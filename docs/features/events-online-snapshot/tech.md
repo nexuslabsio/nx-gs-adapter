@@ -61,7 +61,16 @@ the six wellknown buckets, and publishing.
 - **NxEvents.publishServerOnlineSnapshot / NxEventsImpl.publishServerOnlineSnapshot** (implements R4, R6) —
   symmetric to `publishPremiumPurchase`. Null event → WARN + drop; missing registry
   binding → WARN + drop; family disabled → DEBUG + drop; otherwise enqueue
-  on `EventsPublisher` via the existing `EventEnvelope` path.
+  on `EventsPublisher` via the existing `EventEnvelope` path. Drop policy on
+  queue overflow defaults to `newest` (drop incoming; queue order preserved);
+  `oldest` (evict head) remains opt-in but over-counts `dropped-total` under
+  multi-producer contention.
+
+- **`NxEvents` façade reconnect stability** — the façade returned by
+  `ConnectContext.events()` survives reconnect cycles. An internal
+  `AtomicReference` inside the façade is swapped to the live publisher on
+  every reconnect, so `OnlineSnapshotBuilder` (and any other module-scoped
+  caller) can cache the handle once at `onConnect` and never re-acquire.
 
 - **EventTypeRegistry online binding** (implements R5) — `("serveronline",
   "ServerOnlineSnapshotEvent", evt -> null)`. Null partition-key is intentional —

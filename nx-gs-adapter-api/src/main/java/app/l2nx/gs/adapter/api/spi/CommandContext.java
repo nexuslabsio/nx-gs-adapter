@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 /**
  * Per-invocation context handed to a {@link CommandHandler#handle(Object, CommandContext)}
@@ -45,4 +46,13 @@ public interface CommandContext {
      * the platform's audit stream).
      */
     NxEvents events();
+
+    /**
+     * Adapter-owned IO executor. Use for blocking IO (JDBC, HTTP) issued
+     * from command handlers. NOT the game-thread executor — use
+     * {@link #host()} for game-state reads/writes. Backed by a small bounded
+     * pool sized by {@code l2nx.io.workers} (default =
+     * {@code max(2, Runtime.getRuntime().availableProcessors() / 2)}).
+     */
+    Executor io();
 }
