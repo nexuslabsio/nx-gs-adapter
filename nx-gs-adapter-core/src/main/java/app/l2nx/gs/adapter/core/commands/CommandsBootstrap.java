@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 
 /**
@@ -61,6 +62,7 @@ public final class CommandsBootstrap {
                                                   KafkaConfig kafka,
                                                   String clientIdBase,
                                                   String groupId,
+                                                  UUID ownServerId,
                                                   @Nullable Executor hostExecutor,
                                                   Executor ioExecutor,
                                                   NxEvents events,
@@ -78,8 +80,8 @@ public final class CommandsBootstrap {
             registry = new CommandTypeRegistry();
             ((NxCommandsImpl) facade).swap(registry);
         }
-        return buildConsumer(messagingTopics, kafka, clientIdBase, groupId, hostExecutor,
-                ioExecutor, events, sync, replySender, config, registry);
+        return buildConsumer(messagingTopics, kafka, clientIdBase, groupId, ownServerId,
+                hostExecutor, ioExecutor, events, sync, replySender, config, registry);
     }
 
     /**
@@ -116,6 +118,7 @@ public final class CommandsBootstrap {
                                 KafkaConfig kafka,
                                 String clientIdBase,
                                 String groupId,
+                                UUID ownServerId,
                                 @Nullable Executor hostExecutor,
                                 Executor ioExecutor,
                                 NxEvents events,
@@ -125,7 +128,7 @@ public final class CommandsBootstrap {
         CommandTypeRegistry registry = new CommandTypeRegistry();
         NxCommandsImpl commands = new NxCommandsImpl(registry);
         CommandsConsumer consumer = buildConsumer(messagingTopics, kafka, clientIdBase, groupId,
-                hostExecutor, ioExecutor, events, sync, replySender, config, registry);
+                ownServerId, hostExecutor, ioExecutor, events, sync, replySender, config, registry);
         return new Started(commands, consumer);
     }
 
@@ -133,6 +136,7 @@ public final class CommandsBootstrap {
                                                             KafkaConfig kafka,
                                                             String clientIdBase,
                                                             String groupId,
+                                                            UUID ownServerId,
                                                             @Nullable Executor hostExecutor,
                                                             Executor ioExecutor,
                                                             NxEvents events,
@@ -171,6 +175,7 @@ public final class CommandsBootstrap {
         CommandsConsumer consumer = new CommandsConsumer(
                 inboundTopic,
                 repliesTopic,
+                ownServerId,
                 hostExec,
                 events,
                 ioExecutor,

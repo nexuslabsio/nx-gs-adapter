@@ -34,6 +34,23 @@ public final class NxHeaders {
      */
     public static final String NX_CORRELATION_ID = "Nx-Correlation-Id";
 
+    /**
+     * Inbound-only header carrying the target game-server id for a command
+     * record on the shared per-tenant commands topic. Encoded as 16 raw bytes
+     * via {@link #encodeUuid(UUID)} / {@link #decodeUuid(byte[])}.
+     *
+     * <p>The platform may host multiple game-servers under a single tenant; all
+     * adapters in that tenant subscribe to the same {@code <tenant>.gs.commands}
+     * topic and read every record. The adapter MUST drop records whose
+     * {@code Nx-Target-Server-Id} does not match its own server id (issued in
+     * the {@code /connect} response). Records without the header are dropped
+     * with WARN — this contract is mandatory.</p>
+     *
+     * <p>Distinct from {@link #NX_SERVER_ID} (outbound: "the originating
+     * server"); a single record never carries both at once.</p>
+     */
+    public static final String NX_TARGET_SERVER_ID = "Nx-Target-Server-Id";
+
     private NxHeaders() {
     }
 

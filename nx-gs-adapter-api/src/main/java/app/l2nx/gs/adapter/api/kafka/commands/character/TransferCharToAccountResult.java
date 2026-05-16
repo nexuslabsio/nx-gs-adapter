@@ -3,22 +3,22 @@ package app.l2nx.gs.adapter.api.kafka.commands.character;
 import java.util.Objects;
 
 /**
- * Success payload of {@link TransferCharCommand}. Echoes the rebound
+ * Success payload of {@link TransferCharToAccountCommand}. Echoes the rebound
  * character + the new account name, plus a flag indicating whether a
  * force-logout was needed (the character was online at command time).
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
  */
-public final class TransferCharResult {
+public final class TransferCharToAccountResult {
 
     private final Long charId;
     private final String newAccountName;
     private final boolean wasLoggedOut;
 
-    public TransferCharResult(Long charId,
-                              String newAccountName,
-                              boolean wasLoggedOut) {
+    public TransferCharToAccountResult(Long charId,
+                                       String newAccountName,
+                                       boolean wasLoggedOut) {
         if (charId == null) {
             throw new IllegalArgumentException("charId is required");
         }
@@ -61,8 +61,8 @@ public final class TransferCharResult {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof TransferCharResult)) return false;
-        TransferCharResult that = (TransferCharResult) o;
+        if (!(o instanceof TransferCharToAccountResult)) return false;
+        TransferCharToAccountResult that = (TransferCharToAccountResult) o;
         return wasLoggedOut == that.wasLoggedOut
                 && Objects.equals(charId, that.charId)
                 && Objects.equals(newAccountName, that.newAccountName);
@@ -75,7 +75,7 @@ public final class TransferCharResult {
 
     @Override
     public String toString() {
-        return "TransferCharResult[charId=" + charId
+        return "TransferCharToAccountResult[charId=" + charId
                 + ", newAccountName=" + newAccountName
                 + ", wasLoggedOut=" + wasLoggedOut + "]";
     }
@@ -100,8 +100,8 @@ public final class TransferCharResult {
             return this;
         }
 
-        public TransferCharResult build() {
-            return new TransferCharResult(charId, newAccountName, wasLoggedOut);
+        public TransferCharToAccountResult build() {
+            return new TransferCharToAccountResult(charId, newAccountName, wasLoggedOut);
         }
     }
 }

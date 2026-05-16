@@ -214,7 +214,7 @@ public final class DbSyncModule implements AdapterModule {
             return;
         }
         // Wire NxSync triggers so host code can request an immediate sync
-        // pass for any of our entities (e.g. right after a TransferItemCommand
+        // pass for any of our entities (e.g. right after a TransferItemToCharacterCommand
         // mutates a character) without waiting for the next scheduled tick.
         try {
             CdcEngine running = engine;

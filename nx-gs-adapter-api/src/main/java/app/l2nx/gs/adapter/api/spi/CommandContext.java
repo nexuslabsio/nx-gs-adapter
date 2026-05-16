@@ -42,7 +42,7 @@ public interface CommandContext {
      * Outbound discrete-fact event capability — same instance handed to
      * Tier-1 modules via {@code ConnectContext.events()}. Handlers MAY
      * publish events as side-effects of command processing (e.g. a
-     * {@code TransferItem} command fires a {@code ItemTransferredEvent} for
+     * {@code TransferItemToCharacter} command fires a {@code ItemTransferredEvent} for
      * the platform's audit stream).
      */
     NxEvents events();

@@ -68,17 +68,17 @@ import java.util.Objects;
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
  */
-public final class TransferItemCommand implements NxCommand<TransferItemResult> {
+public final class TransferItemToCharacterCommand implements NxCommand<TransferItemToCharacterResult> {
 
     private final Long charIdFrom;
     private final Long charIdTo;
     private final Long itemId;
     private final Long count;
 
-    public TransferItemCommand(Long charIdFrom,
-                               Long charIdTo,
-                               Long itemId,
-                               Long count) {
+    public TransferItemToCharacterCommand(Long charIdFrom,
+                                          Long charIdTo,
+                                          Long itemId,
+                                          Long count) {
         if (charIdFrom == null) {
             throw new IllegalArgumentException("charIdFrom is required");
         }
@@ -149,8 +149,8 @@ public final class TransferItemCommand implements NxCommand<TransferItemResult> 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof TransferItemCommand)) return false;
-        TransferItemCommand that = (TransferItemCommand) o;
+        if (!(o instanceof TransferItemToCharacterCommand)) return false;
+        TransferItemToCharacterCommand that = (TransferItemToCharacterCommand) o;
         return Objects.equals(charIdFrom, that.charIdFrom)
                 && Objects.equals(charIdTo, that.charIdTo)
                 && Objects.equals(itemId, that.itemId)
@@ -164,7 +164,7 @@ public final class TransferItemCommand implements NxCommand<TransferItemResult> 
 
     @Override
     public String toString() {
-        return "TransferItemCommand[charIdFrom=" + charIdFrom
+        return "TransferItemToCharacterCommand[charIdFrom=" + charIdFrom
                 + ", charIdTo=" + charIdTo
                 + ", itemId=" + itemId
                 + ", count=" + count + "]";
@@ -199,8 +199,8 @@ public final class TransferItemCommand implements NxCommand<TransferItemResult> 
             return this;
         }
 
-        public TransferItemCommand build() {
-            return new TransferItemCommand(charIdFrom, charIdTo, itemId, count);
+        public TransferItemToCharacterCommand build() {
+            return new TransferItemToCharacterCommand(charIdFrom, charIdTo, itemId, count);
         }
     }
 }

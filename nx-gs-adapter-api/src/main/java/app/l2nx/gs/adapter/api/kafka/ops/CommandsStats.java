@@ -20,6 +20,10 @@ import java.util.Objects;
  * <p>Counter taxonomy (cumulative since adapter start):</p>
  * <ul>
  *     <li>{@code consumed-total} — records pulled from Kafka.</li>
+ *     <li>{@code other-server-skipped-total} — records dropped because the
+ *     {@code Nx-Target-Server-Id} header did not match this adapter's own
+ *     server id (cross-server multiplexing on the shared per-tenant commands
+ *     topic) or the header was missing/malformed.</li>
  *     <li>{@code handled-total} — records dispatched to a handler that returned
  *     a {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult} (success
  *     OR business error). Excludes records that hit
@@ -48,6 +52,7 @@ import java.util.Objects;
 public final class CommandsStats {
 
     private final long consumedTotal;
+    private final long otherServerSkippedTotal;
     private final long handledTotal;
     private final long unsupportedTotal;
     private final long validationFailedTotal;
@@ -58,6 +63,7 @@ public final class CommandsStats {
     private final @Nullable List<String> registeredTypes;
 
     public CommandsStats(long consumedTotal,
+                         long otherServerSkippedTotal,
                          long handledTotal,
                          long unsupportedTotal,
                          long validationFailedTotal,
@@ -67,6 +73,7 @@ public final class CommandsStats {
                          long commitFailuresTotal,
                          @Nullable List<String> registeredTypes) {
         this.consumedTotal = consumedTotal;
+        this.otherServerSkippedTotal = otherServerSkippedTotal;
         this.handledTotal = handledTotal;
         this.unsupportedTotal = unsupportedTotal;
         this.validationFailedTotal = validationFailedTotal;
@@ -79,6 +86,10 @@ public final class CommandsStats {
 
     public long getConsumedTotal() {
         return consumedTotal;
+    }
+
+    public long getOtherServerSkippedTotal() {
+        return otherServerSkippedTotal;
     }
 
     public long getHandledTotal() {
@@ -120,6 +131,7 @@ public final class CommandsStats {
     public Builder toBuilder() {
         return new Builder()
                 .consumedTotal(consumedTotal)
+                .otherServerSkippedTotal(otherServerSkippedTotal)
                 .handledTotal(handledTotal)
                 .unsupportedTotal(unsupportedTotal)
                 .validationFailedTotal(validationFailedTotal)
@@ -147,6 +159,7 @@ public final class CommandsStats {
         if (!(o instanceof CommandsStats)) return false;
         CommandsStats that = (CommandsStats) o;
         return consumedTotal == that.consumedTotal
+                && otherServerSkippedTotal == that.otherServerSkippedTotal
                 && handledTotal == that.handledTotal
                 && unsupportedTotal == that.unsupportedTotal
                 && validationFailedTotal == that.validationFailedTotal
@@ -159,7 +172,7 @@ public final class CommandsStats {
 
     @Override
     public int hashCode() {
-        return Objects.hash(consumedTotal, handledTotal, unsupportedTotal,
+        return Objects.hash(consumedTotal, otherServerSkippedTotal, handledTotal, unsupportedTotal,
                 validationFailedTotal, internalErrorsTotal, repliesPublishedTotal,
                 repliesFailedTotal, commitFailuresTotal, registeredTypes);
     }
@@ -167,6 +180,7 @@ public final class CommandsStats {
     @Override
     public String toString() {
         return "CommandsStats[consumed=" + consumedTotal
+                + ", otherServerSkipped=" + otherServerSkippedTotal
                 + ", handled=" + handledTotal
                 + ", unsupported=" + unsupportedTotal
                 + ", validationFailed=" + validationFailedTotal
@@ -179,6 +193,7 @@ public final class CommandsStats {
 
     public static final class Builder {
         private long consumedTotal;
+        private long otherServerSkippedTotal;
         private long handledTotal;
         private long unsupportedTotal;
         private long validationFailedTotal;
@@ -190,6 +205,11 @@ public final class CommandsStats {
 
         public Builder consumedTotal(long v) {
             this.consumedTotal = v;
+            return this;
+        }
+
+        public Builder otherServerSkippedTotal(long v) {
+            this.otherServerSkippedTotal = v;
             return this;
         }
 
@@ -234,7 +254,7 @@ public final class CommandsStats {
         }
 
         public CommandsStats build() {
-            return new CommandsStats(consumedTotal, handledTotal, unsupportedTotal,
+            return new CommandsStats(consumedTotal, otherServerSkippedTotal, handledTotal, unsupportedTotal,
                     validationFailedTotal, internalErrorsTotal, repliesPublishedTotal,
                     repliesFailedTotal, commitFailuresTotal, registeredTypes);
         }

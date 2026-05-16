@@ -77,6 +77,8 @@ class CommandsConsumerTest {
         }
     }
 
+    private static final UUID OWN_SERVER_ID = UUID.fromString("019a0000-0000-7000-8000-000000000abc");
+
     private CommandTypeRegistry registry;
     private CapturingReplySender sender;
     private MockConsumer<byte[], byte[]> mockConsumer;
@@ -92,6 +94,7 @@ class CommandsConsumerTest {
         return new CommandsConsumer(
                 "in",
                 repliesTopic,
+                OWN_SERVER_ID,
                 new HostExecutorImpl(Runnable::run, 1000L),
                 new FakeNxEvents(),
                 Runnable::run,
@@ -105,12 +108,21 @@ class CommandsConsumerTest {
 
     private static ConsumerRecord<byte[], byte[]> recordWithHeaders(String topic, String messageType,
                                                                     UUID corrId, byte[] value) {
+        return recordWithHeaders(topic, messageType, corrId, value, OWN_SERVER_ID);
+    }
+
+    private static ConsumerRecord<byte[], byte[]> recordWithHeaders(String topic, String messageType,
+                                                                    UUID corrId, byte[] value,
+                                                                    UUID targetServerId) {
         ConsumerRecord<byte[], byte[]> r = new ConsumerRecord<>(topic, 0, 0L, new byte[]{1, 2}, value);
         if (messageType != null) {
             r.headers().add(NxHeaders.NX_MESSAGE_TYPE, messageType.getBytes(StandardCharsets.UTF_8));
         }
         if (corrId != null) {
             r.headers().add(NxHeaders.NX_CORRELATION_ID, corrId.toString().getBytes(StandardCharsets.UTF_8));
+        }
+        if (targetServerId != null) {
+            r.headers().add(NxHeaders.NX_TARGET_SERVER_ID, NxHeaders.encodeUuid(targetServerId));
         }
         return r;
     }
@@ -121,7 +133,7 @@ class CommandsConsumerTest {
         CommandHandler<FakeCommand, Void> handler = (cmd, ctx) -> {
             handlerCalled.set(true);
             assertEquals(123L, cmd.getCharId().longValue());
-            return CommandResult.<Void>ok();
+            return CommandResult.ok();
         };
         registry.register(FakeCommand.class, handler);
         CommandsConsumer consumer = build("out");
@@ -178,7 +190,7 @@ class CommandsConsumerTest {
 
     @Test
     void processRecord_badJson_shouldReplyValidationFailed() {
-        registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.<Void>ok());
+        registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.ok());
         CommandsConsumer consumer = build("out");
 
         consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
@@ -244,7 +256,7 @@ class CommandsConsumerTest {
 
     @Test
     void processRecord_repliesTopicNull_shouldDropReplyAndIncrementFailed() {
-        registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.<Void>ok());
+        registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.ok());
         CommandsConsumer consumer = build(null);
 
         consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
@@ -262,7 +274,7 @@ class CommandsConsumerTest {
         registry.register(FakeCommand.class, (cmd, ctx) -> {
             calls.incrementAndGet();
             assertEquals(42L, cmd.getCharId().longValue());
-            return CommandResult.<Void>ok();
+            return CommandResult.ok();
         });
         CommandsConsumer consumer = build("out");
 
@@ -276,7 +288,7 @@ class CommandsConsumerTest {
     void processRecord_correlationIdMissing_shouldGenerateFallbackAndReply() {
         registry.register(FakeCommand.class, (cmd, ctx) -> {
             assertNotNull(ctx.correlationId(), "fallback correlation id must be non-null");
-            return CommandResult.<Void>ok();
+            return CommandResult.ok();
         });
         CommandsConsumer consumer = build("out");
 
@@ -289,7 +301,7 @@ class CommandsConsumerTest {
     @Test
     void processRecord_replySendCallbackFailure_shouldIncrementRepliesFailed() {
         sender.simulateFailure = true;
-        registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.<Void>ok());
+        registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.ok());
         CommandsConsumer consumer = build("out");
 
         consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
@@ -304,7 +316,7 @@ class CommandsConsumerTest {
         AtomicBoolean ioObserved = new AtomicBoolean(false);
         registry.register(FakeCommand.class, (cmd, ctx) -> {
             ctx.io().execute(() -> ioObserved.set(true));
-            return CommandResult.<Void>ok();
+            return CommandResult.ok();
         });
         CommandsConsumer consumer = build("out");
 
@@ -317,7 +329,7 @@ class CommandsConsumerTest {
 
     @Test
     void processRecord_pendingRepliesShouldDrainAfterCallback() {
-        registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.<Void>ok());
+        registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.ok());
         CommandsConsumer consumer = build("out");
 
         consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
@@ -325,5 +337,41 @@ class CommandsConsumerTest {
 
         assertEquals(0, consumer.pendingReplies(),
                 "callback fired synchronously in fake — pending should be back to 0");
+    }
+
+    @Test
+    void processRecord_otherServerTarget_shouldSkipWithoutInvokingHandler() {
+        AtomicBoolean handlerCalled = new AtomicBoolean(false);
+        registry.register(FakeCommand.class, (cmd, ctx) -> {
+            handlerCalled.set(true);
+            return CommandResult.ok();
+        });
+        CommandsConsumer consumer = build("out");
+        UUID otherServer = UUID.fromString("019a0000-0000-7000-8000-00000000beef");
+
+        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
+                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8), otherServer));
+
+        assertFalse(handlerCalled.get(), "handler MUST NOT run for a record targeted at another server");
+        assertEquals(1L, consumer.otherServerSkippedTotal());
+        assertEquals(0, sender.sent.size(), "no reply must be sent for a foreign-target record");
+    }
+
+    @Test
+    void processRecord_missingTargetServerHeader_shouldSkipWithoutInvokingHandler() {
+        AtomicBoolean handlerCalled = new AtomicBoolean(false);
+        registry.register(FakeCommand.class, (cmd, ctx) -> {
+            handlerCalled.set(true);
+            return CommandResult.ok();
+        });
+        CommandsConsumer consumer = build("out");
+
+        // null target → no NX_TARGET_SERVER_ID header stamped
+        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
+                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8), null));
+
+        assertFalse(handlerCalled.get(), "missing target header → strict drop");
+        assertEquals(1L, consumer.otherServerSkippedTotal());
+        assertEquals(0, sender.sent.size());
     }
 }

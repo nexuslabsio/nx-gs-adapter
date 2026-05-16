@@ -21,17 +21,17 @@ mail, link a Telegram user to a character. Every command:
 - Produces a `CommandResult<R>` reply on `<tenant>.gs.commands.replies`
 
 **Naming convention.** Every command's reply type is `{X}Result`
-(strip `Command` suffix, append `Result`): `TransferItemCommand` →
-`TransferItemResult`, `DeleteItemCommand` → `DeleteItemResult`. Wire
+(strip `Command` suffix, append `Result`): `TransferItemToCharacterCommand` →
+`TransferItemToCharacterResult`, `DeleteItemCommand` → `DeleteItemResult`. Wire
 `Nx-Message-Type` header on the reply matches the R class name
-(`TransferItemResult`, not `TransferItemCommandResult`).
+(`TransferItemToCharacterResult`, not `TransferItemToCharacterCommandResult`).
 
 ## End-to-end lifecycle
 
 ```
 ┌──────────────────────────────────────┐
 │ web caller                           │
-│   cmd = TransferItemCommand(...)     │
+│   cmd = TransferItemToCharacterCommand(...)     │
 │   nxSender.sendSync(cmd, Void.class, │
 │     correlationId).join()            │
 └──────────────┬───────────────────────┘
@@ -50,7 +50,7 @@ mail, link a Telegram user to a character. Every command:
 │           key=charId for ordering)   │
 │   headers:                           │
 │     Nx-Message-Type =                │
-│       "TransferItemCommand"          │
+│       "TransferItemToCharacterCommand"          │
 │     Nx-Correlation-Id = <uuid>       │
 │   value:  Gson(cmd) bytes            │
 └──────────────┬───────────────────────┘
@@ -65,8 +65,8 @@ mail, link a Telegram user to a character. Every command:
                ▼
 ┌──────────────────────────────────────┐
 │ CommandTypeRegistry                  │
-│   "TransferItemCommand" →            │
-│      TransferItemHandler             │
+│   "TransferItemToCharacterCommand" →            │
+│      TransferItemToCharacterHandler             │
 │   (populated by host module via      │
 │    NxCommands.on(...))               │
 └──────────────┬───────────────────────┘
@@ -92,7 +92,7 @@ mail, link a Telegram user to a character. Every command:
 │   key:    bigEndian(corrId.msb)      │
 │   headers:                           │
 │     Nx-Message-Type =                │
-│       "TransferItemCommandResult"    │
+│       "TransferItemToCharacterCommandResult"    │
 │     Nx-Correlation-Id = <echoed>     │
 │   value:  Gson(CommandResult) bytes  │
 └──────────────┬───────────────────────┘
@@ -171,11 +171,11 @@ shared `Payload` types) so the reply echoes confirmation data even for
 "void-success" commands.
 
 ```java
-public final class TransferCharCommand implements NxCommand<TransferCharResult> { ... }
+public final class TransferCharToAccountCommand implements NxCommand<TransferCharToAccountResult> { ... }
 
-commands.on(TransferCharCommand.class, (cmd, ctx) -> {
+commands.on(TransferCharToAccountCommand.class, (cmd, ctx) -> {
     boolean wasLoggedOut = doRebind(cmd);
-    return CommandResult.ok(new TransferCharResult(
+    return CommandResult.ok(new TransferCharToAccountResult(
             cmd.getCharId(), cmd.getAccountTo(), wasLoggedOut));
 });
 ```
@@ -313,7 +313,7 @@ static CommandResult<SendMailResult> handleSendMail(SendMailCommand cmd, Command
 
 ### Dispatching online vs offline
 
-The bohpts `DeleteItemHandler` and `TransferItemHandler` are the canonical
+The bohpts `DeleteItemHandler` and `TransferItemToCharacterHandler` are the canonical
 patterns. Detect online state on the consumer thread, then dispatch:
 
 ```java
@@ -330,7 +330,7 @@ try {
 }
 ```
 
-For multi-party operations (e.g. `TransferItem` with two characters),
+For multi-party operations (e.g. `TransferItemToCharacter` with two characters),
 hop to the game pool if **any** party is online, and pass a dedicated
 "offline-only" service entry point on the `ctx.io()` branch — the
 service MUST NOT re-fetch `GameObjectsStorage` on the IO pool, or it
@@ -367,12 +367,12 @@ new state immediately rather than wait for the next scheduled CDC tick
 (typically 60 s). Use `ctx.sync().requestNow(entity, pk)`:
 
 ```java
-static CommandResult<Void> handleTransferItem(TransferItemCommand cmd, CommandContext ctx) {
+static CommandResult<Void> handleTransferItem(TransferItemToCharacterCommand cmd, CommandContext ctx) {
     // ... do the transfer (online or offline)
     if (success) {
         ctx.sync().requestNow("item", cmd.getItemObjectId());
         ctx.sync().requestNow("character", Arrays.asList(fromId, toId));
-        return CommandResult.ok(new TransferItemResult(
+        return CommandResult.ok(new TransferItemToCharacterResult(
                 cmd.getItemObjectId(), countTransferred, fromId, toId));
     }
     // ...
@@ -444,7 +444,7 @@ Every command has a `{X}Result` class; populate it with confirmation data:
 
 ```java
 return CommandResult.ok(new DeleteItemResult(itemObjectId, deletedCount, fullyDeleted));
-return CommandResult.ok(new TransferCharResult(charId, newAccount, wasLoggedOut));
+return CommandResult.ok(new TransferCharToAccountResult(charId, newAccount, wasLoggedOut));
 return CommandResult.ok(new SendMailResult(createdMailIds, itemErrors));
 ```
 
@@ -516,8 +516,8 @@ public final class BohptsCommandsModule implements AdapterModule {
     public void onConnect(ConnectContext ctx) {
         NxCommands commands = ctx.commands();
         commands.on(DeleteItemCommand.class, new DeleteItemHandler());
-        commands.on(TransferItemCommand.class, new TransferItemHandler());
-        commands.on(TransferCharCommand.class, new TransferCharHandler());
+        commands.on(TransferItemToCharacterCommand.class, new TransferItemToCharacterHandler());
+        commands.on(TransferCharToAccountCommand.class, new TransferCharToAccountHandler());
         commands.on(SendMailCommand.class, new SendMailHandler());
         commands.on(TelegramCharLinkCommand.class, new TelegramCharLinkHandler());
     }
@@ -530,8 +530,8 @@ public final class BohptsCommandsModule implements AdapterModule {
 
 The handler `Class` is matched against the inbound `Nx-Message-Type`
 header by **simple class name**. So
-`app.l2nx.gs.adapter.api.kafka.commands.character.TransferCharCommand`
-matches header value `TransferCharCommand`. Two distinct classes with
+`app.l2nx.gs.adapter.api.kafka.commands.character.TransferCharToAccountCommand`
+matches header value `TransferCharToAccountCommand`. Two distinct classes with
 the same simple name would collide — keep simple names unique within
 the catalog.
 
@@ -563,7 +563,7 @@ The adapter publishes replies to `<tenant>.gs.commands.replies` with:
     - `Nx-Server-Id` (auto, from connect handshake)
     - `Nx-Correlation-Id` (echoed from inbound)
     - `Nx-Message-Type = "<OriginalCommandClass>Result"` (e.g.
-      `"TransferItemCommandResult"`)
+      `"TransferItemToCharacterCommandResult"`)
 - **Value** = `gson.toJson(commandResult)`
 
 The platform-side correlator listens on the replies topic, extracts
@@ -590,8 +590,8 @@ commands runtime exposes:
       "internal-errors-total":  3,
       "replies-published-total": 1230,
       "replies-failed-total":   0,
-      "registered-types":       ["DeleteItemCommand", "TransferItemCommand",
-                                 "TransferCharCommand", "SendMailCommand",
+      "registered-types":       ["DeleteItemCommand", "TransferItemToCharacterCommand",
+                                 "TransferCharToAccountCommand", "SendMailCommand",
                                  "TelegramCharLinkCommand"],
       "commit-failures-total":  0
     }
@@ -695,7 +695,7 @@ fresh `correlationId`).
 
 - **`NxCommand<R>`** — type-parameterized marker every command DTO
   implements; `R` is the dedicated `{X}Result` class
-- **`{X}Result`** — per-command reply payload (`TransferItemResult`,
+- **`{X}Result`** — per-command reply payload (`TransferItemToCharacterResult`,
   `DeleteItemResult`, …); always carries confirmation data even for
   "void-success" commands
 - **`CommandHandler<C, R>`** — SAM `(cmd, ctx) -> CommandResult<R>`

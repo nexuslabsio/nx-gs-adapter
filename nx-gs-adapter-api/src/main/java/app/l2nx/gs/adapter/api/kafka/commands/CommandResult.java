@@ -9,7 +9,7 @@ import java.util.Objects;
  * {@code <tenant>.gs.commands.replies} with header {@code Nx-Correlation-Id}
  * echoed from the inbound command and {@code Nx-Message-Type =
  * "<OriginalCommandClassNameWithoutCommandSuffix>Result"} (e.g.
- * {@code "TransferItemResult"}).
+ * {@code "TransferItemToCharacterResult"}).
  *
  * <p><b>Invariant.</b> {@link #getPayload() payload} is non-null iff
  * {@link #getStatus() status} is {@link CommandStatus#OK}; {@link #getProblem()

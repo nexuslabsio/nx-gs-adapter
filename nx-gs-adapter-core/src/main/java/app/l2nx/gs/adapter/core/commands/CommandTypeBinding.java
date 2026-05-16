@@ -19,8 +19,9 @@ import java.nio.charset.StandardCharsets;
  * the consumer's hot path does not re-build the wire reply type on every
  * reply. Naming convention: strip the {@code "Command"} suffix from the
  * command's simple name and append {@code "Result"} — e.g.
- * {@code TransferItemCommand} → {@code TransferItemResult}, matching the
- * sibling {@code TransferItemResult} payload class.</p>
+ * {@code TransferItemToCharacterCommand} →
+ * {@code TransferItemToCharacterResult}, matching the sibling result
+ * payload class.</p>
  */
 final class CommandTypeBinding {
 

@@ -404,7 +404,8 @@ public final class NxAdapter {
         String commandsGroupId = response.getTenantSlug() + ".gs.commands." + response.getServerSlug();
         NxSync sync = startSyncFacade();
         NxCommands commands = startCommandsConsumer(response.getMessagingTopics(),
-                response.getKafka(), clientId, commandsGroupId, events, sync);
+                response.getKafka(), clientId, commandsGroupId, response.getServerId(),
+                events, sync);
 
         ModuleRegistry registry = moduleRegistry;
         if (registry != null) {
@@ -495,6 +496,7 @@ public final class NxAdapter {
                                                     app.l2nx.gs.adapter.api.rest.KafkaConfig kafka,
                                                     String clientId,
                                                     String groupId,
+                                                    UUID ownServerId,
                                                     NxEvents events,
                                                     NxSync sync) {
         CommandsConsumer previous = commandsConsumer;
@@ -510,7 +512,7 @@ public final class NxAdapter {
         NxCommands facade = commandsFacade;
         if (facade == null) {
             CommandsBootstrap.Started started = CommandsBootstrap.start(
-                    messagingTopics, kafka, clientId, groupId,
+                    messagingTopics, kafka, clientId, groupId, ownServerId,
                     hostExecutorRef.get(), ioExecutor, events, sync,
                     replySender, commandsConfig);
             commandsConsumer = started.consumer();
@@ -518,7 +520,7 @@ public final class NxAdapter {
             return commandsFacade;
         }
         commandsConsumer = CommandsBootstrap.swap(facade, messagingTopics, kafka, clientId, groupId,
-                hostExecutorRef.get(), ioExecutor, events, sync, replySender, commandsConfig);
+                ownServerId, hostExecutorRef.get(), ioExecutor, events, sync, replySender, commandsConfig);
         return facade;
     }
 

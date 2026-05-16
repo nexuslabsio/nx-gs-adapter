@@ -3,26 +3,26 @@ package app.l2nx.gs.adapter.api.kafka.commands.item;
 import java.util.Objects;
 
 /**
- * Success payload of {@link TransferItemCommand}. Echoes the actual amount
+ * Success payload of {@link TransferItemToCharacterCommand}. Echoes the actual amount
  * moved and both endpoints. The host's stack-size clamping semantics
  * mirror {@link DeleteItemResult}: {@link #getCountTransferred() countTransferred}
- * MAY be less than the inbound {@link TransferItemCommand#getCount() count}
+ * MAY be less than the inbound {@link TransferItemToCharacterCommand#getCount() count}
  * if the live stack was smaller at execution time.
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
  */
-public final class TransferItemResult {
+public final class TransferItemToCharacterResult {
 
     private final Long itemId;
     private final Long countTransferred;
     private final Long fromCharId;
     private final Long toCharId;
 
-    public TransferItemResult(Long itemId,
-                              Long countTransferred,
-                              Long fromCharId,
-                              Long toCharId) {
+    public TransferItemToCharacterResult(Long itemId,
+                                         Long countTransferred,
+                                         Long fromCharId,
+                                         Long toCharId) {
         if (itemId == null) {
             throw new IllegalArgumentException("itemId is required");
         }
@@ -75,8 +75,8 @@ public final class TransferItemResult {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof TransferItemResult)) return false;
-        TransferItemResult that = (TransferItemResult) o;
+        if (!(o instanceof TransferItemToCharacterResult)) return false;
+        TransferItemToCharacterResult that = (TransferItemToCharacterResult) o;
         return Objects.equals(itemId, that.itemId)
                 && Objects.equals(countTransferred, that.countTransferred)
                 && Objects.equals(fromCharId, that.fromCharId)
@@ -90,7 +90,7 @@ public final class TransferItemResult {
 
     @Override
     public String toString() {
-        return "TransferItemResult[itemId=" + itemId
+        return "TransferItemToCharacterResult[itemId=" + itemId
                 + ", countTransferred=" + countTransferred
                 + ", fromCharId=" + fromCharId
                 + ", toCharId=" + toCharId + "]";
@@ -122,8 +122,8 @@ public final class TransferItemResult {
             return this;
         }
 
-        public TransferItemResult build() {
-            return new TransferItemResult(itemId, countTransferred, fromCharId, toCharId);
+        public TransferItemToCharacterResult build() {
+            return new TransferItemToCharacterResult(itemId, countTransferred, fromCharId, toCharId);
         }
     }
 }

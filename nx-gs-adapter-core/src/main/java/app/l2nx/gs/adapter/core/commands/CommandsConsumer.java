@@ -70,6 +70,7 @@ public final class CommandsConsumer {
 
     private final String inboundTopic;
     private final @Nullable String repliesTopic;
+    private final UUID ownServerId;
     private final HostExecutor hostExecutor;
     private final NxEvents events;
     private final Executor ioExecutor;
@@ -85,6 +86,7 @@ public final class CommandsConsumer {
 
     private final AtomicLong consumedTotal = new AtomicLong();
     private final AtomicLong handledTotal = new AtomicLong();
+    private final AtomicLong otherServerSkippedTotal = new AtomicLong();
     private final AtomicLong unsupportedTotal = new AtomicLong();
     private final AtomicLong validationFailedTotal = new AtomicLong();
     private final AtomicLong internalErrorsTotal = new AtomicLong();
@@ -100,6 +102,7 @@ public final class CommandsConsumer {
 
     CommandsConsumer(String inboundTopic,
                      @Nullable String repliesTopic,
+                     UUID ownServerId,
                      HostExecutor hostExecutor,
                      NxEvents events,
                      Executor ioExecutor,
@@ -111,6 +114,7 @@ public final class CommandsConsumer {
                      CommandsConfig config) {
         this.inboundTopic = inboundTopic;
         this.repliesTopic = repliesTopic;
+        this.ownServerId = ownServerId;
         this.hostExecutor = hostExecutor;
         this.events = events;
         this.ioExecutor = ioExecutor;
@@ -186,6 +190,7 @@ public final class CommandsConsumer {
     CommandsStats currentStats() {
         return CommandsStats.builder()
                 .consumedTotal(consumedTotal.get())
+                .otherServerSkippedTotal(otherServerSkippedTotal.get())
                 .handledTotal(handledTotal.get())
                 .unsupportedTotal(unsupportedTotal.get())
                 .validationFailedTotal(validationFailedTotal.get())
@@ -292,6 +297,12 @@ public final class CommandsConsumer {
     // package-visible for unit tests; production callers go through pollLoop()
     void processRecord(ConsumerRecord<byte[], byte[]> record) {
         Headers headers = record.headers();
+        // Per-tenant commands topic is shared across game-servers; producers stamp
+        // Nx-Target-Server-Id and the wrong-target / missing-header records get dropped.
+        if (!targetsThisServer(headers)) {
+            otherServerSkippedTotal.incrementAndGet();
+            return;
+        }
         String messageType = readStringHeader(headers, NxHeaders.NX_MESSAGE_TYPE);
         UUID correlationId = readCorrelationId(headers);
 
@@ -455,6 +466,29 @@ public final class CommandsConsumer {
                 .getBytes(StandardCharsets.UTF_8);
     }
 
+    private boolean targetsThisServer(Headers headers) {
+        Header h = headers == null ? null : headers.lastHeader(NxHeaders.NX_TARGET_SERVER_ID);
+        if (h == null || h.value() == null) {
+            log.warn("Inbound command record missing {} header — dropping (strict contract)",
+                    NxHeaders.NX_TARGET_SERVER_ID);
+            return false;
+        }
+        UUID target;
+        try {
+            target = NxHeaders.decodeUuid(h.value());
+        } catch (IllegalArgumentException ex) {
+            log.warn("Inbound command record has malformed {} header — dropping: {}",
+                    NxHeaders.NX_TARGET_SERVER_ID, ex.getMessage());
+            return false;
+        }
+        if (!ownServerId.equals(target)) {
+            log.debug("Skipping command record targeted at server {} (own server: {})",
+                    target, ownServerId);
+            return false;
+        }
+        return true;
+    }
+
     private static @Nullable String readStringHeader(Headers headers, String name) {
         if (headers == null) {
             return null;
@@ -501,6 +535,10 @@ public final class CommandsConsumer {
 
     long consumedTotal() {
         return consumedTotal.get();
+    }
+
+    long otherServerSkippedTotal() {
+        return otherServerSkippedTotal.get();
     }
 
     long handledTotal() {

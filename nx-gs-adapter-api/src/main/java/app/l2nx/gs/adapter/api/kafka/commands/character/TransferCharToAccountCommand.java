@@ -52,12 +52,12 @@ import java.util.Objects;
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
  */
-public final class TransferCharCommand implements NxCommand<TransferCharResult> {
+public final class TransferCharToAccountCommand implements NxCommand<TransferCharToAccountResult> {
 
     private final Long charId;
     private final String accountTo;
 
-    public TransferCharCommand(Long charId, String accountTo) {
+    public TransferCharToAccountCommand(Long charId, String accountTo) {
         if (charId == null) {
             throw new IllegalArgumentException("charId is required");
         }
@@ -99,8 +99,8 @@ public final class TransferCharCommand implements NxCommand<TransferCharResult> 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof TransferCharCommand)) return false;
-        TransferCharCommand that = (TransferCharCommand) o;
+        if (!(o instanceof TransferCharToAccountCommand)) return false;
+        TransferCharToAccountCommand that = (TransferCharToAccountCommand) o;
         return Objects.equals(charId, that.charId)
                 && Objects.equals(accountTo, that.accountTo);
     }
@@ -112,7 +112,7 @@ public final class TransferCharCommand implements NxCommand<TransferCharResult> 
 
     @Override
     public String toString() {
-        return "TransferCharCommand[charId=" + charId + ", accountTo=" + accountTo + "]";
+        return "TransferCharToAccountCommand[charId=" + charId + ", accountTo=" + accountTo + "]";
     }
 
     public static final class Builder {
@@ -129,8 +129,8 @@ public final class TransferCharCommand implements NxCommand<TransferCharResult> 
             return this;
         }
 
-        public TransferCharCommand build() {
-            return new TransferCharCommand(charId, accountTo);
+        public TransferCharToAccountCommand build() {
+            return new TransferCharToAccountCommand(charId, accountTo);
         }
     }
 }
