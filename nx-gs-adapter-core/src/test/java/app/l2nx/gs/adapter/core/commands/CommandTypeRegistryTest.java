@@ -18,9 +18,9 @@ class CommandTypeRegistryTest {
     }
 
     private static final CommandHandler<FakeCommandA, Void> NOOP_HANDLER_A =
-            (cmd, ctx) -> CommandResult.success();
+            (cmd, ctx) -> CommandResult.<Void>ok();
     private static final CommandHandler<FakeCommandB, Void> NOOP_HANDLER_B =
-            (cmd, ctx) -> CommandResult.success();
+            (cmd, ctx) -> CommandResult.<Void>ok();
 
     @Test
     void register_firstCall_shouldReturnFalse() {

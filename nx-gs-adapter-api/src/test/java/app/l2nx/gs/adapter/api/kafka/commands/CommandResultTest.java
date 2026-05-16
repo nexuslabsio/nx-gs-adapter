@@ -2,151 +2,139 @@ package app.l2nx.gs.adapter.api.kafka.commands;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class CommandResultTest {
 
     @Test
-    void success_shouldHaveNoErrorCodeAndNoPayload() {
-        CommandResult<Void> r = CommandResult.success();
+    void ok_shouldHaveStatusOkNoPayloadNoProblem() {
+        CommandResult<Void> r = CommandResult.ok();
 
-        assertTrue(r.isSuccess());
-        assertNull(r.getErrorCode());
-        assertTrue(r.getErrorDetails().isEmpty());
+        assertTrue(r.isOk());
+        assertEquals(CommandStatus.OK, r.getStatus());
+        assertEquals(CommandStatus.Tier.OK, r.getTier());
+        assertNull(r.getPayload());
+        assertNull(r.getProblem());
+    }
+
+    @Test
+    void ok_withPayload_shouldCarryPayload() {
+        CommandResult<String> r = CommandResult.ok("hello");
+
+        assertTrue(r.isOk());
+        assertEquals("hello", r.getPayload());
+        assertNull(r.getProblem());
+    }
+
+    @Test
+    void error_shouldFlipOkAndCarryStatusAndProblemTitle() {
+        CommandResult<Void> r = CommandResult.error(CommandStatus.NOT_FOUND, "Character not found");
+
+        assertFalse(r.isOk());
+        assertEquals(CommandStatus.NOT_FOUND, r.getStatus());
+        assertEquals(CommandStatus.Tier.CLIENT_ERROR, r.getTier());
+        assertEquals("Character not found", r.getProblem().getTitle());
         assertNull(r.getPayload());
     }
 
     @Test
-    void success_withPayload_shouldCarryPayload() {
-        CommandResult<String> r = CommandResult.success("hello");
+    void error_withSingleExtension_shouldExposeIt() {
+        CommandResult<Void> r = CommandResult.error(
+                CommandStatus.NOT_FOUND, "not found", "charId", 12345L);
 
-        assertTrue(r.isSuccess());
-        assertEquals("hello", r.getPayload());
+        assertEquals(CommandStatus.NOT_FOUND, r.getStatus());
+        assertEquals(12345L, r.getProblem().getExtensions().get("charId"));
     }
 
     @Test
-    void error_shouldFlipSuccessAndCarryCode() {
-        CommandResult<Void> r = CommandResult.error(ErrorCode.NOT_FOUND);
-
-        assertFalse(r.isSuccess());
-        assertEquals(ErrorCode.NOT_FOUND, r.getErrorCode());
-        assertTrue(r.getErrorDetails().isEmpty());
-    }
-
-    @Test
-    void error_withSingleDetail_shouldExposeIt() {
-        CommandResult<Void> r = CommandResult.error(ErrorCode.NOT_FOUND, "charId", "12345");
-
-        assertEquals(ErrorCode.NOT_FOUND, r.getErrorCode());
-        assertEquals("12345", r.getErrorDetails().get("charId"));
-    }
-
-    @Test
-    void builder_multiDetail_shouldChainErrorDetail() {
-        CommandResult<Void> r = CommandResult.<Void>builder()
-                .errorCode(ErrorCode.VALIDATION_FAILED)
-                .errorDetail("field", "amount")
-                .errorDetail("got", "-100")
+    void error_withPrebuiltProblem_shouldExposeProblem() {
+        CommandProblem problem = CommandProblem.builder()
+                .title("Mail attachment validation failed")
+                .detail("3 of 5 items rejected")
+                .extension("first.reason", "unknown template id")
                 .build();
+        CommandResult<Void> r = CommandResult.error(CommandStatus.VALIDATION_FAILED, problem);
 
-        assertFalse(r.isSuccess());
-        assertEquals(ErrorCode.VALIDATION_FAILED, r.getErrorCode());
-        assertEquals("amount", r.getErrorDetails().get("field"));
-        assertEquals("-100", r.getErrorDetails().get("got"));
+        assertFalse(r.isOk());
+        assertEquals(CommandStatus.VALIDATION_FAILED, r.getStatus());
+        assertSame(problem, r.getProblem());
     }
 
     @Test
-    void builder_withoutErrorCode_shouldProduceSuccess() {
-        CommandResult<String> r = CommandResult.<String>builder()
-                .payload("ok")
-                .build();
+    void notFound_factory_shouldShortcutToNotFoundStatus() {
+        CommandResult<Void> r = CommandResult.notFound("Character not found", "charId", 12345L);
 
-        assertTrue(r.isSuccess());
-        assertEquals("ok", r.getPayload());
+        assertEquals(CommandStatus.NOT_FOUND, r.getStatus());
+        assertEquals("Character not found", r.getProblem().getTitle());
+        assertEquals(12345L, r.getProblem().getExtensions().get("charId"));
     }
 
     @Test
-    void constructor_shouldRejectIncoherentSuccessWithErrorCode() {
+    void invalidState_factory_shouldShortcutToInvalidStateStatus() {
+        CommandResult<Void> r = CommandResult.invalidState("Capacity exceeded");
+
+        assertEquals(CommandStatus.INVALID_STATE, r.getStatus());
+        assertEquals("Capacity exceeded", r.getProblem().getTitle());
+    }
+
+    @Test
+    void validationFailed_withField_shouldEmitFieldExtension() {
+        CommandResult<Void> r = CommandResult.validationFailed("count must be positive", "count");
+
+        assertEquals(CommandStatus.VALIDATION_FAILED, r.getStatus());
+        assertEquals("count", r.getProblem().getExtensions().get("field"));
+    }
+
+    @Test
+    void constructor_shouldRejectOkWithProblem() {
         assertThrows(IllegalArgumentException.class,
-                () -> new CommandResult<Void>(true, ErrorCode.NOT_FOUND, null, null));
+                () -> new CommandResult<Void>(CommandStatus.OK, null, CommandProblem.of("oops")));
     }
 
     @Test
-    void constructor_shouldRejectFailureWithoutErrorCode() {
+    void constructor_shouldRejectNonOkWithoutProblem() {
         assertThrows(IllegalArgumentException.class,
-                () -> new CommandResult<Void>(false, null, null, null));
+                () -> new CommandResult<Void>(CommandStatus.NOT_FOUND, null, null));
     }
 
     @Test
-    void getErrorDetails_shouldNormalizeNullToEmptyMap() {
-        CommandResult<Void> r = new CommandResult<Void>(true, null, null, null);
-
-        assertNotNull(r.getErrorDetails());
-        assertTrue(r.getErrorDetails().isEmpty());
+    void constructor_shouldRejectNonOkWithPayload() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new CommandResult<String>(CommandStatus.NOT_FOUND, "payload", CommandProblem.of("nope")));
     }
 
     @Test
-    void getErrorDetails_shouldBeUnmodifiable() {
-        CommandResult<Void> r = CommandResult.error(ErrorCode.NOT_FOUND, "k", "v");
-
-        assertThrows(UnsupportedOperationException.class,
-                () -> r.getErrorDetails().put("x", "y"));
+    void constructor_shouldRejectNullStatus() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new CommandResult<Void>(null, null, null));
     }
 
     @Test
-    void toBuilder_shouldRoundtripSuccess() {
-        CommandResult<String> original = CommandResult.success("payload");
-
-        CommandResult<String> copy = original.toBuilder().build();
-
-        assertEquals(original, copy);
-    }
-
-    @Test
-    void toBuilder_shouldRoundtripError() {
-        Map<String, String> details = new LinkedHashMap<String, String>();
-        details.put("k1", "v1");
-        details.put("k2", "v2");
-        CommandResult<Void> original = new CommandResult<Void>(false, ErrorCode.FORBIDDEN, details, null);
-
-        CommandResult<Void> copy = original.toBuilder().build();
-
-        assertEquals(original, copy);
-    }
-
-    @Test
-    void toBuilder_thenAddDetail_shouldNotMutateOriginal() {
-        CommandResult<Void> original = CommandResult.error(ErrorCode.NOT_FOUND, "a", "1");
-
-        CommandResult<Void> mutated = original.toBuilder()
-                .errorDetail("b", "2")
-                .build();
-
-        assertEquals(1, original.getErrorDetails().size());
-        assertEquals(2, mutated.getErrorDetails().size());
-    }
-
-    @Test
-    void equals_shouldDistinguishOnErrorCode() {
-        CommandResult<Void> a = CommandResult.error(ErrorCode.NOT_FOUND);
-        CommandResult<Void> b = CommandResult.error(ErrorCode.FORBIDDEN);
+    void equals_shouldDistinguishOnStatus() {
+        CommandResult<Void> a = CommandResult.notFound("not found");
+        CommandResult<Void> b = CommandResult.forbidden("not found");
 
         assertNotEquals(a, b);
     }
 
     @Test
     void equals_shouldDistinguishOnPayload() {
-        CommandResult<String> a = CommandResult.success("x");
-        CommandResult<String> b = CommandResult.success("y");
+        CommandResult<String> a = CommandResult.ok("x");
+        CommandResult<String> b = CommandResult.ok("y");
 
         assertNotEquals(a, b);
     }
 
     @Test
-    void equals_shouldMatchSameSuccessAndPayload() {
-        assertEquals(CommandResult.success("x"), CommandResult.success("x"));
+    void equals_shouldMatchSameOkAndPayload() {
+        assertEquals(CommandResult.ok("x"), CommandResult.ok("x"));
+    }
+
+    @Test
+    void hashCode_shouldMatchEquals() {
+        CommandResult<String> a = CommandResult.ok("x");
+        CommandResult<String> b = CommandResult.ok("x");
+
+        assertEquals(a.hashCode(), b.hashCode());
     }
 }

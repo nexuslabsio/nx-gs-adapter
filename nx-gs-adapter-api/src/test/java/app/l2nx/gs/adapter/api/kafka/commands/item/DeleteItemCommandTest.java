@@ -10,12 +10,12 @@ class DeleteItemCommandTest {
     void builder_shouldRoundtripFields() {
         DeleteItemCommand cmd = DeleteItemCommand.builder()
                 .charId(42L)
-                .itemObjectId(1234567L)
+                .itemId(1234567L)
                 .count(7L)
                 .build();
 
         assertEquals(42L, cmd.getCharId().longValue());
-        assertEquals(1234567L, cmd.getItemObjectId().longValue());
+        assertEquals(1234567L, cmd.getItemId().longValue());
         assertEquals(7L, cmd.getCount().longValue());
     }
 
@@ -23,7 +23,7 @@ class DeleteItemCommandTest {
     void builder_shouldDefaultCountToOne_whenNotSet() {
         DeleteItemCommand cmd = DeleteItemCommand.builder()
                 .charId(42L)
-                .itemObjectId(1234567L)
+                .itemId(1234567L)
                 .build();
 
         assertEquals(1L, cmd.getCount().longValue());
@@ -37,10 +37,10 @@ class DeleteItemCommandTest {
     }
 
     @Test
-    void constructor_shouldRejectNullItemObjectId() {
+    void constructor_shouldRejectNullItemId() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> new DeleteItemCommand(1L, null, 1L));
-        assertTrue(ex.getMessage().contains("itemObjectId"));
+        assertTrue(ex.getMessage().contains("itemId"));
     }
 
     @Test
@@ -66,14 +66,14 @@ class DeleteItemCommandTest {
     void builder_buildWithoutRequiredField_shouldThrow() {
         // charId not set → null → constructor rejects
         assertThrows(IllegalArgumentException.class,
-                () -> DeleteItemCommand.builder().itemObjectId(1L).build());
+                () -> DeleteItemCommand.builder().itemId(1L).build());
     }
 
     @Test
     void toBuilder_shouldRoundtrip() {
         DeleteItemCommand original = DeleteItemCommand.builder()
                 .charId(42L)
-                .itemObjectId(1234567L)
+                .itemId(1234567L)
                 .count(3L)
                 .build();
 
@@ -84,32 +84,32 @@ class DeleteItemCommandTest {
 
     @Test
     void equals_shouldDistinguishOnCharId() {
-        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemObjectId(99L).build();
-        DeleteItemCommand b = DeleteItemCommand.builder().charId(2L).itemObjectId(99L).build();
+        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemId(99L).build();
+        DeleteItemCommand b = DeleteItemCommand.builder().charId(2L).itemId(99L).build();
 
         assertNotEquals(a, b);
     }
 
     @Test
-    void equals_shouldDistinguishOnItemObjectId() {
-        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemObjectId(99L).build();
-        DeleteItemCommand b = DeleteItemCommand.builder().charId(1L).itemObjectId(100L).build();
+    void equals_shouldDistinguishOnItemId() {
+        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemId(99L).build();
+        DeleteItemCommand b = DeleteItemCommand.builder().charId(1L).itemId(100L).build();
 
         assertNotEquals(a, b);
     }
 
     @Test
     void equals_shouldDistinguishOnCount() {
-        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemObjectId(99L).count(1L).build();
-        DeleteItemCommand b = DeleteItemCommand.builder().charId(1L).itemObjectId(99L).count(5L).build();
+        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemId(99L).count(1L).build();
+        DeleteItemCommand b = DeleteItemCommand.builder().charId(1L).itemId(99L).count(5L).build();
 
         assertNotEquals(a, b);
     }
 
     @Test
     void hashCode_shouldMatchEquals() {
-        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemObjectId(99L).count(3L).build();
-        DeleteItemCommand b = DeleteItemCommand.builder().charId(1L).itemObjectId(99L).count(3L).build();
+        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemId(99L).count(3L).build();
+        DeleteItemCommand b = DeleteItemCommand.builder().charId(1L).itemId(99L).count(3L).build();
 
         assertEquals(a.hashCode(), b.hashCode());
     }
@@ -118,7 +118,7 @@ class DeleteItemCommandTest {
     void toString_shouldExposeAllFields() {
         DeleteItemCommand cmd = DeleteItemCommand.builder()
                 .charId(42L)
-                .itemObjectId(1234567L)
+                .itemId(1234567L)
                 .count(7L)
                 .build();
 
@@ -131,7 +131,7 @@ class DeleteItemCommandTest {
 
     @Test
     void implementsNxCommandMarker() {
-        DeleteItemCommand cmd = DeleteItemCommand.builder().charId(1L).itemObjectId(2L).build();
+        DeleteItemCommand cmd = DeleteItemCommand.builder().charId(1L).itemId(2L).build();
 
         assertInstanceOf(app.l2nx.gs.adapter.api.kafka.commands.NxCommand.class, cmd);
     }

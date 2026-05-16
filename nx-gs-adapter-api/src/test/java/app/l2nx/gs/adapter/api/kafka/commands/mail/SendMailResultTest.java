@@ -7,83 +7,83 @@ import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class SendMailPayloadTest {
+class SendMailResultTest {
 
     @Test
     void builder_shouldRoundtripFields() {
         ItemDeliveryError err = ItemDeliveryError.builder()
                 .itemTemplateId(57L).count(1L).reason("x").build();
 
-        SendMailPayload payload = SendMailPayload.builder()
+        SendMailResult result = SendMailResult.builder()
                 .createdMailIds(Arrays.asList(101L, 102L))
                 .itemErrors(Collections.singletonList(err))
                 .build();
 
-        assertEquals(Arrays.asList(101L, 102L), payload.getCreatedMailIds());
-        assertEquals(Collections.singletonList(err), payload.getItemErrors());
+        assertEquals(Arrays.asList(101L, 102L), result.getCreatedMailIds());
+        assertEquals(Collections.singletonList(err), result.getItemErrors());
     }
 
     @Test
     void getCreatedMailIds_shouldReturnEmpty_whenNull() {
-        SendMailPayload payload = new SendMailPayload(null, null);
+        SendMailResult result = new SendMailResult(null, null);
 
-        assertTrue(payload.getCreatedMailIds().isEmpty());
+        assertTrue(result.getCreatedMailIds().isEmpty());
     }
 
     @Test
     void getItemErrors_shouldReturnEmpty_whenNull() {
-        SendMailPayload payload = new SendMailPayload(null, null);
+        SendMailResult result = new SendMailResult(null, null);
 
-        assertTrue(payload.getItemErrors().isEmpty());
+        assertTrue(result.getItemErrors().isEmpty());
     }
 
     @Test
     void getCreatedMailIds_shouldBeUnmodifiable() {
-        SendMailPayload payload = SendMailPayload.builder()
+        SendMailResult result = SendMailResult.builder()
                 .createdMailIds(Arrays.asList(1L, 2L))
                 .build();
 
         assertThrows(UnsupportedOperationException.class,
-                () -> payload.getCreatedMailIds().add(3L));
+                () -> result.getCreatedMailIds().add(3L));
     }
 
     @Test
     void getItemErrors_shouldBeUnmodifiable() {
         ItemDeliveryError err = ItemDeliveryError.builder()
                 .itemTemplateId(57L).count(1L).build();
-        SendMailPayload payload = SendMailPayload.builder()
+        SendMailResult result = SendMailResult.builder()
                 .itemErrors(Collections.singletonList(err))
                 .build();
 
         assertThrows(UnsupportedOperationException.class,
-                () -> payload.getItemErrors().add(err));
+                () -> result.getItemErrors().add(err));
     }
 
     @Test
     void constructor_shouldDefensivelyCopyMailIds() {
         java.util.List<Long> mutable = new java.util.ArrayList<Long>(Arrays.asList(1L, 2L));
-        SendMailPayload payload = new SendMailPayload(mutable, null);
+        SendMailResult result = new SendMailResult(mutable, null);
 
         mutable.add(3L);
 
-        assertEquals(2, payload.getCreatedMailIds().size());
+        assertEquals(2, result.getCreatedMailIds().size());
     }
 
     @Test
     void toBuilder_shouldRoundtrip() {
-        SendMailPayload original = SendMailPayload.builder()
+        SendMailResult original = SendMailResult.builder()
                 .createdMailIds(Arrays.asList(1L, 2L))
                 .build();
-        SendMailPayload copy = original.toBuilder().build();
+        SendMailResult copy = original.toBuilder().build();
 
         assertEquals(original, copy);
     }
 
     @Test
     void equals_shouldDistinguishOnCreatedMailIds() {
-        SendMailPayload a = SendMailPayload.builder()
+        SendMailResult a = SendMailResult.builder()
                 .createdMailIds(Collections.singletonList(1L)).build();
-        SendMailPayload b = SendMailPayload.builder()
+        SendMailResult b = SendMailResult.builder()
                 .createdMailIds(Collections.singletonList(2L)).build();
 
         assertNotEquals(a, b);
@@ -91,9 +91,9 @@ class SendMailPayloadTest {
 
     @Test
     void hashCode_shouldMatchEquals() {
-        SendMailPayload a = SendMailPayload.builder()
+        SendMailResult a = SendMailResult.builder()
                 .createdMailIds(Arrays.asList(1L, 2L)).build();
-        SendMailPayload b = SendMailPayload.builder()
+        SendMailResult b = SendMailResult.builder()
                 .createdMailIds(Arrays.asList(1L, 2L)).build();
 
         assertEquals(a.hashCode(), b.hashCode());
