@@ -16,12 +16,12 @@ import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
  *
  * <p><b>Return contract.</b> Non-null {@link CommandResult} required.
  * Returning {@code null} is treated as
- * {@link app.l2nx.gs.adapter.api.kafka.commands.ErrorCode#INTERNAL_ERROR}
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#INTERNAL_ERROR}
  * with detail {@code error.cause = "handler-returned-null"}.</p>
  *
  * <p><b>Exception contract.</b> Handler MAY throw {@code RuntimeException};
  * the adapter catches and replies with
- * {@link app.l2nx.gs.adapter.api.kafka.commands.ErrorCode#INTERNAL_ERROR}
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#INTERNAL_ERROR}
  * carrying the exception class + message in {@code errorDetails}.
  * {@code Error} (OOM, StackOverflow) propagates uncaught — the consumer
  * thread aborts and the JVM-level handler decides what to do; offset is NOT

@@ -5,6 +5,7 @@ import app.l2nx.gs.adapter.api.rest.MessagingTopics;
 import app.l2nx.gs.adapter.api.spi.HostExecutor;
 import app.l2nx.gs.adapter.api.spi.NxCommands;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
+import app.l2nx.gs.adapter.api.spi.NxSync;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
@@ -63,6 +64,7 @@ public final class CommandsBootstrap {
                                                   @Nullable Executor hostExecutor,
                                                   Executor ioExecutor,
                                                   NxEvents events,
+                                                  NxSync sync,
                                                   CommandsConsumer.ReplySender replySender,
                                                   @Nullable CommandsConfig config) {
         if (!(facade instanceof NxCommandsImpl)) {
@@ -77,7 +79,7 @@ public final class CommandsBootstrap {
             ((NxCommandsImpl) facade).swap(registry);
         }
         return buildConsumer(messagingTopics, kafka, clientIdBase, groupId, hostExecutor,
-                ioExecutor, events, replySender, config, registry);
+                ioExecutor, events, sync, replySender, config, registry);
     }
 
     /**
@@ -117,12 +119,13 @@ public final class CommandsBootstrap {
                                 @Nullable Executor hostExecutor,
                                 Executor ioExecutor,
                                 NxEvents events,
+                                NxSync sync,
                                 CommandsConsumer.ReplySender replySender,
                                 @Nullable CommandsConfig config) {
         CommandTypeRegistry registry = new CommandTypeRegistry();
         NxCommandsImpl commands = new NxCommandsImpl(registry);
         CommandsConsumer consumer = buildConsumer(messagingTopics, kafka, clientIdBase, groupId,
-                hostExecutor, ioExecutor, events, replySender, config, registry);
+                hostExecutor, ioExecutor, events, sync, replySender, config, registry);
         return new Started(commands, consumer);
     }
 
@@ -133,6 +136,7 @@ public final class CommandsBootstrap {
                                                             @Nullable Executor hostExecutor,
                                                             Executor ioExecutor,
                                                             NxEvents events,
+                                                            NxSync sync,
                                                             CommandsConsumer.ReplySender replySender,
                                                             @Nullable CommandsConfig config,
                                                             CommandTypeRegistry registry) {
@@ -170,6 +174,7 @@ public final class CommandsBootstrap {
                 hostExec,
                 events,
                 ioExecutor,
+                sync,
                 registry,
                 kafkaConsumer,
                 replySender,

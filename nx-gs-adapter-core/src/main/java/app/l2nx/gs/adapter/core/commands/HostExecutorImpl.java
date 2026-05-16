@@ -25,7 +25,7 @@ import java.util.function.Supplier;
  * deadlocked host pool cannot wedge the consumer thread indefinitely.
  * On timeout the call throws {@link HostExecutorTimeoutException}; the
  * dispatcher maps this to
- * {@link app.l2nx.gs.adapter.api.kafka.commands.ErrorCode#UNAVAILABLE}.</p>
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#UNAVAILABLE}.</p>
  *
  * <p>Exceptions thrown by the task are captured and rethrown to the calling
  * thread (using a generic-erasure {@code sneakyThrow} trick so checked
@@ -150,7 +150,7 @@ final class HostExecutorImpl implements HostExecutor {
      * one of those.
      */
     private static RuntimeException rethrow(Throwable t) {
-        HostExecutorImpl.<RuntimeException>rethrowAs(t);
+        HostExecutorImpl.rethrowAs(t);
         return null; // unreachable
     }
 

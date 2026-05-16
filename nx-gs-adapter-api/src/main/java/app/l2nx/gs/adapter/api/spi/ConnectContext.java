@@ -41,6 +41,7 @@ public final class ConnectContext {
     private final NxEvents events;
     private final NxCommands commands;
     private final Executor io;
+    private final NxSync sync;
 
     public ConnectContext(UUID tenantId,
                           String tenantSlug,
@@ -51,7 +52,8 @@ public final class ConnectContext {
                           @Nullable SyncTopics syncTopics,
                           @Nullable NxEvents events,
                           @Nullable NxCommands commands,
-                          @Nullable Executor io) {
+                          @Nullable Executor io,
+                          @Nullable NxSync sync) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
@@ -64,6 +66,21 @@ public final class ConnectContext {
         // Direct-run fallback keeps ctx.io().execute(r) usable in tests / pre-wired contexts;
         // production adapter-core injects a bounded pool.
         this.io = io == null ? DirectExecutor.INSTANCE : io;
+        this.sync = sync == null ? NoOpSync.INSTANCE : sync;
+    }
+
+    public ConnectContext(UUID tenantId,
+                          String tenantSlug,
+                          UUID serverId,
+                          String serverSlug,
+                          String serverName,
+                          String adapterVersion,
+                          @Nullable SyncTopics syncTopics,
+                          @Nullable NxEvents events,
+                          @Nullable NxCommands commands,
+                          @Nullable Executor io) {
+        this(tenantId, tenantSlug, serverId, serverSlug, serverName, adapterVersion,
+                syncTopics, events, commands, io, null);
     }
 
     public ConnectContext(UUID tenantId,
@@ -169,6 +186,19 @@ public final class ConnectContext {
         return io;
     }
 
+    /**
+     * Out-of-band sync request capability. Modules with sync responsibilities
+     * register triggers via {@link NxSync#registerTrigger(String, NxSyncTrigger)}
+     * during {@code onConnect}; host code calls
+     * {@code ctx.sync().requestNow(entity, pk)} to demand an immediate sync
+     * pass for a specific entity instance. Always non-null — a {@code null}
+     * passed to the constructor is normalized to a no-op implementation that
+     * silently drops requests.
+     */
+    public NxSync sync() {
+        return sync;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .tenantId(tenantId)
@@ -180,7 +210,8 @@ public final class ConnectContext {
                 .syncTopics(syncTopics)
                 .events(events)
                 .commands(commands)
-                .io(io);
+                .io(io)
+                .sync(sync);
     }
 
     public static Builder builder() {
@@ -229,6 +260,7 @@ public final class ConnectContext {
         private @Nullable NxEvents events;
         private @Nullable NxCommands commands;
         private @Nullable Executor io;
+        private @Nullable NxSync sync;
 
         public Builder tenantId(UUID tenantId) {
             this.tenantId = tenantId;
@@ -280,9 +312,14 @@ public final class ConnectContext {
             return this;
         }
 
+        public Builder sync(@Nullable NxSync sync) {
+            this.sync = sync;
+            return this;
+        }
+
         public ConnectContext build() {
             return new ConnectContext(tenantId, tenantSlug, serverId, serverSlug,
-                    serverName, adapterVersion, syncTopics, events, commands, io);
+                    serverName, adapterVersion, syncTopics, events, commands, io, sync);
         }
     }
 }

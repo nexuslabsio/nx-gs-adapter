@@ -14,7 +14,7 @@ import java.util.Objects;
  * RabbitMQ on both the {@code admin-to-<server>} and {@code tg-to-<server>}
  * queues.
  *
- * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link SendMailPayload}{@code >} —
+ * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link SendMailResult}{@code >} —
  * {@code success(payload)} carries the created mail-row primary keys (one per
  * mail; the host MAY split a single command into multiple mails when
  * attachments exceed its per-mail attachment cap) plus an optional per-line
@@ -53,14 +53,14 @@ import java.util.Objects;
  * crash recovery may re-invoke the handler with the same
  * {@code Nx-Correlation-Id}. Best practice: cache recently-processed
  * correlation ids and short-circuit on a hit, replying with the original
- * {@link SendMailPayload}. Re-creating mails on every redelivery would result
+ * {@link SendMailResult}. Re-creating mails on every redelivery would result
  * in duplicate attachments grants, which is a real-money bug for paid
  * deliveries from the platform's commerce flows.</p>
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
  */
-public final class SendMailCommand implements NxCommand<SendMailPayload> {
+public final class SendMailCommand implements NxCommand<SendMailResult> {
 
     private final Long charId;
     private final @Nullable String author;

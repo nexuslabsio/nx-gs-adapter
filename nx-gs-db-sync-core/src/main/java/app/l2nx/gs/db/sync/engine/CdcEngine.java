@@ -15,10 +15,8 @@ import app.l2nx.gs.log.NxLogFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
@@ -49,6 +47,7 @@ public final class CdcEngine {
     private final List<ScheduledFuture<?>> futures = new ArrayList<ScheduledFuture<?>>();
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean stopped = new AtomicBoolean(false);
+    private final Map<String, EntitySlot> slotsByEntity = new ConcurrentHashMap<String, EntitySlot>();
 
     private volatile ScheduledThreadPoolExecutor scheduler;
 
@@ -105,18 +104,8 @@ public final class CdcEngine {
 
             final AtomicBoolean ticking = new AtomicBoolean(false);
             final String entity = mapping.entityName();
-            Runnable tick = SafeRunnable.wrap(() -> {
-                if (!ticking.compareAndSet(false, true)) {
-                    log.warn("Entity {} previous tick still running — skipping this scheduled cycle", entity);
-                    return;
-                }
-                try {
-                    CycleResult result = task.runCycle();
-                    statsTracker.recordCycleResult(entity, result);
-                } finally {
-                    ticking.set(false);
-                }
-            }, log);
+            slotsByEntity.put(entity, new EntitySlot(task, ticking));
+            Runnable tick = SafeRunnable.wrap(() -> runGuardedCycle(entity, task, ticking), log);
 
             ScheduledFuture<?> handle = pool.scheduleWithFixedDelay(
                     tick,
@@ -127,6 +116,73 @@ public final class CdcEngine {
         }
         log.info("CdcEngine started: {} entities, schemaName={}, poolSize={}",
                 mappings.size(), schemaName, poolSize);
+    }
+
+    /**
+     * Out-of-band trigger: submit an immediate cycle for the named entity
+     * onto the engine's pool, bypassing the fixed-delay timer. Used by
+     * {@code NxSync.requestNow} so command handlers can request fresh
+     * sync state right after mutating an entity (e.g. after item transfer)
+     * instead of waiting for the next scheduled tick.
+     *
+     * <p>Honors the same per-entity {@code ticking} guard as scheduled
+     * runs — if a tick is already running for this entity the trigger
+     * is a no-op (the in-flight cycle picks up the change anyway, since
+     * Phase-1 re-reads the current row hashes). Unknown entity names log
+     * at WARN and drop.</p>
+     *
+     * <p>Engine must be {@link #start()}ed and not {@link #stop()}ped;
+     * pre-start and post-stop calls log at WARN and drop. Calling thread
+     * does NOT block — submission only.</p>
+     *
+     * @param entityName entity name as declared by
+     *                   {@link EntityMapping#entityName()}
+     */
+    public void triggerEntityNow(String entityName) {
+        if (!started.get() || stopped.get()) {
+            log.warn("CdcEngine.triggerEntityNow({}) called before start or after stop — dropping",
+                    entityName);
+            return;
+        }
+        EntitySlot slot = slotsByEntity.get(entityName);
+        if (slot == null) {
+            log.warn("CdcEngine.triggerEntityNow({}) — unknown entity, dropping", entityName);
+            return;
+        }
+        ScheduledThreadPoolExecutor pool = scheduler;
+        if (pool == null) {
+            return;
+        }
+        try {
+            pool.execute(SafeRunnable.wrap(
+                    () -> runGuardedCycle(entityName, slot.task, slot.ticking), log));
+        } catch (Throwable t) {
+            log.warn("CdcEngine.triggerEntityNow({}) submit failed: {}",
+                    entityName, t.getClass().getName(), t);
+        }
+    }
+
+    private void runGuardedCycle(String entity, EntitySyncTask task, AtomicBoolean ticking) {
+        if (!ticking.compareAndSet(false, true)) {
+            log.debug("Entity {} cycle already running — out-of-band/scheduled tick skipped", entity);
+            return;
+        }
+        try {
+            CycleResult result = task.runCycle();
+            statsTracker.recordCycleResult(entity, result);
+        } finally {
+            ticking.set(false);
+        }
+    }
+
+    private static final class EntitySlot {
+        final EntitySyncTask task;
+        final AtomicBoolean ticking;
+
+        EntitySlot(EntitySyncTask task, AtomicBoolean ticking) {
+            this.task = task;
+            this.ticking = ticking;
+        }
     }
 
     public void stop() {
@@ -159,6 +215,7 @@ public final class CdcEngine {
         }
         scheduler = null;
         tasks.clear();
+        slotsByEntity.clear();
         snapshot.clearAll();
         log.info("CdcEngine stopped");
     }

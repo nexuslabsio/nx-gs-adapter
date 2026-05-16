@@ -95,6 +95,7 @@ class CommandsConsumerTest {
                 new HostExecutorImpl(Runnable::run, 1000L),
                 new FakeNxEvents(),
                 Runnable::run,
+                new app.l2nx.gs.adapter.core.sync.NxSyncImpl(),
                 registry,
                 mockConsumer,
                 sender,

@@ -55,4 +55,16 @@ public interface CommandContext {
      * {@code max(2, Runtime.getRuntime().availableProcessors() / 2)}).
      */
     Executor io();
+
+    /**
+     * Out-of-band sync request capability. Handlers that mutate entity state
+     * (item transfer, character account change, mail attach, …) call
+     * {@code ctx.sync().requestNow(entityName, pk)} after the mutation to
+     * trigger an immediate sync pass for the affected entity instead of
+     * waiting for the next scheduled CDC cycle. Same session-scoped instance
+     * exposed via {@link ConnectContext#sync()}. Always non-null — falls back
+     * to a no-op implementation when no sync module has registered a trigger
+     * for the requested entity.
+     */
+    NxSync sync();
 }

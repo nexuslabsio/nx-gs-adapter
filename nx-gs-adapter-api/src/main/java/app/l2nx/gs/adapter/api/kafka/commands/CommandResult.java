@@ -2,151 +2,188 @@ package app.l2nx.gs.adapter.api.kafka.commands;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Objects;
 
 /**
- * Reply envelope for an inbound {@link NxCommand} dispatched through the
- * adapter's command runtime. Travels on {@code <tenant>.gs.commands.replies}
- * with header {@code Nx-Correlation-Id} echoed from the inbound command and
- * {@code Nx-Message-Type = "<OriginalCommandClass>Result"}.
+ * Reply envelope for an inbound {@link NxCommand}. Travels on
+ * {@code <tenant>.gs.commands.replies} with header {@code Nx-Correlation-Id}
+ * echoed from the inbound command and {@code Nx-Message-Type =
+ * "<OriginalCommandClassNameWithoutCommandSuffix>Result"} (e.g.
+ * {@code "TransferItemResult"}).
  *
- * <p>Replaces the legacy free-form {@code ResponseV2.message: String} with a
- * structured discriminator: {@code success} flag + typed {@link ErrorCode} +
- * optional {@code errorDetails} string-string map for context (e.g.
- * {@code {"charId": "12345"}}, {@code {"error.class": "IllegalStateException"}})
- * + optional typed {@code payload} for success cases.</p>
+ * <p><b>Invariant.</b> {@link #getPayload() payload} is non-null iff
+ * {@link #getStatus() status} is {@link CommandStatus#OK}; {@link #getProblem()
+ * problem} is non-null iff status is NOT OK. The constructor enforces this
+ * for programmatic construction. Wire-path Gson bypasses the constructor —
+ * platform consumers SHOULD assume the invariant when reading.</p>
  *
- * <p>Static factories cover the common shapes:</p>
+ * <p>Common shapes:</p>
  * <pre>
- *   CommandResult.&lt;Void&gt;success();
- *   CommandResult.success(payload);
- *   CommandResult.&lt;Void&gt;error(ErrorCode.NOT_FOUND);
- *   CommandResult.&lt;Void&gt;error(ErrorCode.NOT_FOUND, "charId", "12345");
+ *   CommandResult.&lt;DeleteItemResult&gt;ok(new DeleteItemResult(...));
+ *   CommandResult.&lt;Void&gt;ok();                                    // marker-only success
+ *   CommandResult.&lt;Void&gt;notFound("Character not found");
+ *   CommandResult.&lt;Void&gt;notFound("Character not found", "charId", 12345L);
+ *   CommandResult.&lt;Void&gt;validationFailed("count must be positive", "field", "count");
+ *   CommandResult.&lt;Void&gt;error(CommandStatus.FORBIDDEN,
+ *           CommandProblem.of("Self-punishment not allowed"));
  * </pre>
  *
- * <p>For multi-detail errors, use the fluent builder:</p>
- * <pre>
- *   CommandResult.&lt;Void&gt;builder()
- *           .errorCode(ErrorCode.VALIDATION_FAILED)
- *           .errorDetail("field", "amount")
- *           .errorDetail("got", "-100")
- *           .build();
- * </pre>
+ * <p>Domain-specific success data (partial-success flags, affected entity
+ * ids, modes) lives in the {@code R} payload class — NOT in
+ * {@link CommandProblem#getExtensions() problem.extensions}, which is
+ * reserved for failure context.</p>
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters} preserved constructor parameter names.</p>
+ * {@code -parameters}-preserved constructor parameter names.</p>
  *
- * @param <R> success-payload type; {@code Void} for void replies.
+ * @param <R> success-payload type carried by this command (declared on
+ *            {@link NxCommand}{@code <R>}); use {@link Void} for commands
+ *            whose OK reply carries no typed data.
  */
 public final class CommandResult<R> {
 
-    private final boolean success;
-    private final @Nullable ErrorCode errorCode;
-    private final Map<String, String> errorDetails;
+    private final CommandStatus status;
     private final @Nullable R payload;
+    private final @Nullable CommandProblem problem;
 
-    public CommandResult(boolean success,
-                         @Nullable ErrorCode errorCode,
-                         @Nullable Map<String, String> errorDetails,
-                         @Nullable R payload) {
-        if (success && errorCode != null) {
-            throw new IllegalArgumentException(
-                    "success=true is mutually exclusive with errorCode (got " + errorCode + ")");
+    public CommandResult(CommandStatus status,
+                         @Nullable R payload,
+                         @Nullable CommandProblem problem) {
+        if (status == null) {
+            throw new IllegalArgumentException("status is required");
         }
-        if (!success && errorCode == null) {
+        if (status == CommandStatus.OK && problem != null) {
             throw new IllegalArgumentException(
-                    "success=false requires a non-null errorCode");
+                    "status=OK is mutually exclusive with problem (got " + problem + ")");
         }
-        this.success = success;
-        this.errorCode = errorCode;
-        this.errorDetails = freeze(errorDetails);
+        if (status != CommandStatus.OK && problem == null) {
+            throw new IllegalArgumentException(
+                    "status=" + status + " requires a non-null problem");
+        }
+        if (status != CommandStatus.OK && payload != null) {
+            throw new IllegalArgumentException(
+                    "status=" + status + " is mutually exclusive with payload (got "
+                            + payload + ")");
+        }
+        this.status = status;
         this.payload = payload;
+        this.problem = problem;
+    }
+
+    public CommandStatus getStatus() {
+        return status;
     }
 
     /**
-     * Whether the command was processed successfully. {@code false} implies
-     * {@link #getErrorCode()} is non-null.
+     * Coarse 3-way classification (OK / CLIENT_ERROR / SERVER_ERROR).
+     * Shorthand for {@code getStatus().tier()}.
      */
-    public boolean isSuccess() {
-        return success;
+    public CommandStatus.Tier getTier() {
+        return status.tier();
+    }
+
+    public boolean isOk() {
+        return status == CommandStatus.OK;
     }
 
     /**
-     * Standardized error category. Non-null iff {@link #isSuccess()} is
-     * {@code false}.
-     */
-    public @Nullable ErrorCode getErrorCode() {
-        return errorCode;
-    }
-
-    /**
-     * Optional structured error context. Always non-null — {@code null} on
-     * the wire is normalized to an empty map.
-     */
-    public Map<String, String> getErrorDetails() {
-        return errorDetails;
-    }
-
-    /**
-     * Optional success payload; {@code null} for void replies.
+     * Success payload; non-null iff {@link #isOk()}.
      */
     public @Nullable R getPayload() {
         return payload;
     }
 
     /**
-     * Returns a new builder pre-populated with this instance's fields.
-     * The success flag is implied by {@code errorCode == null}.
+     * Failure context; non-null iff NOT {@link #isOk()}.
      */
-    public Builder<R> toBuilder() {
-        return new Builder<R>()
-                .errorCode(errorCode)
-                .errorDetails(errorDetails)
-                .payload(payload);
+    public @Nullable CommandProblem getProblem() {
+        return problem;
     }
 
-    public static <R> Builder<R> builder() {
-        return new Builder<R>();
+    // ─────────────────────────────────────────────────────────────────────
+    // Static factories
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * OK reply with no typed payload (use when {@code R == Void}).
+     */
+    public static <R> CommandResult<R> ok() {
+        return new CommandResult<R>(CommandStatus.OK, null, null);
     }
 
     /**
-     * Success reply with no payload.
+     * OK reply with a typed payload.
      */
-    public static <R> CommandResult<R> success() {
-        return new CommandResult<R>(true, null, null, null);
+    public static <R> CommandResult<R> ok(R payload) {
+        return new CommandResult<R>(CommandStatus.OK, payload, null);
     }
 
     /**
-     * Success reply carrying a typed payload.
+     * Error reply with a pre-built {@link CommandProblem}.
      */
-    public static <R> CommandResult<R> success(@Nullable R payload) {
-        return new CommandResult<R>(true, null, null, payload);
+    public static <R> CommandResult<R> error(CommandStatus status, CommandProblem problem) {
+        return new CommandResult<R>(status, null, problem);
     }
 
     /**
-     * Error reply with no extra context.
+     * Error reply with just a title; the problem body has no extensions.
      */
-    public static <R> CommandResult<R> error(ErrorCode code) {
-        return new CommandResult<R>(false, code, null, null);
+    public static <R> CommandResult<R> error(CommandStatus status, String title) {
+        return new CommandResult<R>(status, null, CommandProblem.of(title));
     }
 
     /**
-     * Error reply with a single key-value detail.
+     * Error reply with title + single-key extension context.
      */
-    public static <R> CommandResult<R> error(ErrorCode code, String key, String value) {
-        Map<String, String> details = new LinkedHashMap<String, String>();
-        details.put(key, value);
-        return new CommandResult<R>(false, code, details, null);
+    public static <R> CommandResult<R> error(CommandStatus status,
+                                             String title,
+                                             String extKey,
+                                             Object extValue) {
+        return new CommandResult<R>(status, null, CommandProblem.of(title, extKey, extValue));
     }
 
-    private static Map<String, String> freeze(@Nullable Map<String, String> src) {
-        if (src == null || src.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        return Collections.unmodifiableMap(new LinkedHashMap<String, String>(src));
+    // ─────────────────────────────────────────────────────────────────────
+    // Sugar: per-status factories for the common cases
+    // ─────────────────────────────────────────────────────────────────────
+
+    public static <R> CommandResult<R> notFound(String title) {
+        return error(CommandStatus.NOT_FOUND, title);
+    }
+
+    public static <R> CommandResult<R> notFound(String title, String extKey, Object extValue) {
+        return error(CommandStatus.NOT_FOUND, title, extKey, extValue);
+    }
+
+    public static <R> CommandResult<R> invalidState(String title) {
+        return error(CommandStatus.INVALID_STATE, title);
+    }
+
+    public static <R> CommandResult<R> invalidState(String title, String extKey, Object extValue) {
+        return error(CommandStatus.INVALID_STATE, title, extKey, extValue);
+    }
+
+    public static <R> CommandResult<R> forbidden(String title) {
+        return error(CommandStatus.FORBIDDEN, title);
+    }
+
+    public static <R> CommandResult<R> validationFailed(String title) {
+        return error(CommandStatus.VALIDATION_FAILED, title);
+    }
+
+    public static <R> CommandResult<R> validationFailed(String title, String field) {
+        return error(CommandStatus.VALIDATION_FAILED, title, "field", field);
+    }
+
+    public static <R> CommandResult<R> rateLimited(String title) {
+        return error(CommandStatus.RATE_LIMITED, title);
+    }
+
+    public static <R> CommandResult<R> unavailable(String title) {
+        return error(CommandStatus.UNAVAILABLE, title);
+    }
+
+    public static <R> CommandResult<R> internalError(String title) {
+        return error(CommandStatus.INTERNAL_ERROR, title);
     }
 
     @Override
@@ -154,76 +191,20 @@ public final class CommandResult<R> {
         if (this == o) return true;
         if (!(o instanceof CommandResult)) return false;
         CommandResult<?> that = (CommandResult<?>) o;
-        return success == that.success
-                && Objects.equals(errorCode, that.errorCode)
-                && Objects.equals(errorDetails, that.errorDetails)
-                && Objects.equals(payload, that.payload);
+        return status == that.status
+                && Objects.equals(payload, that.payload)
+                && Objects.equals(problem, that.problem);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(success, errorCode, errorDetails, payload);
+        return Objects.hash(status, payload, problem);
     }
 
     @Override
     public String toString() {
-        return "CommandResult[success=" + success
-                + ", errorCode=" + errorCode
-                + ", errorDetails=" + errorDetails
-                + ", payload=" + payload + "]";
-    }
-
-    /**
-     * Builder enforcing the {@link CommandResult} invariant: the {@code success}
-     * flag is implied by {@code errorCode == null}, never set independently.
-     * Static factories ({@link CommandResult#success()}, {@link
-     * CommandResult#error(ErrorCode)}, etc.) cover the common shapes; this
-     * builder is for multi-detail error replies.
-     */
-    public static final class Builder<R> {
-
-        private @Nullable ErrorCode errorCode;
-        private @Nullable Map<String, String> errorDetails;
-        private @Nullable R payload;
-
-        /**
-         * Set the error code. {@code null} produces a success reply on
-         * {@link #build()}; non-null produces an error reply.
-         */
-        public Builder<R> errorCode(@Nullable ErrorCode errorCode) {
-            this.errorCode = errorCode;
-            return this;
-        }
-
-        public Builder<R> errorDetails(@Nullable Map<String, String> errorDetails) {
-            this.errorDetails = errorDetails;
-            return this;
-        }
-
-        /**
-         * Append a single key-value detail to the builder. Initializes the
-         * map on first call; if a frozen map was previously set via
-         * {@link #errorDetails(Map)} or {@link CommandResult#toBuilder()},
-         * defensively copies it into a fresh mutable {@link LinkedHashMap}
-         * before mutating. Last write wins on duplicate keys.
-         */
-        public Builder<R> errorDetail(String key, String value) {
-            if (errorDetails == null) {
-                errorDetails = new LinkedHashMap<String, String>();
-            } else if (!(errorDetails instanceof LinkedHashMap)) {
-                errorDetails = new LinkedHashMap<String, String>(errorDetails);
-            }
-            errorDetails.put(key, value);
-            return this;
-        }
-
-        public Builder<R> payload(@Nullable R payload) {
-            this.payload = payload;
-            return this;
-        }
-
-        public CommandResult<R> build() {
-            return new CommandResult<R>(errorCode == null, errorCode, errorDetails, payload);
-        }
+        return "CommandResult[status=" + status
+                + ", payload=" + payload
+                + ", problem=" + problem + "]";
     }
 }

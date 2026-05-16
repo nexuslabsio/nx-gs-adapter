@@ -1,8 +1,9 @@
 package app.l2nx.gs.adapter.core.commands;
 
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
+import app.l2nx.gs.adapter.api.kafka.commands.CommandProblem;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
-import app.l2nx.gs.adapter.api.kafka.commands.ErrorCode;
+import app.l2nx.gs.adapter.api.kafka.commands.CommandStatus;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import app.l2nx.gs.adapter.api.kafka.ops.CommandsStats;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
@@ -32,57 +33,23 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Inbound commands consumer + dispatcher. Owns one Kafka {@link Consumer} on
- * a single daemon thread {@code nx-commands-consumer}. Polls
- * {@code commandsTopic}, resolves handlers via
- * {@link CommandTypeRegistry}, deserializes via {@link Gson}, invokes
- * {@link CommandHandler#handle}, publishes the {@link CommandResult} reply
- * to {@code commandsRepliesTopic}, awaits the per-batch reply-flush, then
- * commits the batch offset.
+ * Inbound commands consumer + dispatcher. Single Kafka consumer on the
+ * {@code nx-commands-consumer} daemon thread; {@link CommandHandler#handle}
+ * runs synchronously on it, so game-state mutations MUST hop via
+ * {@link HostExecutor#sync(Runnable)} (bounded by
+ * {@code l2nx.commands.host-sync-timeout-ms}).
  *
- * <p>Threading model — {@link CommandHandler#handle} runs synchronously on
- * the consumer thread; game-state mutations require an explicit
- * {@link HostExecutor#sync(Runnable)} hop bounded by
- * {@code l2nx.commands.host-sync-timeout-ms}. Slow handlers slow this consumer.</p>
+ * <p><b>At-most-once.</b> {@code commitSync} runs BEFORE dispatch — a
+ * crash or commit failure mid-batch drops the in-flight records (no
+ * redelivery). Caller times out, operator re-issues. Handlers do NOT
+ * need to be idempotent. Reply sends are fire-and-forget.</p>
  *
- * <p>At-least-once contract on both legs — for every batch:</p>
- * <ol>
- *     <li>Dispatch all records, issuing reply sends asynchronously.</li>
- *     <li>Await up to {@code l2nx.commands.reply-flush-timeout-ms} for the
- *     producer's send-callbacks to fire (i.e. broker has acknowledged or
- *     definitively failed). This bounds the at-most-once reply window: a
- *     JVM crash before the flush completes leaves the batch uncommitted, so
- *     the records redeliver and the handlers re-emit the replies (handlers
- *     must be idempotent).</li>
- *     <li>{@code commitSync} the consumer offset.</li>
- * </ol>
- *
- * <p>Error boundaries (per dispatch step):</p>
- * <ul>
- *     <li>Unknown {@code Nx-Message-Type} → reply
- *     {@link ErrorCode#UNSUPPORTED_COMMAND}, commit.</li>
- *     <li>Gson {@link JsonSyntaxException} → reply
- *     {@link ErrorCode#VALIDATION_FAILED}, commit.</li>
- *     <li>Handler {@link HostExecutorTimeoutException} → reply
- *     {@link ErrorCode#UNAVAILABLE} with {@code error.cause =
- *     "host-executor-timeout"}, commit (handler hop did not finish in time;
- *     web side may retry).</li>
- *     <li>Handler {@code RuntimeException} → reply
- *     {@link ErrorCode#INTERNAL_ERROR} with class+message in
- *     {@code errorDetails}, commit.</li>
- *     <li>Handler returns {@code null} → reply
- *     {@link ErrorCode#INTERNAL_ERROR} with
- *     {@code error.cause = "handler-returned-null"}, commit.</li>
- *     <li>Handler {@code Throwable} (OOM / Error) → log ERROR, do NOT reply,
- *     do NOT commit, rethrow (consumer thread aborts; JVM-level handler
- *     decides next).</li>
- * </ul>
- *
- * <p>Reply path bypasses the events publisher's queue and goes directly to
- * the Kafka producer via the supplied {@link ReplySender} bridge — Kafka's
- * own record-accumulator absorbs back-pressure, and reply records have
- * different drop semantics from outbound events (a dropped reply means
- * web-side timeout, no semantic recovery).</p>
+ * <p>Error boundaries: unknown {@code Nx-Message-Type} →
+ * {@link CommandStatus#UNSUPPORTED_COMMAND}; Gson failure →
+ * {@link CommandStatus#VALIDATION_FAILED}; {@link HostExecutorTimeoutException}
+ * → {@link CommandStatus#UNAVAILABLE}; other {@code RuntimeException} or
+ * {@code null} return → {@link CommandStatus#INTERNAL_ERROR}; {@code Error}
+ * (OOM) escapes uncaught.</p>
  */
 public final class CommandsConsumer {
 
@@ -106,6 +73,7 @@ public final class CommandsConsumer {
     private final HostExecutor hostExecutor;
     private final NxEvents events;
     private final Executor ioExecutor;
+    private final NxSync sync;
     private final CommandTypeRegistry registry;
     private final Consumer<byte[], byte[]> kafkaConsumer;
     private final ReplySender replySender;
@@ -135,6 +103,7 @@ public final class CommandsConsumer {
                      HostExecutor hostExecutor,
                      NxEvents events,
                      Executor ioExecutor,
+                     NxSync sync,
                      CommandTypeRegistry registry,
                      Consumer<byte[], byte[]> kafkaConsumer,
                      ReplySender replySender,
@@ -145,6 +114,7 @@ public final class CommandsConsumer {
         this.hostExecutor = hostExecutor;
         this.events = events;
         this.ioExecutor = ioExecutor;
+        this.sync = sync;
         this.registry = registry;
         this.kafkaConsumer = kafkaConsumer;
         this.replySender = replySender;
@@ -247,31 +217,22 @@ public final class CommandsConsumer {
                 continue;
             }
 
+            if (records.isEmpty()) {
+                continue;
+            }
+
+            try {
+                kafkaConsumer.commitSync();
+            } catch (Throwable t) {
+                commitFailuresTotal.incrementAndGet();
+                log.warn("Commands consumer commit failed: {} ({}) — dropping batch (at-most-once)",
+                        t.getClass().getName(), t.getMessage(), t);
+                continue;
+            }
+
             for (ConsumerRecord<byte[], byte[]> record : records) {
                 consumedTotal.incrementAndGet();
                 processRecord(record);
-            }
-
-            if (!records.isEmpty()) {
-                boolean interrupted = awaitRepliesDrain();
-                if (interrupted) {
-                    // Drain returned early via thread interrupt; offsets MUST stay
-                    // uncommitted so the batch redelivers and replies re-emit.
-                    return;
-                }
-                // running may have been flipped to false between processRecord and
-                // this point (concurrent stop()); honor that to avoid committing
-                // records the consumer will redeliver on next start anyway.
-                if (!running) {
-                    return;
-                }
-                try {
-                    kafkaConsumer.commitSync();
-                } catch (Throwable t) {
-                    commitFailuresTotal.incrementAndGet();
-                    log.warn("Commands consumer commit failed: {} ({}) — records will redeliver",
-                            t.getClass().getName(), t.getMessage(), t);
-                }
             }
         }
     }
@@ -340,7 +301,8 @@ public final class CommandsConsumer {
             log.warn("Inbound command record missing {} header — replying UNSUPPORTED_COMMAND",
                     NxHeaders.NX_MESSAGE_TYPE);
             sendReply(correlationId, FALLBACK_REPLY_TYPE_BYTES,
-                    CommandResult.error(ErrorCode.UNSUPPORTED_COMMAND,
+                    CommandResult.error(CommandStatus.UNSUPPORTED_COMMAND,
+                            "Inbound command missing Nx-Message-Type header",
                             "error.cause", "missing-message-type-header"));
             return;
         }
@@ -350,8 +312,9 @@ public final class CommandsConsumer {
             log.warn("No registered handler for command type {} — replying UNSUPPORTED_COMMAND",
                     messageType);
             sendReply(correlationId, computeReplyTypeBytes(messageType),
-                    CommandResult.error(ErrorCode.UNSUPPORTED_COMMAND,
-                            "error.cause", "unregistered-type"));
+                    CommandResult.error(CommandStatus.UNSUPPORTED_COMMAND,
+                            "No registered handler for command type",
+                            "messageType", messageType));
             return;
         }
 
@@ -371,23 +334,29 @@ public final class CommandsConsumer {
             log.warn("Failed to deserialize command type {} (corr={}): {}",
                     messageType, correlationId, jse.getMessage());
             sendReply(correlationId, replyTypeBytes,
-                    CommandResult.error(ErrorCode.VALIDATION_FAILED,
-                            "parse", String.valueOf(jse.getMessage())));
+                    CommandResult.error(CommandStatus.VALIDATION_FAILED,
+                            CommandProblem.builder()
+                                    .title("Failed to deserialize command payload")
+                                    .detail(jse.getMessage())
+                                    .extension("error.class", jse.getClass().getSimpleName())
+                                    .build()));
             return;
         } catch (Throwable t) {
             internalErrorsTotal.incrementAndGet();
             log.error("Unexpected deserialization failure for command type {} (corr={}): {}",
                     messageType, correlationId, t.getClass().getName(), t);
-            sendReply(correlationId, replyTypeBytes, CommandResult.builder()
-                    .errorCode(ErrorCode.INTERNAL_ERROR)
-                    .errorDetail("error.class", t.getClass().getSimpleName())
-                    .errorDetail("error.message", String.valueOf(t.getMessage()))
-                    .build());
+            sendReply(correlationId, replyTypeBytes,
+                    CommandResult.error(CommandStatus.INTERNAL_ERROR,
+                            CommandProblem.builder()
+                                    .title("Deserialization failure")
+                                    .detail(String.valueOf(t.getMessage()))
+                                    .extension("error.class", t.getClass().getSimpleName())
+                                    .build()));
             return;
         }
 
         // 3. Invoke handler — Throwable (Error) intentionally NOT caught (lets JVM-level handler take over)
-        CommandContext ctx = new CommandContextImpl(correlationId, hostExecutor, events, ioExecutor);
+        CommandContext ctx = new CommandContextImpl(correlationId, hostExecutor, events, ioExecutor, sync);
         @SuppressWarnings({"unchecked", "rawtypes"})
         CommandHandler handler = binding.handler();
         CommandResult<?> result;
@@ -399,20 +368,22 @@ public final class CommandsConsumer {
             internalErrorsTotal.incrementAndGet();
             log.warn("Handler for {} (corr={}) hit host-executor timeout after {}ms",
                     messageType, correlationId, hte.getTimeoutMs());
-            result = CommandResult.builder()
-                    .errorCode(ErrorCode.UNAVAILABLE)
-                    .errorDetail("error.cause", "host-executor-timeout")
-                    .errorDetail("timeout.ms", String.valueOf(hte.getTimeoutMs()))
-                    .build();
+            result = CommandResult.error(CommandStatus.UNAVAILABLE,
+                    CommandProblem.builder()
+                            .title("Host executor timeout")
+                            .extension("error.cause", "host-executor-timeout")
+                            .extension("timeout.ms", hte.getTimeoutMs())
+                            .build());
         } catch (RuntimeException re) {
             internalErrorsTotal.incrementAndGet();
             log.warn("Handler for {} (corr={}) threw {}: {}",
                     messageType, correlationId, re.getClass().getSimpleName(), re.getMessage(), re);
-            result = CommandResult.builder()
-                    .errorCode(ErrorCode.INTERNAL_ERROR)
-                    .errorDetail("error.class", re.getClass().getSimpleName())
-                    .errorDetail("error.message", String.valueOf(re.getMessage()))
-                    .build();
+            result = CommandResult.error(CommandStatus.INTERNAL_ERROR,
+                    CommandProblem.builder()
+                            .title("Handler threw " + re.getClass().getSimpleName())
+                            .detail(String.valueOf(re.getMessage()))
+                            .extension("error.class", re.getClass().getSimpleName())
+                            .build());
         }
 
         // 4. Reply
@@ -420,7 +391,8 @@ public final class CommandsConsumer {
             internalErrorsTotal.incrementAndGet();
             log.warn("Handler for {} (corr={}) returned null — auto-wrapping as INTERNAL_ERROR",
                     messageType, correlationId);
-            result = CommandResult.error(ErrorCode.INTERNAL_ERROR,
+            result = CommandResult.error(CommandStatus.INTERNAL_ERROR,
+                    "Handler returned null",
                     "error.cause", "handler-returned-null");
         } else {
             handledTotal.incrementAndGet();
@@ -479,7 +451,8 @@ public final class CommandsConsumer {
     }
 
     private static byte[] computeReplyTypeBytes(String originalMessageType) {
-        return (originalMessageType + "Result").getBytes(StandardCharsets.UTF_8);
+        return CommandTypeBinding.deriveReplyTypeName(originalMessageType)
+                .getBytes(StandardCharsets.UTF_8);
     }
 
     private static @Nullable String readStringHeader(Headers headers, String name) {

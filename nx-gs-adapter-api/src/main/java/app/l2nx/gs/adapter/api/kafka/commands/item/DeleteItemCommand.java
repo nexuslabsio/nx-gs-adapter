@@ -26,7 +26,7 @@ import java.util.Objects;
  *     field; handler MUST check non-null before applying).</li>
  * </ul>
  *
- * <p><b>Identity.</b> {@link #getItemObjectId() itemObjectId} is the L2
+ * <p><b>Identity.</b> {@link #getItemId() itemId} is the L2
  * object-id of the specific item instance (NOT the catalog item-template id) —
  * unique per game-server lifetime, identifies one stack.</p>
  *
@@ -39,7 +39,7 @@ import java.util.Objects;
  * wire path.</p>
  *
  * <p><b>Required fields.</b> All three fields ({@code charId},
- * {@code itemObjectId}, {@code count}) are semantically REQUIRED. The
+ * {@code itemId}, {@code count}) are semantically REQUIRED. The
  * constructor enforces non-null values via {@link IllegalArgumentException}
  * for programmatic construction (tests, host-side replays). Wire-path
  * deserialization bypasses the constructor via Gson — the handler is
@@ -59,20 +59,20 @@ import java.util.Objects;
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
  */
-public final class DeleteItemCommand implements NxCommand<Void> {
+public final class DeleteItemCommand implements NxCommand<DeleteItemResult> {
 
     private final Long charId;
-    private final Long itemObjectId;
+    private final Long itemId;
     private final Long count;
 
     public DeleteItemCommand(Long charId,
-                             Long itemObjectId,
+                             Long itemId,
                              Long count) {
         if (charId == null) {
             throw new IllegalArgumentException("charId is required");
         }
-        if (itemObjectId == null) {
-            throw new IllegalArgumentException("itemObjectId is required");
+        if (itemId == null) {
+            throw new IllegalArgumentException("itemId is required");
         }
         if (count == null) {
             throw new IllegalArgumentException("count is required");
@@ -81,7 +81,7 @@ public final class DeleteItemCommand implements NxCommand<Void> {
             throw new IllegalArgumentException("count must be positive (got " + count + ")");
         }
         this.charId = charId;
-        this.itemObjectId = itemObjectId;
+        this.itemId = itemId;
         this.count = count;
     }
 
@@ -99,8 +99,8 @@ public final class DeleteItemCommand implements NxCommand<Void> {
      * item-template id — this is the per-instance unique id. Handler MUST
      * emit {@code VALIDATION_FAILED} on missing wire data.
      */
-    public Long getItemObjectId() {
-        return itemObjectId;
+    public Long getItemId() {
+        return itemId;
     }
 
     /**
@@ -116,7 +116,7 @@ public final class DeleteItemCommand implements NxCommand<Void> {
     public Builder toBuilder() {
         return new Builder()
                 .charId(charId)
-                .itemObjectId(itemObjectId)
+                .itemId(itemId)
                 .count(count);
     }
 
@@ -130,25 +130,25 @@ public final class DeleteItemCommand implements NxCommand<Void> {
         if (!(o instanceof DeleteItemCommand)) return false;
         DeleteItemCommand that = (DeleteItemCommand) o;
         return Objects.equals(charId, that.charId)
-                && Objects.equals(itemObjectId, that.itemObjectId)
+                && Objects.equals(itemId, that.itemId)
                 && Objects.equals(count, that.count);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(charId, itemObjectId, count);
+        return Objects.hash(charId, itemId, count);
     }
 
     @Override
     public String toString() {
         return "DeleteItemCommand[charId=" + charId
-                + ", itemObjectId=" + itemObjectId
+                + ", itemId=" + itemId
                 + ", count=" + count + "]";
     }
 
     public static final class Builder {
         private Long charId;
-        private Long itemObjectId;
+        private Long itemId;
         private Long count = 1L;
 
         public Builder charId(Long charId) {
@@ -156,8 +156,8 @@ public final class DeleteItemCommand implements NxCommand<Void> {
             return this;
         }
 
-        public Builder itemObjectId(Long itemObjectId) {
-            this.itemObjectId = itemObjectId;
+        public Builder itemId(Long itemId) {
+            this.itemId = itemId;
             return this;
         }
 
@@ -170,7 +170,7 @@ public final class DeleteItemCommand implements NxCommand<Void> {
         }
 
         public DeleteItemCommand build() {
-            return new DeleteItemCommand(charId, itemObjectId, count);
+            return new DeleteItemCommand(charId, itemId, count);
         }
     }
 }

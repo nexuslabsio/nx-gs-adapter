@@ -15,7 +15,7 @@ import java.util.Objects;
  * <p><b>Quantity semantics.</b> {@link #getCount() count} is the size of the
  * stack to attach. Builder defaults to {@code 1}. {@code count <= 0} is rejected
  * at construction (programmatic use); on the wire path the handler MUST emit
- * {@link app.l2nx.gs.adapter.api.kafka.commands.ErrorCode#VALIDATION_FAILED
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#VALIDATION_FAILED
  * VALIDATION_FAILED} when {@code count} is missing or non-positive.</p>
  *
  * <p><b>Required fields.</b> Both {@code itemTemplateId} and {@code count} are

@@ -9,7 +9,7 @@ import java.util.Objects;
 /**
  * Success payload of {@link SendMailCommand}: the set of created mail-message
  * primary keys plus an optional per-attachment-line error report for
- * partial-success cases.
+ * partial-success cases (mail delivered, some attachments dropped).
  *
  * <p><b>Multi-mail batching.</b> When {@link SendMailCommand#getItems()
  * items.size()} exceeds the host's per-mail attachment cap (host-defined; in
@@ -38,13 +38,13 @@ import java.util.Objects;
  * <p>Java 8 POJO; final fields; hand-written builder; defensive copy in
  * constructor; unmodifiable list views from getters.</p>
  */
-public final class SendMailPayload {
+public final class SendMailResult {
 
     private final List<Long> createdMailIds;
     private final List<ItemDeliveryError> itemErrors;
 
-    public SendMailPayload(@Nullable List<Long> createdMailIds,
-                           @Nullable List<ItemDeliveryError> itemErrors) {
+    public SendMailResult(@Nullable List<Long> createdMailIds,
+                          @Nullable List<ItemDeliveryError> itemErrors) {
         this.createdMailIds = MailLists.freeze(createdMailIds);
         this.itemErrors = MailLists.freeze(itemErrors);
     }
@@ -79,8 +79,8 @@ public final class SendMailPayload {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof SendMailPayload)) return false;
-        SendMailPayload that = (SendMailPayload) o;
+        if (!(o instanceof SendMailResult)) return false;
+        SendMailResult that = (SendMailResult) o;
         return Objects.equals(createdMailIds, that.createdMailIds)
                 && Objects.equals(itemErrors, that.itemErrors);
     }
@@ -92,7 +92,7 @@ public final class SendMailPayload {
 
     @Override
     public String toString() {
-        return "SendMailPayload[createdMailIds=" + createdMailIds
+        return "SendMailResult[createdMailIds=" + createdMailIds
                 + ", itemErrors=" + itemErrors + "]";
     }
 
@@ -110,8 +110,8 @@ public final class SendMailPayload {
             return this;
         }
 
-        public SendMailPayload build() {
-            return new SendMailPayload(createdMailIds, itemErrors);
+        public SendMailResult build() {
+            return new SendMailResult(createdMailIds, itemErrors);
         }
     }
 }

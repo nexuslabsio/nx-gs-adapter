@@ -211,6 +211,23 @@ public final class DbSyncModule implements AdapterModule {
                     t.getClass().getName(), t.getMessage());
             state = STATE_FAILED;
             this.engine = null;
+            return;
+        }
+        // Wire NxSync triggers so host code can request an immediate sync
+        // pass for any of our entities (e.g. right after a TransferItemCommand
+        // mutates a character) without waiting for the next scheduled tick.
+        try {
+            CdcEngine running = engine;
+            NxSync sync = ctx.sync();
+            for (EntityMapping<?> mapping : mappings) {
+                final String entityName = mapping.entityName();
+                sync.registerTrigger(entityName, pks -> running.triggerEntityNow(entityName));
+            }
+        } catch (Throwable t) {
+            // Trigger registration failures must not take down the module —
+            // scheduled sync still works without the out-of-band path.
+            log.warn("Failed to register NxSync triggers for db-sync: {}",
+                    t.getClass().getName(), t);
         }
     }
 

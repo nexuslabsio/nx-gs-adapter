@@ -16,8 +16,11 @@ import java.nio.charset.StandardCharsets;
  * safe because the class is what populated the binding in the first place.</p>
  *
  * <p>{@link #replyMessageTypeBytes()} is pre-encoded once at registration so
- * the consumer's hot path does not re-build {@code (simpleName + "Result")}
- * UTF-8 bytes on every reply — mirrors {@code EventTypeBinding.messageTypeBytes}.</p>
+ * the consumer's hot path does not re-build the wire reply type on every
+ * reply. Naming convention: strip the {@code "Command"} suffix from the
+ * command's simple name and append {@code "Result"} — e.g.
+ * {@code TransferItemCommand} → {@code TransferItemResult}, matching the
+ * sibling {@code TransferItemResult} payload class.</p>
  */
 final class CommandTypeBinding {
 
@@ -30,9 +33,21 @@ final class CommandTypeBinding {
     CommandTypeBinding(Class<? extends NxCommand<?>> commandClass,
                        CommandHandler handler) {
         this.commandClass = commandClass;
-        this.replyMessageTypeBytes = (commandClass.getSimpleName() + "Result")
+        this.replyMessageTypeBytes = deriveReplyTypeName(commandClass.getSimpleName())
                 .getBytes(StandardCharsets.UTF_8);
         this.handler = handler;
+    }
+
+    /**
+     * Strip the {@code "Command"} suffix (if present) and append
+     * {@code "Result"}. Package-visible so {@link CommandsConsumer} can
+     * use the same derivation when replying with no resolved binding.
+     */
+    static String deriveReplyTypeName(String commandSimpleName) {
+        String stripped = commandSimpleName.endsWith("Command")
+                ? commandSimpleName.substring(0, commandSimpleName.length() - "Command".length())
+                : commandSimpleName;
+        return stripped + "Result";
     }
 
     Class<? extends NxCommand<?>> commandClass() {

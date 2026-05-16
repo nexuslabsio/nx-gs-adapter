@@ -7,6 +7,7 @@ import app.l2nx.gs.adapter.api.rest.MessagingTopics;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.api.spi.NxCommands;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
+import app.l2nx.gs.adapter.api.spi.NxSync;
 import app.l2nx.gs.adapter.core.commands.CommandsBootstrap;
 import app.l2nx.gs.adapter.core.commands.CommandsConfig;
 import app.l2nx.gs.adapter.core.commands.CommandsConsumer;
@@ -25,6 +26,7 @@ import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
 import app.l2nx.gs.adapter.core.lifecycle.AdapterVersion;
 import app.l2nx.gs.adapter.core.lifecycle.StartupBanner;
 import app.l2nx.gs.adapter.core.modules.ModuleRegistry;
+import app.l2nx.gs.adapter.core.sync.NxSyncImpl;
 import app.l2nx.gs.commons.concurrent.DaemonThreadFactory;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.kafka.KafkaException;
@@ -81,11 +83,11 @@ public final class NxAdapter {
     // Adapter-owned bounded pool for handler/module IO (JDBC/HTTP); never use
     // ForkJoinPool.commonPool — host JVM may share it.
     private static volatile ExecutorService ioExecutor;
-    // Stable cross-reconnect façades so modules that captured ctx.events() /
-    // ctx.commands() during an earlier onConnect keep working after a fresh
-    // connect cycle swaps the underlying publisher/consumer.
+    // Stable cross-reconnect façades — underlying publisher/consumer is swapped
+    // on every handshake, captured references keep working.
     private static volatile NxEvents eventsFacade;
     private static volatile NxCommands commandsFacade;
+    private static volatile NxSyncImpl syncFacade;
     private static final AtomicReference<Executor> hostExecutorRef = new AtomicReference<Executor>();
 
     private NxAdapter() {
@@ -400,8 +402,9 @@ public final class NxAdapter {
         // Group ID lives under the per-tenant prefix so the `User:<tenant>` SCRAM
         // principal's group ACL (prefixed on `<tenant>.`) covers it.
         String commandsGroupId = response.getTenantSlug() + ".gs.commands." + response.getServerSlug();
+        NxSync sync = startSyncFacade();
         NxCommands commands = startCommandsConsumer(response.getMessagingTopics(),
-                response.getKafka(), clientId, commandsGroupId, events);
+                response.getKafka(), clientId, commandsGroupId, events, sync);
 
         ModuleRegistry registry = moduleRegistry;
         if (registry != null) {
@@ -418,6 +421,7 @@ public final class NxAdapter {
                         .events(events)
                         .commands(commands)
                         .io(ioExecutor)
+                        .sync(sync)
                         .build();
                 registry.connect(ctx);
             } catch (Throwable t) {
@@ -491,7 +495,8 @@ public final class NxAdapter {
                                                     app.l2nx.gs.adapter.api.rest.KafkaConfig kafka,
                                                     String clientId,
                                                     String groupId,
-                                                    NxEvents events) {
+                                                    NxEvents events,
+                                                    NxSync sync) {
         CommandsConsumer previous = commandsConsumer;
         if (previous != null) {
             try {
@@ -506,15 +511,26 @@ public final class NxAdapter {
         if (facade == null) {
             CommandsBootstrap.Started started = CommandsBootstrap.start(
                     messagingTopics, kafka, clientId, groupId,
-                    hostExecutorRef.get(), ioExecutor, events,
+                    hostExecutorRef.get(), ioExecutor, events, sync,
                     replySender, commandsConfig);
             commandsConsumer = started.consumer();
             commandsFacade = started.commands();
             return commandsFacade;
         }
         commandsConsumer = CommandsBootstrap.swap(facade, messagingTopics, kafka, clientId, groupId,
-                hostExecutorRef.get(), ioExecutor, events, replySender, commandsConfig);
+                hostExecutorRef.get(), ioExecutor, events, sync, replySender, commandsConfig);
         return facade;
+    }
+
+    private static NxSync startSyncFacade() {
+        NxSyncImpl existing = syncFacade;
+        if (existing != null) {
+            existing.clearTriggers();
+            return existing;
+        }
+        NxSyncImpl fresh = new NxSyncImpl();
+        syncFacade = fresh;
+        return fresh;
     }
 
     /**
@@ -674,6 +690,11 @@ public final class NxAdapter {
         }
         eventsFacade = null;
         commandsFacade = null;
+        NxSyncImpl syncImpl = syncFacade;
+        if (syncImpl != null) {
+            syncImpl.clearTriggers();
+        }
+        syncFacade = null;
         eventsConfig = null;
         commandsConfig = null;
         hostExecutorRef.set(null);

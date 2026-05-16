@@ -2,6 +2,22 @@
 
 > Owner: @n1rmata
 
+> **Update:** This spec was written for the initial slice (at-least-once,
+> `boolean success + ErrorCode` envelope, `*Payload` reply type). The
+> implementation has since evolved — see the canonical [`guide.md`](./guide.md)
+> for the current contract. Key deltas:
+> - **At-most-once consumer** — commit before dispatch; handlers do NOT need
+    > to be idempotent; reply-flush gate is dormant
+> - **Single `CommandStatus` enum** with nested `Tier` (OK / CLIENT_ERROR /
+    > SERVER_ERROR) replaces `boolean success + ErrorCode`
+> - **`CommandProblem`** (RFC 9457-subset: title + detail + extensions)
+    > replaces the free-form `errorDetails` map
+> - **`*Result` per command** (no `Void`, no shared `*Payload`) — every
+    > command echoes confirmation data
+> - **Wire `Nx-Message-Type` reply header** derives via strip `Command` +
+    > add `Result` (e.g. `TransferItemCommand` → header `TransferItemResult`)
+> - **`NxSync`** SPI added for out-of-band sync trigger from handlers
+
 ## Problem
 
 The L2 game-server core needs a structured way to receive operational commands from the

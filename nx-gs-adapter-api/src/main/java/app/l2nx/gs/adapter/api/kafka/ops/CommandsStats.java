@@ -27,13 +27,13 @@ import java.util.Objects;
  *     <li>{@code unsupported-total} — records the dispatcher could not route:
  *     missing {@code Nx-Message-Type} header OR the header value has no
  *     registered handler. Reply emitted with
- *     {@link app.l2nx.gs.adapter.api.kafka.commands.ErrorCode#UNSUPPORTED_COMMAND}.</li>
+ *     {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#UNSUPPORTED_COMMAND}.</li>
  *     <li>{@code validation-failed-total} — Gson deserialization failures.
  *     Reply emitted with
- *     {@link app.l2nx.gs.adapter.api.kafka.commands.ErrorCode#VALIDATION_FAILED}.</li>
+ *     {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#VALIDATION_FAILED}.</li>
  *     <li>{@code internal-errors-total} — handler {@code RuntimeException}
  *     count. Reply emitted with
- *     {@link app.l2nx.gs.adapter.api.kafka.commands.ErrorCode#INTERNAL_ERROR}.</li>
+ *     {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#INTERNAL_ERROR}.</li>
  *     <li>{@code replies-published-total} — Kafka acks for reply records.</li>
  *     <li>{@code replies-failed-total} — Kafka send-callback errors on reply
  *     records.</li>
@@ -114,7 +114,7 @@ public final class CommandsStats {
      * {@code NxCommands.on(...)} at heartbeat tick time. Empty when none.
      */
     public List<String> getRegisteredTypes() {
-        return registeredTypes == null ? Collections.<String>emptyList() : registeredTypes;
+        return registeredTypes == null ? Collections.emptyList() : registeredTypes;
     }
 
     public Builder toBuilder() {

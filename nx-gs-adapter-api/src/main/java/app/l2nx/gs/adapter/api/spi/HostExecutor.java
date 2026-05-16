@@ -27,7 +27,7 @@ import java.util.function.Supplier;
  * host's executor does not complete the task within the window, the call
  * throws {@link HostExecutorTimeoutException}. The adapter's commands
  * consumer catches this and emits an
- * {@link app.l2nx.gs.adapter.api.kafka.commands.ErrorCode#UNAVAILABLE} reply.
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#UNAVAILABLE} reply.
  * This bound is load-bearing: an unbounded await would let a saturated host
  * pool wedge the consumer thread indefinitely.</p>
  *

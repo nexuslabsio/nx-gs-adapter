@@ -8,7 +8,7 @@ package app.l2nx.gs.adapter.api.spi;
  *
  * <p>Operationally indicates a saturated / deadlocked host thread pool —
  * the right reply for the dispatcher is
- * {@link app.l2nx.gs.adapter.api.kafka.commands.ErrorCode#UNAVAILABLE}
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#UNAVAILABLE}
  * because retrying after a delay may succeed once the pool drains.</p>
  *
  * <p>Caller MAY catch this and translate to a richer {@link
