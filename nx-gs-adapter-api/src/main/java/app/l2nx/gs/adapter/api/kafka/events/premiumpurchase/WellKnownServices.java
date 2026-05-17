@@ -135,4 +135,29 @@ public final class WellKnownServices {
      * {@code params}: {@code from_char_id}, {@code to_char_id}.
      */
     public static final String SOUL_CLOAK_TRANSFER = "soul_cloak_transfer";
+
+    /**
+     * Grant a premium account subscription for 1 hour.
+     */
+    public static final String PREMIUM_ACCOUNT_1H = "premium_account_1h";
+
+    /**
+     * Grant a premium account subscription for 4 hours.
+     */
+    public static final String PREMIUM_ACCOUNT_4H = "premium_account_4h";
+
+    /**
+     * Grant a premium account subscription for 1 day.
+     */
+    public static final String PREMIUM_ACCOUNT_1D = "premium_account_1d";
+
+    /**
+     * Grant a premium account subscription for 7 days.
+     */
+    public static final String PREMIUM_ACCOUNT_7D = "premium_account_7d";
+
+    /**
+     * Grant a premium account subscription for 30 days.
+     */
+    public static final String PREMIUM_ACCOUNT_30D = "premium_account_30d";
 }
