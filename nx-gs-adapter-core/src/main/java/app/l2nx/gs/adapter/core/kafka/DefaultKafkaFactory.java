@@ -1,9 +1,6 @@
 package app.l2nx.gs.adapter.core.kafka;
 
-import app.l2nx.gs.kafka.KafkaConfig;
-import app.l2nx.gs.kafka.KafkaException;
-import app.l2nx.gs.kafka.KafkaState;
-import app.l2nx.gs.kafka.NxKafka;
+import app.l2nx.gs.kafka.*;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
@@ -31,6 +28,7 @@ public final class DefaultKafkaFactory implements KafkaFactory {
         KafkaConfig.Builder builder = NxKafka.configure()
                 .brokers(brokers)
                 .clientId(clientId)
+                .gson(NxGsonAdapters.defaultGson())
                 .onStateChange(stateChangeListener);
         for (Map.Entry<String, Object> e : properties.entrySet()) {
             builder.property(e.getKey(), e.getValue());
