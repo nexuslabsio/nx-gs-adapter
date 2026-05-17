@@ -6,6 +6,7 @@ import app.l2nx.gs.adapter.core.concurrent.CapturingScheduler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -62,7 +63,7 @@ class HeartbeatServiceTest {
         assertEquals("primary", event.getServerSlug());
         assertEquals("Acme Primary", event.getServerName());
         assertEquals("1.2.3", event.getAdapterVersion());
-        assertEquals(60_000L, event.getUptimeMs());
+        assertEquals(Duration.ofMinutes(1), event.getUptime());
     }
 
     @Test
@@ -107,8 +108,8 @@ class HeartbeatServiceTest {
         scheduler.runFixedDelayOnce();
 
         HeartbeatEvent event = (HeartbeatEvent) publisher.calls.get(0).payload;
-        // 30_000, not 330_000 — connectInstant was recaptured at the second start().
-        assertEquals(30_000L, event.getUptimeMs());
+        // 30s, not 330s — connectInstant was recaptured at the second start().
+        assertEquals(Duration.ofSeconds(30), event.getUptime());
     }
 
     @Test

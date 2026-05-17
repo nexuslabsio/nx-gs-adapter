@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.ops;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -8,13 +9,14 @@ import java.util.Objects;
 /**
  * Heartbeat message published every 60s. Kafka message key is {@code serverId}.
  *
- * <p>{@code uptimeMs} is milliseconds since the most recent successful
- * {@code /connect} (session-scoped — resets on reconnect). Wire-shape unit is
- * milliseconds for consistency with {@code SyncEvent.timestampEpochMs} and
- * {@code EntityStats.lastSyncEpochMs}. Identity fields ({@code tenantId},
- * {@code tenantSlug}, {@code serverId}, {@code serverSlug}, {@code serverName})
- * mirror the values delivered by {@code ConnectResponse} so consumers can route /
- * label heartbeats without a separate lookup.</p>
+ * <p>{@code uptime} is the session-scoped duration since the most recent
+ * successful {@code /connect} (resets on reconnect). Wire format is ISO-8601
+ * (e.g. {@code "PT60S"}) — Gson uses the registered {@code Duration} adapter
+ * in {@code nx-gs-kafka.NxGsonAdapters}; Jackson auto-handles via JavaTimeModule.
+ * Identity fields ({@code tenantId}, {@code tenantSlug}, {@code serverId},
+ * {@code serverSlug}, {@code serverName}) mirror the values delivered by
+ * {@code ConnectResponse} so consumers can route / label heartbeats without
+ * a separate lookup.</p>
  *
  * <p>{@code enabledModules} carries one {@link ModuleStatus} per discovered Tier-1
  * module — the platform consumes the list to render per-server module health.</p>
@@ -27,7 +29,7 @@ public final class HeartbeatEvent {
     private final String serverSlug;
     private final String serverName;
     private final String adapterVersion;
-    private final long uptimeMs;
+    private final Duration uptime;
     private final List<ModuleStatus> enabledModules;
 
     public HeartbeatEvent(String tenantId,
@@ -36,7 +38,7 @@ public final class HeartbeatEvent {
                           String serverSlug,
                           String serverName,
                           String adapterVersion,
-                          long uptimeMs,
+                          Duration uptime,
                           List<ModuleStatus> enabledModules) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
@@ -44,7 +46,7 @@ public final class HeartbeatEvent {
         this.serverSlug = serverSlug;
         this.serverName = serverName;
         this.adapterVersion = adapterVersion;
-        this.uptimeMs = uptimeMs;
+        this.uptime = uptime;
         this.enabledModules = enabledModules == null
                 ? Collections.emptyList()
                 : Collections.unmodifiableList(new ArrayList<ModuleStatus>(enabledModules));
@@ -74,8 +76,8 @@ public final class HeartbeatEvent {
         return adapterVersion;
     }
 
-    public long getUptimeMs() {
-        return uptimeMs;
+    public Duration getUptime() {
+        return uptime;
     }
 
     public List<ModuleStatus> getEnabledModules() {
@@ -90,7 +92,7 @@ public final class HeartbeatEvent {
                 .serverSlug(serverSlug)
                 .serverName(serverName)
                 .adapterVersion(adapterVersion)
-                .uptimeMs(uptimeMs)
+                .uptime(uptime)
                 .enabledModules(enabledModules);
     }
 
@@ -103,7 +105,7 @@ public final class HeartbeatEvent {
         if (this == o) return true;
         if (!(o instanceof HeartbeatEvent)) return false;
         HeartbeatEvent that = (HeartbeatEvent) o;
-        return uptimeMs == that.uptimeMs
+        return Objects.equals(uptime, that.uptime)
                 && Objects.equals(tenantId, that.tenantId)
                 && Objects.equals(tenantSlug, that.tenantSlug)
                 && Objects.equals(serverId, that.serverId)
@@ -116,7 +118,7 @@ public final class HeartbeatEvent {
     @Override
     public int hashCode() {
         return Objects.hash(tenantId, tenantSlug, serverId, serverSlug, serverName,
-                adapterVersion, uptimeMs, enabledModules);
+                adapterVersion, uptime, enabledModules);
     }
 
     @Override
@@ -127,7 +129,7 @@ public final class HeartbeatEvent {
                 + ", serverSlug=" + serverSlug
                 + ", serverName=" + serverName
                 + ", adapterVersion=" + adapterVersion
-                + ", uptimeMs=" + uptimeMs
+                + ", uptime=" + uptime
                 + ", enabledModules=" + enabledModules + "]";
     }
 
@@ -138,7 +140,7 @@ public final class HeartbeatEvent {
         private String serverSlug;
         private String serverName;
         private String adapterVersion;
-        private long uptimeMs;
+        private Duration uptime;
         private List<ModuleStatus> enabledModules;
 
         public Builder tenantId(String tenantId) {
@@ -171,8 +173,8 @@ public final class HeartbeatEvent {
             return this;
         }
 
-        public Builder uptimeMs(long uptimeMs) {
-            this.uptimeMs = uptimeMs;
+        public Builder uptime(Duration uptime) {
+            this.uptime = uptime;
             return this;
         }
 
@@ -183,7 +185,7 @@ public final class HeartbeatEvent {
 
         public HeartbeatEvent build() {
             return new HeartbeatEvent(tenantId, tenantSlug, serverId, serverSlug, serverName,
-                    adapterVersion, uptimeMs, enabledModules);
+                    adapterVersion, uptime, enabledModules);
         }
     }
 }

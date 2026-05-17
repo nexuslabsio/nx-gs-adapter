@@ -6,8 +6,8 @@ import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
@@ -96,7 +96,7 @@ public final class HeartbeatService {
                       String heartbeatTopic,
                       Instant connectInstant) {
         try {
-            long uptimeMs = ChronoUnit.MILLIS.between(connectInstant, clock.get());
+            Duration uptime = Duration.between(connectInstant, clock.get());
             List<ModuleStatus> modules;
             try {
                 List<ModuleStatus> reported = moduleStatuses.get();
@@ -113,7 +113,7 @@ public final class HeartbeatService {
                     .serverSlug(serverSlug)
                     .serverName(serverName)
                     .adapterVersion(adapterVersion)
-                    .uptimeMs(uptimeMs)
+                    .uptime(uptime)
                     .enabledModules(modules)
                     .build();
             publisher.send(heartbeatTopic, serverId, event);

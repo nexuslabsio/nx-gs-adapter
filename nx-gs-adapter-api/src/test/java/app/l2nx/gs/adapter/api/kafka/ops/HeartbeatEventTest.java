@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.ops;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -25,7 +26,7 @@ class HeartbeatEventTest {
                 .serverSlug("primary")
                 .serverName("Acme Primary")
                 .adapterVersion("1.2.3")
-                .uptimeMs(42L)
+                .uptime(Duration.ofMillis(42))
                 .enabledModules(Collections.singletonList(dbSync))
                 .build();
 
@@ -46,7 +47,7 @@ class HeartbeatEventTest {
                 .serverSlug("server-slug")
                 .serverName("Server Name")
                 .adapterVersion("0.1.0")
-                .uptimeMs(123L)
+                .uptime(Duration.ofSeconds(123))
                 .enabledModules(Arrays.asList(a, b))
                 .build();
 
@@ -56,7 +57,7 @@ class HeartbeatEventTest {
         assertEquals("server-slug", event.getServerSlug());
         assertEquals("Server Name", event.getServerName());
         assertEquals("0.1.0", event.getAdapterVersion());
-        assertEquals(123L, event.getUptimeMs());
+        assertEquals(Duration.ofSeconds(123), event.getUptime());
         assertEquals(Arrays.asList(a, b), event.getEnabledModules());
     }
 
@@ -65,7 +66,7 @@ class HeartbeatEventTest {
         HeartbeatEvent event = HeartbeatEvent.builder()
                 .tenantId("t").tenantSlug("ts")
                 .serverId("s").serverSlug("ss").serverName("sn")
-                .adapterVersion("v").uptimeMs(0L)
+                .adapterVersion("v").uptime(Duration.ZERO)
                 .build();
 
         assertEquals(Collections.emptyList(), event.getEnabledModules());
