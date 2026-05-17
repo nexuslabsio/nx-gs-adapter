@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Wire DTO for one item, payload of {@code SyncEvent<ItemDto>} on the
+ * Wire DTO for one item, payload of {@code SyncEvent<ItemDbDto>} on the
  * platform-supplied per-tenant item sync topic
  * (e.g. {@code bohpts.gs.sync.items}).
  *
@@ -33,7 +33,7 @@ import java.util.Objects;
  * so the wire shape unambiguously distinguishes "feature not synced" from
  * "feature synced, value empty".</p>
  */
-public final class ItemDto {
+public final class ItemDbDto {
 
     private final long id;
     private final @Nullable Long itemTemplateId;
@@ -41,15 +41,15 @@ public final class ItemDto {
     private final @Nullable Long count;
     private final @Nullable Integer enchantLevel;
     private final @Nullable ItemLocation location;
-    private final @Nullable List<ItemAttributeDto> attributes;
+    private final @Nullable List<ItemAttributeDbDto> attributes;
 
-    public ItemDto(long id,
-                   @Nullable Long itemTemplateId,
-                   @Nullable Long ownerId,
-                   @Nullable Long count,
-                   @Nullable Integer enchantLevel,
-                   @Nullable ItemLocation location,
-                   @Nullable List<ItemAttributeDto> attributes) {
+    public ItemDbDto(long id,
+                     @Nullable Long itemTemplateId,
+                     @Nullable Long ownerId,
+                     @Nullable Long count,
+                     @Nullable Integer enchantLevel,
+                     @Nullable ItemLocation location,
+                     @Nullable List<ItemAttributeDbDto> attributes) {
         this.id = id;
         this.itemTemplateId = itemTemplateId;
         this.ownerId = ownerId;
@@ -112,7 +112,7 @@ public final class ItemDto {
      * {@code ChildSource} declared); empty list when the tenant syncs
      * attributes but the item has none.
      */
-    public @Nullable List<ItemAttributeDto> getAttributes() {
+    public @Nullable List<ItemAttributeDbDto> getAttributes() {
         return attributes;
     }
 
@@ -134,8 +134,8 @@ public final class ItemDto {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ItemDto)) return false;
-        ItemDto that = (ItemDto) o;
+        if (!(o instanceof ItemDbDto)) return false;
+        ItemDbDto that = (ItemDbDto) o;
         return id == that.id
                 && Objects.equals(itemTemplateId, that.itemTemplateId)
                 && Objects.equals(ownerId, that.ownerId)
@@ -152,7 +152,7 @@ public final class ItemDto {
 
     @Override
     public String toString() {
-        return "ItemDto[id=" + id
+        return "ItemDbDto[id=" + id
                 + ", itemTemplateId=" + itemTemplateId
                 + ", ownerId=" + ownerId
                 + ", count=" + count
@@ -168,7 +168,7 @@ public final class ItemDto {
         private @Nullable Long count;
         private @Nullable Integer enchantLevel;
         private @Nullable ItemLocation location;
-        private @Nullable List<ItemAttributeDto> attributes;
+        private @Nullable List<ItemAttributeDbDto> attributes;
 
         public Builder id(long id) {
             this.id = id;
@@ -200,13 +200,13 @@ public final class ItemDto {
             return this;
         }
 
-        public Builder attributes(@Nullable List<ItemAttributeDto> attributes) {
+        public Builder attributes(@Nullable List<ItemAttributeDbDto> attributes) {
             this.attributes = attributes;
             return this;
         }
 
-        public ItemDto build() {
-            return new ItemDto(id, itemTemplateId, ownerId, count, enchantLevel, location, attributes);
+        public ItemDbDto build() {
+            return new ItemDbDto(id, itemTemplateId, ownerId, count, enchantLevel, location, attributes);
         }
     }
 }

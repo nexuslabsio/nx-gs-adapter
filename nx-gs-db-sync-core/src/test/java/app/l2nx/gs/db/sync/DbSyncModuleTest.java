@@ -2,7 +2,7 @@ package app.l2nx.gs.db.sync;
 
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
-import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.api.spi.DbSchemaProvider;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
@@ -281,7 +281,7 @@ class DbSyncModuleTest {
         };
     }
 
-    private static EntityMapping<ClanDto> clanMapping() {
+    private static EntityMapping<ClanDbDto> clanMapping() {
         return TestMappings.clanOnly();
     }
 

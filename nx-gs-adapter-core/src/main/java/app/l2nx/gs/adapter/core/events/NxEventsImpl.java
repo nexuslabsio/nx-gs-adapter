@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.events;
 
+import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
@@ -62,6 +63,11 @@ final class NxEventsImpl implements NxEvents {
 
     @Override
     public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
+        dispatch(event);
+    }
+
+    @Override
+    public void publishCharacterPresence(CharacterPresenceEvent event) {
         dispatch(event);
     }
 

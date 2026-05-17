@@ -48,8 +48,8 @@ Six layers, sequentially buildable:
 1. **Specs** — lock decisions: cdc-engine spec.md/tech.md + db-sync spec.md R5
    reflect multi-source SPI + envelope rule.
 2. **SPI v0.7.0** — break `EntityMapping<T>` into `PrimarySource<P>` +
-   `List<ChildSource<C>>` + `T mapEntity(...)`. Add `ClanSkillDto`. Extend `ClanDto`
-   with `List<ClanSkillDto> skills`. api artifact bumps to `0.7.0`.
+   `List<ChildSource<C>>` + `T mapEntity(...)`. Add `ClanSkillDbDto`. Extend `ClanDbDto`
+   with `List<ClanSkillDbDto> skills`. api artifact bumps to `0.7.0`.
 3. **DELETE envelope fix** — `SnapshotStore.minPk/maxPk`; `WindowPlanner` consumes
    them, partitions enveloped range. Single, focused change — testable in isolation.
 4. **Multi-source engine** — `Phase1Hasher` per-source SQL; engine XOR-folds into
@@ -57,7 +57,7 @@ Six layers, sequentially buildable:
    FK and calls `mapping.mapEntity(...)` per PK. `ChangeSet.diff` and snapshot-swap
    path stay byte-identical (CRC compare logic is pure XOR-already).
 5. **Bohpts ClanMapping** — split into `ClanPrimarySource` + `ClanSkillsChildSource`;
-   `mapEntity` assembles `ClanDto` with `skills`.
+   `mapEntity` assembles `ClanDbDto` with `skills`.
 6. **E2E + version tags** — extend `CdcEngineE2ETest` with skills-CRUD scenarios
    (insert child / update child / delete child / delete primary) + DELETE-envelope
    regression (delete `MAX(clan_id)` row, assert tombstone fires next cycle).
@@ -83,7 +83,7 @@ Six layers, sequentially buildable:
 3. [pending] **Update `db-sync/spec.md` R5.** Replace single-table `EntityMapping`
    contract with `PrimarySource` + `List<ChildSource>` + `mapEntity`. Update R10
    (bohpts mapping shape) to enumerate `ClanSkillsChildSource` and `skills` field on
-   `ClanDto`. Bump R11 versions to `nx-gs-adapter-api 0.7.0` +
+   `ClanDbDto`. Bump R11 versions to `nx-gs-adapter-api 0.7.0` +
    `nx-gs-db-sync-core 0.2.0`. Mark `db-sync` R5 / R10 / R11 from `[done]` →
    `[wip]` for the duration of this slice.
 
@@ -137,9 +137,9 @@ shape is unambiguous; downstream milestones implement against frozen contracts.
    single-table fields (`tableName`, `pkColumn`, `hashedColumns`, `mapRow`) are
    removed wholesale (no deprecation step — pre-prod, breaking is fine).
 
-7. [pending] **Add `ClanSkillDto`** in `app.l2nx.gs.adapter.api.kafka.sync.db`:
+7. [pending] **Add `ClanSkillDbDto`** in `app.l2nx.gs.adapter.api.kafka.sync.db`:
    ```java
-   final class ClanSkillDto {
+   final class ClanSkillDbDto {
        int skillId;
        int skillLevel;
        // hand-written builder, equals, hashCode, toString
@@ -148,7 +148,7 @@ shape is unambiguous; downstream milestones implement against frozen contracts.
    Per user scope: only `skill_id` + `skill_level` (no `sub_pledge_id`,
    `skill_name`).
 
-8. [pending] **Extend `ClanDto`** with `List<ClanSkillDto> skills` field. Hand-add
+8. [pending] **Extend `ClanDbDto`** with `List<ClanSkillDbDto> skills` field. Hand-add
    to existing builder; serializable as JSON array. Empty list when clan has no
    skills (NOT null — `Collections.emptyList()` default).
 
@@ -158,7 +158,7 @@ shape is unambiguous; downstream milestones implement against frozen contracts.
 #### Checkpoint — SPI compiles
 
 `nx-gs-adapter-api-0.7.0` compiles; Tier-2 SPI types (`PrimarySource`, `ChildSource`,
-`EntityMapping`, `ClanSkillDto`, extended `ClanDto`) resolve. Downstream
+`EntityMapping`, `ClanSkillDbDto`, extended `ClanDbDto`) resolve. Downstream
 (`nx-gs-db-sync-core`, `bohpts-core`) targets it via composite include for the rest
 of the plan.
 
@@ -283,7 +283,7 @@ fold matches expected). E2E deferred to M21.
       `hashedColumns=[skill_id, skill_level]`, `mapRow → ClanSkillRow` record).
     - `ClanMapping.mapEntity(primaryRow, children)` casts `primaryRow` to
       `ClanRow`, reads `children.get("clan_skills")`, casts each to
-      `ClanSkillRow`, builds `ClanSkillDto` list, assembles `ClanDto.builder()
+      `ClanSkillRow`, builds `ClanSkillDbDto` list, assembles `ClanDbDto.builder()
       .skills(...).build()`. `nullIfZero` helper retained for `leaderId`/`allyId`.
     - `ClanRow` / `ClanSkillRow` are package-private final classes (Java 8 — no
       records).
@@ -297,7 +297,7 @@ fold matches expected). E2E deferred to M21.
 #### Checkpoint — bohpts compiles against api/0.7.0
 
 Bohpts-core builds with new SPI; `BohptsDbSchemaProvider` returns one
-`EntityMapping<ClanDto>` with primary + 1 child + `mapEntity`.
+`EntityMapping<ClanDbDto>` with primary + 1 child + `mapEntity`.
 
 ### End-to-end smoke + regression
 

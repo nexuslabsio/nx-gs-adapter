@@ -188,6 +188,7 @@ class EventsPublisherTest {
         topics.put("premiumpurchase", "acme.gs.events.premiumpurchase");
         topics.put("serveronline", "acme.gs.events.serveronline");
         topics.put("privatestore", "acme.gs.events.privatestore");
+        topics.put("character", "acme.gs.events.character");
         publisher = new EventsPublisher(topics, noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
 
         ModuleStatus status = publisher.currentStatus();

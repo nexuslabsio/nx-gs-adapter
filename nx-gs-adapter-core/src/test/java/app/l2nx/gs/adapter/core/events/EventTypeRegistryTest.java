@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.events;
 
+import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
@@ -123,5 +124,34 @@ class EventTypeRegistryTest {
     @Test
     void knownFamilies_shouldContainPrivateStore() {
         assertTrue(new EventTypeRegistry().knownFamilies().contains("privatestore"));
+    }
+
+    @Test
+    void lookup_shouldReturnBinding_forCharacterPresenceEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(CharacterPresenceEvent.class);
+
+        assertNotNull(binding);
+        assertEquals("character", binding.familyKey());
+        assertEquals("CharacterPresenceEvent", binding.messageType());
+    }
+
+    @Test
+    void partitionKey_shouldEncodeCharId_forCharacterPresenceEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(CharacterPresenceEvent.class);
+        CharacterPresenceEvent event = CharacterPresenceEvent.builder()
+                .eventId(UUIDv7.generate())
+                .charId(0xCAFEBABEL)
+                .online(true)
+                .build();
+
+        byte[] key = binding.partitionKeyExtractor().apply(event);
+
+        assertEquals(8, key.length);
+        assertEquals(0xCAFEBABEL, ByteBuffer.wrap(key).getLong());
+    }
+
+    @Test
+    void knownFamilies_shouldContainCharacter() {
+        assertTrue(new EventTypeRegistry().knownFamilies().contains("character"));
     }
 }

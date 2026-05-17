@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.events;
 
+import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
@@ -8,11 +9,12 @@ import app.l2nx.gs.commons.bytes.LongBytes;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * Hardcoded type-to-wire-metadata registry for outbound events. One entry
  * per concrete event class shipped in {@code nx-gs-adapter-api}; adding a new
- * concrete event type means appending one entry here.
+ * concrete event type means appending one {@code register(...)} call here.
  *
  * <p>Not pluggable — once 3+ event families exist, this graduates to a
  * proper SPI. YAGNI for now.</p>
@@ -28,39 +30,27 @@ final class EventTypeRegistry {
     private final Set<String> familyKeys;
 
     EventTypeRegistry() {
-        Map<Class<?>, EventTypeBinding> map = new HashMap<Class<?>, EventTypeBinding>();
+        Map<Class<?>, EventTypeBinding> map = new HashMap<>();
         Set<String> families = new LinkedHashSet<>();
 
-        map.put(PremiumPurchaseEvent.class, new EventTypeBinding(
-                "premiumpurchase",
-                "PremiumPurchaseEvent",
-                evt -> LongBytes.bigEndian(((PremiumPurchaseEvent) evt).getCharacterId())));
-        families.add("premiumpurchase");
+        register(map, families, PremiumPurchaseEvent.class, "premiumpurchase",
+                evt -> LongBytes.bigEndian(((PremiumPurchaseEvent) evt).getCharacterId()));
 
         // Snapshots have no natural per-entity partition key; null → round-robin,
         // consumers group/order by Nx-Server-Id header + UUIDv7 eventId.
-        map.put(ServerOnlineSnapshotEvent.class, new EventTypeBinding(
-                "serveronline",
-                "ServerOnlineSnapshotEvent",
-                evt -> null));
-        families.add("serveronline");
+        register(map, families, ServerOnlineSnapshotEvent.class, "serveronline",
+                evt -> null);
 
-        // Purchase events: two parties (buyer + seller), no single natural per-entity
-        // key; null → round-robin. Per-character history is a consumer-side query
-        // (filter by buyerId or sellerId, sort by UUIDv7 timestamp), not a
-        // partitioning concern.
-        map.put(PrivateStorePurchaseEvent.class, new EventTypeBinding(
-                "privatestore",
-                "PrivateStorePurchaseEvent",
-                evt -> null));
-        // Snapshot events partition by itemId — all updates for the same item
-        // land on the same partition for ordered consumption / topic-compaction-
-        // friendly "latest known book per item" caching.
-        map.put(PrivateStoreSnapshotEvent.class, new EventTypeBinding(
-                "privatestore",
-                "PrivateStoreSnapshotEvent",
-                evt -> LongBytes.bigEndian(((PrivateStoreSnapshotEvent) evt).getItemId())));
-        families.add("privatestore");
+        // Purchase: two parties, no single natural key → round-robin.
+        register(map, families, PrivateStorePurchaseEvent.class, "privatestore",
+                evt -> null);
+        // Snapshot: partition by itemId — order book per item lands on one partition.
+        register(map, families, PrivateStoreSnapshotEvent.class, "privatestore",
+                evt -> LongBytes.bigEndian(((PrivateStoreSnapshotEvent) evt).getItemId()));
+
+        // Character presence: partition by charId — per-character history ordered.
+        register(map, families, CharacterPresenceEvent.class, "character",
+                evt -> LongBytes.bigEndian(((CharacterPresenceEvent) evt).getCharId()));
 
         this.bindings = Collections.unmodifiableMap(map);
         this.familyKeys = Collections.unmodifiableSet(families);
@@ -82,5 +72,12 @@ final class EventTypeRegistry {
      */
     Set<String> knownFamilies() {
         return familyKeys;
+    }
+
+    private static void register(Map<Class<?>, EventTypeBinding> map, Set<String> families,
+                                 Class<?> type, String familyKey,
+                                 Function<Object, byte[]> partitionKeyExtractor) {
+        map.put(type, new EventTypeBinding(familyKey, type.getSimpleName(), partitionKeyExtractor));
+        families.add(familyKey);
     }
 }

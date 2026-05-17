@@ -1,7 +1,7 @@
 package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
-import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.persist.NoopSnapshotPersistence;
@@ -50,7 +50,7 @@ class CdcEnginePoolTest {
         // Two entities sharing the same pool: both ticks must complete (recorded
         // as DEGRADED because the borrow fails). Without a shared pool with
         // worker capacity for both, the second entity would never tick.
-        EntityMapping<ClanDto> mapping1 = TestMappings.clanOnly();
+        EntityMapping<ClanDbDto> mapping1 = TestMappings.clanOnly();
         EntityMapping<?> mapping2 = renameEntity(TestMappings.clanOnly(), "alpha");
 
         JdbcConnectionSource src = new JdbcConnectionSource() {

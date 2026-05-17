@@ -6,11 +6,11 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-class CharacterSubclassDtoTest {
+class CharacterSubclassDbDtoTest {
 
     @Test
     void builder_shouldMapEachFieldToConstructorPosition() {
-        CharacterSubclassDto sub = CharacterSubclassDto.builder()
+        CharacterSubclassDbDto sub = CharacterSubclassDbDto.builder()
                 .classId(CharacterClass.CARDINAL)
                 .level(82)
                 .build();
@@ -21,13 +21,13 @@ class CharacterSubclassDtoTest {
 
     @Test
     void equals_shouldDistinguishOnFields() {
-        CharacterSubclassDto a = CharacterSubclassDto.builder()
+        CharacterSubclassDbDto a = CharacterSubclassDbDto.builder()
                 .classId(CharacterClass.CARDINAL).level(82).build();
-        CharacterSubclassDto b = CharacterSubclassDto.builder()
+        CharacterSubclassDbDto b = CharacterSubclassDbDto.builder()
                 .classId(CharacterClass.CARDINAL).level(82).build();
-        CharacterSubclassDto c = CharacterSubclassDto.builder()
+        CharacterSubclassDbDto c = CharacterSubclassDbDto.builder()
                 .classId(CharacterClass.CARDINAL).level(83).build();
-        CharacterSubclassDto d = CharacterSubclassDto.builder()
+        CharacterSubclassDbDto d = CharacterSubclassDbDto.builder()
                 .classId(CharacterClass.HIEROPHANT).level(82).build();
 
         assertEquals(a, b);
@@ -38,7 +38,7 @@ class CharacterSubclassDtoTest {
 
     @Test
     void toBuilder_shouldRoundtrip() {
-        CharacterSubclassDto original = new CharacterSubclassDto(CharacterClass.SOULTAKER, 76);
+        CharacterSubclassDbDto original = new CharacterSubclassDbDto(CharacterClass.SOULTAKER, 76);
 
         assertEquals(original, original.toBuilder().build());
     }

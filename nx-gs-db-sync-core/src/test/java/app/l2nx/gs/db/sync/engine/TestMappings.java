@@ -1,7 +1,7 @@
 package app.l2nx.gs.db.sync.engine;
 
-import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
-import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanSkillDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanSkillDbDto;
 import app.l2nx.gs.adapter.api.spi.ChildSource;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.PrimarySource;
@@ -23,9 +23,9 @@ public final class TestMappings {
     /**
      * Single-table {@code clan_data} mapping — no children, mirrors the
      * pre-multi-source MVP shape. Used by tests that only need a typed
-     * {@link EntityMapping<ClanDto>} surface and do not exercise child rows.
+     * {@link EntityMapping<ClanDbDto>} surface and do not exercise child rows.
      */
-    public static EntityMapping<ClanDto> clanOnly() {
+    public static EntityMapping<ClanDbDto> clanOnly() {
         return clanWithChildren(Collections.emptyList());
     }
 
@@ -34,10 +34,10 @@ public final class TestMappings {
      * (sentinel-zero → null for {@code leader_id} / {@code ally_id}) +
      * one child {@code clan_skills} (FK {@code clan_id}, hashed
      * {@code skill_id, skill_level}). {@code mapEntity} assembles a
-     * {@link ClanDto} with a fully populated {@link ClanDto#getSkills() skills}
+     * {@link ClanDbDto} with a fully populated {@link ClanDbDto#getSkills() skills}
      * list.
      */
-    public static EntityMapping<ClanDto> clanWithSkills() {
+    public static EntityMapping<ClanDbDto> clanWithSkills() {
         ChildSource<TestClanSkillRow> skills = new ChildSource<TestClanSkillRow>() {
             @Override
             public String tableName() {
@@ -62,7 +62,7 @@ public final class TestMappings {
         return clanWithChildren(Collections.singletonList(skills));
     }
 
-    private static EntityMapping<ClanDto> clanWithChildren(final List<ChildSource<?>> children) {
+    private static EntityMapping<ClanDbDto> clanWithChildren(final List<ChildSource<?>> children) {
         final PrimarySource<TestClanRow> primary = new PrimarySource<TestClanRow>() {
             @Override
             public String tableName() {
@@ -89,15 +89,15 @@ public final class TestMappings {
                         nullIfZero(rs.getLong("ally_id")));
             }
         };
-        return new EntityMapping<ClanDto>() {
+        return new EntityMapping<ClanDbDto>() {
             @Override
             public String entityName() {
                 return "clan";
             }
 
             @Override
-            public Class<ClanDto> dtoType() {
-                return ClanDto.class;
+            public Class<ClanDbDto> dtoType() {
+                return ClanDbDto.class;
             }
 
             @Override
@@ -111,26 +111,26 @@ public final class TestMappings {
             }
 
             @Override
-            public ClanDto mapEntity(Object primaryRow, Map<String, List<Object>> childRowsByTable) {
+            public ClanDbDto mapEntity(Object primaryRow, Map<String, List<Object>> childRowsByTable) {
                 TestClanRow clan = (TestClanRow) primaryRow;
                 List<Object> rawSkills = childRowsByTable.get("clan_skills");
-                List<ClanSkillDto> skills;
+                List<ClanSkillDbDto> skills;
                 if (rawSkills == null || rawSkills.isEmpty()) {
                     skills = Collections.emptyList();
                 } else {
-                    skills = new ArrayList<ClanSkillDto>(rawSkills.size());
+                    skills = new ArrayList<ClanSkillDbDto>(rawSkills.size());
                     for (Object raw : rawSkills) {
                         TestClanSkillRow row = (TestClanSkillRow) raw;
-                        skills.add(ClanSkillDto.builder()
-                                .skillId(row.skillId)
-                                .skillLevel(row.skillLevel)
+                        skills.add(ClanSkillDbDto.builder()
+                                .id(row.skillId)
+                                .level(row.skillLevel)
                                 .build());
                     }
                 }
-                return ClanDto.builder()
-                        .clanId(clan.clanId)
-                        .clanName(clan.clanName)
-                        .clanLevel(clan.clanLevel)
+                return ClanDbDto.builder()
+                        .id(clan.clanId)
+                        .name(clan.clanName)
+                        .level(clan.clanLevel)
                         .leaderId(clan.leaderId)
                         .allyId(clan.allyId)
                         .skills(skills)

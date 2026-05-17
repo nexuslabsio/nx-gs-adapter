@@ -6,34 +6,38 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Wire DTO for one alliance, payload of {@code SyncEvent<AllianceDto>} on
+ * Wire DTO for one alliance, payload of {@code SyncEvent<AllianceDbDto>} on
  * the per-tenant alliance sync topic.
+ *
+ * <p>Required: {@link #getId() id} (source-side {@code ally_id}) and
+ * {@link #getName() name} (source-side {@code ally_name}). Schema providers
+ * MUST drop dirty rows that lack either rather than ship placeholders.</p>
  *
  * <p>L2-derived schemas denormalize alliance state across {@code clan_data}
  * (every member clan carries {@code ally_id}, {@code ally_name},
  * {@code ally_crest_id}); schema providers project this into a per-alliance
  * shape via a view. Builds with a physical {@code ally_data}-like table
  * emit the same wire shape from a plain table. {@code icon} carries the
- * alliance crest as PNG bytes — same convention as {@code ClanDto.icon}.</p>
+ * alliance crest as PNG bytes — same convention as {@code ClanDbDto.icon}.</p>
  */
-public final class AllianceDto {
+public final class AllianceDbDto {
 
-    private final long allyId;
-    private final String allyName;
+    private final long id;
+    private final String name;
     private final byte @Nullable [] icon;
 
-    public AllianceDto(long allyId, String allyName, byte @Nullable [] icon) {
-        this.allyId = allyId;
-        this.allyName = allyName;
+    public AllianceDbDto(long id, String name, byte @Nullable [] icon) {
+        this.id = id;
+        this.name = Objects.requireNonNull(name, "AllianceDbDto.name is required");
         this.icon = icon;
     }
 
-    public long getAllyId() {
-        return allyId;
+    public long getId() {
+        return id;
     }
 
-    public String getAllyName() {
-        return allyName;
+    public String getName() {
+        return name;
     }
 
     public byte @Nullable [] getIcon() {
@@ -42,8 +46,8 @@ public final class AllianceDto {
 
     public Builder toBuilder() {
         return new Builder()
-                .allyId(allyId)
-                .allyName(allyName)
+                .id(id)
+                .name(name)
                 .icon(icon);
     }
 
@@ -54,39 +58,39 @@ public final class AllianceDto {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof AllianceDto)) return false;
-        AllianceDto that = (AllianceDto) o;
-        return allyId == that.allyId
-                && Objects.equals(allyName, that.allyName)
+        if (!(o instanceof AllianceDbDto)) return false;
+        AllianceDbDto that = (AllianceDbDto) o;
+        return id == that.id
+                && name.equals(that.name)
                 && Arrays.equals(icon, that.icon);
     }
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(allyId, allyName);
+        int result = Objects.hash(id, name);
         result = 31 * result + Arrays.hashCode(icon);
         return result;
     }
 
     @Override
     public String toString() {
-        return "AllianceDto[allyId=" + allyId
-                + ", allyName=" + allyName
+        return "AllianceDbDto[id=" + id
+                + ", name=" + name
                 + ", icon=" + (icon == null ? "null" : "byte[" + icon.length + "]") + "]";
     }
 
     public static final class Builder {
-        private long allyId;
-        private String allyName;
+        private long id;
+        private @Nullable String name;
         private byte @Nullable [] icon;
 
-        public Builder allyId(long allyId) {
-            this.allyId = allyId;
+        public Builder id(long id) {
+            this.id = id;
             return this;
         }
 
-        public Builder allyName(String allyName) {
-            this.allyName = allyName;
+        public Builder name(String name) {
+            this.name = name;
             return this;
         }
 
@@ -95,8 +99,8 @@ public final class AllianceDto {
             return this;
         }
 
-        public AllianceDto build() {
-            return new AllianceDto(allyId, allyName, icon);
+        public AllianceDbDto build() {
+            return new AllianceDbDto(id, name, icon);
         }
     }
 }

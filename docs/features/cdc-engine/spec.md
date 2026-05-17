@@ -334,7 +334,7 @@ per-entity state via heartbeat enrichment).
   **All global engine config keys (MVP):**
 
   | Key                                              | Type           | Default                            |
-                  |--------------------------------------------------|----------------|------------------------------------|
+                                |--------------------------------------------------|----------------|------------------------------------|
   | `l2nx.cdc-engine.tick-interval-seconds`          | long, seconds  | 60                                 |
   | `l2nx.cdc-engine.rows-per-window`                | int            | 500_000 (cap 10_000_000)           |
   | `l2nx.cdc-engine.query-timeout-seconds`          | int, seconds   | 10                                 |
@@ -457,7 +457,7 @@ per-entity state via heartbeat enrichment).
       CREATED|UPDATED|DELETED, payload: T|null, timestamp }`. PK is a JSON number,
       not a string. `payload` is a JSON object (Gson serializes the typed slot
       directly), not an escaped string — platform consumer parameterizes its
-      `Consumer<SyncEvent<ClanDto>>` against the same api artifact.
+      `Consumer<SyncEvent<ClanDbDto>>` against the same api artifact.
     - **DELETE wire shape:** `SyncEvent { op: DELETED, payload: null }` — Kafka
       value is a non-null JSON envelope (entityName + pk + op + null payload +
       timestampEpochMs) so the consumer keeps full audit (entity identity, op,
@@ -596,7 +596,7 @@ per-entity state via heartbeat enrichment).
 - [resolved: SyncEvent is **typed** (`SyncEvent<T>`). Gson serializes the payload slot
   as a JSON object (not an escaped string). Platform-side consumer compiles against
   the same `nx-gs-adapter-api` artifact and parameterizes its consumer per topic
-  (`Consumer<SyncEvent<ClanDto>>` for `bohpts.gs.sync.clans`). Adding a new entity
+  (`Consumer<SyncEvent<ClanDbDto>>` for `bohpts.gs.sync.clans`). Adding a new entity
   bumps the api minor; coordinated upgrade with the platform.]
 - [resolved: Snapshot swap is **per-row**. Engine tracks a per-cycle
   `Long2ObjectMap<Future<RecordMetadata>>` keyed by PK; at end-of-cycle (within

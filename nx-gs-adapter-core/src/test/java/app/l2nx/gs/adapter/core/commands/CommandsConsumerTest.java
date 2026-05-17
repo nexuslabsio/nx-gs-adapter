@@ -4,6 +4,7 @@ import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandStatus;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
@@ -74,6 +75,10 @@ class CommandsConsumerTest {
 
         @Override
         public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
+        }
+
+        @Override
+        public void publishCharacterPresence(CharacterPresenceEvent event) {
         }
     }
 

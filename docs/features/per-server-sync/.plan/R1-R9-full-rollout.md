@@ -200,7 +200,7 @@ Docker. Commit candidate:
 
 14. [x] **Update ingestor signatures.** Modify
     `CharacterDbIngestor.ingestBatch(UUID tenantId, UUID serverId,
-    List<SyncEvent<CharacterDto>> events)`,
+    List<SyncEvent<CharacterDbDto>> events)`,
     `CharacterRuntimeIngestor.ingestBatch(...)`,
     `ClanIngestor.ingestBatch(...)`,
     `ItemIngestor.ingestBatch(...)`. Pass `serverId` through to

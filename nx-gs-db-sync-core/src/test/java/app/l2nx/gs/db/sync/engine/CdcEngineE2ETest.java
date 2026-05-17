@@ -2,8 +2,8 @@ package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.kafka.ops.*;
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
-import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
-import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanSkillDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanSkillDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.persist.NoopSnapshotPersistence;
@@ -125,9 +125,9 @@ class CdcEngineE2ETest {
             awaitTick();
             List<ConsumerRecord<byte[], byte[]>> initial = poll(consumer, 3);
             assertEquals(3, initial.size(), "initial sync emits one event per existing clan");
-            Map<Long, ClanDto> byClanId = new HashMap<>();
+            Map<Long, ClanDbDto> byClanId = new HashMap<>();
             for (ConsumerRecord<byte[], byte[]> record : initial) {
-                SyncEvent<ClanDto> event = decode(record.value());
+                SyncEvent<ClanDbDto> event = decode(record.value());
                 assertEquals("clan", event.getEntityName());
                 assertEquals("CREATED", event.getOp());
                 assertEquals(decodeKey(record.key()), event.getPk());
@@ -148,9 +148,9 @@ class CdcEngineE2ETest {
                 ps.executeUpdate();
             }
             awaitTick();
-            SyncEvent<ClanDto> renameEvent = expectSingleEvent(consumer, "UPDATED");
+            SyncEvent<ClanDbDto> renameEvent = expectSingleEvent(consumer, "UPDATED");
             assertEquals(2L, renameEvent.getPk());
-            assertEquals("Phoenix-renamed", renameEvent.getPayload().getClanName());
+            assertEquals("Phoenix-renamed", renameEvent.getPayload().getName());
             assertEquals(2, renameEvent.getPayload().getSkills().size(),
                     "skill list survives a primary-only rename");
 
@@ -159,7 +159,7 @@ class CdcEngineE2ETest {
                 st.executeUpdate("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (1, 103, 4)");
             }
             awaitTick();
-            SyncEvent<ClanDto> addSkillEvent = expectSingleEvent(consumer, "UPDATED");
+            SyncEvent<ClanDbDto> addSkillEvent = expectSingleEvent(consumer, "UPDATED");
             assertEquals(1L, addSkillEvent.getPk());
             assertEquals(3, addSkillEvent.getPayload().getSkills().size());
             assertSkillsContain(addSkillEvent.getPayload(), 103, 4);
@@ -170,7 +170,7 @@ class CdcEngineE2ETest {
                         + "WHERE clan_id = 2 AND skill_id = 201");
             }
             awaitTick();
-            SyncEvent<ClanDto> levelEvent = expectSingleEvent(consumer, "UPDATED");
+            SyncEvent<ClanDbDto> levelEvent = expectSingleEvent(consumer, "UPDATED");
             assertEquals(2L, levelEvent.getPk());
             assertSkillsContain(levelEvent.getPayload(), 201, 99);
 
@@ -179,7 +179,7 @@ class CdcEngineE2ETest {
                 st.executeUpdate("DELETE FROM clan_skills WHERE clan_id = 1 AND skill_id = 101");
             }
             awaitTick();
-            SyncEvent<ClanDto> dropSkillEvent = expectSingleEvent(consumer, "UPDATED");
+            SyncEvent<ClanDbDto> dropSkillEvent = expectSingleEvent(consumer, "UPDATED");
             assertEquals(1L, dropSkillEvent.getPk());
             assertEquals(2, dropSkillEvent.getPayload().getSkills().size());
 
@@ -223,7 +223,7 @@ class CdcEngineE2ETest {
                 .tenantId("test-tenant")
                 .serverId("test-server")
                 .adapterVersion("0.1.0")
-                .uptimeMs(1000L)
+                .uptime(java.time.Duration.ofSeconds(1))
                 .enabledModules(Collections.singletonList(dbSyncStatus))
                 .build();
         assertEquals(1, heartbeat.getEnabledModules().size());
@@ -237,19 +237,19 @@ class CdcEngineE2ETest {
         assertEquals(EntityState.HEALTHY, heartbeatEntities.get(0).getState());
     }
 
-    private static void assertSkillsContain(ClanDto dto, int skillId, int skillLevel) {
-        for (ClanSkillDto s : dto.getSkills()) {
-            if (s.getSkillId() == skillId && s.getSkillLevel() == skillLevel) {
+    private static void assertSkillsContain(ClanDbDto dto, int skillId, int skillLevel) {
+        for (ClanSkillDbDto s : dto.getSkills()) {
+            if (s.getId() == skillId && s.getLevel() == skillLevel) {
                 return;
             }
         }
         fail("expected skill " + skillId + ":" + skillLevel + " in " + dto.getSkills());
     }
 
-    private SyncEvent<ClanDto> expectSingleEvent(KafkaConsumer<byte[], byte[]> consumer, String op) {
+    private SyncEvent<ClanDbDto> expectSingleEvent(KafkaConsumer<byte[], byte[]> consumer, String op) {
         List<ConsumerRecord<byte[], byte[]>> records = poll(consumer, 1);
         assertEquals(1, records.size(), "expected exactly one " + op + " event");
-        SyncEvent<ClanDto> event = decode(records.get(0).value());
+        SyncEvent<ClanDbDto> event = decode(records.get(0).value());
         assertEquals(op, event.getOp());
         return event;
     }
@@ -259,7 +259,7 @@ class CdcEngineE2ETest {
         assertEquals(1, records.size(), "expected exactly one DELETE event");
         ConsumerRecord<byte[], byte[]> record = records.get(0);
         assertNotNull(record.value(), "DELETE wire shape is a SyncEvent envelope, not a Kafka tombstone");
-        SyncEvent<ClanDto> event = decode(record.value());
+        SyncEvent<ClanDbDto> event = decode(record.value());
         assertEquals("DELETED", event.getOp());
         assertNull(event.getPayload(), "payload slot is null on DELETE");
         assertTrue(event.getTimestampEpochMs() > 0L);
@@ -336,10 +336,10 @@ class CdcEngineE2ETest {
     }
 
     private static final java.lang.reflect.Type SYNC_EVENT_TYPE =
-            new TypeToken<SyncEvent<ClanDto>>() {
+            new TypeToken<SyncEvent<ClanDbDto>>() {
             }.getType();
 
-    private static SyncEvent<ClanDto> decode(byte[] valueBytes) {
+    private static SyncEvent<ClanDbDto> decode(byte[] valueBytes) {
         assertNotNull(valueBytes, "non-tombstone events must have a payload");
         return GSON.fromJson(new String(valueBytes, StandardCharsets.UTF_8), SYNC_EVENT_TYPE);
     }

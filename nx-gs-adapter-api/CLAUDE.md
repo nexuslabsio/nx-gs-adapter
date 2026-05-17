@@ -22,12 +22,20 @@ by the L2NX game-server adapter and its consumers. Published as
 - `app.l2nx.gs.adapter.api.kafka` — Kafka message payloads + header contract
   (`HeartbeatEvent`, `NxHeaders`)
 - `app.l2nx.gs.adapter.api.kafka.sync.db.<entity>` — per-entity wire DTOs for
-  the db-sync stream. Shipped entities: `character` (`CharacterDto`,
-  `CharacterSubclassDto`), `clan` (`ClanDto` + `ClanSkillDto`; ClanDto carries
-  optional `icon: byte[]` for the clan crest as decoded PNG bytes — schema
-  providers do the source-format → PNG conversion in `mapEntity`),
-  `alliance` (`AllianceDto{allyId, allyName, icon: byte[]}` — same icon
-  convention as clan), `item` (`ItemDto`, `ItemAttributeDto`).
+  the db-sync stream. Shipped entities: `character` (`CharacterDbDto`,
+  `CharacterSubclassDbDto`; CharacterDbDto carries optional `accountName`,
+  `nobless`, `scheduledDeletionAt` on top of the identity / progression set, all
+  three from generic L2J columns — see
+  `docs/features/character-core-extension/`), `clan` (`ClanDbDto` +
+  `ClanSkillDbDto`; ClanDbDto carries optional `icon: byte[]` for the clan crest
+  as decoded PNG bytes — schema providers do the source-format → PNG
+  conversion in `mapEntity`), `alliance` (`AllianceDbDto{allyId, allyName,
+  icon: byte[]}` — same icon convention as clan), `item` (`ItemDbDto`,
+  `ItemAttributeDbDto`). CharacterRuntimeDto (`kafka.sync.runtime.character`)
+  carries an optional `online: Boolean` presence marker — wire convention:
+  `null`/omitted = ONLINE (byte-budget default), explicit `false` = one-shot
+  OFFLINE tombstone, explicit `true` allowed but redundant. Consumers MUST
+  treat omitted / `null` as `true` for back-compat.
 - `app.l2nx.gs.adapter.api.kafka.events.<family>` — outbound discrete-fact event
   DTOs grouped by family. Single-event families take the concrete type on the
   publish method directly; multi-event families bind on an abstract base and
@@ -43,6 +51,16 @@ by the L2NX game-server adapter and its consumers. Published as
       Single-event family; periodic snapshots, host-pushed via
       `NxEvents.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)` on
       a host-managed cadence.
+    - `events.character` — `CharacterPresenceEvent` (single-event family;
+      one event per login / logout, distinguished by the `online: boolean`
+      field — `true`=login, `false`=logout). Carries UUIDv7 `eventId`
+      (REQUIRED, derive `occurredAt`), `charId` (REQUIRED),
+      `online` (REQUIRED), optional `accountName` / `ip` / `hwid`.
+      Partitioned by `charId` so per-character presence history lands in
+      one partition in occurrence order. One of three sources feeding
+      `gs_characters.online` on the platform (others: CDC
+      `CharacterDbDto.online`, runtime `CharacterRuntimeDto.online`);
+      timestamp-based last-writer-wins on the consumer.
     - `events.privatestore` — `PrivateStorePurchaseEvent` (closed-deal facts)
         + `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
           `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
@@ -85,6 +103,21 @@ by the L2NX game-server adapter and its consumers. Published as
   hashedColumns) MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`. Schema-qualified
   names (`schema.table`), quoted identifiers, and anything outside that pattern
   are rejected at engine start — no runtime quoting / escaping is performed.
+- **Timestamps are UTC `Instant` only.** Every timestamp field in any wire
+  DTO (`kafka.sync.*`, `kafka.events.*`, `kafka.commands.*`, `kafka.ops.*`,
+  `rest.*`) MUST be `java.time.Instant` — never `OffsetDateTime`,
+  `ZonedDateTime`, `LocalDateTime`, `LocalDate`, `LocalTime`, `java.util.Date`,
+  `java.util.Calendar`, or `java.sql.{Date,Time,Timestamp}`. Rationale: the
+  platform operates strictly on UTC; any zoned / local type risks a
+  host-timezone leak. `Instant` is timezone-free by construction (UTC-equivalent
+  moments) and serializes as ISO-8601 with the `Z` suffix
+  (e.g. `"2026-06-01T12:00:00Z"`) — wire format is unambiguous.
+  Schema providers MUST read source columns through
+  `JdbcNulls.nullableInstantFromEpochMillis(rs, col)` /
+  `instantFromEpochMillisOrSentinel(rs, col, sentinel)` (in `:nx-gs-commons`)
+  rather than `rs.getTimestamp(...).toLocalDateTime(...)` style calls.
+  Enforced at build time by `WireTimestampConformanceTest` (reflective
+  classpath scan; fails the build on any violation in the scanned packages).
 
 ## Constraints
 

@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * Wire DTO for one row of {@code character_subclasses} (or its tenant
- * equivalent), carried inside {@link CharacterDto#getSubclasses()}.
+ * equivalent), carried inside {@link CharacterDbDto#getSubclasses()}.
  *
  * <p>Surfaces the identifying-and-versioning pair: {@code classId} (which
  * subclass) and {@code level} (current subclass level). Volatile columns
@@ -20,12 +20,12 @@ import java.util.Objects;
  * provider before assembly — every row that reaches the wire has a
  * non-null {@code classId}.</p>
  */
-public final class CharacterSubclassDto {
+public final class CharacterSubclassDbDto {
 
     private final CharacterClass classId;
     private final int level;
 
-    public CharacterSubclassDto(CharacterClass classId, int level) {
+    public CharacterSubclassDbDto(CharacterClass classId, int level) {
         this.classId = classId;
         this.level = level;
     }
@@ -56,8 +56,8 @@ public final class CharacterSubclassDto {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof CharacterSubclassDto)) return false;
-        CharacterSubclassDto that = (CharacterSubclassDto) o;
+        if (!(o instanceof CharacterSubclassDbDto)) return false;
+        CharacterSubclassDbDto that = (CharacterSubclassDbDto) o;
         return classId == that.classId && level == that.level;
     }
 
@@ -68,7 +68,7 @@ public final class CharacterSubclassDto {
 
     @Override
     public String toString() {
-        return "CharacterSubclassDto[classId=" + classId + ", level=" + level + "]";
+        return "CharacterSubclassDbDto[classId=" + classId + ", level=" + level + "]";
     }
 
     public static final class Builder {
@@ -85,8 +85,8 @@ public final class CharacterSubclassDto {
             return this;
         }
 
-        public CharacterSubclassDto build() {
-            return new CharacterSubclassDto(classId, level);
+        public CharacterSubclassDbDto build() {
+            return new CharacterSubclassDbDto(classId, level);
         }
     }
 }

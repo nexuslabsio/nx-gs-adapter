@@ -111,7 +111,7 @@ per-server без изменений wire-схемы `SyncEvent<T>`.
 **Non-goals:**
 
 - Изменение wire-схемы `SyncEvent<T>` или per-entity DTO в `nx-gs-adapter-api`
-  (`CharacterDto`, `ClanDto`, …) — header'ом покрывается транспортный слой.
+  (`CharacterDbDto`, `ClanDbDto`, …) — header'ом покрывается транспортный слой.
 - Per-server топик-сплит (например `<slug>.<server>.gs.sync.db.character`) —
   топики остаются shared по тенанту, server — только metadata.
 - Refactor multi-tenancy перимтра — `tenantSlug` остаётся в имени топика,

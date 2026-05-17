@@ -57,7 +57,7 @@ design end-to-end.
       tombstone — db-sync topics use bounded retention, not log compaction;
       consumers MUST handle the DELETED op explicitly (Javadoc on `SyncEvent`
       reflects this).
-    - `kafka/sync/db/ClanDto.java` — clan row DTO (Java 8 POJO, hand-written builder);
+    - `kafka/sync/db/ClanDbDto.java` — clan row DTO (Java 8 POJO, hand-written builder);
       `long clanId` / `int clanLevel` (NOT NULL columns); `Long leaderId` / `Long allyId`
       (nullable per L2J `0`-sentinel convention). Co-located with `SyncEvent<T>` under
       `kafka.sync.db` — DB-sync wire types share one sub-package.
@@ -225,7 +225,7 @@ NxAdapter.shutdown()
     - `SyncEvent` — final wire shape:
       candidate fields: `entityName`, `op (CREATED|UPDATED|DELETED)`, `pk: long`,
       `payload`, `timestamp`
-    - `ClanDto`:
+    - `ClanDbDto`:
         - `long clanId` (PK, `NOT NULL`)
         - `String clanName` (`NOT NULL`)
         - `int clanLevel` (`NOT NULL`, source default `0`)
@@ -235,10 +235,10 @@ NxAdapter.shutdown()
 ## Integration points
 
 - **`:nx-gs-adapter-api`** (R10, R11) — adds `AdapterModule`,
-  `ConnectContext`, `SyncEvent`, `ClanDto`. Bumped to next minor release. Lands in
+  `ConnectContext`, `SyncEvent`, `ClanDbDto`. Bumped to next minor release. Lands in
   two slices: `AdapterModule` + `ConnectContext` arrive with the `adapter-bootstrap`
   / `adapter-modules` extension; `SyncEvent` (with `entityName`, `pk: long`) +
-  `ClanDto` (Long ID fields) arrive with this feature in api/0.7.0 alongside
+  `ClanDbDto` (Long ID fields) arrive with this feature in api/0.7.0 alongside
   `EntityStats` / `EntityState` / `ChangesSummary` and
   `ConnectResponse.syncTopics`.
 - **`:nx-gs-adapter-core`** (R1) — extends `NxAdapter.start()` with

@@ -215,10 +215,10 @@ module authors (datapack sync, metrics).
   pointing to it. Bohpts-core declares `implementation
   'app.l2nx:nx-gs-adapter-api:0.7.0'` from Maven Central. Provider contract:
     - `schemaName()` = `"bohpts"`
-    - `mappings()` returns exactly one `EntityMapping<ClanDto>` for the `clan`
+    - `mappings()` returns exactly one `EntityMapping<ClanDbDto>` for the `clan`
       entity:
         - `entityName()` = `"clan"`
-        - `dtoType()` = `ClanDto.class`
+        - `dtoType()` = `ClanDbDto.class`
         - `primary()` = `ClanPrimarySource`:
             - `tableName()` = `"clan_data"`
             - `pkColumn()` = `"clan_id"`
@@ -240,10 +240,10 @@ module authors (datapack sync, metrics).
         - `mapEntity(primaryRow, childRowsByTable)` casts `primaryRow` to
           `ClanRow`, reads `childRowsByTable.get("clan_skills")` (defaulting
           to empty list), casts each row to `ClanSkillRow`, builds a
-          `List<ClanSkillDto>`, and assembles `ClanDto.builder()
+          `List<ClanSkillDbDto>`, and assembles `ClanDbDto.builder()
           .clanId(...).clanName(...).clanLevel(...).leaderId(...).allyId(...)
           .skills(skills).build()`.
-    - `ClanDto` ships in `nx-gs-adapter-api` (Java 8 POJO, hand-written builder) so
+    - `ClanDbDto` ships in `nx-gs-adapter-api` (Java 8 POJO, hand-written builder) so
       the platform-side consumer compiles against the same wire type. Field types
       mirror DB nullability — primitives for `NOT NULL` columns, boxed for
       nullable. ID fields are `long`/`Long` end-to-end:
@@ -252,14 +252,14 @@ module authors (datapack sync, metrics).
         - `int clanLevel` (`NOT NULL`, source default `0`)
         - `Long leaderId` (null when source `leader_id = 0` per L2J convention)
         - `Long allyId` (null when source `ally_id = 0`)
-        - `List<ClanSkillDto> skills` — `null` when the tenant does not
+        - `List<ClanSkillDbDto> skills` — `null` when the tenant does not
           declare a `ChildSource` for skills at all (no `clan_skills`
           equivalent in the source schema, or skills intentionally not
           synced); empty list when the tenant syncs skills but the clan
           has none. Gson's default `serializeNulls=false` omits the field
           from JSON when `null`, so the wire shape distinguishes
           "feature not synced" from "feature synced, value empty".
-    - `ClanSkillDto` (new, ships in `nx-gs-adapter-api`) is a Java 8 POJO with
+    - `ClanSkillDbDto` (new, ships in `nx-gs-adapter-api`) is a Java 8 POJO with
       `int skillId`, `int skillLevel`, hand-written builder, equals/hashCode/
       toString.
     - The package for `BohptsDbSchemaProvider` inside bohpts-core is
@@ -274,8 +274,8 @@ module authors (datapack sync, metrics).
     - `nx-gs-adapter-api` = `0.7.0` (breaking SPI change for multi-source
       `EntityMapping`: split into `PrimarySource<P>` + `List<ChildSource<C>>` +
       `mapEntity(...)`; removes top-level `tableName` / `pkColumn` /
-      `hashedColumns` / `mapRow`. Adds `ClanSkillDto`; extends `ClanDto` with
-      `List<ClanSkillDto> skills`).
+      `hashedColumns` / `mapRow`. Adds `ClanSkillDbDto`; extends `ClanDbDto` with
+      `List<ClanSkillDbDto> skills`).
     - `nx-gs-db-sync-core` = `0.2.0` (multi-source CDC engine: per-source
       Phase 1 + `BIT_XOR` aggregate, per-source Phase 2 + `mapEntity`
       assembly, envelope-based windowing for DELETE-at-boundary correctness).
@@ -398,7 +398,7 @@ module authors (datapack sync, metrics).
   row. Topic name itself encodes the (tenant, entity) tuple, so the key needs only
   the row identifier.]
 - [resolved: `SyncEvent` is **typed** — `SyncEvent<T>` parameterized by DTO type.
-  Platform-side consumer compiles against `SyncEvent<ClanDto>` and gets compile-time
+  Platform-side consumer compiles against `SyncEvent<ClanDbDto>` and gets compile-time
   payload guarantees. Adding a new entity bumps the api artifact (ship the new DTO)
   and the platform consumer upgrades in lockstep — coordinated upgrade is acceptable
   for the small entity catalog. Erased shape (`String payloadJson`) was rejected:

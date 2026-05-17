@@ -8,8 +8,14 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Wire DTO for one clan, payload of {@code SyncEvent<ClanDto>} on the
+ * Wire DTO for one clan, payload of {@code SyncEvent<ClanDbDto>} on the
  * per-tenant clan sync topic.
+ *
+ * <p>Required: {@link #getId() id} (source-side {@code clan_id}) and
+ * {@link #getName() name} (source-side {@code clan_name}). Schema
+ * providers MUST drop dirty rows that lack either rather than ship
+ * placeholders. {@link #getLevel() level} is optional — historical schemas
+ * leave it unset on freshly-created clans before the next save tick.</p>
  *
  * <p>Schema providers translate source sentinels (typically
  * {@code leader_id} / {@code ally_id} = 0) to {@code null} so the platform
@@ -21,39 +27,39 @@ import java.util.Objects;
  * (schema provider converts its native blob format in {@code mapEntity});
  * {@code null} when no crest is synced or the source row has no reference.</p>
  */
-public final class ClanDto {
+public final class ClanDbDto {
 
-    private final long clanId;
-    private final String clanName;
-    private final int clanLevel;
+    private final long id;
+    private final String name;
+    private final @Nullable Integer level;
     private final @Nullable Long leaderId;
     private final @Nullable Long allyId;
-    private final @Nullable List<ClanSkillDto> skills;
+    private final @Nullable List<ClanSkillDbDto> skills;
     private final byte @Nullable [] icon;
 
-    public ClanDto(long clanId, String clanName, int clanLevel,
-                   @Nullable Long leaderId, @Nullable Long allyId,
-                   @Nullable List<ClanSkillDto> skills,
-                   byte @Nullable [] icon) {
-        this.clanId = clanId;
-        this.clanName = clanName;
-        this.clanLevel = clanLevel;
+    public ClanDbDto(long id, String name, @Nullable Integer level,
+                     @Nullable Long leaderId, @Nullable Long allyId,
+                     @Nullable List<ClanSkillDbDto> skills,
+                     byte @Nullable [] icon) {
+        this.id = id;
+        this.name = Objects.requireNonNull(name, "ClanDbDto.name is required");
+        this.level = level;
         this.leaderId = leaderId;
         this.allyId = allyId;
         this.skills = skills == null ? null : Collections.unmodifiableList(skills);
         this.icon = icon;
     }
 
-    public long getClanId() {
-        return clanId;
+    public long getId() {
+        return id;
     }
 
-    public String getClanName() {
-        return clanName;
+    public String getName() {
+        return name;
     }
 
-    public int getClanLevel() {
-        return clanLevel;
+    public @Nullable Integer getLevel() {
+        return level;
     }
 
     public @Nullable Long getLeaderId() {
@@ -64,7 +70,7 @@ public final class ClanDto {
         return allyId;
     }
 
-    public @Nullable List<ClanSkillDto> getSkills() {
+    public @Nullable List<ClanSkillDbDto> getSkills() {
         return skills;
     }
 
@@ -74,9 +80,9 @@ public final class ClanDto {
 
     public Builder toBuilder() {
         return new Builder()
-                .clanId(clanId)
-                .clanName(clanName)
-                .clanLevel(clanLevel)
+                .id(id)
+                .name(name)
+                .level(level)
                 .leaderId(leaderId)
                 .allyId(allyId)
                 .skills(skills)
@@ -90,11 +96,11 @@ public final class ClanDto {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ClanDto)) return false;
-        ClanDto that = (ClanDto) o;
-        return clanId == that.clanId
-                && clanLevel == that.clanLevel
-                && Objects.equals(clanName, that.clanName)
+        if (!(o instanceof ClanDbDto)) return false;
+        ClanDbDto that = (ClanDbDto) o;
+        return id == that.id
+                && Objects.equals(level, that.level)
+                && name.equals(that.name)
                 && Objects.equals(leaderId, that.leaderId)
                 && Objects.equals(allyId, that.allyId)
                 && Objects.equals(skills, that.skills)
@@ -103,16 +109,16 @@ public final class ClanDto {
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(clanId, clanName, clanLevel, leaderId, allyId, skills);
+        int result = Objects.hash(id, name, level, leaderId, allyId, skills);
         result = 31 * result + Arrays.hashCode(icon);
         return result;
     }
 
     @Override
     public String toString() {
-        return "ClanDto[clanId=" + clanId
-                + ", clanName=" + clanName
-                + ", clanLevel=" + clanLevel
+        return "ClanDbDto[id=" + id
+                + ", name=" + name
+                + ", level=" + level
                 + ", leaderId=" + leaderId
                 + ", allyId=" + allyId
                 + ", skills=" + skills
@@ -120,26 +126,26 @@ public final class ClanDto {
     }
 
     public static final class Builder {
-        private long clanId;
-        private String clanName;
-        private int clanLevel;
+        private long id;
+        private @Nullable String name;
+        private @Nullable Integer level;
         private @Nullable Long leaderId;
         private @Nullable Long allyId;
-        private @Nullable List<ClanSkillDto> skills;
+        private @Nullable List<ClanSkillDbDto> skills;
         private byte @Nullable [] icon;
 
-        public Builder clanId(long clanId) {
-            this.clanId = clanId;
+        public Builder id(long id) {
+            this.id = id;
             return this;
         }
 
-        public Builder clanName(String clanName) {
-            this.clanName = clanName;
+        public Builder name(String name) {
+            this.name = name;
             return this;
         }
 
-        public Builder clanLevel(int clanLevel) {
-            this.clanLevel = clanLevel;
+        public Builder level(@Nullable Integer level) {
+            this.level = level;
             return this;
         }
 
@@ -153,7 +159,7 @@ public final class ClanDto {
             return this;
         }
 
-        public Builder skills(@Nullable List<ClanSkillDto> skills) {
+        public Builder skills(@Nullable List<ClanSkillDbDto> skills) {
             this.skills = skills;
             return this;
         }
@@ -163,8 +169,8 @@ public final class ClanDto {
             return this;
         }
 
-        public ClanDto build() {
-            return new ClanDto(clanId, clanName, clanLevel, leaderId, allyId, skills, icon);
+        public ClanDbDto build() {
+            return new ClanDbDto(id, name, level, leaderId, allyId, skills, icon);
         }
     }
 }

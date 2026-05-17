@@ -177,7 +177,7 @@ public class BohptsDbSchemaProvider implements DbSchemaProvider {
 
 `ClanMapping` declares a `PrimarySource<ClanRow>` over `clan_data`
 (`clan_id` PK, hashedColumns = `clan_name`, `clan_level`, `leader_id`,
-`ally_id`) and assembles `ClanDto` via `mapEntity`. Operational tuning
+`ally_id`) and assembles `ClanDbDto` via `mapEntity`. Operational tuning
 (tickInterval, rowsPerWindow, queryTimeout, fetchSize, workers) is NOT on
 the mapping — it lives in `l2nx.properties` under `l2nx.cdc-engine.*`
 (see [`db-sync` spec](./spec.md) for the full key table).

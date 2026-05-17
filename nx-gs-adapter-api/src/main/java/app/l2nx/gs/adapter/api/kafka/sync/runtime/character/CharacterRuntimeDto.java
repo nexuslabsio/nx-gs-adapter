@@ -10,7 +10,7 @@ import java.util.Objects;
  * runtime character sync topic
  * ({@code <tenant>.gs.sync.runtime.character}).
  *
- * <p>Sibling of {@code app.l2nx.gs.adapter.api.kafka.sync.db.character.CharacterDto}
+ * <p>Sibling of {@code app.l2nx.gs.adapter.api.kafka.sync.db.character.CharacterDbDto}
  * (DB-derived persistent character state). Both DTOs share {@code id} (source-side
  * {@code charId} / {@code objectId}) so platform consumers can join the two streams
  * by primary key.</p>
@@ -19,6 +19,24 @@ import java.util.Objects;
  * tenants populate different subsets — e.g. cores without a vitality mechanic
  * leave {@code curVit}/{@code maxVit} null. Null fields are omitted from the
  * Gson wire when {@code serializeNulls=false} on the platform-side producer.</p>
+ *
+ * <p>Presence ({@link #getOnline() online}) drives platform-side reconciliation
+ * of the per-character "is this player currently logged in" signal. Wire
+ * convention picked for byte-budget at high-load tick rates:
+ * <ul>
+ *   <li>Regular live-state row: {@code online} left {@code null} — the producer
+ *   omits it from the JSON. Platform consumers MUST treat omitted /
+ *   {@code null} as {@code online=true} (the historical wire emitted runtime
+ *   rows only for online characters).</li>
+ *   <li>One-shot offline tombstone: {@code online=false} explicit, vitals /
+ *   coordinates all {@code null} (also omitted from the JSON). The row exists
+ *   only to flip platform-side presence to "offline".</li>
+ *   <li>{@code online=true} explicit is permitted but redundant — producers
+ *   should prefer {@code null} for the regular ONLINE case to save bytes.</li>
+ * </ul>
+ * Why a runtime-channel signal and not a CDC column on {@code CharacterDbDto}:
+ * login / logout would inflate CDC UPDATE volume per cycle, and CDC tick
+ * cadence is too coarse to surface presence reactively.</p>
  */
 public final class CharacterRuntimeDto {
 
@@ -34,6 +52,7 @@ public final class CharacterRuntimeDto {
     private final @Nullable Integer x;
     private final @Nullable Integer y;
     private final @Nullable Integer z;
+    private final @Nullable Boolean online;
 
     public CharacterRuntimeDto(long id,
                                @Nullable Integer curHp,
@@ -46,7 +65,8 @@ public final class CharacterRuntimeDto {
                                @Nullable Integer maxVit,
                                @Nullable Integer x,
                                @Nullable Integer y,
-                               @Nullable Integer z) {
+                               @Nullable Integer z,
+                               @Nullable Boolean online) {
         this.id = id;
         this.curHp = curHp;
         this.maxHp = maxHp;
@@ -59,11 +79,12 @@ public final class CharacterRuntimeDto {
         this.x = x;
         this.y = y;
         this.z = z;
+        this.online = online;
     }
 
     /**
      * Primary key — source {@code charId} / {@code objectId}, {@code NOT NULL}.
-     * Same value as {@code CharacterDto.id} for platform-side join.
+     * Same value as {@code CharacterDbDto.id} for platform-side join.
      */
     public long getId() {
         return id;
@@ -117,6 +138,30 @@ public final class CharacterRuntimeDto {
         return z;
     }
 
+    /**
+     * Presence marker. {@code null} or {@code true} on regular live-state rows
+     * (producer convention: omit from the wire for byte-budget). Explicit
+     * {@code false} on one-shot offline tombstones — vitals / coordinates are
+     * typically {@code null} on those. Platform consumers MUST treat omitted /
+     * {@code null} as {@code online=true} for back-compat with legacy
+     * providers and the byte-optimized regular path.
+     */
+    public @Nullable Boolean getOnline() {
+        return online;
+    }
+
+    /**
+     * Resolves the {@link #getOnline() online} wire field to a primitive
+     * presence value per the wire convention: omitted / {@code null} /
+     * {@code true} all mean ONLINE; only an explicit {@code false} (one-shot
+     * offline tombstone) means OFFLINE. Single point of truth for consumers
+     * — keeps the {@code null = ONLINE} byte-budget rule from leaking into
+     * every call site.
+     */
+    public boolean isOnlineEffective() {
+        return online == null || online;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .id(id)
@@ -130,7 +175,8 @@ public final class CharacterRuntimeDto {
                 .maxVit(maxVit)
                 .x(x)
                 .y(y)
-                .z(z);
+                .z(z)
+                .online(online);
     }
 
     public static Builder builder() {
@@ -153,13 +199,14 @@ public final class CharacterRuntimeDto {
                 && Objects.equals(maxVit, that.maxVit)
                 && Objects.equals(x, that.x)
                 && Objects.equals(y, that.y)
-                && Objects.equals(z, that.z);
+                && Objects.equals(z, that.z)
+                && Objects.equals(online, that.online);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(id, curHp, maxHp, curMp, maxMp, curCp, maxCp,
-                curVit, maxVit, x, y, z);
+                curVit, maxVit, x, y, z, online);
     }
 
     @Override
@@ -169,7 +216,8 @@ public final class CharacterRuntimeDto {
                 + ", curMp=" + curMp + ", maxMp=" + maxMp
                 + ", curCp=" + curCp + ", maxCp=" + maxCp
                 + ", curVit=" + curVit + ", maxVit=" + maxVit
-                + ", x=" + x + ", y=" + y + ", z=" + z + "]";
+                + ", x=" + x + ", y=" + y + ", z=" + z
+                + ", online=" + online + "]";
     }
 
     public static final class Builder {
@@ -185,6 +233,7 @@ public final class CharacterRuntimeDto {
         private @Nullable Integer x;
         private @Nullable Integer y;
         private @Nullable Integer z;
+        private @Nullable Boolean online;
 
         public Builder id(long id) {
             this.id = id;
@@ -246,9 +295,14 @@ public final class CharacterRuntimeDto {
             return this;
         }
 
+        public Builder online(@Nullable Boolean online) {
+            this.online = online;
+            return this;
+        }
+
         public CharacterRuntimeDto build() {
             return new CharacterRuntimeDto(id, curHp, maxHp, curMp, maxMp,
-                    curCp, maxCp, curVit, maxVit, x, y, z);
+                    curCp, maxCp, curVit, maxVit, x, y, z, online);
         }
     }
 }

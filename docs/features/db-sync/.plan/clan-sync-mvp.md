@@ -11,7 +11,7 @@
     MVP-track engine. R14 (dynamic Kafka config) and R18 (persisted snapshot) are explicitly out of scope; deferred.
 >
 > **Resolved decisions (lock into specs in M1):**
-> - `SyncEvent<T>` is **typed**, parameterized by DTO class. Platform consumer compiles against `SyncEvent<ClanDto>`.
+> - `SyncEvent<T>` is **typed**, parameterized by DTO class. Platform consumer compiles against `SyncEvent<ClanDbDto>`.
     Future-entity bumps the api artifact; coordinated upgrade is acceptable for the small entity catalog.
 > - Snapshot swap is **per-row**. End-of-cycle the engine walks the per-PK `Future<RecordMetadata>` map, advances
     snapshot only for PKs whose publish succeeded; failed PKs stay in the previous snapshot and are replayed on the next
@@ -28,7 +28,7 @@ work splits into six layers, each one buildable independently against the previo
 
 1. **Wire shape** — `nx-gs-adapter-api` 0.6.0 carries the new types: `EntityStats`,
    `EntityState (HEALTHY|DEGRADED)`, `ChangesSummary`, renamed `PoolStats { active, idle,
-   total, waiting }` (all `Integer` nullable), `SyncEvent<T>` (typed), `ClanDto` (long PK +
+   total, waiting }` (all `Integer` nullable), `SyncEvent<T>` (typed), `ClanDbDto` (long PK +
    primitive-for-NOT-NULL convention), `Map<String,String> syncTopics` on `ConnectResponse`
    and `ConnectContext`. Tier-2 SPI (`DbSchemaProvider`, `EntityMapping<T>`) lives in
    `:nx-gs-adapter-api` package `app.l2nx.gs.adapter.api.spi` (alongside Tier-1
@@ -52,9 +52,9 @@ work splits into six layers, each one buildable independently against the previo
    > 1 → FAILED); instantiates `CdcEngine`. `currentStatus()` surfaces both `pool` and
    `entities` slots in the heartbeat. `stop` / `onDisconnect` tear down cleanly.
 5. **Bohpts schema provider** — in bohpts-core repo (`E:/bohpts/code/bohpts-core`):
-   `BohptsDbSchemaProvider` returning one `EntityMapping<ClanDto>` (entity `"clan"`,
+   `BohptsDbSchemaProvider` returning one `EntityMapping<ClanDbDto>` (entity `"clan"`,
    table `"clan_data"`, PK `"clan_id"`, hashed columns 4 plain cols, `mapRow` building
-   ClanDto with `long clanId` + `int clanLevel` + 0-sentinel-to-null for
+   ClanDbDto with `long clanId` + `int clanLevel` + 0-sentinel-to-null for
    `leaderId`/`allyId`); service descriptor.
 6. **End-to-end smoke** — Testcontainers MySQL with `clan_data` fixture + Testcontainers
    Kafka + WireMock platform that returns `syncTopics["clan"]="bohpts.gs.sync.clans"`.
@@ -102,7 +102,7 @@ work splits into six layers, each one buildable independently against the previo
    `String entityName`, `long pk`, `String op` (`CREATED|UPDATED|DELETED`), `T payload`
    (nullable for tombstone), `Instant timestamp`. Hand-written builder.
 
-8. [x] **Add `ClanDto`** in `app.l2nx.gs.adapter.api.kafka.sync.db`: `long clanId`,
+8. [x] **Add `ClanDbDto`** in `app.l2nx.gs.adapter.api.kafka.sync.db`: `long clanId`,
    `String clanName`, `int clanLevel`, `Long leaderId`, `Long allyId`. Hand-written
    builder. (Co-located with `SyncEvent` in M7 — both DB-sync wire types live
    under the same sub-package.)
@@ -288,15 +288,15 @@ mode. End-to-end test deferred to M36.
     provider, but bohpts-core's own source code does NOT import anything from
     `nx-gs-db-sync-core`.
 
-35. [x] **`ClanMapping implements EntityMapping<ClanDto>`**:
+35. [x] **`ClanMapping implements EntityMapping<ClanDbDto>`**:
     - `entityName() = "clan"`
     - `tableName() = "clan_data"`
     - `pkColumn() = "clan_id"`
     - `hashedColumns() = ["clan_name", "clan_level", "leader_id", "ally_id"]`
-    - `dtoType() = ClanDto.class`
+    - `dtoType() = ClanDbDto.class`
     - `mapRow(rs)`:
       ```
-      ClanDto.builder()
+      ClanDbDto.builder()
           .clanId(rs.getLong("clan_id"))
           .clanName(rs.getString("clan_name"))
           .clanLevel(rs.getInt("clan_level"))
@@ -318,7 +318,7 @@ mode. End-to-end test deferred to M36.
     test-scope `FakeBohptsDbSchemaProvider` registered via test
     `META-INF/services` resource. Assertions:
     - On engine first tick: 3 `SyncEvent { op: "CREATED" }` records on the topic,
-      key = clan_id (long, 8 bytes), payload = ClanDto with all fields populated
+      key = clan_id (long, 8 bytes), payload = ClanDbDto with all fields populated
     - After UPDATE one row's `clan_name` directly via JDBC: next cycle emits
       exactly 1 `op: "UPDATED"` with the new name in payload
     - After DELETE one row: next cycle emits exactly 1 `op: "DELETED",

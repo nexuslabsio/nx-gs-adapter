@@ -6,26 +6,43 @@ import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
 import app.l2nx.gs.adapter.api.domain.character.CharacterSex;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
 /**
  * Wire DTO for one player character, payload of
- * {@code SyncEvent<CharacterDto>} on the platform-supplied per-tenant
+ * {@code SyncEvent<CharacterDbDto>} on the platform-supplied per-tenant
  * character sync topic (e.g. {@code bohpts.gs.sync.characters}).
  *
- * <p>Only the primary key {@code id} (source-side {@code charId}) is
- * required; everything else is optional. Different tenants populate
- * different subsets depending on which columns exist in their schema and
- * which the tenant chose to surface — schema providers control this via
+ * <p>Required fields: {@link #getId() id} (source-side {@code charId}) and
+ * {@link #getName() name} (source-side {@code char_name}). Both are
+ * structurally guaranteed by every L2J-derived schema (PK + NOT NULL on
+ * {@code char_name}); a row without either is dirty data that the schema
+ * provider MUST drop with a WARN before constructing the DTO. The builder
+ * enforces non-null name; null at construction time throws
+ * {@link NullPointerException} — fail-loud on dirty assembly rather than
+ * shipping placeholder data downstream.</p>
+ *
+ * <p>Everything else is optional. Different tenants populate different
+ * subsets depending on which columns exist in their schema and which the
+ * tenant chose to surface — schema providers control this via
  * {@code PrimarySource.hashedColumns()} and what they put into the row in
  * {@code mapRow()}.</p>
  *
  * <p>Sentinel mapping: most game-server schemas use {@code 0} as the
- * "no clan" sentinel in {@code characters.clanid}. Schema providers
+ * "no clan" sentinel in {@code characters.clanid} and as the "not pending
+ * deletion" sentinel in {@code characters.deletetime}. Schema providers
  * translate sentinel-zero (and source SQL NULL) to {@code null} when
- * populating {@code clanId}; platform consumers see explicit nulls.</p>
+ * populating {@code clanId} / {@code scheduledDeletionAt}; platform consumers see
+ * explicit nulls.</p>
+ *
+ * <p>Online presence is intentionally NOT modeled here — that signal lives
+ * on the sibling runtime channel ({@code CharacterRuntimeDto.online})
+ * and is reconciled by platform-side consumers. CDC cannot deliver
+ * login/logout reactively without an UPDATE-storm risk; runtime channel
+ * is the authoritative source for "is this character logged in right now".</p>
  *
  * <p>Volatile state ({@code curHp}/{@code curMp}/{@code x}/{@code y}/
  * {@code z}/{@code exp}/{@code onlinetime}/{@code lastAccess} and similar
@@ -34,39 +51,48 @@ import java.util.Objects;
  * online character on every cycle. Real-time state belongs on a separate
  * event channel.</p>
  */
-public final class CharacterDto {
+public final class CharacterDbDto {
 
     private final long id;
-    private final @Nullable String name;
+    private final String name;
+    private final @Nullable String accountName;
     private final @Nullable String title;
     private final @Nullable Integer level;
     private final @Nullable CharacterSex sex;
     private final @Nullable CharacterRace race;
     private final @Nullable CharacterClass classId;
     private final @Nullable CharacterClass baseClassId;
-    private final @Nullable List<CharacterSubclassDto> subclasses;
+    private final @Nullable List<CharacterSubclassDbDto> subclasses;
     private final @Nullable CharacterPrivateStore privateStore;
     private final @Nullable Long clanId;
     private final @Nullable Integer pvpCounter;
     private final @Nullable Integer pkCounter;
     private final @Nullable Integer karma;
+    private final @Nullable Boolean nobless;
+    private final @Nullable Instant scheduledDeletionAt;
+    private final @Nullable Boolean online;
 
-    public CharacterDto(long id,
-                        @Nullable String name,
-                        @Nullable String title,
-                        @Nullable Integer level,
-                        @Nullable CharacterSex sex,
-                        @Nullable CharacterRace race,
-                        @Nullable CharacterClass classId,
-                        @Nullable CharacterClass baseClassId,
-                        @Nullable List<CharacterSubclassDto> subclasses,
-                        @Nullable CharacterPrivateStore privateStore,
-                        @Nullable Long clanId,
-                        @Nullable Integer pvpCounter,
-                        @Nullable Integer pkCounter,
-                        @Nullable Integer karma) {
+    public CharacterDbDto(long id,
+                          String name,
+                          @Nullable String accountName,
+                          @Nullable String title,
+                          @Nullable Integer level,
+                          @Nullable CharacterSex sex,
+                          @Nullable CharacterRace race,
+                          @Nullable CharacterClass classId,
+                          @Nullable CharacterClass baseClassId,
+                          @Nullable List<CharacterSubclassDbDto> subclasses,
+                          @Nullable CharacterPrivateStore privateStore,
+                          @Nullable Long clanId,
+                          @Nullable Integer pvpCounter,
+                          @Nullable Integer pkCounter,
+                          @Nullable Integer karma,
+                          @Nullable Boolean nobless,
+                          @Nullable Instant scheduledDeletionAt,
+                          @Nullable Boolean online) {
         this.id = id;
-        this.name = name;
+        this.name = Objects.requireNonNull(name, "CharacterDbDto.name is required");
+        this.accountName = accountName;
         this.title = title;
         this.level = level;
         this.sex = sex;
@@ -79,6 +105,9 @@ public final class CharacterDto {
         this.pvpCounter = pvpCounter;
         this.pkCounter = pkCounter;
         this.karma = karma;
+        this.nobless = nobless;
+        this.scheduledDeletionAt = scheduledDeletionAt;
+        this.online = online;
     }
 
     /**
@@ -89,11 +118,23 @@ public final class CharacterDto {
     }
 
     /**
-     * Character name — source {@code char_name}, {@code NOT NULL} on the
-     * source side. {@code null} when the tenant does not surface this column.
+     * Character name — source {@code char_name}, {@code NOT NULL}. Schema
+     * providers MUST skip rows where the source column is null/missing
+     * rather than shipping placeholders.
      */
-    public @Nullable String getName() {
+    public String getName() {
         return name;
+    }
+
+    /**
+     * Login account owning this character — source {@code account_name}.
+     * {@code null} when the tenant does not surface this column. Used by
+     * platform consumers as a generic per-character account label and as a
+     * filter dimension; the field is generic across L2 forks (vanilla L2J,
+     * Lucera, Essence all carry it on {@code characters}).
+     */
+    public @Nullable String getAccountName() {
+        return accountName;
     }
 
     /**
@@ -149,7 +190,7 @@ public final class CharacterDto {
      * {@code ChildSource} declared); empty list when the tenant syncs
      * subclasses but the character has none.
      */
-    public @Nullable List<CharacterSubclassDto> getSubclasses() {
+    public @Nullable List<CharacterSubclassDbDto> getSubclasses() {
         return subclasses;
     }
 
@@ -192,10 +233,48 @@ public final class CharacterDto {
         return karma;
     }
 
+    /**
+     * Noblesse status — source {@code nobless} (typically tinyint 0/1).
+     * {@code null} when the tenant does not surface this column.
+     */
+    public @Nullable Boolean getNobless() {
+        return nobless;
+    }
+
+    /**
+     * Pending-deletion timestamp — source {@code deletetime} (typically
+     * epoch-millis BIGINT, with {@code 0} as the "not pending deletion"
+     * sentinel). Schema providers translate sentinel-zero / SQL NULL to
+     * {@code null}; non-null values denote when the character will be
+     * (or was scheduled to be) hard-deleted by the game server.
+     */
+    public @Nullable Instant getScheduledDeletionAt() {
+        return scheduledDeletionAt;
+    }
+
+    /**
+     * Persisted online flag from the source row — typically
+     * {@code characters.online} (TINYINT 0/1) on L2J schemas.
+     * {@code null} when the tenant does not surface this column.
+     *
+     * <p>One of three sources platform consumers reconcile into the
+     * {@code online} column on {@code gs_characters} (the others being
+     * the runtime channel's {@code CharacterRuntimeDto.online} and
+     * discrete {@code CharacterPresenceEvent}s). Timestamp-based
+     * last-writer-wins on the platform side — CDC source has the
+     * coarsest tick cadence (~60s) and acts as the authoritative
+     * backstop after adapter restart, when the runtime channel's
+     * in-memory previous-online set is empty.</p>
+     */
+    public @Nullable Boolean getOnline() {
+        return online;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .id(id)
                 .name(name)
+                .accountName(accountName)
                 .title(title)
                 .level(level)
                 .sex(sex)
@@ -207,7 +286,10 @@ public final class CharacterDto {
                 .clanId(clanId)
                 .pvpCounter(pvpCounter)
                 .pkCounter(pkCounter)
-                .karma(karma);
+                .karma(karma)
+                .nobless(nobless)
+                .scheduledDeletionAt(scheduledDeletionAt)
+                .online(online);
     }
 
     public static Builder builder() {
@@ -217,10 +299,11 @@ public final class CharacterDto {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof CharacterDto)) return false;
-        CharacterDto that = (CharacterDto) o;
+        if (!(o instanceof CharacterDbDto)) return false;
+        CharacterDbDto that = (CharacterDbDto) o;
         return id == that.id
-                && Objects.equals(name, that.name)
+                && name.equals(that.name)
+                && Objects.equals(accountName, that.accountName)
                 && Objects.equals(title, that.title)
                 && Objects.equals(level, that.level)
                 && sex == that.sex
@@ -232,20 +315,24 @@ public final class CharacterDto {
                 && Objects.equals(clanId, that.clanId)
                 && Objects.equals(pvpCounter, that.pvpCounter)
                 && Objects.equals(pkCounter, that.pkCounter)
-                && Objects.equals(karma, that.karma);
+                && Objects.equals(karma, that.karma)
+                && Objects.equals(nobless, that.nobless)
+                && Objects.equals(scheduledDeletionAt, that.scheduledDeletionAt)
+                && Objects.equals(online, that.online);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, name, title, level, sex, race,
+        return Objects.hash(id, name, accountName, title, level, sex, race,
                 classId, baseClassId, subclasses, privateStore,
-                clanId, pvpCounter, pkCounter, karma);
+                clanId, pvpCounter, pkCounter, karma, nobless, scheduledDeletionAt, online);
     }
 
     @Override
     public String toString() {
-        return "CharacterDto[id=" + id
+        return "CharacterDbDto[id=" + id
                 + ", name=" + name
+                + ", accountName=" + accountName
                 + ", title=" + title
                 + ", level=" + level
                 + ", sex=" + sex
@@ -257,32 +344,44 @@ public final class CharacterDto {
                 + ", clanId=" + clanId
                 + ", pvpCounter=" + pvpCounter
                 + ", pkCounter=" + pkCounter
-                + ", karma=" + karma + "]";
+                + ", karma=" + karma
+                + ", nobless=" + nobless
+                + ", scheduledDeletionAt=" + scheduledDeletionAt
+                + ", online=" + online + "]";
     }
 
     public static final class Builder {
         private long id;
         private @Nullable String name;
+        private @Nullable String accountName;
         private @Nullable String title;
         private @Nullable Integer level;
         private @Nullable CharacterSex sex;
         private @Nullable CharacterRace race;
         private @Nullable CharacterClass classId;
         private @Nullable CharacterClass baseClassId;
-        private @Nullable List<CharacterSubclassDto> subclasses;
+        private @Nullable List<CharacterSubclassDbDto> subclasses;
         private @Nullable CharacterPrivateStore privateStore;
         private @Nullable Long clanId;
         private @Nullable Integer pvpCounter;
         private @Nullable Integer pkCounter;
         private @Nullable Integer karma;
+        private @Nullable Boolean nobless;
+        private @Nullable Instant scheduledDeletionAt;
+        private @Nullable Boolean online;
 
         public Builder id(long id) {
             this.id = id;
             return this;
         }
 
-        public Builder name(@Nullable String name) {
+        public Builder name(String name) {
             this.name = name;
+            return this;
+        }
+
+        public Builder accountName(@Nullable String accountName) {
+            this.accountName = accountName;
             return this;
         }
 
@@ -316,7 +415,7 @@ public final class CharacterDto {
             return this;
         }
 
-        public Builder subclasses(@Nullable List<CharacterSubclassDto> subclasses) {
+        public Builder subclasses(@Nullable List<CharacterSubclassDbDto> subclasses) {
             this.subclasses = subclasses;
             return this;
         }
@@ -346,10 +445,25 @@ public final class CharacterDto {
             return this;
         }
 
-        public CharacterDto build() {
-            return new CharacterDto(id, name, title, level, sex, race,
+        public Builder nobless(@Nullable Boolean nobless) {
+            this.nobless = nobless;
+            return this;
+        }
+
+        public Builder scheduledDeletionAt(@Nullable Instant scheduledDeletionAt) {
+            this.scheduledDeletionAt = scheduledDeletionAt;
+            return this;
+        }
+
+        public Builder online(@Nullable Boolean online) {
+            this.online = online;
+            return this;
+        }
+
+        public CharacterDbDto build() {
+            return new CharacterDbDto(id, name, accountName, title, level, sex, race,
                     classId, baseClassId, subclasses, privateStore,
-                    clanId, pvpCounter, pkCounter, karma);
+                    clanId, pvpCounter, pkCounter, karma, nobless, scheduledDeletionAt, online);
         }
     }
 }

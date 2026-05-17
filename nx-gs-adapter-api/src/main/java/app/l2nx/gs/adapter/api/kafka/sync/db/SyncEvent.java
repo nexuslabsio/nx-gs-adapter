@@ -7,7 +7,7 @@ import java.util.Objects;
 /**
  * Typed CDC event published by the adapter for one row of one synced entity.
  * Generic parameter {@code T} is the entity's DTO class
- * (e.g. {@code SyncEvent<ClanDto>}); the platform-side consumer parameterizes
+ * (e.g. {@code SyncEvent<ClanDbDto>}); the platform-side consumer parameterizes
  * its {@code Consumer<SyncEvent<T>>} against the same {@code nx-gs-adapter-api}
  * artifact and gets compile-time payload guarantees.
  *

@@ -1,7 +1,7 @@
 package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
-import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
@@ -94,7 +94,7 @@ class EntitySyncTaskTest {
         };
     }
 
-    private static EntityMapping<ClanDto> clanMapping() {
+    private static EntityMapping<ClanDbDto> clanMapping() {
         return TestMappings.clanOnly();
     }
 

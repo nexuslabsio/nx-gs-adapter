@@ -1,7 +1,7 @@
 package app.l2nx.gs.db.sync.engine.publish;
 
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
-import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
+import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.db.sync.engine.TestMappings;
 import org.apache.kafka.clients.producer.Callback;
@@ -29,7 +29,7 @@ class SyncEventPublisherTest {
         RecordingSender sender = new RecordingSender();
         SyncEventPublisher publisher = new SyncEventPublisher(sender);
 
-        ClanDto dto = ClanDto.builder().clanId(42L).clanName("Hellbound").clanLevel(5).build();
+        ClanDbDto dto = ClanDbDto.builder().id(42L).name("Hellbound").level(5).build();
         CompletableFuture<RecordMetadata> future =
                 publisher.publish(clanMapping(), SyncEventPublisher.OP_CREATED, 42L, dto, TOPIC);
         sender.completeLast(metadata());
@@ -87,7 +87,7 @@ class SyncEventPublisherTest {
         RecordingSender sender = new RecordingSender();
         SyncEventPublisher publisher = new SyncEventPublisher(sender);
 
-        ClanDto dto = ClanDto.builder().clanId(1L).clanName("X").clanLevel(1).build();
+        ClanDbDto dto = ClanDbDto.builder().id(1L).name("X").level(1).build();
         CompletableFuture<RecordMetadata> future =
                 publisher.publish(clanMapping(), SyncEventPublisher.OP_UPDATED, 1L, dto, TOPIC);
         sender.completeLast(new RuntimeException("kafka down"));
@@ -104,7 +104,7 @@ class SyncEventPublisherTest {
         };
         SyncEventPublisher publisher = new SyncEventPublisher(sender);
 
-        ClanDto dto = ClanDto.builder().clanId(1L).clanName("X").clanLevel(1).build();
+        ClanDbDto dto = ClanDbDto.builder().id(1L).name("X").level(1).build();
         CompletableFuture<RecordMetadata> future =
                 publisher.publish(clanMapping(), SyncEventPublisher.OP_CREATED, 1L, dto, TOPIC);
 
@@ -118,7 +118,7 @@ class SyncEventPublisherTest {
         RecordingSender sender = new RecordingSender();
         SyncEventPublisher publisher = new SyncEventPublisher(sender);
 
-        ClanDto dto = ClanDto.builder().clanId(1L).clanName("X").clanLevel(1).build();
+        ClanDbDto dto = ClanDbDto.builder().id(1L).name("X").level(1).build();
         CompletableFuture<RecordMetadata> future =
                 publisher.publish(clanMapping(), SyncEventPublisher.OP_CREATED, 1L, dto, TOPIC);
 
@@ -129,7 +129,7 @@ class SyncEventPublisherTest {
         return new RecordMetadata(new TopicPartition(TOPIC, 0), 0L, 0, 0L, 0, 0);
     }
 
-    private static EntityMapping<ClanDto> clanMapping() {
+    private static EntityMapping<ClanDbDto> clanMapping() {
         return TestMappings.clanOnly();
     }
 

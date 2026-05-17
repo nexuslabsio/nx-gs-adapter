@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
+import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
@@ -48,6 +49,10 @@ class NxEventsConnectContextTest {
             @Override
             public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
             }
+
+            @Override
+            public void publishCharacterPresence(CharacterPresenceEvent event) {
+            }
         };
 
         ConnectContext ctx = ConnectContext.builder()
@@ -89,6 +94,10 @@ class NxEventsConnectContextTest {
 
                     @Override
                     public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
+                    }
+
+                    @Override
+                    public void publishCharacterPresence(CharacterPresenceEvent event) {
                     }
                 })
                 .build();

@@ -210,11 +210,11 @@ state, siege participants, raid boss vitals).
 
 - [done] R10. `CharacterRuntimeDto` MUST ship in `nx-gs-adapter-api` package
   `app.l2nx.gs.adapter.api.kafka.sync.runtime.character`, parallel to
-  `kafka.sync.db.character.CharacterDto`. All fields except `id` are nullable per the
+  `kafka.sync.db.character.CharacterDbDto`. All fields except `id` are nullable per the
   project-wide DTO convention — tenants without a given concept (e.g. no vitality
   mechanic) leave the field unset, Gson omits it on the wire (`serializeNulls=false`).
   Field set:
-    - `long id` — `NOT NULL`, primary key (matches `db-sync` `CharacterDto.id`,
+    - `long id` — `NOT NULL`, primary key (matches `db-sync` `CharacterDbDto.id`,
       same `charId` / `objectId`)
     - `@Nullable Integer curHp`, `@Nullable Integer maxHp`
     - `@Nullable Integer curMp`, `@Nullable Integer maxMp`
@@ -225,7 +225,7 @@ state, siege participants, raid boss vitals).
       world coordinates
 
   Java 8 POJO, hand-written builder, equals/hashCode/toString. Same shape conventions
-  as the existing `CharacterDto` in `kafka.sync.db.character`.
+  as the existing `CharacterDbDto` in `kafka.sync.db.character`.
 
 - [done] R11. **Module versions:**
     - `nx-gs-adapter-api` = `0.11.0` (breaking: namespaced `ConnectResponse.syncTopics`

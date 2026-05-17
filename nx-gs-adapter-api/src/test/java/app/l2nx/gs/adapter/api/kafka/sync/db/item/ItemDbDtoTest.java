@@ -10,15 +10,15 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class ItemDtoTest {
+class ItemDbDtoTest {
 
     @Test
     void builder_shouldMapEachFieldToConstructorPosition() {
-        List<ItemAttributeDto> attrs = Arrays.asList(
-                ItemAttributeDto.builder().type(ItemAttribute.FIRE).value(150).build(),
-                ItemAttributeDto.builder().type(ItemAttribute.WATER).value(60).build());
+        List<ItemAttributeDbDto> attrs = Arrays.asList(
+                ItemAttributeDbDto.builder().type(ItemAttribute.FIRE).value(150).build(),
+                ItemAttributeDbDto.builder().type(ItemAttribute.WATER).value(60).build());
 
-        ItemDto item = ItemDto.builder()
+        ItemDbDto item = ItemDbDto.builder()
                 .id(98765L)
                 .itemTemplateId(7575L)
                 .ownerId(12345L)
@@ -39,7 +39,7 @@ class ItemDtoTest {
 
     @Test
     void allOptionalFields_shouldBeNullable_whenTenantOmitsThem() {
-        ItemDto item = ItemDto.builder().id(1L).build();
+        ItemDbDto item = ItemDbDto.builder().id(1L).build();
 
         assertEquals(1L, item.getId());
         assertNull(item.getItemTemplateId());
@@ -52,21 +52,21 @@ class ItemDtoTest {
 
     @Test
     void ownerId_shouldBeNullable_forSentinelZeroSourceValue() {
-        ItemDto item = ItemDto.builder().id(1L).ownerId(null).build();
+        ItemDbDto item = ItemDbDto.builder().id(1L).ownerId(null).build();
 
         assertNull(item.getOwnerId());
     }
 
     @Test
     void attributes_shouldBeNull_whenTenantDoesNotSyncThem() {
-        ItemDto item = ItemDto.builder().id(1L).build();
+        ItemDbDto item = ItemDbDto.builder().id(1L).build();
 
         assertNull(item.getAttributes());
     }
 
     @Test
     void attributes_shouldBeEmptyList_whenTenantSyncsThemButItemHasNone() {
-        ItemDto item = ItemDto.builder()
+        ItemDbDto item = ItemDbDto.builder()
                 .id(1L)
                 .attributes(Collections.emptyList())
                 .build();
@@ -77,8 +77,8 @@ class ItemDtoTest {
 
     @Test
     void builder_andConstructor_shouldProduceEqualObjects_whenAllOptionalNull() {
-        ItemDto fromBuilder = ItemDto.builder().id(1L).build();
-        ItemDto fromCtor = new ItemDto(1L, null, null, null, null, null, null);
+        ItemDbDto fromBuilder = ItemDbDto.builder().id(1L).build();
+        ItemDbDto fromCtor = new ItemDbDto(1L, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -86,9 +86,9 @@ class ItemDtoTest {
 
     @Test
     void toBuilder_shouldRoundtrip() {
-        List<ItemAttributeDto> attrs = Collections.singletonList(
-                ItemAttributeDto.builder().type(ItemAttribute.HOLY).value(120).build());
-        ItemDto original = new ItemDto(1L, 7L, 2L, 5L, 10, ItemLocation.INVENTORY, attrs);
+        List<ItemAttributeDbDto> attrs = Collections.singletonList(
+                ItemAttributeDbDto.builder().type(ItemAttribute.HOLY).value(120).build());
+        ItemDbDto original = new ItemDbDto(1L, 7L, 2L, 5L, 10, ItemLocation.INVENTORY, attrs);
 
         assertEquals(original, original.toBuilder().build());
     }

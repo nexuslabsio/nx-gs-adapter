@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
+import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
@@ -119,4 +120,22 @@ public interface NxEvents {
      *              — game-loop safety).
      */
     void publishPrivateStorePurchase(PrivateStorePurchaseEvent event);
+
+    /**
+     * Publish a discrete presence-change fact in the {@code character}
+     * family — one event per login ({@code online=true}) or logout
+     * ({@code online=false}). Pushed by host hooks on the standard packet
+     * path. Custom / cheat clients that skip the packet flow won't trigger
+     * this event — CDC and runtime sync channels act as fallback.
+     *
+     * <p>Returns immediately after enqueueing. Same delivery semantics as
+     * {@link #publishPremiumPurchase} — at-least-once, idempotency on
+     * UUIDv7 {@code eventId}. Partition key is {@code charId} so per-
+     * character presence history lands on one partition in occurrence order.</p>
+     *
+     * @param event non-null presence event; {@code null} is treated as a
+     *              no-op with a WARN log entry (does not throw —
+     *              game-loop safety).
+     */
+    void publishCharacterPresence(CharacterPresenceEvent event);
 }

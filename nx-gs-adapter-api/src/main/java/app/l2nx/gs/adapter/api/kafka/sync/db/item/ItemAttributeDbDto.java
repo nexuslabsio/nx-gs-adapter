@@ -6,20 +6,20 @@ import java.util.Objects;
 
 /**
  * Wire DTO for one row of {@code item_elementals} (or its tenant-equivalent),
- * carried inside {@link ItemDto#getAttributes()}.
+ * carried inside {@link ItemDbDto#getAttributes()}.
  *
  * <p>Surfaces the elemental kind ({@link ItemAttribute}) and the source-side
  * numeric strength ({@code value}). The composite source-side key is
  * {@code (itemId, elemType)} — the {@code itemId} part is implicit (the
- * parent {@link ItemDto}'s {@code id}); only {@code type} disambiguates
+ * parent {@link ItemDbDto}'s {@code id}); only {@code type} disambiguates
  * rows within one item's attributes list.</p>
  */
-public final class ItemAttributeDto {
+public final class ItemAttributeDbDto {
 
     private final ItemAttribute type;
     private final int value;
 
-    public ItemAttributeDto(ItemAttribute type, int value) {
+    public ItemAttributeDbDto(ItemAttribute type, int value) {
         this.type = type;
         this.value = value;
     }
@@ -50,8 +50,8 @@ public final class ItemAttributeDto {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ItemAttributeDto)) return false;
-        ItemAttributeDto that = (ItemAttributeDto) o;
+        if (!(o instanceof ItemAttributeDbDto)) return false;
+        ItemAttributeDbDto that = (ItemAttributeDbDto) o;
         return type == that.type && value == that.value;
     }
 
@@ -62,7 +62,7 @@ public final class ItemAttributeDto {
 
     @Override
     public String toString() {
-        return "ItemAttributeDto[type=" + type + ", value=" + value + "]";
+        return "ItemAttributeDbDto[type=" + type + ", value=" + value + "]";
     }
 
     public static final class Builder {
@@ -79,8 +79,8 @@ public final class ItemAttributeDto {
             return this;
         }
 
-        public ItemAttributeDto build() {
-            return new ItemAttributeDto(type, value);
+        public ItemAttributeDbDto build() {
+            return new ItemAttributeDbDto(type, value);
         }
     }
 }
