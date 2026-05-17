@@ -74,8 +74,28 @@ class ClanDtoTest {
     void toBuilder_shouldRoundtrip() {
         List<ClanSkillDto> skills = Collections.singletonList(
                 ClanSkillDto.builder().skillId(1).skillLevel(2).build());
-        ClanDto original = new ClanDto(1L, "X", 5, 2L, null, skills);
+        ClanDto original = ClanDto.builder()
+                .clanId(1L).clanName("X").clanLevel(5).leaderId(2L)
+                .skills(skills)
+                .icon(new byte[]{1, 2, 3})
+                .build();
 
         assertEquals(original, original.toBuilder().build());
+    }
+
+    @Test
+    void icon_shouldBeNull_whenTenantDoesNotSyncCrests() {
+        ClanDto clan = ClanDto.builder().clanId(1L).clanName("X").clanLevel(1).build();
+        assertNull(clan.getIcon());
+    }
+
+    @Test
+    void equals_shouldCompareIconBytes() {
+        ClanDto a = ClanDto.builder().clanId(1L).clanName("X").clanLevel(1).icon(new byte[]{1, 2}).build();
+        ClanDto b = ClanDto.builder().clanId(1L).clanName("X").clanLevel(1).icon(new byte[]{1, 2}).build();
+        ClanDto c = ClanDto.builder().clanId(1L).clanName("X").clanLevel(1).icon(new byte[]{1, 3}).build();
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+        assertNotEquals(a, c);
     }
 }

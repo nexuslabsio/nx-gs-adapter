@@ -2,33 +2,24 @@ package app.l2nx.gs.adapter.api.kafka.sync.db.clan;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
 /**
  * Wire DTO for one clan, payload of {@code SyncEvent<ClanDto>} on the
- * platform-supplied per-tenant clan sync topic
- * (e.g. {@code bohpts.gs.sync.clans}).
+ * per-tenant clan sync topic.
  *
- * <p>Field types mirror DB nullability: primitives for {@code NOT NULL} columns,
- * boxed for nullable. Gson serializes both identically (both render as JSON
- * numbers); the type carries the nullability contract.</p>
- *
- * <p>Sentinel mapping: most game-server schemas use {@code 0} as the
- * "no leader" / "no ally" sentinel in {@code clan_data.leader_id} /
- * {@code ally_id}. Schema providers translate sentinel-zero to {@code null}
- * when populating these fields ({@code Long leaderId / allyId}); platform
- * consumers see explicit nulls.</p>
- *
- * <p>The {@code skills} list aggregates child rows from the tenant's
- * {@code clan_skills}-equivalent table assembled by the schema provider's
- * {@code mapEntity}. {@code null} when the tenant does not sync skills
- * at all (no {@code ChildSource} declared for skills); empty list when the
- * tenant syncs skills but the clan has none. Gson's default
- * {@code serializeNulls=false} omits the field from JSON when {@code null},
- * so the wire shape unambiguously distinguishes "feature not synced" from
- * "feature synced, value empty".</p>
+ * <p>Schema providers translate source sentinels (typically
+ * {@code leader_id} / {@code ally_id} = 0) to {@code null} so the platform
+ * sees explicit absence. {@code skills} is {@code null} when the tenant
+ * does not sync skills at all (no {@code ChildSource} declared), empty
+ * list when the clan has none — Gson's default
+ * {@code serializeNulls=false} preserves that distinction on the wire.
+ * {@code icon} carries the clan crest as already-decoded PNG bytes
+ * (schema provider converts its native blob format in {@code mapEntity});
+ * {@code null} when no crest is synced or the source row has no reference.</p>
  */
 public final class ClanDto {
 
@@ -38,63 +29,47 @@ public final class ClanDto {
     private final @Nullable Long leaderId;
     private final @Nullable Long allyId;
     private final @Nullable List<ClanSkillDto> skills;
+    private final byte @Nullable [] icon;
 
     public ClanDto(long clanId, String clanName, int clanLevel,
                    @Nullable Long leaderId, @Nullable Long allyId,
-                   @Nullable List<ClanSkillDto> skills) {
+                   @Nullable List<ClanSkillDto> skills,
+                   byte @Nullable [] icon) {
         this.clanId = clanId;
         this.clanName = clanName;
         this.clanLevel = clanLevel;
         this.leaderId = leaderId;
         this.allyId = allyId;
         this.skills = skills == null ? null : Collections.unmodifiableList(skills);
+        this.icon = icon;
     }
 
-    /**
-     * Primary key — {@code NOT NULL}.
-     */
     public long getClanId() {
         return clanId;
     }
 
-    /**
-     * {@code NOT NULL}.
-     */
     public String getClanName() {
         return clanName;
     }
 
-    /**
-     * {@code NOT NULL}; source default {@code 0}.
-     */
     public int getClanLevel() {
         return clanLevel;
     }
 
-    /**
-     * {@code null} when source {@code leader_id = 0} (the conventional
-     * "no leader" sentinel).
-     */
     public @Nullable Long getLeaderId() {
         return leaderId;
     }
 
-    /**
-     * {@code null} when source {@code ally_id = 0} (the conventional
-     * "no ally" sentinel).
-     */
     public @Nullable Long getAllyId() {
         return allyId;
     }
 
-    /**
-     * Clan skills, ordered as the schema provider's {@code mapEntity}
-     * produced them (no platform-side ordering contract). {@code null} when
-     * the tenant does not sync skills (no {@code ChildSource} declared);
-     * empty list when the tenant syncs skills but the clan has none.
-     */
     public @Nullable List<ClanSkillDto> getSkills() {
         return skills;
+    }
+
+    public byte @Nullable [] getIcon() {
+        return icon;
     }
 
     public Builder toBuilder() {
@@ -104,7 +79,8 @@ public final class ClanDto {
                 .clanLevel(clanLevel)
                 .leaderId(leaderId)
                 .allyId(allyId)
-                .skills(skills);
+                .skills(skills)
+                .icon(icon);
     }
 
     public static Builder builder() {
@@ -121,12 +97,15 @@ public final class ClanDto {
                 && Objects.equals(clanName, that.clanName)
                 && Objects.equals(leaderId, that.leaderId)
                 && Objects.equals(allyId, that.allyId)
-                && Objects.equals(skills, that.skills);
+                && Objects.equals(skills, that.skills)
+                && Arrays.equals(icon, that.icon);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(clanId, clanName, clanLevel, leaderId, allyId, skills);
+        int result = Objects.hash(clanId, clanName, clanLevel, leaderId, allyId, skills);
+        result = 31 * result + Arrays.hashCode(icon);
+        return result;
     }
 
     @Override
@@ -136,7 +115,8 @@ public final class ClanDto {
                 + ", clanLevel=" + clanLevel
                 + ", leaderId=" + leaderId
                 + ", allyId=" + allyId
-                + ", skills=" + skills + "]";
+                + ", skills=" + skills
+                + ", icon=" + (icon == null ? "null" : "byte[" + icon.length + "]") + "]";
     }
 
     public static final class Builder {
@@ -146,6 +126,7 @@ public final class ClanDto {
         private @Nullable Long leaderId;
         private @Nullable Long allyId;
         private @Nullable List<ClanSkillDto> skills;
+        private byte @Nullable [] icon;
 
         public Builder clanId(long clanId) {
             this.clanId = clanId;
@@ -177,8 +158,13 @@ public final class ClanDto {
             return this;
         }
 
+        public Builder icon(byte @Nullable [] icon) {
+            this.icon = icon;
+            return this;
+        }
+
         public ClanDto build() {
-            return new ClanDto(clanId, clanName, clanLevel, leaderId, allyId, skills);
+            return new ClanDto(clanId, clanName, clanLevel, leaderId, allyId, skills, icon);
         }
     }
 }

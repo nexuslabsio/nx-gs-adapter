@@ -21,6 +21,13 @@ by the L2NX game-server adapter and its consumers. Published as
   `ConnectResponse`, `KafkaConfig`, `SyncTopics`, `MessagingTopics`)
 - `app.l2nx.gs.adapter.api.kafka` — Kafka message payloads + header contract
   (`HeartbeatEvent`, `NxHeaders`)
+- `app.l2nx.gs.adapter.api.kafka.sync.db.<entity>` — per-entity wire DTOs for
+  the db-sync stream. Shipped entities: `character` (`CharacterDto`,
+  `CharacterSubclassDto`), `clan` (`ClanDto` + `ClanSkillDto`; ClanDto carries
+  optional `icon: byte[]` for the clan crest as decoded PNG bytes — schema
+  providers do the source-format → PNG conversion in `mapEntity`),
+  `alliance` (`AllianceDto{allyId, allyName, icon: byte[]}` — same icon
+  convention as clan), `item` (`ItemDto`, `ItemAttributeDto`).
 - `app.l2nx.gs.adapter.api.kafka.events.<family>` — outbound discrete-fact event
   DTOs grouped by family. Single-event families take the concrete type on the
   publish method directly; multi-event families bind on an abstract base and
