@@ -6,12 +6,19 @@ import java.util.*;
 
 /**
  * One service-applied line of a {@link PremiumPurchaseEvent}. Carries the
- * canonical service code, optional structured args, and the per-line cost.
+ * canonical service code, quantity, optional structured args, and the
+ * per-line cost.
  *
  * <p>{@link #getCode() code} SHOULD be drawn from {@link WellKnownServices}
  * for L2-canonical services so cross-tenant dashboards can aggregate
  * consistently. Hosts MAY use private codes (e.g. {@code "bohpts:my_custom_service"})
  * for vendor-specific actions; the platform treats unknown codes as opaque.</p>
+ *
+ * <p>{@link #getQty() qty} is the number of identical services applied in
+ * this line (e.g. {@code 3× name_change}). Defaults to {@code 1}; legacy
+ * payloads without the field deserialize to {@code 1} via the getter
+ * normalization. Downstream charting MUST aggregate units sold via
+ * {@code sum(qty)}, not {@code count(*)}.</p>
  *
  * <p>{@link #getParams() params} carries structured arguments
  * (e.g. {@code rename}: {@code old}/{@code new}; {@code name_color_change}:
@@ -23,13 +30,16 @@ import java.util.*;
 public final class PurchaseService {
 
     private final String code;
+    private final @Nullable Long qty;
     private final @Nullable Map<String, String> params;
     private final List<Payment> payments;
 
     public PurchaseService(String code,
+                           @Nullable Long qty,
                            @Nullable Map<String, String> params,
                            @Nullable List<Payment> payments) {
         this.code = code;
+        this.qty = qty;
         this.params = freezeMap(params);
         this.payments = freezeList(payments);
     }
@@ -41,6 +51,15 @@ public final class PurchaseService {
      */
     public String getCode() {
         return code;
+    }
+
+    /**
+     * Quantity of identical services applied in this line. Defaults to
+     * {@code 1} — legacy payloads without the field deserialize to
+     * {@code null} on the underlying slot and surface as {@code 1} here.
+     */
+    public long getQty() {
+        return qty == null ? 1L : qty;
     }
 
     /**
@@ -59,7 +78,7 @@ public final class PurchaseService {
     }
 
     public Builder toBuilder() {
-        return new Builder().code(code).params(params).payments(payments);
+        return new Builder().code(code).qty(getQty()).params(params).payments(payments);
     }
 
     public static Builder builder() {
@@ -85,29 +104,38 @@ public final class PurchaseService {
         if (this == o) return true;
         if (!(o instanceof PurchaseService)) return false;
         PurchaseService that = (PurchaseService) o;
-        return Objects.equals(code, that.code)
+        // Compare via getQty() so {qty=null} and {qty=1L} are equal — both
+        // mean "one service applied" per the wire contract.
+        return getQty() == that.getQty()
+                && Objects.equals(code, that.code)
                 && Objects.equals(params, that.params)
                 && Objects.equals(payments, that.payments);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(code, params, payments);
+        return Objects.hash(code, getQty(), params, payments);
     }
 
     @Override
     public String toString() {
-        return "PurchaseService[code=" + code + ", params=" + params
-                + ", payments=" + payments + "]";
+        return "PurchaseService[code=" + code + ", qty=" + getQty()
+                + ", params=" + params + ", payments=" + payments + "]";
     }
 
     public static final class Builder {
         private String code;
+        private long qty = 1L;
         private @Nullable Map<String, String> params;
         private @Nullable List<Payment> payments;
 
         public Builder code(String code) {
             this.code = code;
+            return this;
+        }
+
+        public Builder qty(long qty) {
+            this.qty = qty;
             return this;
         }
 
@@ -122,7 +150,7 @@ public final class PurchaseService {
         }
 
         public PurchaseService build() {
-            return new PurchaseService(code, params, payments);
+            return new PurchaseService(code, qty, params, payments);
         }
     }
 }
