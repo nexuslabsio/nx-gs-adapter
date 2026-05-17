@@ -200,8 +200,14 @@ NxAdapter.shutdown()
 
 ## Data model
 
-- **No adapter-side persistence.** `SnapshotStore` lives in heap and is lost on JVM restart.
-  Cold start replays everything via initial sync. Acceptable bursty cost on rare reboots.
+- **Adapter-side persistence: per-entity snapshot files on local disk** —
+  `SnapshotStore` is dumped to
+  `<persist-dir>/<schema>/<entityName>.snap` after every successful
+  cycle (throttled, default 300s) and force-flushed on engine stop.
+  Reloaded on start BEFORE the first tick — so DELETE events fire on the
+  next cycle for rows removed from the host DB while the adapter was
+  offline. See [`snapshot-persistence`](../snapshot-persistence/spec.md)
+  for the boundary contract + file format.
 - **Host DB tables (read-only)** — bohpts schema confirmed against
   `bohpts-core/com.bohpts.game.clan.Clan`:
     - `clan_data` [bohpts] — `clan_id` (PK, BIGINT), `clan_name` (VARCHAR), `clan_level`

@@ -135,9 +135,23 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   `EntityMapping` /
   `PrimarySource` / `ChildSource` (tableName / pkColumn / fkColumn / hashedColumns)
   MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` — schema-qualified or quoted names are
-  rejected at engine start. Depends on `:nx-gs-adapter-api` + `:nx-gs-kafka` +
-  `:nx-gs-commons` + `fastutil-core` + `gson`. Package root `app.l2nx.gs.db.sync`.
-  `:nx-gs-log` shadow-included.
+  rejected at engine start — and the same regex now also guards
+  `mapping.entityName()` and `provider.schemaName()` since both are
+  interpolated into the on-disk snapshot file path. **Snapshot persistence**
+  (sub-package `app.l2nx.gs.db.sync.engine.persist`): always on,
+  per-entity binary file `<persist.dir>/<schemaName>/<entityName>.snap`
+  (`nx-cdc-snapshot` default dir relative to JVM cwd) written
+  tmp → fsync → atomic-rename on every successful cycle (per-entity
+  throttle `l2nx.cdc-engine.persist.checkpoint-min-interval-seconds`
+  default 300s), force-flushed on `engine.stop()`, reloaded on
+  `engine.start()` before the first tick. Directory-level
+  `FileChannel.tryLock` on `.lock` refuses a second adapter JVM pointed at
+  the same dir → module `STATE_FAILED`. Closes the orphan-on-restart bug
+  where rows deleted from the host DB while the adapter was offline were
+  never observed by the next cycle (diff against empty snapshot
+  misclassified everything as CREATE). Depends on `:nx-gs-adapter-api` +
+  `:nx-gs-kafka` + `:nx-gs-commons` + `fastutil-core` + `gson`. Package
+  root `app.l2nx.gs.db.sync`. `:nx-gs-log` shadow-included.
 - `:nx-gs-runtime-sync-core` — Runtime-sync `AdapterModule` shipped to Maven Central.
   Owns the in-memory snapshot+diff engine (shared bounded pool —
   `l2nx.runtime-sync.workers` daemon threads, default `max(2, min(entities,

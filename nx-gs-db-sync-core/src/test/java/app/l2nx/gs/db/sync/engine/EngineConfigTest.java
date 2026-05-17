@@ -72,4 +72,34 @@ class EngineConfigTest {
         source.put(EngineConfig.KEY_ROWS_PER_WINDOW, "-5");
         assertThrows(IllegalStateException.class, () -> EngineConfig.from(source::get));
     }
+
+    @Test
+    void persist_shouldDefaultToStandardDirAndInterval() {
+        EngineConfig cfg = EngineConfig.defaults();
+
+        assertEquals("nx-cdc-snapshot", cfg.persistDir());
+        assertEquals(300, cfg.persistCheckpointMinIntervalSeconds());
+    }
+
+    @Test
+    void persist_shouldRespectOverrides() {
+        Map<String, String> source = new HashMap<String, String>();
+        source.put(EngineConfig.KEY_PERSIST_DIR, "/var/lib/nx/cdc");
+        source.put(EngineConfig.KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS, "60");
+
+        EngineConfig cfg = EngineConfig.from(source::get);
+
+        assertEquals("/var/lib/nx/cdc", cfg.persistDir());
+        assertEquals(60, cfg.persistCheckpointMinIntervalSeconds());
+    }
+
+    @Test
+    void persist_checkpointInterval_shouldAcceptZero() {
+        Map<String, String> source = new HashMap<String, String>();
+        source.put(EngineConfig.KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS, "0");
+
+        EngineConfig cfg = EngineConfig.from(source::get);
+
+        assertEquals(0, cfg.persistCheckpointMinIntervalSeconds());
+    }
 }

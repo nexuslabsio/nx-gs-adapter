@@ -700,54 +700,25 @@ HeartbeatService tick   [heartbeat thread]
   topic is permanently `DEGRADED` per R17 — defensive path for ConnectResponse
   payloads that lose entries during platform-side rollouts; not expected in
   steady-state operation.
-- **Persisted previous-snapshot cache (post-MVP, R18) — feasibility analysis.**
-  Goal: a host-JVM restart should not trigger a full initial-sync replay (R7) for
-  every entity. The in-memory `Long2IntOpenHashMap` per entity could be
-  periodically dumped to disk (e.g. `<host>/.nx-adapter/cdc/<tenantSlug>/<serverSlug>/<entityName>.bin`)
-  and reloaded on next startup. Feasibility — yes, but with non-trivial constraints
-  worth documenting before the dedicated slice:
-    1. **Schema invalidation.** The cache must invalidate on any change to
-       `hashedColumns` (CRC32 input set) or to `dtoType` / `mapRow` (Phase 2
-       output shape). Mechanism: store a `schemaFingerprint` in the cache header
-       — hash of `(entityName, tableName, hashedColumns, hashedColumns ordering)`.
-       Mismatch on load → discard cache, full resync. Schema-provider version
-       bump (e.g. adding a hashedColumn) invalidates correctly without operator
-       action.
-    2. **Format.** Naive: serialized `Long2IntOpenHashMap` via Java
-       Serialization. Better: simple binary format — header (magic, version,
-       schemaFingerprint, entryCount) + dense `(long pk, int crc32)` pairs. ~12
-       bytes/entry on disk → ~144 MB for 12M items. Survives JVM Java-version
-       changes and avoids `serialVersionUID` brittleness.
-    3. **fsync cadence.** Every cycle is wasteful (12M-entry rewrite × per-tick
-       cadence). Options: dump on shutdown only (loses recent diffs on JVM
-       crash), or periodic dump every N cycles (configurable). Preferred:
-       shutdown-only via JVM shutdown hook — the worst case (crash) replays
-       diffs since last clean shutdown, which is bounded by reboot cadence
-       (rare on production game servers). Periodic dump can be added later if
-       actual recovery scenarios demand it.
-    4. **Filesystem location.** Operator-controlled via
-       `l2nx.cdc-engine.cache-dir` config; default `<host-tmp>/nx-adapter/cdc/`.
-       Container ephemeral filesystems (no persistent volume) → cache is lost
-       on container restart anyway, falls back to MVP behavior (full resync) —
-       no regression. Operators wanting persistence mount a volume.
-    5. **Corruption recovery.** Header magic + checksum over the file body. On
-       checksum mismatch: log WARN, delete the file, full resync. No partial
-       recovery; integrity > completeness.
-    6. **Multi-JVM cohabitation on the same host.** Cache directory is keyed by
-       `(tenantSlug, serverSlug)` so multiple game servers share the host
-       without colliding. File lock (`FileChannel.tryLock`) on the cache
-       directory prevents two adapter instances of the same server from racing
-       on writes — second instance falls back to no-cache behavior with WARN.
-    7. **Initial-sync cost amortization.** Initial-sync (R7) for 12M items at
-       ~40s Phase 1 + ~30s Phase 2 chunked publish + Kafka burst is a real
-       operator pain on every restart. With cache: ~1s load + diff against
-       current DB state (already the cycle's normal path). Net win for
-       operators with frequent reboots; no impact for operators who restart
-       rarely (cache loaded once and reused indefinitely).
-
-  Conclusion: feasible, well-defined boundaries, post-MVP slice. Risks are
-  manageable (schema invalidation is the main one; the fingerprint approach
-  handles it cleanly).
+- **Persisted previous-snapshot cache (R18) — delivered as
+  [`snapshot-persistence`](../snapshot-persistence/spec.md).** Per-entity
+  binary file `<persist-dir>/<schema>/<entityName>.snap` (magic + version +
+  name + count + dense `(long pk, int crc32)` pairs + trailing CRC32),
+  written via tmp → fsync → atomic rename, throttled at
+  `persist.checkpoint-min-interval-seconds` (default 300s), force-flushed
+  on shutdown. Directory lock via `FileChannel.tryLock` on `.lock` prevents
+  two adapter JVMs on the same host from racing. Loaded once on
+  `CdcEngine.start` BEFORE the first tick is scheduled — closes the
+  orphan-on-restart bug where rows deleted from the host DB during
+  adapter downtime were never observed (next cycle's diff against empty
+  snapshot would classify everything as CREATE, never DELETE). Wired by
+  `DbSyncModule.buildPersistence`; lock-acquisition failure transitions
+  the module to `STATE_FAILED`. Schema-fingerprint invalidation deferred —
+  the simpler `FORMAT_VERSION` bump-and-drop policy covers the only
+  near-term invalidation case (engine-side wire format change); column-set
+  / DTO-shape changes that don't bump `FORMAT_VERSION` are caught by
+  natural re-CRC of the next cycle (the changed hash flows as an UPDATE
+  event, not as a stale snapshot read).
 
 ## Extension points
 

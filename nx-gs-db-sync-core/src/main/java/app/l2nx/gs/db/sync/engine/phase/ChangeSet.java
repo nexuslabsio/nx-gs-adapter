@@ -65,10 +65,12 @@ public final class ChangeSet {
         for (Long2IntMap.Entry e : currentScan.long2IntEntrySet()) {
             long pk = e.getLongKey();
             int newCrc = e.getIntValue();
-            int prevCrc = snapshot.getCrc(entityName, pk);
-            if (prevCrc == Phase1Hasher.MISSING_HASH) {
+            // containsCrc + getCrc instead of comparing getCrc against MISSING_HASH:
+            // a real CRC32 value can collide with the sentinel (Integer.MIN_VALUE),
+            // which would otherwise misclassify tracked rows as CREATED on every cycle.
+            if (!snapshot.containsCrc(entityName, pk)) {
                 created.add(pk);
-            } else if (prevCrc != newCrc) {
+            } else if (snapshot.getCrc(entityName, pk) != newCrc) {
                 updated.add(pk);
             }
         }

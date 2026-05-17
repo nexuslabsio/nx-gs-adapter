@@ -24,6 +24,16 @@ import java.util.function.Function;
  * </ol>
  *
  * <p>Knob keys are namespaced under {@code l2nx.cdc-engine.*}.</p>
+ *
+ * <p><strong>Pool sizing vs persistence latency:</strong> snapshot checkpoint
+ * (write + fsync) runs inline on the CDC pool worker thread that just finished
+ * the entity's cycle. On a 6.5M-entry entity (~78 MB on disk) a fsync can
+ * take 50–200 ms on local SSD, 0.2–1 s on HDD / dev-container loopback, or
+ * several seconds on network-mounted storage. With the default 300 s throttle
+ * a single entity flushes ~12×/hour; on a 2-worker pool with 4 entities that
+ * works out to ~3 % worker utilization even on pathologically slow disks,
+ * but operators on very slow storage may want to bump {@link #KEY_WORKERS}
+ * past the {@code max(2, cores/2)} default to absorb the tail latency.</p>
  */
 public final class EngineConfig {
 
@@ -33,6 +43,9 @@ public final class EngineConfig {
     public static final String KEY_PUBLISH_FLUSH_SECONDS = "l2nx.cdc-engine.publish-flush-seconds";
     public static final String KEY_FETCH_SIZE = "l2nx.cdc-engine.fetch-size";
     public static final String KEY_WORKERS = "l2nx.cdc-engine.workers";
+    public static final String KEY_PERSIST_DIR = "l2nx.cdc-engine.persist.dir";
+    public static final String KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS =
+            "l2nx.cdc-engine.persist.checkpoint-min-interval-seconds";
 
     public static final int DEFAULT_TICK_INTERVAL_SECONDS = 60;
     public static final int DEFAULT_ROWS_PER_WINDOW = 500_000;
@@ -40,6 +53,8 @@ public final class EngineConfig {
     public static final int DEFAULT_PUBLISH_FLUSH_SECONDS = 5;
     public static final int DEFAULT_FETCH_SIZE = 10_000;
     public static final int DEFAULT_WORKERS = 0;
+    public static final String DEFAULT_PERSIST_DIR = "nx-cdc-snapshot";
+    public static final int DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS = 300;
 
     static final int MAX_ROWS_PER_WINDOW = 10_000_000;
 
@@ -49,13 +64,16 @@ public final class EngineConfig {
     private final int publishFlushSeconds;
     private final int fetchSize;
     private final int workers;
+    private final String persistDir;
+    private final int persistCheckpointMinIntervalSeconds;
 
     public EngineConfig(int tickIntervalSeconds,
                         int rowsPerWindow,
                         int queryTimeoutSeconds,
                         int publishFlushSeconds) {
         this(tickIntervalSeconds, rowsPerWindow, queryTimeoutSeconds, publishFlushSeconds,
-                DEFAULT_FETCH_SIZE, DEFAULT_WORKERS);
+                DEFAULT_FETCH_SIZE, DEFAULT_WORKERS,
+                DEFAULT_PERSIST_DIR, DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS);
     }
 
     public EngineConfig(int tickIntervalSeconds,
@@ -64,11 +82,33 @@ public final class EngineConfig {
                         int publishFlushSeconds,
                         int fetchSize,
                         int workers) {
+        this(tickIntervalSeconds, rowsPerWindow, queryTimeoutSeconds, publishFlushSeconds,
+                fetchSize, workers,
+                DEFAULT_PERSIST_DIR, DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS);
+    }
+
+    public EngineConfig(int tickIntervalSeconds,
+                        int rowsPerWindow,
+                        int queryTimeoutSeconds,
+                        int publishFlushSeconds,
+                        int fetchSize,
+                        int workers,
+                        String persistDir,
+                        int persistCheckpointMinIntervalSeconds) {
         if (rowsPerWindow > MAX_ROWS_PER_WINDOW) {
             throw new IllegalStateException(
                     "Invalid '" + KEY_ROWS_PER_WINDOW + "' value " + rowsPerWindow
                             + ": must be <= " + MAX_ROWS_PER_WINDOW
                             + " (sanity cap — larger windows risk OOM on hash buffers)");
+        }
+        if (persistDir == null || persistDir.trim().isEmpty()) {
+            throw new IllegalStateException(
+                    "Invalid '" + KEY_PERSIST_DIR + "': must be non-empty");
+        }
+        if (persistCheckpointMinIntervalSeconds < 0) {
+            throw new IllegalStateException(
+                    "Invalid '" + KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS + "' value "
+                            + persistCheckpointMinIntervalSeconds + ": must be >= 0");
         }
         this.tickIntervalSeconds = tickIntervalSeconds;
         this.rowsPerWindow = rowsPerWindow;
@@ -76,6 +116,8 @@ public final class EngineConfig {
         this.publishFlushSeconds = publishFlushSeconds;
         this.fetchSize = fetchSize;
         this.workers = workers;
+        this.persistDir = persistDir;
+        this.persistCheckpointMinIntervalSeconds = persistCheckpointMinIntervalSeconds;
     }
 
     public int tickIntervalSeconds() {
@@ -102,6 +144,14 @@ public final class EngineConfig {
         return workers;
     }
 
+    public String persistDir() {
+        return persistDir;
+    }
+
+    public int persistCheckpointMinIntervalSeconds() {
+        return persistCheckpointMinIntervalSeconds;
+    }
+
     public static EngineConfig defaults() {
         return new EngineConfig(
                 DEFAULT_TICK_INTERVAL_SECONDS,
@@ -109,7 +159,9 @@ public final class EngineConfig {
                 DEFAULT_QUERY_TIMEOUT_SECONDS,
                 DEFAULT_PUBLISH_FLUSH_SECONDS,
                 DEFAULT_FETCH_SIZE,
-                DEFAULT_WORKERS);
+                DEFAULT_WORKERS,
+                DEFAULT_PERSIST_DIR,
+                DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS);
     }
 
     public static EngineConfig fromProductionChain() {
@@ -132,7 +184,10 @@ public final class EngineConfig {
                 positiveInt(source, KEY_QUERY_TIMEOUT_SECONDS, DEFAULT_QUERY_TIMEOUT_SECONDS),
                 positiveInt(source, KEY_PUBLISH_FLUSH_SECONDS, DEFAULT_PUBLISH_FLUSH_SECONDS),
                 positiveInt(source, KEY_FETCH_SIZE, DEFAULT_FETCH_SIZE),
-                nonNegativeInt(source, KEY_WORKERS, DEFAULT_WORKERS));
+                nonNegativeInt(source, KEY_WORKERS, DEFAULT_WORKERS),
+                stringOrDefault(source, KEY_PERSIST_DIR, DEFAULT_PERSIST_DIR),
+                nonNegativeInt(source, KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS,
+                        DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS));
     }
 
     static Function<String, String> fileFirstChain(Properties fileProps,
@@ -228,6 +283,14 @@ public final class EngineConfig {
         return parsed;
     }
 
+    private static String stringOrDefault(Function<String, String> source, String key, String defaultValue) {
+        String raw = source.apply(key);
+        if (raw == null || raw.trim().isEmpty()) {
+            return defaultValue;
+        }
+        return raw.trim();
+    }
+
     private static boolean booleanFlag(Function<String, String> source, String key, boolean defaultValue) {
         String raw = source.apply(key);
         if (raw == null || raw.trim().isEmpty()) {
@@ -254,13 +317,16 @@ public final class EngineConfig {
                 && queryTimeoutSeconds == that.queryTimeoutSeconds
                 && publishFlushSeconds == that.publishFlushSeconds
                 && fetchSize == that.fetchSize
-                && workers == that.workers;
+                && workers == that.workers
+                && persistCheckpointMinIntervalSeconds == that.persistCheckpointMinIntervalSeconds
+                && Objects.equals(persistDir, that.persistDir);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(tickIntervalSeconds, rowsPerWindow, queryTimeoutSeconds,
-                publishFlushSeconds, fetchSize, workers);
+                publishFlushSeconds, fetchSize, workers,
+                persistDir, persistCheckpointMinIntervalSeconds);
     }
 
     @Override
@@ -270,6 +336,9 @@ public final class EngineConfig {
                 + ", queryTimeoutSeconds=" + queryTimeoutSeconds
                 + ", publishFlushSeconds=" + publishFlushSeconds
                 + ", fetchSize=" + fetchSize
-                + ", workers=" + workers + "]";
+                + ", workers=" + workers
+                + ", persistDir=" + persistDir
+                + ", persistCheckpointMinIntervalSeconds=" + persistCheckpointMinIntervalSeconds
+                + "]";
     }
 }

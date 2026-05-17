@@ -6,6 +6,7 @@ import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanSkillDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.db.sync.engine.persist.NoopSnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
 import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
@@ -279,6 +280,7 @@ class CdcEngineE2ETest {
                 mappings,
                 new TestcontainerJdbcSource(),
                 new SnapshotStore(),
+                NoopSnapshotPersistence.INSTANCE,
                 config,
                 topicResolver,
                 publisher,

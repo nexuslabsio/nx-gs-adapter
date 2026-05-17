@@ -3,11 +3,9 @@ package app.l2nx.gs.db.sync.engine;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.OptionalLong;
+import java.util.*;
 
 /**
  * In-memory primitive-keyed CRC32 snapshot, one {@link Long2IntOpenHashMap} per
@@ -152,6 +150,77 @@ public final class SnapshotStore {
             return OptionalLong.empty();
         }
         return OptionalLong.of(cacheOf(entityName, map).max(map));
+    }
+
+    /**
+     * Snapshot of entity names currently tracked. Stable (copy-on-read) so callers
+     * can iterate without worrying about a concurrent {@link #clearEntity} reshuffle.
+     */
+    public Set<String> entityNames() {
+        return new LinkedHashSet<String>(byEntity.keySet());
+    }
+
+    /**
+     * Streaming iteration over all (pk, crc) entries for one entity. No-op when
+     * the entity is unknown. Iteration order is unspecified.
+     *
+     * <p>Uses fastutil's {@code fastIterator()} — the entry view is reused
+     * across the loop, so a 6.5M-entry dump allocates zero {@code Entry}
+     * instances instead of 6.5M.</p>
+     */
+    public void forEachEntry(String entityName, EntryConsumer consumer) {
+        Long2IntOpenHashMap map = byEntity.get(entityName);
+        if (map == null || map.isEmpty()) {
+            return;
+        }
+        ObjectIterator<Long2IntMap.Entry> it = map.long2IntEntrySet().fastIterator();
+        while (it.hasNext()) {
+            Long2IntMap.Entry e = it.next();
+            consumer.accept(e.getLongKey(), e.getIntValue());
+        }
+    }
+
+    /**
+     * Streaming bulk-load entry point. Returns a {@link Loader} the caller
+     * fills via {@link Loader#put(long, int)} and finalizes via
+     * {@link Loader#commit()} once the source is fully decoded; if the source
+     * fails mid-decode the loader is simply abandoned — partial state never
+     * reaches the live store.
+     */
+    public Loader newLoader(String entityName, int sizeHint) {
+        Long2IntOpenHashMap fresh = new Long2IntOpenHashMap(sizeHint);
+        fresh.defaultReturnValue(Phase1Hasher.MISSING_HASH);
+        return new Loader(this, entityName, fresh);
+    }
+
+    @FunctionalInterface
+    public interface EntryConsumer {
+        void accept(long pk, int crc);
+    }
+
+    public static final class Loader {
+        private final SnapshotStore parent;
+        private final String entityName;
+        private final Long2IntOpenHashMap fresh;
+
+        private Loader(SnapshotStore parent, String entityName, Long2IntOpenHashMap fresh) {
+            this.parent = parent;
+            this.entityName = entityName;
+            this.fresh = fresh;
+        }
+
+        public void put(long pk, int crc) {
+            fresh.put(pk, crc);
+        }
+
+        public int size() {
+            return fresh.size();
+        }
+
+        public void commit() {
+            parent.byEntity.put(entityName, fresh);
+            parent.extremeCache.remove(entityName);
+        }
     }
 
     public void clearEntity(String entityName) {

@@ -334,7 +334,7 @@ per-entity state via heartbeat enrichment).
   **All global engine config keys (MVP):**
 
   | Key                                              | Type           | Default                            |
-              |--------------------------------------------------|----------------|------------------------------------|
+                  |--------------------------------------------------|----------------|------------------------------------|
   | `l2nx.cdc-engine.tick-interval-seconds`          | long, seconds  | 60                                 |
   | `l2nx.cdc-engine.rows-per-window`                | int            | 500_000 (cap 10_000_000)           |
   | `l2nx.cdc-engine.query-timeout-seconds`          | int, seconds   | 10                                 |
@@ -500,16 +500,18 @@ per-entity state via heartbeat enrichment).
   (static, restart to change); the config topic feature is deferred until a real ops
   case demands per-entity dynamic tuning.
 
-- [todo] R18. **Persisted snapshot cache (post-MVP).** The in-memory snapshot
-  (R4) could be periodically dumped to disk so that a host-JVM restart does not
-  trigger a full initial-sync replay (R7) for every entity. On engine start, the
-  cache would be loaded if present, validated against the current schema/CRC32 of
-  hashed columns (mismatch → discard and full resync), then merged into the active
-  snapshot. Trade-offs to evaluate during the dedicated slice: hash invalidation
-  policy on schema-provider version bump, cache file location vs container
-  ephemeral filesystems, fsync cadence vs IO impact, corruption recovery, multi-JVM
-  cohabitation on the same host. Out of MVP scope — see Decisions in tech.md for
-  the analysis.
+- [done] R18. **Persisted snapshot cache.** The in-memory snapshot (R4)
+  is periodically dumped to disk so a host-JVM restart does not trigger a
+  full initial-sync replay (R7), and — more critically — so DELETE events
+  fire for rows removed from the host DB while the adapter was offline
+  (otherwise the next cycle's diff against an empty snapshot classifies
+  everything as CREATE and orphan rows linger forever in `nx-gameservers`).
+  Implemented as the [`snapshot-persistence`](../snapshot-persistence/spec.md)
+  feature — see that spec for requirements, edge cases, and the file
+  format. Operationally: two knobs in the same `l2nx.cdc-engine.*`
+  namespace — `persist.dir` (default `nx-cdc-snapshot`) and
+  `persist.checkpoint-min-interval-seconds` (default 300s). Feature is
+  always on; there is no disable flag.
 
 **Non-goals:**
 
@@ -546,11 +548,12 @@ per-entity state via heartbeat enrichment).
 - **Cycle ordering by row count** — engine processes mappings in the order returned
   by `provider.mappings()`. Engine does NOT sort by observed row count or do
   "small-entities-first" reordering. Provider authors arrange the list manually.
-- **Persistent snapshot store (in MVP)** — MVP snapshots are heap-only and lost on
-  JVM restart. Cold start replays every entity as initial sync (R7). A 12M-row
-  initial sync is acceptable bursty cost on rare reboots. Persisting snapshots is
-  tracked as R18 (post-MVP) — see Decisions in tech.md for the feasibility analysis
-  (cache file format, schema-version invalidation, fsync cadence).
+- **Real-time durability of the freshest mutations** — the snapshot
+  cache (R18) writes per-entity at most every
+  `persist.checkpoint-min-interval-seconds` (default 5 min). A crash within
+  that window loses the last few cycles' advance; the next cycle's Phase-1
+  diff re-detects via the live DB scan, not via a WAL replay. Not a real-
+  time durability ledger.
 - **Hash function alternatives** — CRC32 is hardcoded. CRC64 / xxHash / SHA would expand
   the hash domain at the cost of doubled RAM (R4) and require client-side computation
   (defeating Phase 1's "MySQL computes hashes server-side" advantage). See Decisions in

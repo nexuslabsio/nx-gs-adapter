@@ -4,6 +4,7 @@ import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
 import app.l2nx.gs.commons.concurrent.DaemonThreadFactory;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
+import app.l2nx.gs.db.sync.engine.persist.SnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
 import app.l2nx.gs.db.sync.engine.publish.SyncEventPublisher;
@@ -33,6 +34,7 @@ public final class CdcEngine {
     private final List<EntityMapping<?>> mappings;
     private final JdbcConnectionSource jdbcSource;
     private final SnapshotStore snapshot;
+    private final SnapshotPersistence persistence;
     private final EngineConfig config;
     private final TopicResolver topicResolver;
     private final SyncEventPublisher publisher;
@@ -55,6 +57,7 @@ public final class CdcEngine {
                      List<? extends EntityMapping<?>> mappings,
                      JdbcConnectionSource jdbcSource,
                      SnapshotStore snapshot,
+                     SnapshotPersistence persistence,
                      EngineConfig config,
                      TopicResolver topicResolver,
                      SyncEventPublisher publisher,
@@ -67,6 +70,7 @@ public final class CdcEngine {
         this.mappings = Collections.unmodifiableList(new ArrayList<EntityMapping<?>>(mappings));
         this.jdbcSource = jdbcSource;
         this.snapshot = snapshot;
+        this.persistence = persistence;
         this.config = config;
         this.topicResolver = topicResolver;
         this.publisher = publisher;
@@ -83,6 +87,13 @@ public final class CdcEngine {
             return;
         }
         ConfigResolutionLogger.log(log, config, mappings, topicResolver, configOverrideSource);
+
+        try {
+            persistence.load(snapshot);
+        } catch (Throwable t) {
+            log.warn("SnapshotPersistence.load threw {}: {} — starting with empty snapshot",
+                    t.getClass().getName(), t.getMessage());
+        }
 
         int poolSize = resolvePoolSize(config.workers(), mappings.size());
         ScheduledThreadPoolExecutor pool = new ScheduledThreadPoolExecutor(
@@ -170,6 +181,12 @@ public final class CdcEngine {
         try {
             CycleResult result = task.runCycle();
             statsTracker.recordCycleResult(entity, result);
+            try {
+                persistence.checkpoint(entity, snapshot);
+            } catch (Throwable persistError) {
+                log.warn("SnapshotPersistence.checkpoint({}) threw {}: {}",
+                        entity, persistError.getClass().getName(), persistError.getMessage());
+            }
         } finally {
             ticking.set(false);
         }
@@ -216,6 +233,18 @@ public final class CdcEngine {
         scheduler = null;
         tasks.clear();
         slotsByEntity.clear();
+        try {
+            persistence.flushAll(snapshot);
+        } catch (Throwable t) {
+            log.warn("SnapshotPersistence.flushAll threw {}: {} — shutdown continues",
+                    t.getClass().getName(), t.getMessage());
+        }
+        try {
+            persistence.close();
+        } catch (Throwable t) {
+            log.warn("SnapshotPersistence.close threw {}: {}",
+                    t.getClass().getName(), t.getMessage());
+        }
         snapshot.clearAll();
         log.info("CdcEngine stopped");
     }

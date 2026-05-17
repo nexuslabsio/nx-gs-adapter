@@ -42,6 +42,11 @@ public final class ConfigResolutionLogger {
                 tag(overrideSource, EngineConfig.KEY_QUERY_TIMEOUT_SECONDS),
                 effective.publishFlushSeconds(),
                 tag(overrideSource, EngineConfig.KEY_PUBLISH_FLUSH_SECONDS));
+        log.info("cdc-engine persist: dir={} {}, checkpointMinInterval={}s {}",
+                effective.persistDir(),
+                tag(overrideSource, EngineConfig.KEY_PERSIST_DIR),
+                effective.persistCheckpointMinIntervalSeconds(),
+                tag(overrideSource, EngineConfig.KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS));
 
         if (mappings == null || mappings.isEmpty()) {
             log.warn("cdc-engine entities: <none> — DbSchemaProvider returned no mappings");

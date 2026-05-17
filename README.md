@@ -100,14 +100,23 @@ keys unset — the adapter will reuse the host's existing pool.
 keys from the same source chain (file-first, sysprop fallback). All have sane defaults
 sized for a 12M-row items table:
 
-| Key                                          | Default                          | Purpose                                                           |
-|----------------------------------------------|----------------------------------|-------------------------------------------------------------------|
-| `l2nx.cdc-engine.tick-interval-seconds`      | `60`                             | Cycle period per entity                                           |
-| `l2nx.cdc-engine.rows-per-window`            | `500000`                         | PK-window size; large entities split into multiple windows        |
-| `l2nx.cdc-engine.query-timeout-seconds`      | `10`                             | Per-statement JDBC timeout                                        |
-| `l2nx.cdc-engine.publish-flush-seconds`      | `5`                              | End-of-cycle Kafka-ack wait budget; failed PKs replay             |
-| `l2nx.cdc-engine.workers`                    | `max(2, min(entities, cores/2))` | Shared engine pool size (replaces thread-per-entity)              |
-| `l2nx.cdc-engine.fetch-size`                 | `10000`                          | JDBC fetch-size hint (Postgres cursor batch; MySQL auto-uses streaming) |
+| Key                                                       | Default                          | Purpose                                                                    |
+|-----------------------------------------------------------|----------------------------------|----------------------------------------------------------------------------|
+| `l2nx.cdc-engine.tick-interval-seconds`                   | `60`                             | Cycle period per entity                                                    |
+| `l2nx.cdc-engine.rows-per-window`                         | `500000`                         | PK-window size; large entities split into multiple windows                 |
+| `l2nx.cdc-engine.query-timeout-seconds`                   | `10`                             | Per-statement JDBC timeout                                                 |
+| `l2nx.cdc-engine.publish-flush-seconds`                   | `5`                              | End-of-cycle Kafka-ack wait budget; failed PKs replay                      |
+| `l2nx.cdc-engine.workers`                                 | `max(2, min(entities, cores/2))` | Shared engine pool size (replaces thread-per-entity)                       |
+| `l2nx.cdc-engine.fetch-size`                              | `10000`                          | JDBC fetch-size hint (Postgres cursor batch; MySQL auto-uses streaming)    |
+| `l2nx.cdc-engine.persist.dir`                             | `nx-cdc-snapshot`                | Directory for on-disk snapshot cache (relative to JVM cwd unless absolute) |
+| `l2nx.cdc-engine.persist.checkpoint-min-interval-seconds` | `300`                            | Per-entity throttle on snapshot file rewrite                               |
+
+Snapshot persistence is always on — the per-entity PK→CRC32 store is
+periodically flushed to `<persist.dir>/<schemaName>/<entityName>.snap`
+(tmp → fsync → atomic rename) and reloaded on restart so the next cycle's
+diff produces DELETE events for rows removed from the host DB while the
+adapter was offline. A directory-level file lock (`.lock`) refuses a second
+adapter JVM pointed at the same directory.
 
 **Runtime-sync engine tuning (`nx-gs-runtime-sync-core`):**
 

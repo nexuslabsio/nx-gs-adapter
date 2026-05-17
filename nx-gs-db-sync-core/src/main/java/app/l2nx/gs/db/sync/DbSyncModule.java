@@ -5,6 +5,8 @@ import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
 import app.l2nx.gs.adapter.api.spi.*;
 import app.l2nx.gs.db.sync.engine.*;
+import app.l2nx.gs.db.sync.engine.persist.FileSnapshotPersistence;
+import app.l2nx.gs.db.sync.engine.persist.SnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
 import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
@@ -16,6 +18,8 @@ import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
@@ -172,6 +176,7 @@ public final class DbSyncModule implements AdapterModule {
             return;
         }
         try {
+            SqlIdent.validate(p.schemaName(), "DbSchemaProvider.schemaName");
             validateIdentifiers(mappings);
         } catch (IllegalStateException invalidIdentifier) {
             log.error("DbSchemaProvider {} returned an invalid identifier: {}",
@@ -190,11 +195,22 @@ public final class DbSyncModule implements AdapterModule {
         TopicResolver resolver = TopicResolver.fromContext(ctx);
         SyncEventPublisher publisher = new SyncEventPublisher(kafkaSender);
 
+        SnapshotPersistence persistence;
+        try {
+            persistence = buildPersistence(config, p.schemaName());
+        } catch (RuntimeException persistFailure) {
+            log.error("Snapshot persistence init failed ({}: {}) — db-sync FAILED",
+                    persistFailure.getClass().getName(), persistFailure.getMessage());
+            state = STATE_FAILED;
+            return;
+        }
+
         CdcEngine built = new CdcEngine(
                 p.schemaName(),
                 mappings,
                 s,
                 new SnapshotStore(),
+                persistence,
                 config,
                 resolver,
                 publisher,
@@ -299,6 +315,9 @@ public final class DbSyncModule implements AdapterModule {
     static void validateIdentifiers(List<? extends EntityMapping<?>> mappings) {
         for (EntityMapping<?> mapping : mappings) {
             String entity = mapping.entityName();
+            // Validated as a filesystem-safe identifier too — entity name is
+            // interpolated into FileSnapshotPersistence's per-entity file path.
+            SqlIdent.validate(entity, "EntityMapping.entityName");
             PrimarySource<?> primary = mapping.primary();
             SqlIdent.validate(primary.tableName(), "entity '" + entity + "' primary.tableName");
             SqlIdent.validate(primary.pkColumn(), "entity '" + entity + "' primary.pkColumn");
@@ -321,6 +340,15 @@ public final class DbSyncModule implements AdapterModule {
                 }
             }
         }
+    }
+
+    private static SnapshotPersistence buildPersistence(EngineConfig config, String schemaName) {
+        Path schemaDir = Paths.get(config.persistDir()).resolve(schemaName);
+        FileSnapshotPersistence fp = new FileSnapshotPersistence(
+                schemaDir, config.persistCheckpointMinIntervalSeconds());
+        log.info("Snapshot persistence: dir={}, checkpointMinIntervalSeconds={}",
+                schemaDir, config.persistCheckpointMinIntervalSeconds());
+        return fp;
     }
 
     private static boolean performSmokeCheck(JdbcConnectionSource src) {

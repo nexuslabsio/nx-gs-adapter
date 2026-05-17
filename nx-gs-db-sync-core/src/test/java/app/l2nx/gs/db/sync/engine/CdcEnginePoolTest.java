@@ -4,6 +4,7 @@ import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.db.sync.engine.persist.NoopSnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
 import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
@@ -80,6 +81,7 @@ class CdcEnginePoolTest {
                 Arrays.asList(mapping1, mapping2),
                 src,
                 new SnapshotStore(),
+                NoopSnapshotPersistence.INSTANCE,
                 new EngineConfig(1, 500_000, 5, 5, 10_000, 2),
                 topicResolver,
                 new SyncEventPublisher(sender),
