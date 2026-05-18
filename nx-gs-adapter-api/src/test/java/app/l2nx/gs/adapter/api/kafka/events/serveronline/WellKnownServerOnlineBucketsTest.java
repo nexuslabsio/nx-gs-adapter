@@ -15,11 +15,9 @@ class WellKnownServerOnlineBucketsTest {
     @Test
     void constants_shouldUseLowerSnakeCase() {
         assertEquals("total", WellKnownServerOnlineBuckets.TOTAL);
-        assertEquals("online", WellKnownServerOnlineBuckets.ONLINE);
-        assertEquals("real", WellKnownServerOnlineBuckets.REAL);
+        assertEquals("unique", WellKnownServerOnlineBuckets.UNIQUE);
         assertEquals("offline_trade", WellKnownServerOnlineBuckets.OFFLINE_TRADE);
         assertEquals("fishing", WellKnownServerOnlineBuckets.FISHING);
-        assertEquals("phantoms", WellKnownServerOnlineBuckets.PHANTOMS);
     }
 
     @Test
@@ -40,10 +38,8 @@ class WellKnownServerOnlineBucketsTest {
     private static List<String> allConstants() {
         return Arrays.asList(
                 WellKnownServerOnlineBuckets.TOTAL,
-                WellKnownServerOnlineBuckets.ONLINE,
-                WellKnownServerOnlineBuckets.REAL,
+                WellKnownServerOnlineBuckets.UNIQUE,
                 WellKnownServerOnlineBuckets.OFFLINE_TRADE,
-                WellKnownServerOnlineBuckets.FISHING,
-                WellKnownServerOnlineBuckets.PHANTOMS);
+                WellKnownServerOnlineBuckets.FISHING);
     }
 }

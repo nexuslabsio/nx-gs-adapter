@@ -9,17 +9,19 @@ introduced by `events.premiumpurchase`. It carries periodic snapshots of game-se
 population broken down by activity bucket. Wire shape: a single concrete DTO
 `ServerOnlineSnapshotEvent` with a UUIDv7 `eventId` and an open `Map<String, Long>`
 of bucket-key → count entries (lower_snake_case keys, consistent with
-`WellKnownServices`); `WellKnownServerOnlineBuckets` enumerates the canonical
-constants (`total`, `online`, `real`, `offline_trade`, `fishing`,
-`phantoms`). Hosts publish via a single new
-`NxEvents.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)` SPI method. Adapter-core registers the
-binding in `EventTypeRegistry`; the existing `EventsPublisher` /
-`EventEnvelope` machinery handles fanout, headers, and disabled-family
-short-circuiting unchanged. bohpts-core extends its existing
+`WellKnownServices`); `WellKnownServerOnlineBuckets` enumerates four
+canonical constants — `total` and `unique` are required on every snapshot,
+`offline_trade` and `fishing` are optional canonical (host SHOULD publish
+when concept applies). Hosts MAY additionally publish arbitrary
+non-canonical keys (open map). Hosts publish via a single
+`NxEvents.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)` SPI method.
+Adapter-core registers the binding in `EventTypeRegistry`; the existing
+`EventsPublisher` / `EventEnvelope` machinery handles fanout, headers, and
+disabled-family short-circuiting unchanged. bohpts-core extends its existing
 `BohptsEventsModule` (the module that already owns `events.premiumpurchase` wiring)
 to schedule a 30-second snapshot tick (`scheduleAtFixedDelay`) on
 `ThreadPoolManager`, walking `GameObjectsStorage.getPlayers()`, computing
-the six wellknown buckets, and publishing.
+the four canonical buckets, and publishing.
 
 ## Structure
 
@@ -53,10 +55,13 @@ the six wellknown buckets, and publishing.
   null normalizes to `Collections.emptyMap()`. Has a hand-written `Builder`
   with `toBuilder()`. Java-8 source (no records).
 
-- **WellKnownServerOnlineBuckets** (implements R3) — string constants. Doc-only
-  semantics: each constant carries a Javadoc paragraph clarifying the bohpts
+- **WellKnownServerOnlineBuckets** (implements R3) — string constants split
+  into required (`TOTAL`, `UNIQUE`) and optional canonical (`OFFLINE_TRADE`,
+  `FISHING`). Each constant carries a Javadoc paragraph clarifying the bohpts
   reference definition; other forks may reuse the constant with their own
-  bucket-builder logic so long as the operator-facing meaning is consistent.
+  bucket-builder logic so long as the operator-facing meaning is consistent
+  (e.g. `UNIQUE` is "distinct active humans" — the identity tuple is
+  host-defined).
 
 - **NxEvents.publishServerOnlineSnapshot / NxEventsImpl.publishServerOnlineSnapshot** (implements R4, R6) —
   symmetric to `publishPremiumPurchase`. Null event → WARN + drop; missing registry
@@ -89,8 +94,8 @@ the six wellknown buckets, and publishing.
 - **OnlineSnapshotBuilder** — public static facade in the same
   `l2nx.events` package as `PremiumPublisher`. Holds the current
   `NxEvents` handle (volatile). `tick()` iterates the player set on
-  whatever thread `ThreadPoolManager` provides, computes the six
-  wellknown counts in a single pass, builds the event, and publishes.
+  whatever thread `ThreadPoolManager` provides, computes the four
+  canonical counts in a single pass, builds the event, and publishes.
   Wraps the whole tick in `try { ... } catch (Throwable t) { log.debug }`
   for game-loop-safety symmetry with `PremiumPublisher`.
 
@@ -102,9 +107,13 @@ Snapshot tick (host → platform):
 ThreadPoolManager.scheduleAtFixedDelay
   → OnlineSnapshotBuilder.tick()
     → GameObjectsStorage.getPlayers() iteration (single pass)
-      → counters: total++, online++ if !offline, real++ if !fake,
-                  offlineTrade++ if offline, fishing++ if fishing,
-                  phantoms++ if fake
+      → counters: total++ always
+                  offlineTrade++ if isInOfflineMode()
+                  uniqueSet.add(hwid + "|" + ip) if !offline && !fake
+                                                && hwid != "N/A"
+                                                && ip ∉ {"N/A","Disconnected"}
+                  fishing++ if isFishing()
+      → unique = uniqueSet.size()
     → ServerOnlineSnapshotEvent (eventId = UUIDv7.generate(), buckets = Map.of(...))
     → NxEvents.publishServerOnlineSnapshot(event)
       → NxEventsImpl: registry.lookup → publisher.isFamilyEnabled →

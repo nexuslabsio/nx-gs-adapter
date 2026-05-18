@@ -41,7 +41,7 @@ class ServerOnlineSnapshotEventTest {
                 .build();
 
         assertThrows(UnsupportedOperationException.class,
-                () -> event.getBuckets().put(WellKnownServerOnlineBuckets.REAL, 99L));
+                () -> event.getBuckets().put(WellKnownServerOnlineBuckets.UNIQUE, 99L));
     }
 
     @Test
@@ -54,7 +54,7 @@ class ServerOnlineSnapshotEventTest {
                 .buckets(source)
                 .build();
 
-        source.put(WellKnownServerOnlineBuckets.REAL, 95L);
+        source.put(WellKnownServerOnlineBuckets.UNIQUE, 95L);
 
         assertEquals(1, event.getBuckets().size());
         assertEquals(Long.valueOf(100L), event.getBuckets().get(WellKnownServerOnlineBuckets.TOTAL));
@@ -64,11 +64,9 @@ class ServerOnlineSnapshotEventTest {
     void toBuilder_shouldRoundtripAllFields() {
         Map<String, Long> buckets = new LinkedHashMap<String, Long>();
         buckets.put(WellKnownServerOnlineBuckets.TOTAL, 1808L);
-        buckets.put(WellKnownServerOnlineBuckets.ONLINE, 1786L);
-        buckets.put(WellKnownServerOnlineBuckets.REAL, 1711L);
+        buckets.put(WellKnownServerOnlineBuckets.UNIQUE, 1640L);
         buckets.put(WellKnownServerOnlineBuckets.OFFLINE_TRADE, 22L);
         buckets.put(WellKnownServerOnlineBuckets.FISHING, 15L);
-        buckets.put(WellKnownServerOnlineBuckets.PHANTOMS, 75L);
 
         ServerOnlineSnapshotEvent original = ServerOnlineSnapshotEvent.builder()
                 .eventId(UUID.randomUUID())

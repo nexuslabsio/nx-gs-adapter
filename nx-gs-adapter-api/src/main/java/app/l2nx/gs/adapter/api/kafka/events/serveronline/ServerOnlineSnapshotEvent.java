@@ -16,14 +16,19 @@ import java.util.*;
  * (at-least-once delivery) and order within-server by the embedded
  * timestamp.</p>
  *
- * <p>{@link #getBuckets() buckets} is an open map — keys SHOULD be drawn
- * from {@link WellKnownServerOnlineBuckets} where the host has the
- * corresponding concept; arbitrary additional keys are permitted for
- * host-specific buckets. There is no top-level {@code total} field: buckets
- * can overlap (a fishing player typically counts in {@code FISHING},
- * {@code REAL}, and {@code ONLINE}), so the host publishes
- * {@link WellKnownServerOnlineBuckets#TOTAL} as an explicit map entry when
- * it tracks a meaningful total.</p>
+ * <p>{@link #getBuckets() buckets} is an open map. Every snapshot MUST
+ * carry the required canonical keys
+ * {@link WellKnownServerOnlineBuckets#TOTAL} and
+ * {@link WellKnownServerOnlineBuckets#UNIQUE}; hosts SHOULD additionally
+ * publish the optional canonical keys
+ * ({@link WellKnownServerOnlineBuckets#OFFLINE_TRADE},
+ * {@link WellKnownServerOnlineBuckets#FISHING}) when the corresponding
+ * concept applies, and MAY publish arbitrary host-specific keys. There is
+ * no top-level {@code total} field: buckets can overlap (e.g. a fishing
+ * player typically also counts in {@code UNIQUE}), so consumers MUST NOT
+ * derive any total as {@code sum(buckets)} — read the {@code TOTAL} entry
+ * directly. See {@link WellKnownServerOnlineBuckets} for the soft
+ * cross-bucket invariant.</p>
  *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
  * parameter names so Gson can deserialize without {@code @JsonProperty}.</p>

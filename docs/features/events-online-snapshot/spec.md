@@ -44,39 +44,46 @@ plugging in a snapshot-builder.
   ship as the Phase-1 concrete subtype with the following fields:
     - `UUID eventId` — REQUIRED. UUIDv7; the upper 48 bits encode the snapshot
       occurrence timestamp. Platform consumers dedupe on this id.
-    - `@Nullable Map<String, Long> buckets` — bucket-key → count map. Keys
-      SHOULD include constants from `WellKnownServerOnlineBuckets` where the host has
-      the corresponding concept; arbitrary additional keys are allowed for
-      host-specific buckets. Null at the constructor normalizes to an empty
-      map; getter returns an unmodifiable view.
+    - `@Nullable Map<String, Long> buckets` — bucket-key → count map. Every
+      snapshot MUST carry the required canonical keys `TOTAL` and `UNIQUE`;
+      hosts SHOULD additionally publish `OFFLINE_TRADE` / `FISHING` when the
+      concept applies, and MAY publish arbitrary host-specific keys. Null at
+      the constructor normalizes to an empty map; getter returns an
+      unmodifiable view.
 
   No top-level `total` field — buckets can overlap (e.g. a fishing player is
-  also in `REAL` and `ONLINE`), so `TOTAL` cannot be derived as `sum(buckets)`.
-  The host publishes `WellKnownServerOnlineBuckets.TOTAL` as an explicit map entry
-  when it tracks a meaningful total.
+  also in `UNIQUE`), so `TOTAL` cannot be derived as `sum(buckets)`.
+  The host publishes `WellKnownServerOnlineBuckets.TOTAL` as an explicit map
+  entry.
 
   POJO + hand-written Builder + `equals`/`hashCode`/`toString` + Java-8 source.
   Constructor parameter names preserved for Gson `-parameters` deserialization.
 
 - [todo] R3. `nx-gs-adapter-api.kafka.events.serveronline.WellKnownServerOnlineBuckets` MUST
   ship a constants class enumerating the canonical bucket keys observed in
-  L2 game-server forks. Wire values are `lower_snake_case` (consistent with
-  `WellKnownServices`):
-    - `TOTAL` → `"total"` — total player presence (includes offline-trade and
-      phantoms).
-    - `ONLINE` → `"serveronline"` — players actively in the world (excludes
-      offline-trade).
-    - `REAL` → `"real"` — non-phantom human players (the operator's "real
-      audience").
-    - `OFFLINE_TRADE` → `"offline_trade"` — players parked in offline-trade mode.
-    - `FISHING` → `"fishing"` — players currently fishing (typically a subset
-      of `real`).
-    - `PHANTOMS` → `"phantoms"` — bot-driven / fake players (typically
-      `online − real`).
+  L2 game-server forks. The canonical set is intentionally narrow — these
+  are the keys cross-tenant dashboards aggregate on. Wire values are
+  `lower_snake_case` (consistent with `WellKnownServices`):
 
-  Hosts publish whichever subset of these they track; bucket overlap and
-  exclusion semantics are host-defined and documented per host's bucket-builder.
-  Adding a new constant is a non-breaking minor-version change.
+  **Required** (host MUST publish):
+    - `TOTAL` → `"total"` — total character presence (includes offline-trade
+      and phantoms).
+    - `UNIQUE` → `"unique"` — distinct active human players, deduplicated by
+      a host-defined identity tuple (bohpts: HWID + IP among
+      `!isInOfflineMode() && !isFakePlayer()`).
+
+  **Optional canonical** (host SHOULD publish when concept applies;
+  consumers MUST tolerate absence):
+    - `OFFLINE_TRADE` → `"offline_trade"` — players parked in offline-trade mode.
+    - `FISHING` → `"fishing"` — characters currently fishing.
+
+  Hosts MAY publish arbitrary non-canonical keys; the platform treats unknown
+  keys as opaque strings. Adding a new canonical constant is a non-breaking
+  minor-version change.
+
+  Soft invariant when both keys present: `total >= unique + offline_trade`.
+  Consumers MUST NOT reject snapshots that violate it (transient race during
+  the tick walk can produce minor drift).
 
 - [todo] R4. `nx-gs-adapter-api.spi.NxEvents` MUST gain a single new method
   `void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event)` mirroring `publishPremiumPurchase` exactly:
@@ -109,11 +116,20 @@ plugging in a snapshot-builder.
 
   The snapshot-builder iterates `GameObjectsStorage.getPlayers()` once per tick,
   walks every player, applies the bohpts predicates (`isInOfflineMode`,
-  `isFishing`, `isFakePlayer`) and computes the wellknown buckets:
-  `total`, `online`, `real`, `offline_trade`, `fishing`, `phantoms`. Builds
-  `ServerOnlineSnapshotEvent` with UUIDv7 `eventId`, calls
-  `nxEvents.publishServerOnlineSnapshot(event)`. Any uncaught `Throwable` is logged at DEBUG
-  and swallowed — game-loop safety identical to `PremiumPublisher`.
+  `isFishing`, `isFakePlayer`, `getHWID`, `getIPAddress`) and computes the
+  four canonical buckets:
+    - `total` — every player in the iteration (including phantoms and
+      offline-trade).
+    - `unique` — `Set<(hwid, ip)>.size()` accumulated across players where
+      `!isInOfflineMode() && !isFakePlayer()` and both HWID and IP are
+      meaningful (HWID != `"N/A"`, IP != `"N/A"` and != `"Disconnected"`).
+    - `offline_trade` — `isInOfflineMode()`.
+    - `fishing` — `isFishing()` regardless of offline-trade / phantom state.
+
+  Builds `ServerOnlineSnapshotEvent` with UUIDv7 `eventId`, calls
+  `nxEvents.publishServerOnlineSnapshot(event)`. Any uncaught `Throwable` is
+  logged at DEBUG and swallowed — game-loop safety identical to
+  `PremiumPublisher`.
 
   No separate `AdapterModule` registration — `events.serveronline` rides the same
   `bohpts-events` module entry in `META-INF/services` as `events.premiumpurchase`.
@@ -162,9 +178,14 @@ plugging in a snapshot-builder.
 - **Family disabled (platform did not configure `MessagingTopics.events.serveronline`).**
   Adapter logs DEBUG once per call, increments nothing, surfaces via the
   `events.disabled-families` heartbeat slot (existing mechanism).
-- **Buckets overlap.** A fishing player counts toward both `FISHING` and
-  `REAL` and `ONLINE`. `TOTAL` is published as a separate map entry — the
-  consumer never tries to derive it from `sum(buckets)`.
+- **Buckets overlap.** A fishing active player counts toward both `FISHING`
+  and `UNIQUE` and `TOTAL`. `TOTAL` is published as a separate map entry —
+  the consumer never tries to derive it from `sum(buckets)`.
+- **Unidentifiable client.** Active non-phantom player whose `_client` is
+  transiently null (login / logout boundary) reports HWID=`"N/A"` and
+  IP=`"N/A"`. The bucket-builder skips that row from the unique-set entirely
+  rather than collapsing it into a `("N/A","N/A")` sentinel — accuracy of
+  `unique` is more important than reflecting transient login-window state.
 
 ## Open questions
 
@@ -176,6 +197,11 @@ plugging in a snapshot-builder.
   (rejected typed-fields-per-bucket alternative). Allows adding new
   conventional buckets without api releases and accommodates host-specific
   custom buckets without a wire-schema change.]
+- [resolved: canonical set narrowed to `total` / `unique` / `offline_trade` /
+  `fishing` (api/v0.26.0). `online` / `real` / `phantoms` were removed —
+  `unique` (distinct active humans by host-defined identity tuple) carries
+  the operator-facing audience number; hosts that still want phantom counts
+  emit them under custom keys.]
 - [resolved: partition-key = `null` (round-robin). Snapshot cadence is low
   (~one per 30 sec × N servers); ordering preserved per-server via the UUIDv7
   `eventId` timestamp. Consumer groups by `Nx-Server-Id` header.]

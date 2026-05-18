@@ -46,9 +46,12 @@ by the L2NX game-server adapter and its consumers. Published as
       `NxEvents.publishPremiumPurchase(PremiumPurchaseEvent)`.
     - `events.serveronline` — `ServerOnlineSnapshotEvent` (final, UUIDv7
       `eventId` + open `Map<String, Long> buckets`) +
-      `WellKnownServerOnlineBuckets` lower_snake_case constants (`total` /
-      `online` / `real` / `offline_trade` / `fishing` / `phantoms`).
-      Single-event family; periodic snapshots, host-pushed via
+      `WellKnownServerOnlineBuckets` lower_snake_case constants split into
+      required (`total` — full character presence, `unique` — distinct
+      active humans by host-defined identity tuple) and optional canonical
+      (`offline_trade`, `fishing`); hosts MAY publish arbitrary
+      non-canonical keys. Single-event family; periodic snapshots,
+      host-pushed via
       `NxEvents.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)` on
       a host-managed cadence.
     - `events.character` — `CharacterPresenceEvent` (single-event family;

@@ -35,8 +35,9 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   `events.serveronline.ServerOnlineSnapshotEvent` (single-event family;
   periodic population breakdown carrying UUIDv7 `eventId` + open
   `Map<String, Long> buckets` keyed by `WellKnownServerOnlineBuckets`
-  lower_snake_case constants — `total` / `online` / `real` /
-  `offline_trade` / `fishing` / `phantoms`, cadence host-managed);
+  lower_snake_case constants — required `total` / `unique`, optional
+  canonical `offline_trade` / `fishing`; hosts MAY publish arbitrary
+  non-canonical keys; cadence host-managed);
   `events.privatestore` (multi-event family: `PrivateStorePurchaseEvent`
   for closed deals + `PrivateStoreSnapshotEvent` for per-`(itemId, side)`
   order book, with `TradeLine` / `Offer` line types, `PrivateStoreSide`
