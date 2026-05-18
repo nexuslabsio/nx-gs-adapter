@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 
 final class Slf4jNxLog implements NxLog {
 
+    private static final String PREFIX = "[L2NX] ";
+
     private final Logger logger;
 
     Slf4jNxLog(Class<?> clazz) {
@@ -13,21 +15,21 @@ final class Slf4jNxLog implements NxLog {
 
     @Override
     public void debug(String message, Object... args) {
-        logger.debug(message, args);
+        logger.debug(PREFIX + message, args);
     }
 
     @Override
     public void info(String message, Object... args) {
-        logger.info(message, args);
+        logger.info(PREFIX + message, args);
     }
 
     @Override
     public void warn(String message, Object... args) {
-        logger.warn(message, args);
+        logger.warn(PREFIX + message, args);
     }
 
     @Override
     public void error(String message, Object... args) {
-        logger.error(message, args);
+        logger.error(PREFIX + message, args);
     }
 }

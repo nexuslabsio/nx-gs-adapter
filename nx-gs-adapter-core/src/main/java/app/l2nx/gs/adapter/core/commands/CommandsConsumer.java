@@ -306,6 +306,12 @@ public final class CommandsConsumer {
         String messageType = readStringHeader(headers, NxHeaders.NX_MESSAGE_TYPE);
         UUID correlationId = readCorrelationId(headers);
 
+        byte[] value = record.value();
+        String rawJson = (value == null) ? "{}" : new String(value, StandardCharsets.UTF_8);
+
+        log.info("Inbound command received — type={}, corr={}, payload={}",
+                messageType, correlationId, rawJson);
+
         // 1. Resolve binding
         if (messageType == null || messageType.isEmpty()) {
             unsupportedTotal.incrementAndGet();
@@ -334,15 +340,13 @@ public final class CommandsConsumer {
         // 2. Deserialize
         NxCommand<?> command;
         try {
-            byte[] value = record.value();
-            String json = (value == null) ? "{}" : new String(value, StandardCharsets.UTF_8);
-            command = gson.fromJson(json, binding.commandClass());
+            command = gson.fromJson(rawJson, binding.commandClass());
             if (command == null) {
                 throw new JsonSyntaxException("Gson returned null for non-null payload");
             }
         } catch (JsonSyntaxException jse) {
             validationFailedTotal.incrementAndGet();
-            log.warn("Failed to deserialize command type {} (corr={}): {}",
+            log.error("Failed to deserialize command type {} (corr={}): {}",
                     messageType, correlationId, jse.getMessage());
             sendReply(correlationId, replyTypeBytes,
                     CommandResult.error(CommandStatus.VALIDATION_FAILED,

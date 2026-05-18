@@ -7,7 +7,7 @@ import java.time.format.DateTimeFormatter;
 final class ConsoleNxLog implements NxLog {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final String PREFIX = "[Nx]";
+    private static final String PREFIX = "[L2NX]";
 
     private final String name;
 
