@@ -79,7 +79,7 @@ public final class EventsStats {
 
     /**
      * Event families with no topic configured in
-     * {@code MessagingTopics.events} — every {@code NxEvents.publishX(...)}
+     * {@code MessagingTopics.events} — every {@code NxEvents.publish(...)}
      * for these families is a no-op. Empty when all known families are wired.
      */
     public List<String> getDisabledFamilies() {

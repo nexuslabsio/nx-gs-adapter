@@ -39,11 +39,17 @@ by the L2NX game-server adapter and its consumers. Published as
 - `app.l2nx.gs.adapter.api.kafka.events.<family>` — outbound discrete-fact event
   DTOs grouped by family. Single-event families take the concrete type on the
   publish method directly; multi-event families bind on an abstract base and
-  dispatch on the platform via the `Nx-Message-Type` header. Shipped families:
+  dispatch on the platform via the `Nx-Message-Type` header. Host code
+  publishes through a single generic `NxEvents.publish(Object event)` method;
+  the adapter-core `EventTypeRegistry` routes by the runtime class of the
+  payload (family + partition-key extractor + `Nx-Message-Type` header value).
+  Adding a new event type means appending one `register(...)` call there —
+  the SPI surface stays one method regardless of how many families ship.
+  Shipped families:
     - `events.premiumpurchase` — `PremiumPurchaseEvent` (final) +
       `PurchaseItem` / `PurchaseService` / `Payment` + `WellKnownServices`
       constants. Single-event family; per-fact, host-pushed via
-      `NxEvents.publishPremiumPurchase(PremiumPurchaseEvent)`.
+      `NxEvents.publish(...)`. Partition key: `characterId`.
     - `events.serveronline` — `ServerOnlineSnapshotEvent` (final, UUIDv7
       `eventId` + open `Map<String, Long> buckets`) +
       `WellKnownServerOnlineBuckets` lower_snake_case constants split into
@@ -51,9 +57,8 @@ by the L2NX game-server adapter and its consumers. Published as
       active humans by host-defined identity tuple) and optional canonical
       (`offline_trade`, `fishing`); hosts MAY publish arbitrary
       non-canonical keys. Single-event family; periodic snapshots,
-      host-pushed via
-      `NxEvents.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)` on
-      a host-managed cadence.
+      host-pushed via `NxEvents.publish(...)` on a host-managed cadence.
+      Partition key: `null` (round-robin).
     - `events.character` — `CharacterPresenceEvent` (single-event family;
       one event per login / logout, distinguished by the `online: boolean`
       field — `true`=login, `false`=logout). Carries UUIDv7 `eventId`
@@ -68,9 +73,28 @@ by the L2NX game-server adapter and its consumers. Published as
         + `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
           `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
           `WellKnownElements` constants. Multi-event family (no abstract base);
-          both subtypes ride one topic, host-pushed via per-subtype methods
-          `NxEvents.publishPrivateStorePurchase(PrivateStorePurchaseEvent)` /
-          `NxEvents.publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent)`.
+          both subtypes ride one topic, host-pushed via `NxEvents.publish(...)`
+          with the concrete subtype. Partition keys: snapshot → `itemId`,
+          purchase → `null` (round-robin, no single natural per-entity key).
+    - `events.raid` — `RaidKillEvent` (final) + `RaidActor` /
+      `RaidDropItem` sub-DTOs + `RaidBossKind` enum (`RAID` /
+      `GRAND_BOSS` / `INSTANCE_BOSS`). Single-event family; one event per
+      `Attackable.isRaid() && !isRaidMinion()` death. Carries UUIDv7
+      `eventId` (REQUIRED, derive `occurredAt`), `bossNpcId` (REQUIRED,
+      partition key as 8-byte big-endian), `bossKind` (REQUIRED), boss
+      identity (incl. `bossName` until an NPC CDC stream exists), two
+      `@Nullable RaidActor` refs (`lastHit` — final-blow character;
+      `dropOwner` — L2 `mainDamageDealer` with group-first semantics:
+      `partyId` / `commandChannelId` are canonical, `charId` is the
+      unstable representative for narrative only), `participants`
+      (`List<RaidActor>` — damage breakdown from aggro list), `drops`.
+      `RaidActor` carries `charId` + affiliation ids + `damageDealt`;
+      char / clan names are NOT included — platform joins on the
+      character / clan CDC streams. Party / CC identities are
+      `@Nullable UUID` (UUIDv7 minted by the host on group construction,
+      stable across leader changes within the same group instance, reset
+      on disband / restart). Topic retention 7d (rare, high-value
+      analytics events).
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:

@@ -62,7 +62,7 @@ public final class MessagingTopics {
      * Outbound events: family → fully-qualified Kafka topic. Always non-null —
      * {@code freeze()} normalizes a {@code null} constructor argument to an
      * empty map. Empty means no event families are configured (every
-     * {@code NxEvents.publishX(...)} becomes a no-op + DEBUG log).
+     * {@code NxEvents.publish(...)} becomes a no-op + DEBUG log).
      */
     public Map<String, String> getEvents() {
         return events;

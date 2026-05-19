@@ -5,6 +5,8 @@ import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
+import app.l2nx.gs.adapter.api.kafka.events.raid.RaidKillEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.commons.UUIDv7;
 import org.junit.jupiter.api.Test;
@@ -153,5 +155,34 @@ class EventTypeRegistryTest {
     @Test
     void knownFamilies_shouldContainCharacter() {
         assertTrue(new EventTypeRegistry().knownFamilies().contains("character"));
+    }
+
+    @Test
+    void lookup_shouldReturnBinding_forRaidKillEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(RaidKillEvent.class);
+
+        assertNotNull(binding);
+        assertEquals("raid", binding.familyKey());
+        assertEquals("RaidKillEvent", binding.messageType());
+    }
+
+    @Test
+    void partitionKey_shouldEncodeBossNpcId_forRaidKillEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(RaidKillEvent.class);
+        RaidKillEvent event = RaidKillEvent.builder()
+                .eventId(UUIDv7.generate())
+                .bossNpcId(29028)
+                .bossKind(RaidBossKind.GRAND_BOSS)
+                .build();
+
+        byte[] key = binding.partitionKeyExtractor().apply(event);
+
+        assertEquals(8, key.length);
+        assertEquals(29028L, ByteBuffer.wrap(key).getLong());
+    }
+
+    @Test
+    void knownFamilies_shouldContainRaid() {
+        assertTrue(new EventTypeRegistry().knownFamilies().contains("raid"));
     }
 }

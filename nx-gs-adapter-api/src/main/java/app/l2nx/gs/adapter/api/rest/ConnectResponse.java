@@ -100,7 +100,7 @@ public final class ConnectResponse {
     /**
      * Outbound-events / inbound-commands topic addressing. {@code null} (field
      * absent on the wire) means messaging is unconfigured — every
-     * {@code NxEvents.publishX(...)} call becomes a no-op + DEBUG log, and
+     * {@code NxEvents.publish(...)} call becomes a no-op + DEBUG log, and
      * inbound commands (Phase 2) stay disabled.
      */
     public @Nullable MessagingTopics getMessagingTopics() {

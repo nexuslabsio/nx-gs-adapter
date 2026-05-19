@@ -1,20 +1,16 @@
 package app.l2nx.gs.adapter.core.events;
 
-import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
-import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Adapter-core implementation of {@link NxEvents}. Stateless façade — every
- * {@code publishX} method resolves the registered binding for the concrete
- * payload class and enqueues into the shared {@link EventsPublisher}.
+ * Adapter-core implementation of {@link NxEvents}. Stateless façade —
+ * {@link #publish} resolves the registered binding for the concrete payload
+ * class and enqueues into the shared {@link EventsPublisher}.
  *
  * <p>The façade survives reconnect: {@code NxAdapter} caches a single
  * {@code NxEventsImpl} per JVM and calls {@link #swap(EventsPublisher, EventTypeRegistry)}
@@ -47,31 +43,7 @@ final class NxEventsImpl implements NxEvents {
     }
 
     @Override
-    public void publishPremiumPurchase(PremiumPurchaseEvent event) {
-        dispatch(event);
-    }
-
-    @Override
-    public void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event) {
-        dispatch(event);
-    }
-
-    @Override
-    public void publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent event) {
-        dispatch(event);
-    }
-
-    @Override
-    public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
-        dispatch(event);
-    }
-
-    @Override
-    public void publishCharacterPresence(CharacterPresenceEvent event) {
-        dispatch(event);
-    }
-
-    private void dispatch(Object event) {
+    public void publish(@Nullable Object event) {
         if (event == null) {
             log.warn("publish called with null event — dropping");
             return;

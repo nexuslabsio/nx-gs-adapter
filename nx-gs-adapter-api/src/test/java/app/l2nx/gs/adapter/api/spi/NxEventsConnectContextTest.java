@@ -1,10 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import org.junit.jupiter.api.Test;
 
@@ -26,34 +22,13 @@ class NxEventsConnectContextTest {
 
         // No NPE, no throw — and the same singleton across calls.
         assertNotNull(ctx.events());
-        ctx.events().publishPremiumPurchase(stubPurchase());
+        ctx.events().publish(stubPurchase());
     }
 
     @Test
     void events_shouldReturnProvidedImpl_whenBuilderSets() {
-        AtomicReference<PremiumPurchaseEvent> seen = new AtomicReference<PremiumPurchaseEvent>();
-        NxEvents capturing = new NxEvents() {
-            @Override
-            public void publishPremiumPurchase(PremiumPurchaseEvent event) {
-                seen.set(event);
-            }
-
-            @Override
-            public void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event) {
-            }
-
-            @Override
-            public void publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent event) {
-            }
-
-            @Override
-            public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
-            }
-
-            @Override
-            public void publishCharacterPresence(CharacterPresenceEvent event) {
-            }
-        };
+        AtomicReference<Object> seen = new AtomicReference<Object>();
+        NxEvents capturing = event -> seen.set(event);
 
         ConnectContext ctx = ConnectContext.builder()
                 .tenantId(UUID.randomUUID()).tenantSlug("acme")
@@ -63,7 +38,7 @@ class NxEventsConnectContextTest {
                 .build();
 
         PremiumPurchaseEvent event = stubPurchase();
-        ctx.events().publishPremiumPurchase(event);
+        ctx.events().publish(event);
 
         assertSame(event, seen.get());
     }
@@ -79,26 +54,7 @@ class NxEventsConnectContextTest {
                 .serverName("Acme").adapterVersion("0.13.0")
                 .build();
         ConnectContext withCustom = withNoOp.toBuilder()
-                .events(new NxEvents() {
-                    @Override
-                    public void publishPremiumPurchase(PremiumPurchaseEvent event) {
-                    }
-
-                    @Override
-                    public void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event) {
-                    }
-
-                    @Override
-                    public void publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent event) {
-                    }
-
-                    @Override
-                    public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
-                    }
-
-                    @Override
-                    public void publishCharacterPresence(CharacterPresenceEvent event) {
-                    }
+                .events(event -> {
                 })
                 .build();
 

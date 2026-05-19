@@ -4,6 +4,7 @@ import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.raid.RaidKillEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.commons.bytes.LongBytes;
 import org.jspecify.annotations.Nullable;
@@ -51,6 +52,10 @@ final class EventTypeRegistry {
         // Character presence: partition by charId — per-character history ordered.
         register(map, families, CharacterPresenceEvent.class, "character",
                 evt -> LongBytes.bigEndian(((CharacterPresenceEvent) evt).getCharId()));
+
+        // Raid kill: partition by bossNpcId — per-boss kill history (e.g. all Valakas kills) ordered.
+        register(map, families, RaidKillEvent.class, "raid",
+                evt -> LongBytes.bigEndian(((RaidKillEvent) evt).getBossNpcId()));
 
         this.bindings = Collections.unmodifiableMap(map);
         this.familyKeys = Collections.unmodifiableSet(families);

@@ -153,8 +153,10 @@ public final class ConnectContext {
      * Per-family discrete-fact fanout capability. Always non-null — a
      * {@code null} passed to the constructor is normalized to a no-op
      * implementation that swallows every publish call (with a DEBUG log entry).
-     * Phase-3 host code calls {@code ctx.events().publishPremium(event)};
-     * future families add sibling methods to {@link NxEvents}.
+     * Host code calls {@code ctx.events().publish(event)}; the runtime type
+     * of {@code event} routes to the correct family via the adapter-core
+     * type registry. Adding a new event type is a one-line registration —
+     * no SPI change.
      */
     public NxEvents events() {
         return events;

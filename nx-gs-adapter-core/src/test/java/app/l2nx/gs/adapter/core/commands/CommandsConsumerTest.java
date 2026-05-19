@@ -4,11 +4,6 @@ import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandStatus;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
-import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.spi.CommandHandler;
 import app.l2nx.gs.adapter.api.spi.HostExecutorTimeoutException;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
@@ -62,23 +57,7 @@ class CommandsConsumerTest {
 
     static final class FakeNxEvents implements NxEvents {
         @Override
-        public void publishPremiumPurchase(PremiumPurchaseEvent event) {
-        }
-
-        @Override
-        public void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event) {
-        }
-
-        @Override
-        public void publishPrivateStoreSnapshot(PrivateStoreSnapshotEvent event) {
-        }
-
-        @Override
-        public void publishPrivateStorePurchase(PrivateStorePurchaseEvent event) {
-        }
-
-        @Override
-        public void publishCharacterPresence(CharacterPresenceEvent event) {
+        public void publish(Object event) {
         }
     }
 

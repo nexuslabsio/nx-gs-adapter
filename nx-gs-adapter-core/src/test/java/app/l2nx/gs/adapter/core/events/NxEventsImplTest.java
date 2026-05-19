@@ -4,6 +4,8 @@ import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
+import app.l2nx.gs.adapter.api.kafka.events.raid.RaidKillEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.WellKnownServerOnlineBuckets;
 import app.l2nx.gs.commons.UUIDv7;
@@ -31,7 +33,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishPremiumPurchase_shouldEnqueueIntoPublisher() throws InterruptedException {
+    void publish_shouldEnqueuePremiumPurchaseIntoPublisher() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sent = new ConcurrentLinkedQueue<Object>();
         CountDownLatch latch = new CountDownLatch(1);
         EventsPublisher.Sender sender = (record, callback) -> {
@@ -51,15 +53,15 @@ class NxEventsImplTest {
                 .characterId(42L)
                 .build();
 
-        events.publishPremiumPurchase(event);
+        events.publish(event);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPremiumPurchase did not reach sender");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publish(PremiumPurchaseEvent) did not reach sender");
         assertEquals(1, sent.size());
         assertEquals(event, sent.peek());
     }
 
     @Test
-    void publishPremiumPurchase_shouldNoOp_forNullEvent() {
+    void publish_shouldNoOp_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
                 Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"),
@@ -67,21 +69,21 @@ class NxEventsImplTest {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPremiumPurchase(null);
+        events.publish(null);
 
         assertEquals(0, publisher.queueDepth());
         assertEquals(0L, publisher.droppedTotal());
     }
 
     @Test
-    void publishPremiumPurchase_shouldShortCircuit_whenFamilyTopicMissing() {
+    void publish_shouldShortCircuitPremiumPurchase_whenFamilyTopicMissing() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(Collections.emptyMap(),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPremiumPurchase(PremiumPurchaseEvent.builder()
+        events.publish(PremiumPurchaseEvent.builder()
                 .eventId(UUIDv7.generate())
                 .characterId(42L)
                 .build());
@@ -93,7 +95,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishServerOnlineSnapshot_shouldEnqueueIntoPublisher() throws InterruptedException {
+    void publish_shouldEnqueueServerOnlineSnapshotIntoPublisher() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
         // ConcurrentLinkedQueue rejects nulls, so partition-key=null observation
         // is recorded via a flag rather than queueing the byte[].
@@ -117,9 +119,9 @@ class NxEventsImplTest {
                 .buckets(Collections.singletonMap(WellKnownServerOnlineBuckets.TOTAL, 1808L))
                 .build();
 
-        events.publishServerOnlineSnapshot(event);
+        events.publish(event);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishServerOnlineSnapshot did not reach sender");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publish(ServerOnlineSnapshotEvent) did not reach sender");
         assertEquals(1, sentValues.size());
         assertEquals(event, sentValues.peek());
         assertTrue(partitionKeyWasNull.get(),
@@ -127,7 +129,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishServerOnlineSnapshot_shouldNoOp_forNullEvent() {
+    void publish_shouldNoOpServerOnlineSnapshot_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
                 Collections.singletonMap("serveronline", "acme.gs.events.serveronline"),
@@ -135,21 +137,21 @@ class NxEventsImplTest {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishServerOnlineSnapshot(null);
+        events.publish(null);
 
         assertEquals(0, publisher.queueDepth());
         assertEquals(0L, publisher.droppedTotal());
     }
 
     @Test
-    void publishServerOnlineSnapshot_shouldShortCircuit_whenFamilyTopicMissing() {
+    void publish_shouldShortCircuitServerOnlineSnapshot_whenFamilyTopicMissing() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(Collections.emptyMap(),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent.builder()
+        events.publish(ServerOnlineSnapshotEvent.builder()
                 .eventId(UUIDv7.generate())
                 .buckets(Collections.singletonMap(WellKnownServerOnlineBuckets.TOTAL, 1L))
                 .build());
@@ -161,7 +163,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishPrivateStorePurchase_shouldEnqueueRoundRobin() throws InterruptedException {
+    void publish_shouldEnqueuePrivateStorePurchaseRoundRobin() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
         AtomicBoolean partitionKeyWasNull = new AtomicBoolean(false);
         CountDownLatch latch = new CountDownLatch(1);
@@ -184,9 +186,9 @@ class NxEventsImplTest {
                 .sellerId(1L).buyerId(2L)
                 .build();
 
-        events.publishPrivateStorePurchase(event);
+        events.publish(event);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPrivateStorePurchase did not reach sender");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publish(PrivateStorePurchaseEvent) did not reach sender");
         assertEquals(1, sentValues.size());
         assertEquals(event, sentValues.peek());
         assertTrue(partitionKeyWasNull.get(),
@@ -194,7 +196,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishPrivateStoreSnapshot_shouldEnqueuePartitionedByItemId() throws InterruptedException {
+    void publish_shouldEnqueuePrivateStoreSnapshotPartitionedByItemId() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
         ConcurrentLinkedQueue<byte[]> sentKeys = new ConcurrentLinkedQueue<byte[]>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -217,9 +219,9 @@ class NxEventsImplTest {
                 .side(PrivateStoreSide.ASK)
                 .build();
 
-        events.publishPrivateStoreSnapshot(event);
+        events.publish(event);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS), "publishPrivateStoreSnapshot did not reach sender");
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publish(PrivateStoreSnapshotEvent) did not reach sender");
         assertEquals(1, sentValues.size());
         assertEquals(event, sentValues.peek());
         assertArrayEquals(LongBytes.bigEndian(0xCAFEBABEL), sentKeys.peek(),
@@ -227,7 +229,7 @@ class NxEventsImplTest {
     }
 
     @Test
-    void publishPrivateStorePurchase_shouldNoOp_forNullEvent() {
+    void publish_shouldNoOpPrivateStorePurchase_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
                 Collections.singletonMap("privatestore", "acme.gs.events.privatestore"),
@@ -235,14 +237,14 @@ class NxEventsImplTest {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPrivateStorePurchase(null);
+        events.publish(null);
 
         assertEquals(0, publisher.queueDepth());
         assertEquals(0L, publisher.droppedTotal());
     }
 
     @Test
-    void publishPrivateStoreSnapshot_shouldNoOp_forNullEvent() {
+    void publish_shouldNoOpPrivateStoreSnapshot_forNullEvent() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(
                 Collections.singletonMap("privatestore", "acme.gs.events.privatestore"),
@@ -250,24 +252,92 @@ class NxEventsImplTest {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPrivateStoreSnapshot(null);
+        events.publish(null);
 
         assertEquals(0, publisher.queueDepth());
         assertEquals(0L, publisher.droppedTotal());
     }
 
     @Test
-    void publishPrivateStorePurchase_shouldShortCircuit_whenFamilyTopicMissing() {
+    void publish_shouldShortCircuitPrivateStorePurchase_whenFamilyTopicMissing() {
         EventTypeRegistry registry = new EventTypeRegistry();
         publisher = new EventsPublisher(Collections.emptyMap(),
                 (r, c) -> {
                 }, cfg(5, 0L), registry);
 
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
-        events.publishPrivateStorePurchase(PrivateStorePurchaseEvent.builder()
+        events.publish(PrivateStorePurchaseEvent.builder()
                 .eventId(UUIDv7.generate())
                 .storeType(PrivateStoreSide.ASK)
                 .sellerId(1L).buyerId(2L)
+                .build());
+
+        assertEquals(0, publisher.queueDepth(),
+                "disabled family must not enqueue an envelope");
+        assertEquals(0L, publisher.droppedTotal(),
+                "disabled family must not count toward dropped-total");
+    }
+
+    @Test
+    void publish_shouldEnqueueRaidKillPartitionedByBossNpcId() throws InterruptedException {
+        ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
+        ConcurrentLinkedQueue<byte[]> sentKeys = new ConcurrentLinkedQueue<byte[]>();
+        CountDownLatch latch = new CountDownLatch(1);
+        EventsPublisher.Sender sender = (record, callback) -> {
+            sentValues.add(record.value());
+            sentKeys.add(record.key());
+            callback.onCompletion(null, null);
+            latch.countDown();
+        };
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("raid", "acme.gs.events.raid"),
+                sender, cfg(50, 500L), registry);
+        publisher.start();
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        RaidKillEvent event = RaidKillEvent.builder()
+                .eventId(UUIDv7.generate())
+                .bossNpcId(29028)
+                .bossKind(RaidBossKind.GRAND_BOSS)
+                .build();
+
+        events.publish(event);
+
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "publish(RaidKillEvent) did not reach sender");
+        assertEquals(1, sentValues.size());
+        assertEquals(event, sentValues.peek());
+        assertArrayEquals(LongBytes.bigEndian(29028L), sentKeys.peek(),
+                "raid-kill event must be keyed by bossNpcId as 8 big-endian bytes");
+    }
+
+    @Test
+    void publish_shouldNoOpRaidKill_forNullEvent() {
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(
+                Collections.singletonMap("raid", "acme.gs.events.raid"),
+                (r, c) -> {
+                }, cfg(5, 0L), registry);
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        events.publish(null);
+
+        assertEquals(0, publisher.queueDepth());
+        assertEquals(0L, publisher.droppedTotal());
+    }
+
+    @Test
+    void publish_shouldShortCircuitRaidKill_whenFamilyTopicMissing() {
+        EventTypeRegistry registry = new EventTypeRegistry();
+        publisher = new EventsPublisher(Collections.emptyMap(),
+                (r, c) -> {
+                }, cfg(5, 0L), registry);
+
+        NxEventsImpl events = new NxEventsImpl(publisher, registry);
+        events.publish(RaidKillEvent.builder()
+                .eventId(UUIDv7.generate())
+                .bossNpcId(29028)
+                .bossKind(RaidBossKind.GRAND_BOSS)
                 .build());
 
         assertEquals(0, publisher.queueDepth(),
@@ -294,7 +364,7 @@ class NxEventsImplTest {
         NxEventsImpl events = new NxEventsImpl(publisher, registry1);
 
         // Old publisher receives the first event.
-        events.publishPremiumPurchase(PremiumPurchaseEvent.builder()
+        events.publish(PremiumPurchaseEvent.builder()
                 .eventId(UUIDv7.generate()).characterId(1L).build());
         assertTrue(latch1.await(2, TimeUnit.SECONDS));
         assertEquals(1, captured1.size());
@@ -316,7 +386,7 @@ class NxEventsImplTest {
         events.swap(next, registry2);
         publisher = next; // ensure tearDown stops it
 
-        events.publishPremiumPurchase(PremiumPurchaseEvent.builder()
+        events.publish(PremiumPurchaseEvent.builder()
                 .eventId(UUIDv7.generate()).characterId(2L).build());
 
         assertTrue(latch2.await(2, TimeUnit.SECONDS), "swapped publisher did not receive event");
