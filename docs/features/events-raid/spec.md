@@ -144,11 +144,10 @@ host-side authors hooking raid-death paths.
 
 - [todo] R9. The new Kafka topic `bohpts.gs.events.raid` MUST be documented
   in `nx-infra/komodo/l2nx/prod-kafka/tenants/bohpts.md` with 2 partitions,
-  replication factor 1, retention 604_800_000 ms (7 days). Retention extends
-  beyond the platform-wide 3h default because raid kills are scarce, high-value
-  business events that consumers may need to replay during incident recovery —
-  losing one Antharas kill because a downstream consumer was offline for an
-  hour is unacceptable.
+  replication factor 1, retention 10_800_000 ms (3 hours) matching the
+  platform-wide default for event topics. Long-term persistence is a
+  consumer-side concern (TSDB / PostgreSQL / etc.); the Kafka topic only
+  acts as a short-term replay buffer.
 
 - [todo] R10. `bohpts-core` MUST extend `l2e.gameserver.l2nx.events.BohptsEventsModule`
   to bind a new `RaidKillPublisher` static facade alongside the existing

@@ -93,8 +93,8 @@ by the L2NX game-server adapter and its consumers. Published as
       character / clan CDC streams. Party / CC identities are
       `@Nullable UUID` (UUIDv7 minted by the host on group construction,
       stable across leader changes within the same group instance, reset
-      on disband / restart). Topic retention 7d (rare, high-value
-      analytics events).
+      on disband / restart). Topic retention 3h (platform default for
+      event topics; long-term persistence is consumer-side).
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:
