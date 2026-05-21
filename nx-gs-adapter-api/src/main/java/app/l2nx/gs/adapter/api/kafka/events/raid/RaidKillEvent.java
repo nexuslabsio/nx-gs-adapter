@@ -37,10 +37,14 @@ import java.util.*;
  *   {@code null} when no resolvable player damager (admin kill, instant
  *   kill with empty aggro list).</li>
  *   <li>{@link #getParticipants() participants} — one
- *   {@code RaidActor} per character with non-zero accumulated damage on
- *   the aggro list. Producers SHOULD emit sorted by
+ *   {@code RaidActor} per character who took part in the kill. A character
+ *   qualifies via the host aggro list (damage <em>or</em> hate accrued —
+ *   the latter covers healers / tanks / aggro-skill users who never landed
+ *   their own damage) <em>or</em> via Party / CommandChannel membership of
+ *   any aggro-list contributor (covers pure buffers grouped with the actual
+ *   fighters). Producers SHOULD emit sorted by
  *   {@link RaidActor#getDamageDealt() damageDealt} desc as a consumer
- *   convenience.</li>
+ *   convenience — support entries (damage=0) park at the tail.</li>
  * </ul></p>
  *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
@@ -144,9 +148,11 @@ public final class RaidKillEvent {
 
     /**
      * Per-character contribution records — one {@link RaidActor} per
-     * character with non-zero damage on the host aggro list. Always
-     * non-null on read; {@code null} passed to the constructor is
-     * normalized to an empty list.
+     * character who fought the raid. Includes everyone with damage or
+     * hate on the aggro list plus their Party / CommandChannel teammates
+     * (supports who buffed without engaging directly). Always non-null on
+     * read; {@code null} passed to the constructor is normalized to an
+     * empty list.
      */
     public List<RaidActor> getParticipants() {
         return participants;

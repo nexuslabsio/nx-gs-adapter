@@ -4,7 +4,7 @@ plugins {
     signing
 }
 
-version = findProperty("${project.name}.version") as String? ?: "0.28.0"
+version = findProperty("${project.name}.version") as String? ?: "0.29.0"
 
 java {
     withSourcesJar()

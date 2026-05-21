@@ -68,9 +68,15 @@ host-side authors hooking raid-death paths.
     - `List<RaidActor> participants` — REQUIRED, may be empty (raid
       killed without aggro accrual — degenerate but possible via instant-kill
       admin commands). Each entry is the same `RaidActor` shape used for
-      `lastHit` / `dropOwner`, with `damageDealt > 0`. Ordering not enforced
-      on wire; producers SHOULD emit sorted by `damageDealt` desc as a
-      convenience.
+      `lastHit` / `dropOwner`. Participation = any player on the aggro list
+      with `damage > 0` OR `hate > 0` (captures healers / tanks /
+      aggro-skill users who never landed damage themselves), unioned with
+      Party / CommandChannel members of those players (covers pure buffers
+      grouped with the actual fighters). Multiple aggro entries for the
+      same character (main attacks + summon) are aggregated — one
+      `RaidActor` per `charId`, damage summed across entries. Ordering not
+      enforced on wire; producers SHOULD emit sorted by `damageDealt` desc
+      as a convenience — support entries (damage=0) park at the tail.
     - `List<RaidDropItem> drops` — REQUIRED, may be empty (raid configured
       without drops, or all drops auto-looted before the recorder caught them).
 
@@ -93,10 +99,11 @@ host-side authors hooking raid-death paths.
     - `@Nullable UUID commandChannelId` — UUIDv7 CC identity, same
       lifecycle rules as `partyId`.
     - `long damageDealt` — REQUIRED. Accumulated damage from the host aggro
-      list. {@code >= 0}; {@code 0} is valid for actor refs reached via
-      `lastHit` (KS final blow with prior damage by others, GM kill) but
-      participants list MUST NOT contain `damageDealt == 0` entries (those
-      would be pure noise).
+      list (summed across main + summon entries for the same character).
+      `>= 0`; `0` is a valid edge — surfaces healers / tanks /
+      aggro-skill users (hate-only on the aggro list), Party / CC
+      teammates added by group extension (pure buffers), and `lastHit`
+      KS-style final blows where prior damage came from others.
 
   POJO + Builder. No top-level damage-share-percent field — consumer trivially
   derives `damageDealt / sum(participants.damageDealt)` per event.
