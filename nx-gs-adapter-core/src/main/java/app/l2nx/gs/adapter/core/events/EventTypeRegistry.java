@@ -1,9 +1,15 @@
 package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
+import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
+import app.l2nx.gs.adapter.api.kafka.events.mail.MailCancelledEvent;
+import app.l2nx.gs.adapter.api.kafka.events.mail.MailReturnedEvent;
+import app.l2nx.gs.adapter.api.kafka.events.mail.MailSentEvent;
+import app.l2nx.gs.adapter.api.kafka.events.olympiad.OlympiadMatchResultEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.privatetrade.PrivateTradeFinishedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.raid.RaidKillEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.commons.bytes.LongBytes;
@@ -34,28 +40,31 @@ final class EventTypeRegistry {
         Map<Class<?>, EventTypeBinding> map = new HashMap<>();
         Set<String> families = new LinkedHashSet<>();
 
+        // Partition key extractor returns null = round-robin (no natural per-entity key).
         register(map, families, PremiumPurchaseEvent.class, "premiumpurchase",
                 evt -> LongBytes.bigEndian(((PremiumPurchaseEvent) evt).getCharacterId()));
-
-        // Snapshots have no natural per-entity partition key; null → round-robin,
-        // consumers group/order by Nx-Server-Id header + UUIDv7 eventId.
         register(map, families, ServerOnlineSnapshotEvent.class, "serveronline",
                 evt -> null);
-
-        // Purchase: two parties, no single natural key → round-robin.
         register(map, families, PrivateStorePurchaseEvent.class, "privatestore",
                 evt -> null);
-        // Snapshot: partition by itemId — order book per item lands on one partition.
         register(map, families, PrivateStoreSnapshotEvent.class, "privatestore",
                 evt -> LongBytes.bigEndian(((PrivateStoreSnapshotEvent) evt).getItemId()));
-
-        // Character presence: partition by charId — per-character history ordered.
         register(map, families, CharacterPresenceEvent.class, "character",
                 evt -> LongBytes.bigEndian(((CharacterPresenceEvent) evt).getCharId()));
-
-        // Raid kill: partition by bossNpcId — per-boss kill history (e.g. all Valakas kills) ordered.
         register(map, families, RaidKillEvent.class, "raid",
                 evt -> LongBytes.bigEndian(((RaidKillEvent) evt).getBossNpcId()));
+        register(map, families, MailSentEvent.class, "mail",
+                evt -> LongBytes.bigEndian(((MailSentEvent) evt).getMailId()));
+        register(map, families, MailAcceptedEvent.class, "mail",
+                evt -> LongBytes.bigEndian(((MailAcceptedEvent) evt).getMailId()));
+        register(map, families, MailCancelledEvent.class, "mail",
+                evt -> LongBytes.bigEndian(((MailCancelledEvent) evt).getMailId()));
+        register(map, families, MailReturnedEvent.class, "mail",
+                evt -> LongBytes.bigEndian(((MailReturnedEvent) evt).getMailId()));
+        register(map, families, PrivateTradeFinishedEvent.class, "privatetrade",
+                evt -> null);
+        register(map, families, OlympiadMatchResultEvent.class, "olympiad",
+                evt -> LongBytes.bigEndian(((OlympiadMatchResultEvent) evt).getCharId()));
 
         this.bindings = Collections.unmodifiableMap(map);
         this.familyKeys = Collections.unmodifiableSet(families);

@@ -190,6 +190,9 @@ class EventsPublisherTest {
         topics.put("privatestore", "acme.gs.events.privatestore");
         topics.put("character", "acme.gs.events.character");
         topics.put("raid", "acme.gs.events.raid");
+        topics.put("mail", "acme.gs.events.mail");
+        topics.put("privatetrade", "acme.gs.events.privatetrade");
+        topics.put("olympiad", "acme.gs.events.olympiad");
         publisher = new EventsPublisher(topics, noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
 
         ModuleStatus status = publisher.currentStatus();

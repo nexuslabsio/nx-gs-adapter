@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
+import app.l2nx.gs.adapter.api.domain.item.ItemAttribute;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -12,63 +13,63 @@ import static org.junit.jupiter.api.Assertions.*;
 class OfferTest {
 
     @Test
-    void getElementalAttrs_shouldReturnEmptyMap_whenBuilderOmits() {
+    void getAttributes_shouldReturnEmptyMap_whenBuilderOmits() {
         Offer offer = Offer.builder()
                 .traderId(42L).count(1L).unitPrice(100L).currencyItemId(57L)
                 .build();
 
-        assertTrue(offer.getElementalAttrs().isEmpty());
+        assertTrue(offer.getAttributes().isEmpty());
     }
 
     @Test
-    void getElementalAttrs_shouldReturnEmptyMap_whenBuilderPassesNull() {
+    void getAttributes_shouldReturnEmptyMap_whenBuilderPassesNull() {
         Offer offer = Offer.builder()
-                .traderId(42L).elementalAttrs(null)
+                .traderId(42L).attributes(null)
                 .count(1L).unitPrice(100L).currencyItemId(57L)
                 .build();
 
-        assertTrue(offer.getElementalAttrs().isEmpty());
+        assertTrue(offer.getAttributes().isEmpty());
     }
 
     @Test
-    void getElementalAttrs_shouldBeUnmodifiable() {
-        Map<String, Integer> source = new HashMap<String, Integer>();
-        source.put(WellKnownElements.FIRE, 300);
+    void getAttributes_shouldBeUnmodifiable() {
+        Map<ItemAttribute, Integer> source = new HashMap<ItemAttribute, Integer>();
+        source.put(ItemAttribute.FIRE, 300);
 
         Offer offer = Offer.builder()
-                .traderId(42L).elementalAttrs(source)
+                .traderId(42L).attributes(source)
                 .count(1L).unitPrice(100L).currencyItemId(57L)
                 .build();
 
         assertThrows(UnsupportedOperationException.class,
-                () -> offer.getElementalAttrs().put(WellKnownElements.WATER, 150));
+                () -> offer.getAttributes().put(ItemAttribute.WATER, 150));
     }
 
     @Test
-    void constructor_shouldDefensivelyCopyElementalAttrs() {
-        Map<String, Integer> source = new HashMap<String, Integer>();
-        source.put(WellKnownElements.FIRE, 300);
+    void constructor_shouldDefensivelyCopyAttributes() {
+        Map<ItemAttribute, Integer> source = new HashMap<ItemAttribute, Integer>();
+        source.put(ItemAttribute.FIRE, 300);
 
         Offer offer = Offer.builder()
-                .traderId(42L).elementalAttrs(source)
+                .traderId(42L).attributes(source)
                 .count(1L).unitPrice(100L).currencyItemId(57L)
                 .build();
 
-        source.put(WellKnownElements.WATER, 150);
+        source.put(ItemAttribute.WATER, 150);
 
-        assertEquals(1, offer.getElementalAttrs().size());
-        assertEquals(Integer.valueOf(300), offer.getElementalAttrs().get(WellKnownElements.FIRE));
+        assertEquals(1, offer.getAttributes().size());
+        assertEquals(Integer.valueOf(300), offer.getAttributes().get(ItemAttribute.FIRE));
     }
 
     @Test
     void toBuilder_shouldRoundtripAllFields() {
-        Map<String, Integer> attrs = new LinkedHashMap<String, Integer>();
-        attrs.put(WellKnownElements.FIRE, 300);
+        Map<ItemAttribute, Integer> attrs = new LinkedHashMap<ItemAttribute, Integer>();
+        attrs.put(ItemAttribute.FIRE, 300);
 
         Offer original = Offer.builder()
                 .traderId(268437521L)
                 .enchantLevel(8)
-                .elementalAttrs(attrs)
+                .attributes(attrs)
                 .count(2L)
                 .unitPrice(50_000_000L)
                 .currencyItemId(57L)
@@ -90,14 +91,14 @@ class OfferTest {
     }
 
     @Test
-    void equals_shouldDistinguishElementalAttrs() {
+    void equals_shouldDistinguishAttributes() {
         Offer a = Offer.builder()
                 .traderId(1L).count(1L).unitPrice(100L).currencyItemId(57L)
-                .elementalAttrs(Collections.singletonMap(WellKnownElements.FIRE, 300))
+                .attributes(Collections.singletonMap(ItemAttribute.FIRE, 300))
                 .build();
         Offer b = Offer.builder()
                 .traderId(1L).count(1L).unitPrice(100L).currencyItemId(57L)
-                .elementalAttrs(Collections.singletonMap(WellKnownElements.FIRE, 301))
+                .attributes(Collections.singletonMap(ItemAttribute.FIRE, 301))
                 .build();
 
         assertNotEquals(a, b);

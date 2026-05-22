@@ -4,7 +4,7 @@ plugins {
     signing
 }
 
-version = findProperty("${project.name}.version") as String? ?: "0.6.1"
+version = findProperty("${project.name}.version") as String? ?: "0.7.0"
 
 java {
     withSourcesJar()
@@ -22,6 +22,7 @@ repositories {
 
 dependencies {
     api(libs.jspecify)
+    api(project(":nx-gs-adapter-api"))
 
     // :nx-gs-log is shadow-included into the published jar — not exposed as a Maven dep.
     compileOnly(project(":nx-gs-log"))
