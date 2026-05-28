@@ -1,7 +1,7 @@
 package app.l2nx.gs.adapter.core;
 
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
-import app.l2nx.gs.adapter.api.rest.KafkaConfig;
+import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.core.kafka.CapturingKafkaFactory;
@@ -106,7 +106,7 @@ class SyncTopicsWiringTest {
                 .serverId(UUID.randomUUID())
                 .serverSlug("acme-x1")
                 .serverName("Acme X1")
-                .kafka(KafkaConfig.builder().bootstrap("k:9092").build())
+                .kafka(KafkaCredentials.builder().bootstrap("k:9092").build())
                 .heartbeatTopic("acme.gs.heartbeat")
                 .syncTopics(syncTopics)
                 .build();

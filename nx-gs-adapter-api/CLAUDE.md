@@ -18,7 +18,8 @@ by the L2NX game-server adapter and its consumers. Published as
 ## Package layout
 
 - `app.l2nx.gs.adapter.api.rest` — REST request/response DTOs (`ConnectRequest`,
-  `ConnectResponse`, `KafkaConfig`, `SyncTopics`, `MessagingTopics`)
+  `ConnectResponse`, `LoginServerConnectResponse`, `KafkaCredentials`, `SyncTopics`,
+  `MessagingTopics`)
 - `app.l2nx.gs.adapter.api.kafka` — Kafka message payloads + header contract
   (`HeartbeatEvent`, `NxHeaders`)
 - `app.l2nx.gs.adapter.api.kafka.sync.db.<entity>` — per-entity wire DTOs for

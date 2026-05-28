@@ -1,6 +1,9 @@
 package app.l2nx.gs.adapter.core.connect;
 
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
+import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
+import app.l2nx.gs.adapter.api.rest.MessagingTopics;
+import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import app.l2nx.gs.adapter.core.concurrent.CapturingScheduler;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.AdapterConfigFixtures;
@@ -22,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ConnectFlowTest {
 
-    private static final String CONNECT_PATH = "/api/tenants/servers/connect";
+    private static final String CONNECT_PATH = "/api/tenants/gameservers/connect";
 
     private static final String VALID_CONNECT_RESPONSE = "{"
             + "\"tenantId\":\"00000000-0000-0000-0000-000000000001\","
@@ -60,8 +63,7 @@ class ConnectFlowTest {
     private ConnectFlow newFlow() {
         AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
         return new ConnectFlow(
-                cfg,
-                new HttpURLConnectionConnectClient(),
+                new GameServerConnectFlow(cfg),
                 new DefaultBackoffSchedule(),
                 scheduler,
                 outcomes::add);
@@ -149,8 +151,7 @@ class ConnectFlowTest {
         wireMock.stop();
 
         AdapterConfig cfg = AdapterConfigFixtures.enabled(baseUrl);
-        ConnectFlow flow = new ConnectFlow(cfg,
-                new HttpURLConnectionConnectClient(),
+        ConnectFlow flow = new ConnectFlow(new GameServerConnectFlow(cfg),
                 new DefaultBackoffSchedule(),
                 scheduler,
                 outcomes::add);
@@ -192,10 +193,10 @@ class ConnectFlowTest {
 
     @Test
     void buildUrl_shouldStripTrailingSlash() {
-        assertEquals("https://acme.api.l2nx.app/api/tenants/servers/connect",
-                ConnectFlow.buildUrl("https://acme.api.l2nx.app/"));
-        assertEquals("https://acme.api.l2nx.app/api/tenants/servers/connect",
-                ConnectFlow.buildUrl("https://acme.api.l2nx.app"));
+        assertEquals("https://acme.api.l2nx.app/api/tenants/gameservers/connect",
+                ConnectFlow.buildUrl("https://acme.api.l2nx.app/", "/api/tenants/gameservers/connect"));
+        assertEquals("https://acme.api.l2nx.app/api/tenants/gameservers/connect",
+                ConnectFlow.buildUrl("https://acme.api.l2nx.app", "/api/tenants/gameservers/connect"));
     }
 
     @Test
@@ -230,10 +231,9 @@ class ConnectFlowTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody(body)));
 
-        AtomicReference<ConnectResponse> captured = new AtomicReference<ConnectResponse>();
+        AtomicReference<HostConnectFlow<?>> captured = new AtomicReference<HostConnectFlow<?>>();
         AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
-        ConnectFlow flow = new ConnectFlow(cfg,
-                new HttpURLConnectionConnectClient(),
+        ConnectFlow flow = new ConnectFlow(new GameServerConnectFlow(cfg),
                 new DefaultBackoffSchedule(),
                 scheduler,
                 outcomes::add,
@@ -241,7 +241,9 @@ class ConnectFlowTest {
         flow.run();
 
         assertEquals(Collections.singletonList(ConnectFlow.Outcome.STARTING), outcomes);
-        ConnectResponse response = captured.get();
+        HostConnectFlow<?> active = captured.get();
+        assertNotNull(active);
+        ConnectResponse response = (ConnectResponse) active.response();
         assertNotNull(response);
         Map<String, String> expectedDb = new HashMap<String, String>();
         expectedDb.put("clan", "bohpts.gs.sync.db.clan");
@@ -260,17 +262,18 @@ class ConnectFlowTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_CONNECT_RESPONSE)));
 
-        AtomicReference<ConnectResponse> captured = new AtomicReference<ConnectResponse>();
+        AtomicReference<HostConnectFlow<?>> captured = new AtomicReference<HostConnectFlow<?>>();
         AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
-        ConnectFlow flow = new ConnectFlow(cfg,
-                new HttpURLConnectionConnectClient(),
+        ConnectFlow flow = new ConnectFlow(new GameServerConnectFlow(cfg),
                 new DefaultBackoffSchedule(),
                 scheduler,
                 outcomes::add,
                 captured::set);
         flow.run();
 
-        ConnectResponse response = captured.get();
+        HostConnectFlow<?> active = captured.get();
+        assertNotNull(active);
+        ConnectResponse response = (ConnectResponse) active.response();
         assertNotNull(response);
         assertNull(response.getSyncTopics());
         assertEquals("tenants.heartbeat", response.getHeartbeatTopic());
@@ -292,17 +295,18 @@ class ConnectFlowTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody(body)));
 
-        AtomicReference<ConnectResponse> captured = new AtomicReference<ConnectResponse>();
+        AtomicReference<HostConnectFlow<?>> captured = new AtomicReference<HostConnectFlow<?>>();
         AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
-        ConnectFlow flow = new ConnectFlow(cfg,
-                new HttpURLConnectionConnectClient(),
+        ConnectFlow flow = new ConnectFlow(new GameServerConnectFlow(cfg),
                 new DefaultBackoffSchedule(),
                 scheduler,
                 outcomes::add,
                 captured::set);
         flow.run();
 
-        ConnectResponse response = captured.get();
+        HostConnectFlow<?> active = captured.get();
+        assertNotNull(active);
+        ConnectResponse response = (ConnectResponse) active.response();
         assertNotNull(response);
         assertNotNull(response.getSyncTopics());
         assertTrue(response.getSyncTopics().getDb().isEmpty());
@@ -312,9 +316,8 @@ class ConnectFlowTest {
 
     @Test
     void run_shouldNotPropagate_whenAttemptThrows() {
-        AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
-        ConnectFlow flow = new ConnectFlow(cfg,
-                new ThrowingConnectClient(),
+        ConnectFlow flow = new ConnectFlow(
+                new ThrowingHostConnectFlow(),
                 new DefaultBackoffSchedule(),
                 scheduler,
                 outcomes::add);
@@ -333,8 +336,7 @@ class ConnectFlowTest {
         java.util.concurrent.ScheduledExecutorService rejecting = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
         rejecting.shutdownNow();
         AdapterConfig cfg = AdapterConfigFixtures.enabled(wireMock.baseUrl());
-        ConnectFlow flow = new ConnectFlow(cfg,
-                new HttpURLConnectionConnectClient(),
+        ConnectFlow flow = new ConnectFlow(new GameServerConnectFlow(cfg),
                 new DefaultBackoffSchedule(),
                 rejecting,
                 outcomes::add);
@@ -348,11 +350,65 @@ class ConnectFlowTest {
                 ConnectFlow.Outcome.FAILED), outcomes);
     }
 
-    private static final class ThrowingConnectClient implements ConnectClient {
+    private static final class ThrowingHostConnectFlow implements HostConnectFlow<ConnectResponse> {
         @Override
-        public ConnectResult connect(String url, String serverKey,
-                                     app.l2nx.gs.adapter.api.rest.ConnectRequest body) {
-            throw new RuntimeException("simulated client bug");
+        public TypedConnectOutcome<ConnectResponse> connect() {
+            throw new RuntimeException("simulated flow bug");
+        }
+
+        @Override
+        public String connectPath() {
+            return "/throwing";
+        }
+
+        @Override
+        public ConnectResponse response() {
+            return null;
+        }
+
+        @Override
+        public String heartbeatTopic() {
+            return null;
+        }
+
+        @Override
+        public MessagingTopics topics() {
+            return null;
+        }
+
+        @Override
+        public SyncTopics syncTopics() {
+            return null;
+        }
+
+        @Override
+        public UUID serverId() {
+            return null;
+        }
+
+        @Override
+        public UUID tenantId() {
+            return null;
+        }
+
+        @Override
+        public String tenantSlug() {
+            return null;
+        }
+
+        @Override
+        public String serverSlug() {
+            return null;
+        }
+
+        @Override
+        public String serverName() {
+            return null;
+        }
+
+        @Override
+        public KafkaCredentials kafka() {
+            return null;
         }
     }
 }

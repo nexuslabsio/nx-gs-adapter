@@ -1,7 +1,7 @@
 package app.l2nx.gs.adapter.core.kafka;
 
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
-import app.l2nx.gs.adapter.api.rest.KafkaConfig;
+import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.kafka.KafkaState;
 import org.junit.jupiter.api.Test;
 
@@ -16,8 +16,8 @@ class KafkaInitializerTest {
 
     private static final UUID SERVER_ID = UUID.fromString("01997e26-1000-7000-8000-000000000001");
 
-    private static KafkaConfig kafkaConfig(String user, String password) {
-        return KafkaConfig.builder()
+    private static KafkaCredentials kafkaCredentials(String user, String password) {
+        return KafkaCredentials.builder()
                 .bootstrap("kafka.l2nx.app:9092")
                 .securityProtocol("SASL_SSL")
                 .saslMechanism("SCRAM-SHA-256")
@@ -35,7 +35,7 @@ class KafkaInitializerTest {
                 NxHeaders.NX_SERVER_ID, NxHeaders.encodeUuid(SERVER_ID));
 
         KafkaState result = init.init(
-                kafkaConfig("acme-x1-user", "p@ss"),
+                kafkaCredentials("acme-x1-user", "p@ss"),
                 "nx-gs-adapter-acme-acme-x1",
                 staticHeaders,
                 listener);
@@ -62,7 +62,7 @@ class KafkaInitializerTest {
         CapturingKafkaFactory factory = new CapturingKafkaFactory();
         KafkaInitializer init = new KafkaInitializer(factory);
 
-        init.init(kafkaConfig("u", "p"), "client-id", Collections.emptyMap(), s -> {
+        init.init(kafkaCredentials("u", "p"), "client-id", Collections.emptyMap(), s -> {
         });
 
         assertNotNull(factory.capturedStaticHeaders);
@@ -75,7 +75,7 @@ class KafkaInitializerTest {
         factory.postBuildState = KafkaState.DISCONNECTED;
         KafkaInitializer init = new KafkaInitializer(factory);
 
-        KafkaState result = init.init(kafkaConfig("user", "pass"),
+        KafkaState result = init.init(kafkaCredentials("user", "pass"),
                 "nx-gs-adapter-acme-acme-x1", Collections.emptyMap(), state -> {
                 });
 

@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.core.commands;
 
-import app.l2nx.gs.adapter.api.rest.KafkaConfig;
+import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.adapter.api.rest.MessagingTopics;
 import app.l2nx.gs.adapter.api.spi.HostExecutor;
 import app.l2nx.gs.adapter.api.spi.NxCommands;
@@ -59,7 +59,7 @@ public final class CommandsBootstrap {
      */
     public static @Nullable CommandsConsumer swap(NxCommands facade,
                                                   @Nullable MessagingTopics messagingTopics,
-                                                  KafkaConfig kafka,
+                                                  KafkaCredentials kafka,
                                                   String clientIdBase,
                                                   String groupId,
                                                   UUID ownServerId,
@@ -115,7 +115,7 @@ public final class CommandsBootstrap {
      *                        {@link CommandsConfig#defaults()} when {@code null}.
      */
     public static Started start(@Nullable MessagingTopics messagingTopics,
-                                KafkaConfig kafka,
+                                KafkaCredentials kafka,
                                 String clientIdBase,
                                 String groupId,
                                 UUID ownServerId,
@@ -133,7 +133,7 @@ public final class CommandsBootstrap {
     }
 
     private static @Nullable CommandsConsumer buildConsumer(@Nullable MessagingTopics messagingTopics,
-                                                            KafkaConfig kafka,
+                                                            KafkaCredentials kafka,
                                                             String clientIdBase,
                                                             String groupId,
                                                             UUID ownServerId,
@@ -189,7 +189,7 @@ public final class CommandsBootstrap {
         return consumer;
     }
 
-    private static Map<String, Object> buildConsumerConfig(KafkaConfig kafka,
+    private static Map<String, Object> buildConsumerConfig(KafkaCredentials kafka,
                                                            String clientIdBase,
                                                            String groupId,
                                                            CommandsConfig config) {

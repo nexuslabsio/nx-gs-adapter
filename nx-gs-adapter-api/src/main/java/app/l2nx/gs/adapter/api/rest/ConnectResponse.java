@@ -12,7 +12,7 @@ import java.util.UUID;
  * surface.
  *
  * @see ConnectRequest
- * @see KafkaConfig
+ * @see KafkaCredentials
  * @see SyncTopics
  * @see MessagingTopics
  */
@@ -23,7 +23,7 @@ public final class ConnectResponse {
     private final UUID serverId;
     private final String serverSlug;
     private final String serverName;
-    private final KafkaConfig kafka;
+    private final KafkaCredentials kafka;
     private final @Nullable String heartbeatTopic;
     private final @Nullable SyncTopics syncTopics;
     private final @Nullable MessagingTopics messagingTopics;
@@ -33,7 +33,7 @@ public final class ConnectResponse {
                            UUID serverId,
                            String serverSlug,
                            String serverName,
-                           KafkaConfig kafka,
+                           KafkaCredentials kafka,
                            @Nullable String heartbeatTopic,
                            @Nullable SyncTopics syncTopics,
                            @Nullable MessagingTopics messagingTopics) {
@@ -73,7 +73,7 @@ public final class ConnectResponse {
         return serverName;
     }
 
-    public KafkaConfig getKafka() {
+    public KafkaCredentials getKafka() {
         return kafka;
     }
 
@@ -165,7 +165,7 @@ public final class ConnectResponse {
         private UUID serverId;
         private String serverSlug;
         private String serverName;
-        private KafkaConfig kafka;
+        private KafkaCredentials kafka;
         private @Nullable String heartbeatTopic;
         private @Nullable SyncTopics syncTopics;
         private @Nullable MessagingTopics messagingTopics;
@@ -195,7 +195,7 @@ public final class ConnectResponse {
             return this;
         }
 
-        public Builder kafka(KafkaConfig kafka) {
+        public Builder kafka(KafkaCredentials kafka) {
             this.kafka = kafka;
             return this;
         }

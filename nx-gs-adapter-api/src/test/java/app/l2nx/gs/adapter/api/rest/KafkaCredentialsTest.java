@@ -5,11 +5,11 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class KafkaConfigTest {
+class KafkaCredentialsTest {
 
     @Test
     void toString_shouldRedactSaslPassword() {
-        KafkaConfig kafka = KafkaConfig.builder()
+        KafkaCredentials kafka = KafkaCredentials.builder()
                 .bootstrap("kafka.l2nx.online:9094")
                 .securityProtocol("SASL_SSL")
                 .saslMechanism("SCRAM-SHA-512")

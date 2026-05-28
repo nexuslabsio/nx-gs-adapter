@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.core.events;
 
+import app.l2nx.gs.adapter.api.kafka.events.account.AccountAuthAttemptEvent;
+import app.l2nx.gs.adapter.api.kafka.events.account.AuthOutcomes;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailCancelledEvent;
@@ -344,5 +346,53 @@ class EventTypeRegistryTest {
     @Test
     void knownFamilies_shouldContainOlympiad() {
         assertTrue(new EventTypeRegistry().knownFamilies().contains("olympiad"));
+    }
+
+    @Test
+    void lookup_shouldReturnBinding_forAccountAuthAttemptEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(AccountAuthAttemptEvent.class);
+
+        assertNotNull(binding);
+        assertEquals("account", binding.familyKey());
+        assertEquals("AccountAuthAttemptEvent", binding.messageType());
+    }
+
+    @Test
+    void partitionKey_shouldEncodeLowercasedAccountNameAsUtf8_forAccountAuthAttemptEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(AccountAuthAttemptEvent.class);
+        AccountAuthAttemptEvent event = AccountAuthAttemptEvent.builder()
+                .eventId(UUIDv7.generate().toString())
+                .serverId(UUIDv7.generate().toString())
+                .accountName("Olya")
+                .clientIp("10.0.0.1")
+                .outcome(AuthOutcomes.SUCCESS)
+                .attemptedAt(Instant.parse("2026-06-01T12:00:00Z"))
+                .build();
+
+        byte[] key = binding.partitionKeyExtractor().apply(event);
+
+        assertArrayEquals("olya".getBytes(java.nio.charset.StandardCharsets.UTF_8), key);
+    }
+
+    @Test
+    void partitionKey_shouldPreserveNonAsciiAccountName_forAccountAuthAttemptEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(AccountAuthAttemptEvent.class);
+        AccountAuthAttemptEvent event = AccountAuthAttemptEvent.builder()
+                .eventId(UUIDv7.generate().toString())
+                .serverId(UUIDv7.generate().toString())
+                .accountName("Олья")
+                .clientIp("10.0.0.1")
+                .outcome(AuthOutcomes.SUCCESS)
+                .attemptedAt(Instant.parse("2026-06-01T12:00:00Z"))
+                .build();
+
+        byte[] key = binding.partitionKeyExtractor().apply(event);
+
+        assertArrayEquals("олья".getBytes(java.nio.charset.StandardCharsets.UTF_8), key);
+    }
+
+    @Test
+    void knownFamilies_shouldContainAccount() {
+        assertTrue(new EventTypeRegistry().knownFamilies().contains("account"));
     }
 }

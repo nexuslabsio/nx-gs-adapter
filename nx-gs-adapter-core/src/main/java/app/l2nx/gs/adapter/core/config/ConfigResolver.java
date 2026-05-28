@@ -45,9 +45,15 @@ public final class ConfigResolver {
     private static final String CONFIG_FILE_KEY = "l2nx.config-file";
 
     static final String KEY_SERVER_KEY = "l2nx.gs-key";
+    static final String KEY_LS_KEY = "l2nx.ls-key";
+    static final String KEY_HOST_TYPE = "l2nx.host-type";
     static final String KEY_PLATFORM_URL = "l2nx.platform-url";
     static final String KEY_ENABLED = "l2nx.enabled";
     static final String KEY_IO_WORKERS = "l2nx.io.workers";
+
+    static final String HOST_TYPE_GS = "gs";
+    static final String HOST_TYPE_LS = "ls";
+    static final String DEFAULT_HOST_TYPE = HOST_TYPE_GS;
 
     static final String KEY_KAFKA_BATCH_SIZE = "l2nx.kafka.producer.batch.size";
     static final String KEY_KAFKA_LINGER_MS = "l2nx.kafka.producer.linger.ms";
@@ -89,7 +95,8 @@ public final class ConfigResolver {
     }
 
     public AdapterConfig resolve() {
-        String serverKey = resolveServerKey();
+        String hostType = resolveHostType();
+        String serverKey = resolveServerKey(hostType);
         String platformUrl = resolvePlatformUrl();
         String adapterVersion = resolveAdapterVersion();
         boolean enabled = resolveEnabled();
@@ -98,7 +105,28 @@ public final class ConfigResolver {
         EventsConfig events = resolveEventsConfig();
         CommandsConfig commands = resolveCommandsConfig();
         return new AdapterConfig(serverKey, platformUrl, adapterVersion, enabled,
-                ioWorkers, kafkaProducerOverrides, events, commands);
+                ioWorkers, kafkaProducerOverrides, events, commands, hostType);
+    }
+
+    /**
+     * Host-type — selects which connect endpoint the adapter targets and
+     * which server-key property name is required. Values: {@code gs} (game
+     * server) or {@code ls} (login server). Defaults to {@code gs} for
+     * back-compat with existing deployments that pre-date the host-type
+     * config key.
+     */
+    public String resolveHostType() {
+        Optional<String> raw = resolveString(KEY_HOST_TYPE);
+        if (!raw.isPresent()) {
+            return DEFAULT_HOST_TYPE;
+        }
+        String value = raw.get().trim().toLowerCase(Locale.ROOT);
+        if (!HOST_TYPE_GS.equals(value) && !HOST_TYPE_LS.equals(value)) {
+            throw new IllegalStateException(
+                    "Invalid value for '" + KEY_HOST_TYPE + "': '" + raw.get()
+                            + "' (expected '" + HOST_TYPE_GS + "' or '" + HOST_TYPE_LS + "')");
+        }
+        return value;
     }
 
     public int resolveIoWorkers() {
@@ -277,11 +305,37 @@ public final class ConfigResolver {
     }
 
     public String resolveServerKey() {
-        String value = resolveString(KEY_SERVER_KEY).orElseThrow(() -> missingValueException(KEY_SERVER_KEY));
+        return resolveServerKey(DEFAULT_HOST_TYPE);
+    }
+
+    /**
+     * Resolve the server key matching the host-type. Validation:
+     * <ul>
+     *   <li>{@code host-type=gs} → exactly {@code l2nx.gs-key} must be
+     *   present; setting {@code l2nx.ls-key} alongside is a fatal
+     *   misconfiguration.</li>
+     *   <li>{@code host-type=ls} → exactly {@code l2nx.ls-key} must be
+     *   present; setting {@code l2nx.gs-key} alongside is a fatal
+     *   misconfiguration.</li>
+     * </ul>
+     */
+    public String resolveServerKey(String hostType) {
+        boolean isGs = HOST_TYPE_GS.equals(hostType);
+        String expectedKey = isGs ? KEY_SERVER_KEY : KEY_LS_KEY;
+        String otherKey = isGs ? KEY_LS_KEY : KEY_SERVER_KEY;
+        boolean otherPresent = resolveString(otherKey).isPresent();
+        if (otherPresent) {
+            throw new IllegalStateException(
+                    "Conflicting server-key configuration for host-type='" + hostType
+                            + "': '" + otherKey + "' must not be set when '"
+                            + KEY_HOST_TYPE + "=" + hostType + "'. Provide '" + expectedKey
+                            + "' only.");
+        }
+        String value = resolveString(expectedKey).orElseThrow(() -> missingValueException(expectedKey));
         if (!value.startsWith(SERVER_KEY_PREFIX) || value.length() != SERVER_KEY_LENGTH) {
             throw new IllegalStateException(
-                    "Invalid server-key format: expected prefix '" + SERVER_KEY_PREFIX
-                            + "' and total length " + SERVER_KEY_LENGTH
+                    "Invalid server-key format for '" + expectedKey + "': expected prefix '"
+                            + SERVER_KEY_PREFIX + "' and total length " + SERVER_KEY_LENGTH
                             + " (got length " + value.length() + ")");
         }
         return value;

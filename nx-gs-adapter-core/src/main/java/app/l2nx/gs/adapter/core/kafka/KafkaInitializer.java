@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.core.kafka;
 
-import app.l2nx.gs.adapter.api.rest.KafkaConfig;
+import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 
 /**
  * Bootstraps the {@code nx-gs-kafka} singleton from a platform-issued
- * {@link KafkaConfig}. The state listener forwarded to the factory drives the
+ * {@link KafkaCredentials}. The state listener forwarded to the factory drives the
  * adapter's {@code ACTIVE ↔ DEGRADED} transitions once the platform handshake
  * has completed.
  *
@@ -52,7 +52,7 @@ public final class KafkaInitializer {
      *                            (e.g. {@code Nx-Server-Id}); may be empty
      * @param stateChangeListener forwarded to {@code NxKafka.onStateChange}
      */
-    public KafkaState init(KafkaConfig kafka,
+    public KafkaState init(KafkaCredentials kafka,
                            String clientId,
                            Map<String, byte[]> staticHeaders,
                            Consumer<KafkaState> stateChangeListener) {

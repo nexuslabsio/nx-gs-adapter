@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ConfigResolverTest {
 
     private static final String VALID_KEY = "nx_sk_abcdefghijklmnopqrstuvwxyz012345"; // 38 chars
+    private static final String VALID_LS_KEY = "nx_sk_lsxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; // 38 chars
     private static final String VALID_PLATFORM_URL = "https://acme.api.l2nx.app";
 
     @Test
@@ -350,6 +351,115 @@ class ConfigResolverTest {
         ConfigResolver resolver = withSysprop("l2nx.io.workers", "0");
 
         assertThrows(IllegalStateException.class, resolver::resolveIoWorkers);
+    }
+
+    @Test
+    void resolveHostType_shouldDefaultToGs_whenAbsent() {
+        ConfigResolver resolver = new ConfigResolver(empty(), new Properties());
+
+        assertEquals("gs", resolver.resolveHostType());
+    }
+
+    @Test
+    void resolveHostType_shouldAcceptLs() {
+        ConfigResolver resolver = withSysprop("l2nx.host-type", "ls");
+
+        assertEquals("ls", resolver.resolveHostType());
+    }
+
+    @Test
+    void resolveHostType_shouldBeCaseInsensitive() {
+        ConfigResolver resolver = withSysprop("l2nx.host-type", "LS");
+
+        assertEquals("ls", resolver.resolveHostType());
+    }
+
+    @Test
+    void resolveHostType_shouldRejectUnknownValue() {
+        ConfigResolver resolver = withSysprop("l2nx.host-type", "dp");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, resolver::resolveHostType);
+        assertTrue(ex.getMessage().contains("l2nx.host-type"));
+        assertTrue(ex.getMessage().contains("dp"));
+    }
+
+    @Test
+    void resolveServerKey_shouldReturnGsKey_whenHostTypeGs() {
+        ConfigResolver resolver = withSysprop("l2nx.gs-key", VALID_KEY);
+
+        assertEquals(VALID_KEY, resolver.resolveServerKey("gs"));
+    }
+
+    @Test
+    void resolveServerKey_shouldReturnLsKey_whenHostTypeLs() {
+        ConfigResolver resolver = withSysprop("l2nx.ls-key", VALID_LS_KEY);
+
+        assertEquals(VALID_LS_KEY, resolver.resolveServerKey("ls"));
+    }
+
+    @Test
+    void resolveServerKey_shouldRejectMismatch_whenGsKeyPresentButHostTypeLs() {
+        Map<String, String> sys = new HashMap<>();
+        sys.put("l2nx.gs-key", VALID_KEY);
+        sys.put("l2nx.ls-key", VALID_LS_KEY);
+        ConfigResolver resolver = new ConfigResolver(sys::get, new Properties());
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> resolver.resolveServerKey("ls"));
+        assertTrue(ex.getMessage().contains("l2nx.gs-key"));
+        assertTrue(ex.getMessage().contains("ls"));
+    }
+
+    @Test
+    void resolveServerKey_shouldRejectMismatch_whenLsKeyPresentButHostTypeGs() {
+        Map<String, String> sys = new HashMap<>();
+        sys.put("l2nx.gs-key", VALID_KEY);
+        sys.put("l2nx.ls-key", VALID_LS_KEY);
+        ConfigResolver resolver = new ConfigResolver(sys::get, new Properties());
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> resolver.resolveServerKey("gs"));
+        assertTrue(ex.getMessage().contains("l2nx.ls-key"));
+        assertTrue(ex.getMessage().contains("gs"));
+    }
+
+    @Test
+    void resolveServerKey_shouldFailMissing_whenLsKeyAbsentAndHostTypeLs() {
+        ConfigResolver resolver = new ConfigResolver(empty(), new Properties());
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> resolver.resolveServerKey("ls"));
+        assertTrue(ex.getMessage().contains("l2nx.ls-key"));
+        assertTrue(ex.getMessage().contains("Missing"));
+    }
+
+    @Test
+    void resolve_shouldPickGsKey_whenHostTypeDefault() {
+        Map<String, String> sys = new HashMap<>();
+        sys.put("l2nx.gs-key", VALID_KEY);
+        sys.put("l2nx.platform-url", VALID_PLATFORM_URL);
+        sys.put("l2nx.enabled", "true");
+        ConfigResolver resolver = new ConfigResolver(sys::get, new Properties());
+
+        AdapterConfig config = resolver.resolve();
+
+        assertEquals("gs", config.getHostType());
+        assertEquals(VALID_KEY, config.getServerKey());
+    }
+
+    @Test
+    void resolve_shouldPickLsKey_whenHostTypeLs() {
+        Map<String, String> sys = new HashMap<>();
+        sys.put("l2nx.host-type", "ls");
+        sys.put("l2nx.ls-key", VALID_LS_KEY);
+        sys.put("l2nx.platform-url", VALID_PLATFORM_URL);
+        sys.put("l2nx.enabled", "true");
+        ConfigResolver resolver = new ConfigResolver(sys::get, new Properties());
+
+        AdapterConfig config = resolver.resolve();
+
+        assertEquals("ls", config.getHostType());
+        assertEquals(VALID_LS_KEY, config.getServerKey());
     }
 
     @Test

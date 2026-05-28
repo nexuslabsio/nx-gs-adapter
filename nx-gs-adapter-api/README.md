@@ -16,8 +16,8 @@ the network between the adapter and any consumer that speaks its protocol.
 ## Contents
 
 - `app.l2nx.gs.adapter.api.rest.*` — REST request / response DTOs (`ConnectRequest`,
-  `ConnectResponse`, `KafkaConfig`, `SyncTopics`, `MessagingTopics` — the wire shape of the
-  adapter handshake)
+  `ConnectResponse`, `LoginServerConnectResponse`, `KafkaCredentials`, `SyncTopics`,
+  `MessagingTopics` — the wire shape of the adapter handshake)
 - `app.l2nx.gs.adapter.api.kafka.*` — Kafka message payloads + header contract (`NxHeaders`),
   per-family event DTOs under `kafka.events.<family>`, inbound command marker
   `kafka.commands.NxCommand` + reply envelope `CommandResult` + `ErrorCode`, operational

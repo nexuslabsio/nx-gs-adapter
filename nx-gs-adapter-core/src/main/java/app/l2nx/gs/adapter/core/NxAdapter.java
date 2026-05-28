@@ -3,7 +3,9 @@ package app.l2nx.gs.adapter.core;
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
+import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.adapter.api.rest.MessagingTopics;
+import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.api.spi.NxCommands;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
@@ -13,9 +15,7 @@ import app.l2nx.gs.adapter.core.commands.CommandsConfig;
 import app.l2nx.gs.adapter.core.commands.CommandsConsumer;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.ConfigResolver;
-import app.l2nx.gs.adapter.core.connect.ConnectFlow;
-import app.l2nx.gs.adapter.core.connect.DefaultBackoffSchedule;
-import app.l2nx.gs.adapter.core.connect.HttpURLConnectionConnectClient;
+import app.l2nx.gs.adapter.core.connect.*;
 import app.l2nx.gs.adapter.core.events.EventsBootstrap;
 import app.l2nx.gs.adapter.core.events.EventsConfig;
 import app.l2nx.gs.adapter.core.events.EventsPublisher;
@@ -182,10 +182,12 @@ public final class NxAdapter {
         KafkaFactory override = kafkaFactoryOverride;
         KafkaFactory factory = override != null ? override : new DefaultKafkaFactory();
         KafkaInitializer kafkaInit = new KafkaInitializer(factory, config.getKafkaProducerOverrides());
-        Consumer<ConnectResponse> onActive = response -> initKafka(kafkaInit, response);
+        HostConnectFlow<?> hostFlow = "ls".equals(config.getHostType())
+                ? new LoginServerConnectFlow(config)
+                : new GameServerConnectFlow(config);
+        Consumer<HostConnectFlow<?>> onActive = active -> initKafka(kafkaInit, active);
         ConnectFlow flow = new ConnectFlow(
-                config,
-                new HttpURLConnectionConnectClient(),
+                hostFlow,
                 new DefaultBackoffSchedule(),
                 scheduler,
                 NxAdapter::handleConnectOutcome,
@@ -343,7 +345,7 @@ public final class NxAdapter {
                 break;
             case ACTIVE:
                 // Reached only when Kafka wiring is skipped (test-only); production goes
-                // through initKafka via onActiveResponse and never emits bare ACTIVE here.
+                // through initKafka via onActiveFlow and never emits bare ACTIVE here.
                 wasActive.set(true);
                 transition(AdapterState.ACTIVE);
                 break;
@@ -363,17 +365,17 @@ public final class NxAdapter {
         }
     }
 
-    private static void initKafka(KafkaInitializer init, ConnectResponse response) {
+    private static void initKafka(KafkaInitializer init, HostConnectFlow<?> active) {
         // Test paths can drive initKafka directly without going through start();
         // prime a small IO pool so ConnectContext.io() and CommandContext.io() are usable.
         if (ioExecutor == null) {
             ioExecutor = createIoExecutor(AdapterConfig.defaultIoWorkers());
         }
-        String clientId = "nx-gs-adapter-" + response.getTenantSlug() + "-" + response.getServerSlug();
-        Map<String, byte[]> staticHeaders = buildStaticHeaders(response.getServerId());
+        String clientId = "nx-gs-adapter-" + active.tenantSlug() + "-" + active.serverSlug();
+        Map<String, byte[]> staticHeaders = buildStaticHeaders(active.serverId());
         KafkaState postBuild;
         try {
-            postBuild = init.init(response.getKafka(), clientId, staticHeaders, NxAdapter::handleKafkaStateChange);
+            postBuild = init.init(active.kafka(), clientId, staticHeaders, NxAdapter::handleKafkaStateChange);
         } catch (Throwable t) {
             log.error("Kafka init failed — adapter degraded: {}", t.getMessage(), t);
             transition(AdapterState.DEGRADED);
@@ -382,29 +384,29 @@ public final class NxAdapter {
 
         // Re-arming on a re-handshake recaptures connectInstant, so uptime is session-scoped.
         HeartbeatService hb = heartbeatService;
-        String heartbeatTopic = response.getHeartbeatTopic();
-        if (hb != null && heartbeatTopic != null && response.getServerId() != null) {
+        String heartbeatTopic = active.heartbeatTopic();
+        if (hb != null && heartbeatTopic != null && active.serverId() != null) {
             try {
-                String tenantId = response.getTenantId() != null ? response.getTenantId().toString() : null;
+                String tenantId = active.tenantId() != null ? active.tenantId().toString() : null;
                 hb.start(
                         tenantId,
-                        response.getTenantSlug(),
-                        response.getServerId().toString(),
-                        response.getServerSlug(),
-                        response.getServerName(),
+                        active.tenantSlug(),
+                        active.serverId().toString(),
+                        active.serverSlug(),
+                        active.serverName(),
                         heartbeatTopic);
             } catch (Throwable t) {
                 log.error("HeartbeatService.start threw {}", t.getClass().getName(), t);
             }
         }
 
-        NxEvents events = startEventsPublisher(response.getMessagingTopics());
+        NxEvents events = startEventsPublisher(active.topics());
         // Group ID lives under the per-tenant prefix so the `User:<tenant>` SCRAM
         // principal's group ACL (prefixed on `<tenant>.`) covers it.
-        String commandsGroupId = response.getTenantSlug() + ".gs.commands." + response.getServerSlug();
+        String commandsGroupId = active.tenantSlug() + ".gs.commands." + active.serverSlug();
         NxSync sync = startSyncFacade();
-        NxCommands commands = startCommandsConsumer(response.getMessagingTopics(),
-                response.getKafka(), clientId, commandsGroupId, response.getServerId(),
+        NxCommands commands = startCommandsConsumer(active.topics(),
+                active.kafka(), clientId, commandsGroupId, active.serverId(),
                 events, sync);
 
         ModuleRegistry registry = moduleRegistry;
@@ -412,13 +414,13 @@ public final class NxAdapter {
             try {
                 registry.discover();
                 ConnectContext ctx = ConnectContext.builder()
-                        .tenantId(response.getTenantId())
-                        .tenantSlug(response.getTenantSlug())
-                        .serverId(response.getServerId())
-                        .serverSlug(response.getServerSlug())
-                        .serverName(response.getServerName())
+                        .tenantId(active.tenantId())
+                        .tenantSlug(active.tenantSlug())
+                        .serverId(active.serverId())
+                        .serverSlug(active.serverSlug())
+                        .serverName(active.serverName())
                         .adapterVersion(adapterVersion)
-                        .syncTopics(response.getSyncTopics())
+                        .syncTopics(active.syncTopics())
                         .events(events)
                         .commands(commands)
                         .io(ioExecutor)
@@ -493,7 +495,7 @@ public final class NxAdapter {
      * {@code commandsTopic} is unconfigured no consumer thread is spawned.
      */
     private static NxCommands startCommandsConsumer(MessagingTopics messagingTopics,
-                                                    app.l2nx.gs.adapter.api.rest.KafkaConfig kafka,
+                                                    KafkaCredentials kafka,
                                                     String clientId,
                                                     String groupId,
                                                     UUID ownServerId,
@@ -718,7 +720,81 @@ public final class NxAdapter {
     }
 
     static void simulateInitKafkaForTesting(KafkaInitializer init, ConnectResponse response) {
-        initKafka(init, response);
+        initKafka(init, new GameServerResponseFlowAdapter(response));
+    }
+
+    /**
+     * Test-only adapter wrapping a fully-built {@link ConnectResponse} as a
+     * {@link HostConnectFlow}. Lets tests exercise the production
+     * {@code initKafka(HostConnectFlow)} path without standing up a real
+     * {@link GameServerConnectFlow} + WireMock.
+     */
+    private static final class GameServerResponseFlowAdapter implements HostConnectFlow<ConnectResponse> {
+        private final ConnectResponse r;
+
+        GameServerResponseFlowAdapter(ConnectResponse r) {
+            this.r = r;
+        }
+
+        @Override
+        public TypedConnectOutcome<ConnectResponse> connect() {
+            return TypedConnectOutcome.ok(r);
+        }
+
+        @Override
+        public String connectPath() {
+            return GameServerConnectFlow.CONNECT_PATH;
+        }
+
+        @Override
+        public ConnectResponse response() {
+            return r;
+        }
+
+        @Override
+        public String heartbeatTopic() {
+            return r.getHeartbeatTopic();
+        }
+
+        @Override
+        public MessagingTopics topics() {
+            return r.getMessagingTopics();
+        }
+
+        @Override
+        public SyncTopics syncTopics() {
+            return r.getSyncTopics();
+        }
+
+        @Override
+        public UUID serverId() {
+            return r.getServerId();
+        }
+
+        @Override
+        public UUID tenantId() {
+            return r.getTenantId();
+        }
+
+        @Override
+        public String tenantSlug() {
+            return r.getTenantSlug();
+        }
+
+        @Override
+        public String serverSlug() {
+            return r.getServerSlug();
+        }
+
+        @Override
+        public String serverName() {
+            return r.getServerName();
+        }
+
+        @Override
+        public KafkaCredentials kafka() {
+            return r.getKafka();
+        }
     }
 
     /**

@@ -15,7 +15,7 @@ class ConnectResponseTest {
                 .tenantId(UUID.randomUUID()).tenantSlug("acme")
                 .serverId(UUID.randomUUID()).serverSlug("primary")
                 .serverName("Acme Primary")
-                .kafka(KafkaConfig.builder().bootstrap("localhost:9092").build())
+                .kafka(KafkaCredentials.builder().bootstrap("localhost:9092").build())
                 .build();
 
         assertNull(response.getSyncTopics());
@@ -66,7 +66,7 @@ class ConnectResponseTest {
                 .tenantId(UUID.randomUUID()).tenantSlug("acme")
                 .serverId(UUID.randomUUID()).serverSlug("primary")
                 .serverName("Acme")
-                .kafka(KafkaConfig.builder().bootstrap("localhost:9092").build())
+                .kafka(KafkaCredentials.builder().bootstrap("localhost:9092").build())
                 .heartbeatTopic("acme.gs.heartbeat")
                 .syncTopics(SyncTopics.builder()
                         .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
@@ -85,7 +85,7 @@ class ConnectResponseTest {
                 .tenantId(UUID.randomUUID()).tenantSlug("acme")
                 .serverId(UUID.randomUUID()).serverSlug("primary")
                 .serverName("Acme")
-                .kafka(KafkaConfig.builder().bootstrap("localhost:9092").build())
+                .kafka(KafkaCredentials.builder().bootstrap("localhost:9092").build())
                 .build();
 
         assertNull(response.getMessagingTopics());

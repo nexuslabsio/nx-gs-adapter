@@ -19,6 +19,12 @@ public final class AdapterConfig {
      */
     public static final int DEFAULT_IO_WORKERS_MIN = 2;
 
+    /**
+     * Default host-type when no {@code l2nx.host-type} is configured —
+     * preserves back-compat for pre-host-type adapter deployments.
+     */
+    public static final String DEFAULT_HOST_TYPE = "gs";
+
     private final String serverKey;
     private final String platformUrl;
     private final String adapterVersion;
@@ -27,11 +33,20 @@ public final class AdapterConfig {
     private final Map<String, Object> kafkaProducerOverrides;
     private final EventsConfig events;
     private final CommandsConfig commands;
+    private final String hostType;
 
     AdapterConfig(String serverKey, String platformUrl, String adapterVersion, boolean enabled,
                   int ioWorkers,
                   Map<String, Object> kafkaProducerOverrides, EventsConfig events,
                   CommandsConfig commands) {
+        this(serverKey, platformUrl, adapterVersion, enabled, ioWorkers,
+                kafkaProducerOverrides, events, commands, DEFAULT_HOST_TYPE);
+    }
+
+    AdapterConfig(String serverKey, String platformUrl, String adapterVersion, boolean enabled,
+                  int ioWorkers,
+                  Map<String, Object> kafkaProducerOverrides, EventsConfig events,
+                  CommandsConfig commands, String hostType) {
         this.serverKey = serverKey;
         this.platformUrl = platformUrl;
         this.adapterVersion = adapterVersion;
@@ -40,6 +55,7 @@ public final class AdapterConfig {
         this.kafkaProducerOverrides = Collections.unmodifiableMap(new LinkedHashMap<>(kafkaProducerOverrides));
         this.events = events != null ? events : EventsConfig.defaults();
         this.commands = commands != null ? commands : CommandsConfig.defaults();
+        this.hostType = hostType != null ? hostType : DEFAULT_HOST_TYPE;
     }
 
     public static int defaultIoWorkers() {
@@ -76,5 +92,14 @@ public final class AdapterConfig {
 
     public CommandsConfig getCommands() {
         return commands;
+    }
+
+    /**
+     * Adapter host-type — {@code gs} (game server) or {@code ls} (login
+     * server). Selects the platform connect endpoint and the expected
+     * server-key property name.
+     */
+    public String getHostType() {
+        return hostType;
     }
 }

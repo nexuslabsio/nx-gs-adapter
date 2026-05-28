@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.events;
 
+import app.l2nx.gs.adapter.api.kafka.events.account.AccountAuthAttemptEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailCancelledEvent;
@@ -15,6 +16,7 @@ import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEve
 import app.l2nx.gs.commons.bytes.LongBytes;
 import org.jspecify.annotations.Nullable;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 
@@ -65,6 +67,12 @@ final class EventTypeRegistry {
                 evt -> null);
         register(map, families, OlympiadMatchResultEvent.class, "olympiad",
                 evt -> LongBytes.bigEndian(((OlympiadMatchResultEvent) evt).getCharId()));
+        // Login-server account auth: partition key is the lowercased account name
+        // so per-account attempt history lands in one partition in occurrence order.
+        register(map, families, AccountAuthAttemptEvent.class, "account",
+                evt -> ((AccountAuthAttemptEvent) evt).getAccountName()
+                        .toLowerCase(Locale.ROOT)
+                        .getBytes(StandardCharsets.UTF_8));
 
         this.bindings = Collections.unmodifiableMap(map);
         this.familyKeys = Collections.unmodifiableSet(families);

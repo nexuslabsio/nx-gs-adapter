@@ -3,14 +3,15 @@ package app.l2nx.gs.adapter.api.rest;
 import java.util.Objects;
 
 /**
- * Kafka credentials and bootstrap addressing returned in {@link ConnectResponse}.
+ * Kafka credentials and bootstrap addressing returned in {@link ConnectResponse} /
+ * {@link LoginServerConnectResponse}.
  *
  * <p>{@code saslPassword} travels in plaintext within this DTO — wire-level confidentiality
  * is the transport's responsibility, not this contract's.</p>
  *
  * <p>{@link #toString()} redacts {@code saslPassword}.</p>
  */
-public final class KafkaConfig {
+public final class KafkaCredentials {
 
     private final String bootstrap;
     private final String securityProtocol;
@@ -18,11 +19,11 @@ public final class KafkaConfig {
     private final String saslUsername;
     private final String saslPassword;
 
-    public KafkaConfig(String bootstrap,
-                       String securityProtocol,
-                       String saslMechanism,
-                       String saslUsername,
-                       String saslPassword) {
+    public KafkaCredentials(String bootstrap,
+                            String securityProtocol,
+                            String saslMechanism,
+                            String saslUsername,
+                            String saslPassword) {
         this.bootstrap = bootstrap;
         this.securityProtocol = securityProtocol;
         this.saslMechanism = saslMechanism;
@@ -66,8 +67,8 @@ public final class KafkaConfig {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof KafkaConfig)) return false;
-        KafkaConfig that = (KafkaConfig) o;
+        if (!(o instanceof KafkaCredentials)) return false;
+        KafkaCredentials that = (KafkaCredentials) o;
         return Objects.equals(bootstrap, that.bootstrap)
                 && Objects.equals(securityProtocol, that.securityProtocol)
                 && Objects.equals(saslMechanism, that.saslMechanism)
@@ -82,7 +83,7 @@ public final class KafkaConfig {
 
     @Override
     public String toString() {
-        return "KafkaConfig[bootstrap=" + bootstrap
+        return "KafkaCredentials[bootstrap=" + bootstrap
                 + ", securityProtocol=" + securityProtocol
                 + ", saslMechanism=" + saslMechanism
                 + ", saslUsername=" + saslUsername
@@ -121,8 +122,8 @@ public final class KafkaConfig {
             return this;
         }
 
-        public KafkaConfig build() {
-            return new KafkaConfig(bootstrap, securityProtocol, saslMechanism, saslUsername, saslPassword);
+        public KafkaCredentials build() {
+            return new KafkaCredentials(bootstrap, securityProtocol, saslMechanism, saslUsername, saslPassword);
         }
     }
 }

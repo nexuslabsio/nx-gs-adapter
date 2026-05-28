@@ -1,8 +1,5 @@
 package app.l2nx.gs.adapter.core.connect;
 
-import app.l2nx.gs.adapter.api.rest.ConnectRequest;
-import app.l2nx.gs.adapter.api.rest.ConnectResponse;
-import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 
@@ -15,8 +12,12 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
- * Drives the {@code POST /api/tenants/servers/connect} lifecycle and emits an
- * {@link Outcome} per logical state transition. Status-code dispatch:
+ * Drives the platform-side connect lifecycle through a host-type-specific
+ * {@link HostConnectFlow} strategy and emits an {@link Outcome} per logical
+ * state transition. The strategy owns the endpoint URL + typed response
+ * deserialization; this class owns retry / backoff / state-machine semantics.
+ *
+ * <p>Status-code dispatch:</p>
  * <ul>
  *   <li>{@code 200} → {@link Outcome#ACTIVE}</li>
  *   <li>{@code 401} → {@link Outcome#FAILED} (terminal, no retry)</li>
@@ -37,7 +38,6 @@ public final class ConnectFlow implements Runnable {
 
     private static final NxLog log = NxLogFactory.getLogger(ConnectFlow.class);
 
-    private static final String CONNECT_PATH = "/api/tenants/servers/connect";
     private static final String CODE_GAME_SERVER_DEACTIVATED = "GAME_SERVER_DEACTIVATED";
     private static final String CODE_KAFKA_CREDENTIALS_MISSING = "KAFKA_CREDENTIALS_MISSING";
 
@@ -46,65 +46,61 @@ public final class ConnectFlow implements Runnable {
      */
     private static final Pattern BEARER_PATTERN = Pattern.compile("Bearer\\s+\\S+");
 
-    private final AdapterConfig config;
-    private final ConnectClient client;
+    private final HostConnectFlow<?> flow;
     private final BackoffSchedule backoff;
     private final ScheduledExecutorService scheduler;
     private final Consumer<Outcome> onOutcome;
     /**
-     * Invoked exactly once, immediately before {@link Outcome#ACTIVE}, with the parsed
-     * {@link ConnectResponse}. Lets the orchestrator (e.g. {@code NxAdapter}) bootstrap
-     * the Kafka client before the {@code ACTIVE} state is observed by registered
-     * state-change callbacks. {@code null} = the response is not needed.
+     * Invoked exactly once, immediately before {@link Outcome#ACTIVE}, with the
+     * flow whose accessors expose the platform handshake result. Lets the
+     * orchestrator (e.g. {@code NxAdapter}) bootstrap the Kafka client before
+     * the {@code ACTIVE} state is observed by registered state-change callbacks.
+     * {@code null} = the response is not needed.
      */
-    private final Consumer<ConnectResponse> onActiveResponse;
+    private final Consumer<HostConnectFlow<?>> onActiveFlow;
 
     private final AtomicInteger attempt = new AtomicInteger(0);
 
-    public ConnectFlow(AdapterConfig config,
-                       ConnectClient client,
+    public ConnectFlow(HostConnectFlow<?> flow,
                        BackoffSchedule backoff,
                        ScheduledExecutorService scheduler,
                        Consumer<Outcome> onOutcome) {
-        this(config, client, backoff, scheduler, onOutcome, null);
+        this(flow, backoff, scheduler, onOutcome, null);
     }
 
-    public ConnectFlow(AdapterConfig config,
-                       ConnectClient client,
+    public ConnectFlow(HostConnectFlow<?> flow,
                        BackoffSchedule backoff,
                        ScheduledExecutorService scheduler,
                        Consumer<Outcome> onOutcome,
-                       Consumer<ConnectResponse> onActiveResponse) {
-        this.config = config;
-        this.client = client;
+                       Consumer<HostConnectFlow<?>> onActiveFlow) {
+        this.flow = flow;
         this.backoff = backoff;
         this.scheduler = scheduler;
         this.onOutcome = onOutcome;
-        this.onActiveResponse = onActiveResponse;
+        this.onActiveFlow = onActiveFlow;
     }
 
     @Override
     public void run() {
         emit(Outcome.STARTING);
+        TypedConnectOutcome<?> outcome;
         try {
-            String url = buildUrl(config.getPlatformUrl());
-            ConnectRequest body = ConnectRequest.builder()
-                    .adapterVersion(config.getAdapterVersion())
-                    .build();
-            ConnectResult result = client.connect(url, config.getServerKey(), body);
-            dispatch(result);
+            outcome = flow.connect();
         } catch (Throwable t) {
-            // Defensive: ConnectClient is contracted not to throw, but a faulty impl
-            // (or a downstream wiring bug) must not bring down the daemon thread.
-            // Log only the exception class — message may carry the bearer token if
-            // the JDK threw IllegalArgumentException from setRequestProperty.
+            // Defensive: HostConnectFlow.connect is contracted not to throw, but a
+            // faulty impl (or downstream wiring bug) must not bring down the
+            // daemon thread. Log only the exception class — message may carry the
+            // bearer token if the JDK threw IllegalArgumentException from
+            // setRequestProperty.
             log.error("Connect attempt threw {}", t.getClass().getName(), t);
             emit(Outcome.TRANSIENT);
             scheduleRetry();
+            return;
         }
+        dispatch(outcome);
     }
 
-    private void dispatch(ConnectResult result) {
+    private void dispatch(TypedConnectOutcome<?> result) {
         if (result.isIoFailure()) {
             String msg = sanitize(result.getIoException().map(Throwable::getMessage).orElse(null));
             log.warn("Connect IO failure: {} — retrying with backoff", msg);
@@ -117,20 +113,19 @@ public final class ConnectFlow implements Runnable {
         if (status == HttpURLConnection.HTTP_OK) {
             log.info("Connect succeeded — platform handshake passed");
             attempt.set(0);
-            if (onActiveResponse != null) {
-                ConnectResponse response = result.getResponse().orElse(null);
-                if (response != null) {
+            if (onActiveFlow != null) {
+                if (result.getResponse().isPresent()) {
                     try {
-                        onActiveResponse.accept(response);
+                        onActiveFlow.accept(flow);
                     } catch (Throwable t) {
-                        log.error("ConnectFlow onActiveResponse threw: {}", t.getMessage(), t);
+                        log.error("ConnectFlow onActiveFlow threw: {}", t.getMessage(), t);
                     }
                     // Ownership transferred — orchestrator drives the final post-200 state
                     // (e.g. ACTIVE if Kafka up, DEGRADED if Kafka down). Re-emitting
                     // Outcome.ACTIVE here would clobber a legitimate DEGRADED.
                     return;
                 }
-                log.error("ConnectClient returned 200 with no parsed body — falling back to bare ACTIVE outcome");
+                log.error("HostConnectFlow returned 200 with no parsed body — falling back to bare ACTIVE outcome");
             }
             emit(Outcome.ACTIVE);
             return;
@@ -186,7 +181,7 @@ public final class ConnectFlow implements Runnable {
         }
     }
 
-    private static boolean hasCode(ConnectResult result, String code) {
+    private static boolean hasCode(TypedConnectOutcome<?> result, String code) {
         return result.getError().map(e -> code.equals(e.getCode())).orElse(false);
     }
 
@@ -196,11 +191,11 @@ public final class ConnectFlow implements Runnable {
      * just the base + path. Defensive trailing-slash strip is kept for tests that
      * bypass the resolver via fixtures.
      */
-    static String buildUrl(String platformUrl) {
+    static String buildUrl(String platformUrl, String connectPath) {
         String base = platformUrl.endsWith("/")
                 ? platformUrl.substring(0, platformUrl.length() - 1)
                 : platformUrl;
-        return base + CONNECT_PATH;
+        return base + connectPath;
     }
 
     static String sanitize(String text) {

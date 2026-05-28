@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.core.connect;
 
 import app.l2nx.gs.adapter.api.rest.ConnectRequest;
-import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;
@@ -13,33 +12,38 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 /**
- * JDK-only {@link ConnectClient} backed by {@link HttpURLConnection} + Gson.
+ * Generic single-attempt HTTP POST + JSON-deserialize helper used by the
+ * host-type {@link HostConnectFlow} implementations. Parameterized on the
+ * response type so the same code path serves both gameserver and login-server
+ * handshakes. Stateless; instantiate per call or reuse — no shared mutable
+ * state.
  *
- * <p>Sets {@code Authorization: Bearer <serverKey>}, {@code Content-Type:
- * application/json; charset=UTF-8}, {@code Connection: close} (avoids leaking
- * connections into a host-JVM connection pool we don't own). Connect timeout
- * 5s, read timeout 10s — adapter is fire-and-forget; long stalls would just
- * delay the inevitable retry.</p>
+ * <p>Transport invariants: 5s connect timeout, 10s read timeout,
+ * {@code Connection: close}, 1 MiB response body char cap.</p>
+ *
+ * @param <R> JSON DTO type Gson deserializes the 200 body into
  */
-public final class HttpURLConnectionConnectClient implements ConnectClient {
+final class TypedHttpConnect<R> {
 
-    private static final NxLog log = NxLogFactory.getLogger(HttpURLConnectionConnectClient.class);
+    private static final NxLog log = NxLogFactory.getLogger(TypedHttpConnect.class);
 
     private static final int CONNECT_TIMEOUT_MS = 5_000;
     private static final int READ_TIMEOUT_MS = 10_000;
-    /**
-     * Hard cap on response body size in CHARACTERS — guards the host JVM
-     * from OOM on a runaway response. Counted via {@link StringBuilder#length()};
-     * the underlying byte count can exceed this for non-ASCII payloads
-     * (max 4× under UTF-8). Renamed from MAX_RESPONSE_BODY_BYTES to be
-     * honest about the unit; the cap value is unchanged.
-     */
-    static final int MAX_RESPONSE_BODY_CHARS = 1 << 20; // 1 MiB chars
+    static final int MAX_RESPONSE_BODY_CHARS = 1 << 20;
 
-    private final Gson gson = new Gson();
+    private final Class<R> responseType;
+    private final Gson gson;
 
-    @Override
-    public ConnectResult connect(String url, String serverKey, ConnectRequest body) {
+    TypedHttpConnect(Class<R> responseType) {
+        this(responseType, new Gson());
+    }
+
+    TypedHttpConnect(Class<R> responseType, Gson gson) {
+        this.responseType = responseType;
+        this.gson = gson;
+    }
+
+    TypedConnectOutcome<R> exchange(String url, String serverKey, ConnectRequest body) {
         HttpURLConnection conn = null;
         try {
             URL endpoint = new URL(url);
@@ -63,16 +67,14 @@ public final class HttpURLConnectionConnectClient implements ConnectClient {
             if (status == HttpURLConnection.HTTP_OK) {
                 String responseBody = readBody(conn.getInputStream());
                 try {
-                    ConnectResponse parsed = gson.fromJson(responseBody, ConnectResponse.class);
+                    R parsed = gson.fromJson(responseBody, responseType);
                     if (parsed == null) {
-                        return ConnectResult.ioFailure(
-                                new IOException("connect: 200 with empty body"));
+                        return TypedConnectOutcome.ioFailure(new IOException("connect: 200 with empty body"));
                     }
-                    return ConnectResult.success(parsed);
+                    return TypedConnectOutcome.ok(parsed);
                 } catch (JsonSyntaxException e) {
                     log.warn("connect: 200 with malformed JSON ({})", e.getClass().getSimpleName());
-                    return ConnectResult.ioFailure(
-                            new IOException("connect: malformed response body", e));
+                    return TypedConnectOutcome.ioFailure(new IOException("connect: malformed response body", e));
                 }
             }
 
@@ -80,51 +82,18 @@ public final class HttpURLConnectionConnectClient implements ConnectClient {
             try {
                 errStream = errorStreamOf(conn);
             } catch (IOException e) {
-                // Couldn't even read the error body — surface as transient IO failure
-                // so ConnectFlow retries instead of misclassifying as terminal.
-                return ConnectResult.ioFailure(e);
+                return TypedConnectOutcome.ioFailure(e);
             }
             String errBody = readBody(errStream);
             ErrorEnvelope envelope = parseEnvelope(errBody);
-            return ConnectResult.httpError(status, envelope);
+            return TypedConnectOutcome.httpError(status, envelope);
 
         } catch (IOException e) {
-            return ConnectResult.ioFailure(e);
+            return TypedConnectOutcome.ioFailure(e);
         } finally {
             if (conn != null) {
                 conn.disconnect();
             }
-        }
-    }
-
-    private static InputStream errorStreamOf(HttpURLConnection conn) throws IOException {
-        InputStream err = conn.getErrorStream();
-        if (err != null) {
-            return err;
-        }
-        return conn.getInputStream();
-    }
-
-    /**
-     * Reads the response body as UTF-8 with a hard size cap. Reads bytes (not lines)
-     * so the original payload is preserved verbatim — parsing CRLF / preserving
-     * quoted strings is the JSON parser's job, not ours.
-     */
-    static String readBody(InputStream in) throws IOException {
-        if (in == null) {
-            return "";
-        }
-        try (Reader r = new InputStreamReader(in, StandardCharsets.UTF_8)) {
-            char[] buf = new char[4096];
-            StringBuilder sb = new StringBuilder();
-            int read;
-            while ((read = r.read(buf)) != -1) {
-                if (sb.length() + read > MAX_RESPONSE_BODY_CHARS) {
-                    throw new IOException("connect: response body exceeds " + MAX_RESPONSE_BODY_CHARS + " chars");
-                }
-                sb.append(buf, 0, read);
-            }
-            return sb.toString();
         }
     }
 
@@ -140,6 +109,32 @@ public final class HttpURLConnectionConnectClient implements ConnectClient {
             return env;
         } catch (JsonSyntaxException e) {
             return new ErrorEnvelope(null, body);
+        }
+    }
+
+    private static InputStream errorStreamOf(HttpURLConnection conn) throws IOException {
+        InputStream err = conn.getErrorStream();
+        if (err != null) {
+            return err;
+        }
+        return conn.getInputStream();
+    }
+
+    static String readBody(InputStream in) throws IOException {
+        if (in == null) {
+            return "";
+        }
+        try (Reader r = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+            char[] buf = new char[4096];
+            StringBuilder sb = new StringBuilder();
+            int read;
+            while ((read = r.read(buf)) != -1) {
+                if (sb.length() + read > MAX_RESPONSE_BODY_CHARS) {
+                    throw new IOException("connect: response body exceeds " + MAX_RESPONSE_BODY_CHARS + " chars");
+                }
+                sb.append(buf, 0, read);
+            }
+            return sb.toString();
         }
     }
 }

@@ -1,7 +1,7 @@
 package app.l2nx.gs.adapter.core;
 
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
-import app.l2nx.gs.adapter.api.rest.KafkaConfig;
+import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.adapter.core.connect.ConnectFlow;
 import app.l2nx.gs.adapter.core.kafka.CapturingKafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
@@ -113,7 +113,7 @@ class NxAdapterStateMachineTest {
         assertEquals(Collections.singletonList(AdapterState.DEGRADED), captured);
     }
 
-    private static ConnectResponse response(String tenantSlug, String serverSlug, KafkaConfig kafka) {
+    private static ConnectResponse response(String tenantSlug, String serverSlug, KafkaCredentials kafka) {
         return ConnectResponse.builder()
                 .tenantId(UUID.randomUUID())
                 .tenantSlug(tenantSlug)
@@ -125,8 +125,8 @@ class NxAdapterStateMachineTest {
                 .build();
     }
 
-    private static KafkaConfig validKafkaConfig() {
-        return KafkaConfig.builder()
+    private static KafkaCredentials validKafkaCredentials() {
+        return KafkaCredentials.builder()
                 .bootstrap("kafka.l2nx.app:9092")
                 .securityProtocol("SASL_SSL")
                 .saslMechanism("SCRAM-SHA-256")
@@ -140,7 +140,7 @@ class NxAdapterStateMachineTest {
         CapturingKafkaFactory factory = new CapturingKafkaFactory();
         KafkaInitializer init = new KafkaInitializer(factory);
 
-        NxAdapter.simulateInitKafkaForTesting(init, response("acme", "acme-x1", validKafkaConfig()));
+        NxAdapter.simulateInitKafkaForTesting(init, response("acme", "acme-x1", validKafkaCredentials()));
 
         assertEquals("nx-gs-adapter-acme-acme-x1", factory.capturedClientId);
         assertEquals(AdapterState.ACTIVE, NxAdapter.state());
@@ -152,7 +152,7 @@ class NxAdapterStateMachineTest {
         factory.postBuildState = KafkaState.DISCONNECTED;
         KafkaInitializer init = new KafkaInitializer(factory);
 
-        NxAdapter.simulateInitKafkaForTesting(init, response("acme", "acme-x1", validKafkaConfig()));
+        NxAdapter.simulateInitKafkaForTesting(init, response("acme", "acme-x1", validKafkaCredentials()));
 
         assertEquals(AdapterState.DEGRADED, NxAdapter.state());
         assertEquals(1, factory.callCount);
