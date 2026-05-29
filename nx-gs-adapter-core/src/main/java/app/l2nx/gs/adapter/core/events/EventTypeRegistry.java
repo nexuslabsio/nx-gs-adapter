@@ -6,6 +6,7 @@ import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailCancelledEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailReturnedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailSentEvent;
+import app.l2nx.gs.adapter.api.kafka.events.olympiad.HeroGrantedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.olympiad.OlympiadMatchResultEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
@@ -67,6 +68,8 @@ final class EventTypeRegistry {
                 evt -> null);
         register(map, families, OlympiadMatchResultEvent.class, "olympiad",
                 evt -> LongBytes.bigEndian(((OlympiadMatchResultEvent) evt).getCharId()));
+        register(map, families, HeroGrantedEvent.class, "olympiad",
+                evt -> LongBytes.bigEndian(((HeroGrantedEvent) evt).getCharId()));
         // Login-server account auth: partition key is the lowercased account name
         // so per-account attempt history lands in one partition in occurrence order.
         register(map, families, AccountAuthAttemptEvent.class, "account",

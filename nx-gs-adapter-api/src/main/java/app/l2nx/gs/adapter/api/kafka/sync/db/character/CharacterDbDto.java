@@ -38,18 +38,19 @@ import java.util.Objects;
  * populating {@code clanId} / {@code scheduledDeletionAt}; platform consumers see
  * explicit nulls.</p>
  *
- * <p>Online presence is intentionally NOT modeled here — that signal lives
- * on the sibling runtime channel ({@code CharacterRuntimeDto.online})
- * and is reconciled by platform-side consumers. CDC cannot deliver
- * login/logout reactively without an UPDATE-storm risk; runtime channel
- * is the authoritative source for "is this character logged in right now".</p>
+ * <p>The persisted {@code online} flag is surfaced as a coarse CDC backstop
+ * (see {@link #getOnline()}); authoritative real-time presence lives on the
+ * sibling runtime channel ({@code CharacterRuntimeDto.online}) and discrete
+ * {@code CharacterPresenceEvent}s, reconciled by platform-side consumers.</p>
  *
- * <p>Volatile state ({@code curHp}/{@code curMp}/{@code x}/{@code y}/
- * {@code z}/{@code exp}/{@code onlinetime}/{@code lastAccess} and similar
- * tick-frequency fields) is intentionally not modeled — including such
- * fields in a poll-based CDC hash would cause an UPDATE storm for every
- * online character on every cycle. Real-time state belongs on a separate
- * event channel.</p>
+ * <p>Tick-frequency volatile state ({@code curHp}/{@code curMp}/{@code x}/
+ * {@code y}/{@code z}/{@code exp}/{@code lastAccess} and similar) is
+ * intentionally not modeled — including such fields in a poll-based CDC hash
+ * would cause an UPDATE storm for every online character on every cycle;
+ * real-time state belongs on a separate event channel. Accumulated
+ * {@link #getOnlineTimeSeconds() online time} is the exception: the source
+ * column advances only when the row is persisted (logout + periodic
+ * autosave), not at tick frequency, so it is CDC-tolerable.</p>
  */
 public final class CharacterDbDto {
 
@@ -68,9 +69,11 @@ public final class CharacterDbDto {
     private final @Nullable Integer pvpCounter;
     private final @Nullable Integer pkCounter;
     private final @Nullable Integer karma;
-    private final @Nullable Boolean nobless;
+    private final @Nullable Boolean noblesse;
     private final @Nullable Instant scheduledDeletionAt;
     private final @Nullable Boolean online;
+    private final @Nullable Long onlineTimeSeconds;
+    private final @Nullable Boolean hero;
 
     public CharacterDbDto(long id,
                           String name,
@@ -87,9 +90,11 @@ public final class CharacterDbDto {
                           @Nullable Integer pvpCounter,
                           @Nullable Integer pkCounter,
                           @Nullable Integer karma,
-                          @Nullable Boolean nobless,
+                          @Nullable Boolean noblesse,
                           @Nullable Instant scheduledDeletionAt,
-                          @Nullable Boolean online) {
+                          @Nullable Boolean online,
+                          @Nullable Long onlineTimeSeconds,
+                          @Nullable Boolean hero) {
         this.id = id;
         this.name = Objects.requireNonNull(name, "CharacterDbDto.name is required");
         this.accountName = accountName;
@@ -105,9 +110,11 @@ public final class CharacterDbDto {
         this.pvpCounter = pvpCounter;
         this.pkCounter = pkCounter;
         this.karma = karma;
-        this.nobless = nobless;
+        this.noblesse = noblesse;
         this.scheduledDeletionAt = scheduledDeletionAt;
         this.online = online;
+        this.onlineTimeSeconds = onlineTimeSeconds;
+        this.hero = hero;
     }
 
     /**
@@ -237,8 +244,8 @@ public final class CharacterDbDto {
      * Noblesse status — source {@code nobless} (typically tinyint 0/1).
      * {@code null} when the tenant does not surface this column.
      */
-    public @Nullable Boolean getNobless() {
-        return nobless;
+    public @Nullable Boolean getNoblesse() {
+        return noblesse;
     }
 
     /**
@@ -270,6 +277,32 @@ public final class CharacterDbDto {
         return online;
     }
 
+    /**
+     * Accumulated total online time in seconds — source {@code onlinetime}.
+     * The game server rewrites this column to the live total (stored baseline
+     * + current-session elapsed) on every full store (logout + periodic
+     * autosave), so it advances at autosave cadence rather than tick frequency
+     * and is safe to surface through CDC. {@code null} when the tenant does not
+     * surface this column. For a currently-online character the value is stale
+     * by up to one autosave interval; platform consumers wanting a live figure
+     * compose {@code value + (now − loginAt)} from the presence stream.
+     */
+    public @Nullable Long getOnlineTimeSeconds() {
+        return onlineTimeSeconds;
+    }
+
+    /**
+     * Current hero status — {@code true} when the character is a recognized
+     * hero in the active Olympiad cycle (source {@code heroes.played = 1}).
+     * {@code null} when the tenant does not surface hero status. Historical
+     * crownings (who became hero, when, in which class / cycle) are carried by
+     * the discrete {@code HeroGrantedEvent} on the {@code olympiad} event
+     * family, not here.
+     */
+    public @Nullable Boolean getHero() {
+        return hero;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .id(id)
@@ -287,9 +320,11 @@ public final class CharacterDbDto {
                 .pvpCounter(pvpCounter)
                 .pkCounter(pkCounter)
                 .karma(karma)
-                .nobless(nobless)
+                .noblesse(noblesse)
                 .scheduledDeletionAt(scheduledDeletionAt)
-                .online(online);
+                .online(online)
+                .onlineTimeSeconds(onlineTimeSeconds)
+                .hero(hero);
     }
 
     public static Builder builder() {
@@ -316,16 +351,19 @@ public final class CharacterDbDto {
                 && Objects.equals(pvpCounter, that.pvpCounter)
                 && Objects.equals(pkCounter, that.pkCounter)
                 && Objects.equals(karma, that.karma)
-                && Objects.equals(nobless, that.nobless)
+                && Objects.equals(noblesse, that.noblesse)
                 && Objects.equals(scheduledDeletionAt, that.scheduledDeletionAt)
-                && Objects.equals(online, that.online);
+                && Objects.equals(online, that.online)
+                && Objects.equals(onlineTimeSeconds, that.onlineTimeSeconds)
+                && Objects.equals(hero, that.hero);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(id, name, accountName, title, level, sex, race,
                 classId, baseClassId, subclasses, privateStore,
-                clanId, pvpCounter, pkCounter, karma, nobless, scheduledDeletionAt, online);
+                clanId, pvpCounter, pkCounter, karma, noblesse, scheduledDeletionAt, online,
+                onlineTimeSeconds, hero);
     }
 
     @Override
@@ -345,9 +383,11 @@ public final class CharacterDbDto {
                 + ", pvpCounter=" + pvpCounter
                 + ", pkCounter=" + pkCounter
                 + ", karma=" + karma
-                + ", nobless=" + nobless
+                + ", noblesse=" + noblesse
                 + ", scheduledDeletionAt=" + scheduledDeletionAt
-                + ", online=" + online + "]";
+                + ", online=" + online
+                + ", onlineTimeSeconds=" + onlineTimeSeconds
+                + ", hero=" + hero + "]";
     }
 
     public static final class Builder {
@@ -366,9 +406,11 @@ public final class CharacterDbDto {
         private @Nullable Integer pvpCounter;
         private @Nullable Integer pkCounter;
         private @Nullable Integer karma;
-        private @Nullable Boolean nobless;
+        private @Nullable Boolean noblesse;
         private @Nullable Instant scheduledDeletionAt;
         private @Nullable Boolean online;
+        private @Nullable Long onlineTimeSeconds;
+        private @Nullable Boolean hero;
 
         public Builder id(long id) {
             this.id = id;
@@ -445,8 +487,8 @@ public final class CharacterDbDto {
             return this;
         }
 
-        public Builder nobless(@Nullable Boolean nobless) {
-            this.nobless = nobless;
+        public Builder noblesse(@Nullable Boolean noblesse) {
+            this.noblesse = noblesse;
             return this;
         }
 
@@ -460,10 +502,21 @@ public final class CharacterDbDto {
             return this;
         }
 
+        public Builder onlineTimeSeconds(@Nullable Long onlineTimeSeconds) {
+            this.onlineTimeSeconds = onlineTimeSeconds;
+            return this;
+        }
+
+        public Builder hero(@Nullable Boolean hero) {
+            this.hero = hero;
+            return this;
+        }
+
         public CharacterDbDto build() {
             return new CharacterDbDto(id, name, accountName, title, level, sex, race,
                     classId, baseClassId, subclasses, privateStore,
-                    clanId, pvpCounter, pkCounter, karma, nobless, scheduledDeletionAt, online);
+                    clanId, pvpCounter, pkCounter, karma, noblesse, scheduledDeletionAt, online,
+                    onlineTimeSeconds, hero);
         }
     }
 }

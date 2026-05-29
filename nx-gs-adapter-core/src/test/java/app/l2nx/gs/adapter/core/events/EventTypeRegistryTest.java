@@ -7,10 +7,7 @@ import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailCancelledEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailReturnedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailSentEvent;
-import app.l2nx.gs.adapter.api.kafka.events.olympiad.OlympiadGameType;
-import app.l2nx.gs.adapter.api.kafka.events.olympiad.OlympiadMatchReason;
-import app.l2nx.gs.adapter.api.kafka.events.olympiad.OlympiadMatchResult;
-import app.l2nx.gs.adapter.api.kafka.events.olympiad.OlympiadMatchResultEvent;
+import app.l2nx.gs.adapter.api.kafka.events.olympiad.*;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
@@ -346,6 +343,31 @@ class EventTypeRegistryTest {
     @Test
     void knownFamilies_shouldContainOlympiad() {
         assertTrue(new EventTypeRegistry().knownFamilies().contains("olympiad"));
+    }
+
+    @Test
+    void lookup_shouldReturnBinding_forHeroGrantedEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(HeroGrantedEvent.class);
+
+        assertNotNull(binding);
+        assertEquals("olympiad", binding.familyKey());
+        assertEquals("HeroGrantedEvent", binding.messageType());
+    }
+
+    @Test
+    void partitionKey_shouldEncodeCharId_forHeroGrantedEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(HeroGrantedEvent.class);
+        HeroGrantedEvent event = HeroGrantedEvent.builder()
+                .eventId(UUIDv7.generate())
+                .charId(0xCAFEBABEL)
+                .classId(88)
+                .olympiadCycle(7)
+                .build();
+
+        byte[] key = binding.partitionKeyExtractor().apply(event);
+
+        assertEquals(8, key.length);
+        assertEquals(0xCAFEBABEL, ByteBuffer.wrap(key).getLong());
     }
 
     @Test

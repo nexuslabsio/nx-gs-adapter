@@ -38,8 +38,11 @@ class CharacterDbDtoTest {
                 .pvpCounter(1200)
                 .pkCounter(7)
                 .karma(0)
-                .nobless(Boolean.TRUE)
+                .noblesse(Boolean.TRUE)
                 .scheduledDeletionAt(deleteAt)
+                .online(Boolean.TRUE)
+                .onlineTimeSeconds(86_400L)
+                .hero(Boolean.TRUE)
                 .build();
 
         assertEquals(54321L, ch.getId());
@@ -57,8 +60,11 @@ class CharacterDbDtoTest {
         assertEquals(Integer.valueOf(1200), ch.getPvpCounter());
         assertEquals(Integer.valueOf(7), ch.getPkCounter());
         assertEquals(Integer.valueOf(0), ch.getKarma());
-        assertEquals(Boolean.TRUE, ch.getNobless());
+        assertEquals(Boolean.TRUE, ch.getNoblesse());
         assertEquals(deleteAt, ch.getScheduledDeletionAt());
+        assertEquals(Boolean.TRUE, ch.getOnline());
+        assertEquals(Long.valueOf(86_400L), ch.getOnlineTimeSeconds());
+        assertEquals(Boolean.TRUE, ch.getHero());
     }
 
     @Test
@@ -80,8 +86,11 @@ class CharacterDbDtoTest {
         assertNull(ch.getPvpCounter());
         assertNull(ch.getPkCounter());
         assertNull(ch.getKarma());
-        assertNull(ch.getNobless());
+        assertNull(ch.getNoblesse());
         assertNull(ch.getScheduledDeletionAt());
+        assertNull(ch.getOnline());
+        assertNull(ch.getOnlineTimeSeconds());
+        assertNull(ch.getHero());
     }
 
     @Test
@@ -128,7 +137,7 @@ class CharacterDbDtoTest {
     void builder_andConstructor_shouldProduceEqualObjects_whenAllOptionalNull() {
         CharacterDbDto fromBuilder = CharacterDbDto.builder().id(1L).name("X").build();
         CharacterDbDto fromCtor = new CharacterDbDto(1L, "X", null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -142,7 +151,8 @@ class CharacterDbDtoTest {
                 CharacterSex.MALE, CharacterRace.HUMAN,
                 CharacterClass.HUMAN_FIGHTER, CharacterClass.HUMAN_FIGHTER,
                 subs, CharacterPrivateStore.CRAFT,
-                null, 0, 0, 0, Boolean.FALSE, Instant.parse("2026-07-01T00:00:00Z"), Boolean.TRUE);
+                null, 0, 0, 0, Boolean.FALSE, Instant.parse("2026-07-01T00:00:00Z"), Boolean.TRUE,
+                86_400L, Boolean.TRUE);
 
         assertEquals(original, original.toBuilder().build());
     }
