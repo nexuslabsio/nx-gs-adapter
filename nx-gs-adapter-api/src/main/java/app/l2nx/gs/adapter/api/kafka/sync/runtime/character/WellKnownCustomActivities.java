@@ -1,20 +1,24 @@
 package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 /**
- * Canonical values for {@link CharacterRuntimeDto#getCustomActivity()}. The
+ * Canonical {@code type} discriminator values for {@link CustomActivity#getType()}
+ * (the structured value of {@link CharacterRuntimeDto#getCustomActivity()}). The
  * custom activity is a <b>build-specific</b>, high-level "what the player is
  * occupied with" signal that lives outside the engine AI state machine —
  * sustained activities a particular core implements on its own state and timers
- * rather than through {@code CtrlIntention}.
+ * rather than through {@code CtrlIntention}. Activity-specific extras (elapsed
+ * time, penalty tier, …) ride the {@code metadata} map — see
+ * {@link WellKnownCustomActivityMetadata}.
  *
  * <p>The classic example is fishing: it is a self-contained mini-engine on most
  * cores (its own immobilize + tick loop, no AI intention), and some servers do
  * not ship it at all — replacing it with a different sustained activity (reading
  * a book, mining, etc.). Because the activity set genuinely varies per build,
- * the field is an <b>open string</b> with the widest possible host freedom: a
- * host emits whatever lower_snake_case activity key its core supports, and
- * consumers map known values to a label / icon while falling back to the raw
- * string for unknowns. {@code null} (omitted) means "no special activity".</p>
+ * the {@code type} is an <b>open string</b> with the widest possible host
+ * freedom: a host emits whatever lower_snake_case activity key its core supports,
+ * and consumers map known values to a label / icon while falling back to the raw
+ * string for unknowns. A {@code null} {@code customActivity} means "no special
+ * activity".</p>
  *
  * <p>The constants below are merely the activities seen often enough to be worth
  * naming — they are NOT an exhaustive or required set, and a build that has none

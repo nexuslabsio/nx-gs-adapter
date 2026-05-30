@@ -46,11 +46,12 @@ import java.util.Objects;
  *   <li>{@code aiStatus} — engine-native control intention (canonical values in
  *   {@link WellKnownAiStatuses}). Transient: flips with movement / combat much
  *   like {@code x}/{@code y}/{@code z}.</li>
- *   <li>{@code customActivity} — build-specific sustained activity (canonical
- *   values in {@link WellKnownCustomActivities}; e.g. fishing, reading). Long-lived;
+ *   <li>{@code customActivity} — build-specific sustained activity as a
+ *   structured {@link CustomActivity} ({@code type} + open {@code metadata};
+ *   e.g. fishing with elapsed-time / penalty-tier metadata). Long-lived;
  *   {@code null} when the character is not in any special activity. The activity
- *   set varies per core, so the field is open: hosts emit their own keys and
- *   consumers tolerate unknown values.</li>
+ *   set varies per core, so the envelope is open: hosts emit their own type /
+ *   metadata keys and consumers tolerate unknown values.</li>
  * </ul>
  * Both are {@code null} on offline tombstones and on hosts that do not populate
  * them.</p>
@@ -71,7 +72,7 @@ public final class CharacterRuntimeDto {
     private final @Nullable Integer z;
     private final @Nullable Boolean online;
     private final @Nullable String aiStatus;
-    private final @Nullable String customActivity;
+    private final @Nullable CustomActivity customActivity;
 
     /**
      * Canonical constructor. Prefer {@link #builder()} — positional construction
@@ -91,7 +92,7 @@ public final class CharacterRuntimeDto {
                                @Nullable Integer z,
                                @Nullable Boolean online,
                                @Nullable String aiStatus,
-                               @Nullable String customActivity) {
+                               @Nullable CustomActivity customActivity) {
         this.id = id;
         this.curHp = curHp;
         this.maxHp = maxHp;
@@ -192,14 +193,18 @@ public final class CharacterRuntimeDto {
     /**
      * Build-specific sustained activity — the high-level "what the player is
      * occupied with" signal that lives outside the engine AI state machine
-     * (e.g. fishing, reading a book). Open string; canonical values in
-     * {@link WellKnownCustomActivities}, but the set varies per core so hosts
-     * MAY emit their own keys and consumers tolerate unknowns. {@code null}
-     * when the character is in no special activity, the host does not report
-     * it, or on offline tombstones. Independent of
-     * {@link #getAiStatus() aiStatus} — no precedence between the two.
+     * (e.g. fishing, reading a book). Structured {@link CustomActivity}:
+     * a required {@code type} discriminator (canonical values in
+     * {@link WellKnownCustomActivities}) plus an open {@code metadata} map for
+     * activity-specific extras (canonical keys in
+     * {@link WellKnownCustomActivityMetadata}). The set varies per core, so the
+     * envelope stays agnostic — hosts emit their own type / keys and consumers
+     * tolerate unknowns. {@code null} when the character is in no special
+     * activity, the host does not report it, or on offline tombstones.
+     * Independent of {@link #getAiStatus() aiStatus} — no precedence between
+     * the two.
      */
-    public @Nullable String getCustomActivity() {
+    public @Nullable CustomActivity getCustomActivity() {
         return customActivity;
     }
 
@@ -294,7 +299,7 @@ public final class CharacterRuntimeDto {
         private @Nullable Integer z;
         private @Nullable Boolean online;
         private @Nullable String aiStatus;
-        private @Nullable String customActivity;
+        private @Nullable CustomActivity customActivity;
 
         public Builder id(long id) {
             this.id = id;
@@ -371,11 +376,11 @@ public final class CharacterRuntimeDto {
         }
 
         /**
-         * Build-specific sustained activity — canonical values in
-         * {@link WellKnownCustomActivities}. Open string; {@code null} when the
-         * character is in no special activity.
+         * Build-specific sustained activity — structured {@link CustomActivity}
+         * ({@code type} + open {@code metadata}). {@code null} when the character
+         * is in no special activity.
          */
-        public Builder customActivity(@Nullable String customActivity) {
+        public Builder customActivity(@Nullable CustomActivity customActivity) {
             this.customActivity = customActivity;
             return this;
         }

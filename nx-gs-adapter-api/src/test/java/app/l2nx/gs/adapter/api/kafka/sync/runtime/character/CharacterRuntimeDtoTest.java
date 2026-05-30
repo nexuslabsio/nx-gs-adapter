@@ -2,9 +2,19 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class CharacterRuntimeDtoTest {
+
+    private static CustomActivity fishing() {
+        return CustomActivity.builder()
+                .type(WellKnownCustomActivities.FISHING)
+                .metadata(Collections.singletonMap(
+                        WellKnownCustomActivityMetadata.ELAPSED_SECONDS, "1820"))
+                .build();
+    }
 
     @Test
     void builder_shouldPopulateOnlineLiveStateRow() {
@@ -51,21 +61,25 @@ class CharacterRuntimeDtoTest {
     void toBuilder_shouldRoundtrip() {
         CharacterRuntimeDto original = new CharacterRuntimeDto(
                 123L, 100, 200, 50, 100, 25, 50,
-                1000, 2000, 500, 600, -700, Boolean.TRUE, "attack", "fishing");
+                1000, 2000, 500, 600, -700, Boolean.TRUE, "attack", fishing());
 
         assertEquals(original, original.toBuilder().build());
     }
 
     @Test
     void builder_shouldCarryActivityFields() {
+        CustomActivity activity = fishing();
         CharacterRuntimeDto dto = CharacterRuntimeDto.builder()
                 .id(42L)
                 .aiStatus("idle")
-                .customActivity("fishing")
+                .customActivity(activity)
                 .build();
 
         assertEquals("idle", dto.getAiStatus());
-        assertEquals("fishing", dto.getCustomActivity());
+        assertEquals(activity, dto.getCustomActivity());
+        assertEquals("fishing", dto.getCustomActivity().getType());
+        assertEquals("1820", dto.getCustomActivity().getMetadata()
+                .get(WellKnownCustomActivityMetadata.ELAPSED_SECONDS));
     }
 
     @Test
@@ -79,7 +93,7 @@ class CharacterRuntimeDtoTest {
     @Test
     void activityFields_shouldBeIndependentInEquals() {
         CharacterRuntimeDto fishingIdle = CharacterRuntimeDto.builder()
-                .id(1L).aiStatus("idle").customActivity("fishing").build();
+                .id(1L).aiStatus("idle").customActivity(fishing()).build();
         CharacterRuntimeDto plainIdle = CharacterRuntimeDto.builder()
                 .id(1L).aiStatus("idle").build();
 
@@ -91,7 +105,7 @@ class CharacterRuntimeDtoTest {
     @Test
     void toBuilder_shouldRoundtripActivityFields() {
         CharacterRuntimeDto original = CharacterRuntimeDto.builder()
-                .id(9L).aiStatus("cast").customActivity("reading").build();
+                .id(9L).aiStatus("cast").customActivity(fishing()).build();
 
         assertEquals(original, original.toBuilder().build());
     }

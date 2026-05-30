@@ -1,0 +1,117 @@
+package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
+
+import org.jspecify.annotations.Nullable;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Structured value of {@link CharacterRuntimeDto#getCustomActivity()} — a
+ * build-specific, high-level "what the player is occupied with" signal that lives
+ * outside the engine AI state machine (e.g. fishing, reading a book).
+ *
+ * <p>Deliberately a thin, build-agnostic envelope:
+ * <ul>
+ *   <li>{@link #getType() type} — REQUIRED discriminator. Canonical values in
+ *   {@link WellKnownCustomActivities} ({@code fishing} / {@code reading} / …);
+ *   open, so a host MAY emit its own activity key without an API release.</li>
+ *   <li>{@link #getMetadata() metadata} — optional open {@code String→String}
+ *   map of activity-specific extras, mirroring the {@code metadata} maps on the
+ *   discrete event DTOs ({@code BossRespawnEntry}, {@code CharacterPresenceEvent},
+ *   {@code GameEventEntry}). Canonical keys in
+ *   {@link WellKnownCustomActivityMetadata} (e.g. {@code elapsed_seconds},
+ *   {@code penalty_multiplier}); values are stringified (the platform stores the
+ *   whole object as JSON and the dashboard parses what it needs). Hosts MAY add
+ *   arbitrary keys; consumers ignore keys they do not understand.</li>
+ * </ul>
+ *
+ * <p>The contract intentionally does NOT type any per-activity field (not even
+ * {@code elapsed_seconds}) — everything beyond {@code type} is the open
+ * {@code metadata} map. This keeps the wire and the platform's JSONB storage
+ * agnostic to which core ships which activity. {@code null} {@code customActivity}
+ * on {@link CharacterRuntimeDto} means "no special activity".</p>
+ *
+ * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor parameter
+ * names so Gson / Jackson can deserialize without {@code @JsonProperty}.</p>
+ */
+public final class CustomActivity {
+
+    private final String type;
+    private final @Nullable Map<String, String> metadata;
+
+    public CustomActivity(String type,
+                          @Nullable Map<String, String> metadata) {
+        this.type = type;
+        this.metadata = metadata == null
+                ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+    }
+
+    /**
+     * Activity discriminator — canonical values in
+     * {@link WellKnownCustomActivities}. REQUIRED.
+     */
+    public String getType() {
+        return type;
+    }
+
+    /**
+     * Open {@code String→String} map of activity-specific metadata, or
+     * {@code null} when absent. Canonical keys in
+     * {@link WellKnownCustomActivityMetadata}. When non-null the returned map
+     * is unmodifiable and preserves insertion order.
+     */
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
+    public Builder toBuilder() {
+        return new Builder()
+                .type(type)
+                .metadata(metadata);
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof CustomActivity)) return false;
+        CustomActivity that = (CustomActivity) o;
+        return Objects.equals(type, that.type)
+                && Objects.equals(metadata, that.metadata);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(type, metadata);
+    }
+
+    @Override
+    public String toString() {
+        return "CustomActivity[type=" + type + ", metadata=" + metadata + "]";
+    }
+
+    public static final class Builder {
+        private @Nullable String type;
+        private @Nullable Map<String, String> metadata;
+
+        public Builder type(String type) {
+            this.type = type;
+            return this;
+        }
+
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
+        public CustomActivity build() {
+            return new CustomActivity(type, metadata);
+        }
+    }
+}

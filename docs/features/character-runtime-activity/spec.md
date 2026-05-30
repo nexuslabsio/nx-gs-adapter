@@ -53,17 +53,25 @@ runtime character mapping.
   consumers treat unknowns as opaque (display raw, no behaviour routed on it).
   Mirrors the existing `WellKnownBossStatuses` pattern.
 
-- [done] R3. `CharacterRuntimeDto` MUST add `@Nullable String customActivity` —
-  the build-specific sustained activity as an **open string**. `null` = "no
-  special activity". Independent of `aiStatus`: any combination is legal
-  (`aiStatus=idle` + `customActivity=fishing`; `aiStatus=moving` +
-  `customActivity=null`; both null; both set). The wire encodes **no precedence**
-  between the two — combining them is purely a consumer concern.
+- [done] R3. `CharacterRuntimeDto` MUST add `@Nullable CustomActivity
+  customActivity` — the build-specific sustained activity as a **structured
+  object**, not a bare string, because activities carry extra info (fishing:
+  elapsed time, penalty tier/multiplier, time-to-next-tier). `CustomActivity` is
+  a thin agnostic envelope: `String type` (REQUIRED discriminator) + `@Nullable
+  Map<String,String> metadata` (open, stringified values — same shape as
+  `BossRespawnEntry.metadata`). `null` customActivity = "no special activity".
+  Independent of `aiStatus` (any combination legal); **no precedence** between
+  the two on the wire — combining them is a consumer concern. Only `type` is
+  typed; everything else (even `elapsed_seconds`) is an open metadata key, so the
+  contract never names a per-activity field.
 
-- [done] R4. `nx-gs-adapter-api` MUST ship `WellKnownCustomActivities` with the
-  commonly-seen values (`fishing`, `reading`), explicitly documented as a
-  non-exhaustive, non-required set: a build with none of them is valid, and a
-  host needs no API release to emit a brand-new activity string.
+- [done] R4. `nx-gs-adapter-api` MUST ship `WellKnownCustomActivities` (the
+  `type` discriminator values `fishing` / `reading`) **and**
+  `WellKnownCustomActivityMetadata` (the canonical metadata keys: common
+  `elapsed_seconds`; fishing `penalty_multiplier` / `penalty_tier` /
+  `seconds_to_next_tier` + tier values `none` / `tier1` / `tier2`). Both
+  documented as non-exhaustive / open: a host MAY emit its own type or keys
+  without an API release; consumers ignore unknowns.
 
 - [done] R5. Both fields are additive. The single canonical `CharacterRuntimeDto`
   constructor is **extended** to 15 args (NOT a second overload) — matching how
@@ -79,34 +87,51 @@ runtime character mapping.
     - `aiStatus` = `player.getAI().getIntention().name().toLowerCase(ROOT)`
       (1:1 with `WellKnownAiStatuses`; `null` when the AI / intention is
       unavailable);
-    - `customActivity` = `WellKnownCustomActivities.FISHING` when
-      `player.isFishing()`, else `null` (fishing is the only sustained activity
-      this core models outside the AI machine today);
-    - both MUST be mixed into the hand-written FNV-1a `hash(dto)` so a change to
-      either triggers a diff/publish (the engine diffs on this hash — an unmixed
-      field would never surface a change). Offline tombstones carry neither.
+    - `customActivity` = a `CustomActivity{type=fishing, metadata=…}` when
+      `player.isFishing()`, else `null`. Metadata is pulled live from
+      `FishingPenaltyManager`: `elapsed_seconds` (= `getElapsedMs/1000`, the
+      paused-accumulator active-fishing clock) plus, when
+      `Config.FISHING_PENALTY_ENABLE`, `penalty_tier` / `penalty_multiplier` and
+      `seconds_to_next_tier` derived from the config tier thresholds (mirroring
+      `getChanceMultiplier`'s logic; `seconds_to_next_tier` omitted at the worst
+      tier);
+    - the hand-written FNV-1a `hash(dto)` MUST mix `aiStatus` and the
+      `CustomActivity` (`type` + each `metadata` entry, insertion-ordered) so a
+      change triggers a diff/publish. `elapsed_seconds` advances each snapshot →
+      a fishing character republishes every runtime tick (~10s), accepted (char
+      population is < 10k). Offline tombstones carry neither.
 
 - [done] R7. `nx-gameservers` MUST persist both fields on `gs_characters` as
-  `ai_status VARCHAR(32)` + `custom_activity VARCHAR(64)`, written by the
-  runtime-sync upsert path (`CharacterRuntimeIngestor` → `UPSERT_RUNTIME_SQL`).
-  Stored as the raw open string (no enum / CHECK) so unknown build-specific
-  values survive round-trip. NOT timestamp-gated — they ride the unconditional
-  runtime-column overwrite (same as vitals / coordinates); newest runtime tick
-  wins. db-sync never writes them.
+  `ai_status VARCHAR(32)` + `custom_activity JSONB`, written by the runtime-sync
+  upsert path (`CharacterRuntimeIngestor` → `UPSERT_RUNTIME_SQL`). The ingestor
+  serializes `CustomActivity` to JSON via `JsonMapper` and binds it
+  `CAST(:customActivity AS jsonb)`. Stored **opaque** — the platform never models
+  per-activity keys, so any build's metadata round-trips. NOT timestamp-gated —
+  rides the unconditional runtime-column overwrite (same as vitals / coordinates);
+  newest tick wins. db-sync never writes them.
 
 **Should:**
 
 - [done] R8. The `GET /v1/gameservers/characters` read API MUST expose both
-  fields on `CharacterListItemDto` (display-only — no new filter or sort) so the
-  dashboard can render them. Plumbed through `CharacterReadRepository`
-  (`CharacterListRow` + SELECT + row mapper) and `CharacterQueryService`.
+  fields on `CharacterListItemDto`. `aiStatus` is a plain string; `customActivity`
+  is passed through as **raw JSON** via `@JsonRawValue` on a `String` field (the
+  repo reads the jsonb column with `rs.getString` and forwards it verbatim — no
+  parsing, the platform stays agnostic to fishing's keys). Display-only, no new
+  filter or sort.
+
+- [done] R10. The `nx-telegram` bot MUST show fishing info in the character
+  detail view, **only while the character is fishing**, positioned **above the
+  HP/CP/MP block**. Renders from `customActivity` when `type=fishing`: time spent
+  fishing (`elapsed_seconds`), current `penalty_multiplier`, and the countdown to
+  the next penalty tier (`seconds_to_next_tier`; omit the countdown line at the
+  worst tier). Hidden entirely when not fishing / no activity.
 
 **Could:**
 
-- [todo] R9. A sibling `customActivityMeta` (open `Map<String,String>` for extra
-  context like fish-count / session-duration) — explicitly NOT shipped (YAGNI;
-  the dashboard wants a label, not a payload). The open string leaves room to add
-  it later without a breaking change.
+- [todo] R9. Typed metadata (promoting `elapsed_seconds` etc. to typed fields, or
+  a `Map<String,Object>`) — explicitly NOT shipped. Chose a fully-open
+  `Map<String,String>` (stringified values) for maximum agnosticism and to match
+  the existing event `metadata` pattern; consumers parse keys they care about.
 
 **Non-goals:**
 
@@ -128,25 +153,41 @@ runtime character mapping.
 
 - **Core without fishing** → `customActivity` stays `null` until that core's
   mapping emits its own activity string (e.g. `reading`); no contract change.
-- **Unknown `aiStatus` / `customActivity` value at the consumer** → stored and
-  displayed as the raw string; no behaviour is gated on it.
+- **Unknown `aiStatus` value / unknown `customActivity.type` or metadata key at
+  the consumer** → `aiStatus` stored/displayed raw; `customActivity` stored as
+  opaque JSONB and re-emitted raw by the read API; no behaviour gated on either.
 - **`getAI()` null mid-transition** → `aiStatus = null` (guarded), row still
   emitted with the other fields.
 - **`PICK_UP` intention** → canonical `pick_up` (snake_case, consistent with
   `in_combat` in `WellKnownBossStatuses`).
-- **Activity churn** → `aiStatus` flips with combat/movement, same cost profile
-  as the `x`/`y`/`z` already on the runtime channel; both ride the existing tick
-  diff, no new channel. A core that wants to dampen churn can coarsen its mapping
-  (e.g. collapse `attack`/`cast` → `combat`) without any contract change.
+- **Activity churn** → `aiStatus` flips with combat/movement; a fishing
+  character republishes every tick because `elapsed_seconds` advances. Both ride
+  the existing tick diff (no new channel). Accepted — character population is
+  < 10k and republishing runtime rows is cheap. (A churn-free alternative —
+  carrying a `startedAt` instant and deriving elapsed on the consumer — was
+  rejected: the penalty clock is a *paused accumulator* of active fishing time,
+  not wall-clock since start, so no single timestamp yields it.)
 - **Runtime arrives before db-sync** → skeleton `gs_characters` row gets the
   activity columns; db columns stay `null` until db-sync catches up (existing
   overlay behaviour, unchanged).
 
 ## Open questions
 
-- [resolved: both `aiStatus` and `customActivity` modeled as **open strings +
-  `WellKnown*` constants**, not enums. Mirrors `BossRespawnEntry.status`; keeps
-  the contract build-agnostic and lets hosts extend without an API release.]
+- [resolved: `aiStatus` is an **open string** (`WellKnown*` constants), not an
+  enum. Mirrors `BossRespawnEntry.status`; keeps the contract build-agnostic.]
+- [resolved: `customActivity` is a **structured `CustomActivity` object**
+  (`type` + open `Map<String,String> metadata`), NOT a bare string — activities
+  carry extra info (fishing elapsed/penalty). Chose a fully-open metadata map
+  over typed fields (even `elapsed_seconds` is a key) for maximum agnosticism,
+  matching the event `metadata` pattern. The map key is `metadata` (not
+  `attributes`) to align with the other event DTOs.]
+- [resolved: stored as **JSONB** on `gs_characters.custom_activity` (opaque);
+  read API re-emits raw via `@JsonRawValue`. The platform never models
+  per-activity keys. The unreleased `v2.3.0` changeset was edited in place
+  (VARCHAR → JSONB) rather than adding a follow-up migration.]
+- [resolved: live `elapsed_seconds` (republish every ~10s tick per fisher) is
+  fine — char population < 10k. A `startedAt`-timestamp churn-free model doesn't
+  fit the paused-accumulator penalty clock.]
 - [resolved: **two independent fields**, not one unified "state". Faithful to the
   engine (fishing = `idle` AI + `fishing` activity); no precedence baked into the
   wire — the consumer decides how to combine.]
@@ -167,13 +208,15 @@ runtime character mapping.
 
 ## Versioning
 
-- `nx-gs-adapter-api` — **minor** bump (additive nullable `CharacterRuntimeDto`
-  fields + two new `WellKnown*` constant classes; back-compat constructor kept;
-  non-breaking).
+- `nx-gs-adapter-api` — **minor** bump (additive `CharacterRuntimeDto.aiStatus`
+  + `customActivity` fields, new `CustomActivity` type, `WellKnownAiStatuses` /
+  `WellKnownCustomActivities` / `WellKnownCustomActivityMetadata`; single
+  canonical 15-arg constructor; wire-compatible — old producers omit the keys).
 - `nx-gs-adapter-core` / `nx-gs-db-sync-core` / `nx-gs-runtime-sync-core` /
   `nx-gs-kafka` — no contract change (the runtime engine hashes whatever the
   mapping mixes).
-- `bohpts-core` — `CharacterRuntimeMapping` populates + hashes the two fields.
+- `bohpts-core` — `CharacterRuntimeMapping` populates + hashes both fields.
+- `nx-telegram` — character detail view renders the fishing block (R10).
 - `nx-gameservers` — Liquibase `v2.3.0_character_activity.sql`, runtime upsert,
   read API.
 
