@@ -2,7 +2,10 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -61,7 +64,7 @@ class CharacterRuntimeDtoTest {
     void toBuilder_shouldRoundtrip() {
         CharacterRuntimeDto original = new CharacterRuntimeDto(
                 123L, 100, 200, 50, 100, 25, 50,
-                1000, 2000, 500, 600, -700, Boolean.TRUE, "attack", fishing());
+                1000, 2000, 500, 600, -700, Boolean.TRUE, "attack", Collections.singletonList(fishing()));
 
         assertEquals(original, original.toBuilder().build());
     }
@@ -72,14 +75,43 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto dto = CharacterRuntimeDto.builder()
                 .id(42L)
                 .aiStatus("idle")
-                .customActivity(activity)
+                .customActivities(Collections.singletonList(activity))
                 .build();
 
         assertEquals("idle", dto.getAiStatus());
-        assertEquals(activity, dto.getCustomActivity());
-        assertEquals("fishing", dto.getCustomActivity().getType());
-        assertEquals("1820", dto.getCustomActivity().getMetadata()
+        assertEquals(Collections.singletonList(activity), dto.getCustomActivities());
+        assertEquals("fishing", dto.getCustomActivities().get(0).getType());
+        assertEquals("1820", dto.getCustomActivities().get(0).getMetadata()
                 .get(WellKnownCustomActivityMetadata.ELAPSED_SECONDS));
+    }
+
+    @Test
+    void customActivities_shouldCarryMultipleEntries() {
+        CustomActivity autofarming = CustomActivity.builder()
+                .type(WellKnownCustomActivities.AUTOFARMING)
+                .metadata(Collections.singletonMap(
+                        WellKnownCustomActivityMetadata.SECONDS_REMAINING, "3600"))
+                .build();
+        CharacterRuntimeDto dto = CharacterRuntimeDto.builder()
+                .id(42L)
+                .customActivities(Arrays.asList(fishing(), autofarming))
+                .build();
+
+        assertEquals(2, dto.getCustomActivities().size());
+        assertEquals("fishing", dto.getCustomActivities().get(0).getType());
+        assertEquals("autofarming", dto.getCustomActivities().get(1).getType());
+    }
+
+    @Test
+    void customActivities_shouldBeUnmodifiableAndDefensivelyCopied() {
+        List<CustomActivity> source = new ArrayList<>();
+        source.add(fishing());
+        CharacterRuntimeDto dto = CharacterRuntimeDto.builder().id(1L).customActivities(source).build();
+
+        source.clear();
+        assertEquals(1, dto.getCustomActivities().size());
+        assertThrows(UnsupportedOperationException.class,
+                () -> dto.getCustomActivities().add(fishing()));
     }
 
     @Test
@@ -87,17 +119,17 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto dto = CharacterRuntimeDto.builder().id(1L).build();
 
         assertNull(dto.getAiStatus());
-        assertNull(dto.getCustomActivity());
+        assertNull(dto.getCustomActivities());
     }
 
     @Test
     void activityFields_shouldBeIndependentInEquals() {
         CharacterRuntimeDto fishingIdle = CharacterRuntimeDto.builder()
-                .id(1L).aiStatus("idle").customActivity(fishing()).build();
+                .id(1L).aiStatus("idle").customActivities(Collections.singletonList(fishing())).build();
         CharacterRuntimeDto plainIdle = CharacterRuntimeDto.builder()
                 .id(1L).aiStatus("idle").build();
 
-        // customActivity differs (fishing vs none) though aiStatus matches —
+        // customActivities differ (fishing vs none) though aiStatus matches —
         // the two fields are orthogonal and both participate in equality.
         assertNotEquals(fishingIdle, plainIdle);
     }
@@ -105,7 +137,7 @@ class CharacterRuntimeDtoTest {
     @Test
     void toBuilder_shouldRoundtripActivityFields() {
         CharacterRuntimeDto original = CharacterRuntimeDto.builder()
-                .id(9L).aiStatus("cast").customActivity(fishing()).build();
+                .id(9L).aiStatus("cast").customActivities(Collections.singletonList(fishing())).build();
 
         assertEquals(original, original.toBuilder().build());
     }

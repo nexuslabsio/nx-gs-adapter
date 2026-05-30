@@ -209,9 +209,9 @@ runtime character mapping.
 ## Versioning
 
 - `nx-gs-adapter-api` — **minor** bump (additive `CharacterRuntimeDto.aiStatus`
-  + `customActivity` fields, new `CustomActivity` type, `WellKnownAiStatuses` /
-  `WellKnownCustomActivities` / `WellKnownCustomActivityMetadata`; single
-  canonical 15-arg constructor; wire-compatible — old producers omit the keys).
+    + `customActivity` fields, new `CustomActivity` type, `WellKnownAiStatuses` /
+      `WellKnownCustomActivities` / `WellKnownCustomActivityMetadata`; single
+      canonical 15-arg constructor; wire-compatible — old producers omit the keys).
 - `nx-gs-adapter-core` / `nx-gs-db-sync-core` / `nx-gs-runtime-sync-core` /
   `nx-gs-kafka` — no contract change (the runtime engine hashes whatever the
   mapping mixes).
@@ -219,6 +219,43 @@ runtime character mapping.
 - `nx-telegram` — character detail view renders the fishing block (R10).
 - `nx-gameservers` — Liquibase `v2.3.0_character_activity.sql`, runtime upsert,
   read API.
+
+## Amendment — `customActivities` array + autofarming
+
+> Supersedes the singular-`customActivity` shape described in R3–R8 above.
+> A character can be in several sustained activities at once (e.g. autofarming
+> while fishing), so the single object becomes a **list**, and a new
+> `autofarming` activity is added.
+
+- **A1. `CharacterRuntimeDto.customActivity` (single `CustomActivity`) →
+  `customActivities` (`@Nullable List<CustomActivity>`).** Wire field is now a
+  JSON **array** of `{type, metadata}` objects. `null` / omitted / empty = "no
+  special activity". The list is defensively copied + unmodifiable. `CustomActivity`
+  itself is unchanged (`type` + open `metadata`). Builder/getter/hash all move to
+  the plural. The 15-arg canonical constructor keeps its arity (last arg type
+  changes `CustomActivity` → `List<CustomActivity>`).
+- **A2. New activity `autofarming`** (`WellKnownCustomActivities.AUTOFARMING`) —
+  server-side auto-hunt. Time-limited builds carry the remaining purchased
+  auto-farm time on the new metadata key
+  `WellKnownCustomActivityMetadata.SECONDS_REMAINING` (`seconds_remaining`),
+  omitted when the farm is unlimited / free.
+- **A3. bohpts `CharacterRuntimeMapping`** now collects a list:
+  `resolveFishing(p)` (unchanged logic) + `resolveAutofarming(p)`. Autofarming is
+  emitted while `player.getFarmSystem().isAutofarming()`; `seconds_remaining`
+  comes from `AutoFarmOptions.getFarmEndTaskDelay(SECONDS)` (the scheduled
+  farm-end countdown; `-1` → unlimited → key omitted). `hash(dto)` iterates the
+  list (fixed order fishing→autofarming) so the diff/publish trigger is stable.
+- **A4. `nx-gameservers`** — column `gs_characters.custom_activity` →
+  `custom_activities` (still JSONB; now holds the array). Migration `v2.3.0`
+  edited in place (assumed not yet deployed — otherwise a follow-up
+  `ALTER … RENAME COLUMN` migration is needed). `CharacterRepository` serializes
+  the `List<CustomActivity>`; read API field `customActivities` stays
+  `@JsonRawValue` raw-JSON passthrough (now an array).
+- **A5. `nx-telegram`** — `CharacterStats.activity` → `activities`
+  (`List<CharacterActivity>`); adapter parses the JSONB array; char-info screen
+  renders one block per activity (fishing as before + a new `autofarming` block
+  showing remaining time). New localization keys `chars.info.autofarming.{title,
+  remaining}` (ru/en/uk).
 
 ## Links
 

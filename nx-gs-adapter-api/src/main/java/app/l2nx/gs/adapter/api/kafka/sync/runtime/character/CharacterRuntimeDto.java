@@ -2,6 +2,9 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -39,19 +42,22 @@ import java.util.Objects;
  * cadence is too coarse to surface presence reactively.</p>
  *
  * <p>Activity signals ({@link #getAiStatus() aiStatus},
- * {@link #getCustomActivity() customActivity}) describe "what the character is
- * doing" for dashboard / presence consumers. They are two <b>independent</b>
- * open strings — no precedence between them is implied by the wire:
+ * {@link #getCustomActivities() customActivities}) describe "what the character
+ * is doing" for dashboard / presence consumers. They are <b>independent</b> —
+ * no precedence between them is implied by the wire:
  * <ul>
  *   <li>{@code aiStatus} — engine-native control intention (canonical values in
  *   {@link WellKnownAiStatuses}). Transient: flips with movement / combat much
  *   like {@code x}/{@code y}/{@code z}.</li>
- *   <li>{@code customActivity} — build-specific sustained activity as a
- *   structured {@link CustomActivity} ({@code type} + open {@code metadata};
- *   e.g. fishing with elapsed-time / penalty-tier metadata). Long-lived;
- *   {@code null} when the character is not in any special activity. The activity
- *   set varies per core, so the envelope is open: hosts emit their own type /
- *   metadata keys and consumers tolerate unknown values.</li>
+ *   <li>{@code customActivities} — build-specific sustained activities as a
+ *   <b>list</b> of structured {@link CustomActivity} entries ({@code type} +
+ *   open {@code metadata}; e.g. fishing with elapsed-time / penalty-tier
+ *   metadata, or autofarming with remaining-time metadata). A character can be
+ *   in several at once (e.g. autofarming while fishing), so the wire carries
+ *   them as a JSON array. Long-lived; {@code null} / omitted when the character
+ *   is not in any special activity. The activity set varies per core, so each
+ *   entry is open: hosts emit their own type / metadata keys and consumers
+ *   tolerate unknown values.</li>
  * </ul>
  * Both are {@code null} on offline tombstones and on hosts that do not populate
  * them.</p>
@@ -72,7 +78,7 @@ public final class CharacterRuntimeDto {
     private final @Nullable Integer z;
     private final @Nullable Boolean online;
     private final @Nullable String aiStatus;
-    private final @Nullable CustomActivity customActivity;
+    private final @Nullable List<CustomActivity> customActivities;
 
     /**
      * Canonical constructor. Prefer {@link #builder()} — positional construction
@@ -92,7 +98,7 @@ public final class CharacterRuntimeDto {
                                @Nullable Integer z,
                                @Nullable Boolean online,
                                @Nullable String aiStatus,
-                               @Nullable CustomActivity customActivity) {
+                               @Nullable List<CustomActivity> customActivities) {
         this.id = id;
         this.curHp = curHp;
         this.maxHp = maxHp;
@@ -107,7 +113,9 @@ public final class CharacterRuntimeDto {
         this.z = z;
         this.online = online;
         this.aiStatus = aiStatus;
-        this.customActivity = customActivity;
+        this.customActivities = customActivities == null
+                ? null
+                : Collections.unmodifiableList(new ArrayList<CustomActivity>(customActivities));
     }
 
     /**
@@ -184,28 +192,30 @@ public final class CharacterRuntimeDto {
      * string; canonical lower_snake_case values in {@link WellKnownAiStatuses}.
      * {@code null} when the host does not report it or on offline tombstones.
      * Transient by nature — flips with movement / combat. Independent of
-     * {@link #getCustomActivity() customActivity}.
+     * {@link #getCustomActivities() customActivities}.
      */
     public @Nullable String getAiStatus() {
         return aiStatus;
     }
 
     /**
-     * Build-specific sustained activity — the high-level "what the player is
-     * occupied with" signal that lives outside the engine AI state machine
-     * (e.g. fishing, reading a book). Structured {@link CustomActivity}:
-     * a required {@code type} discriminator (canonical values in
+     * Build-specific sustained activities — the high-level "what the player is
+     * occupied with" signals that live outside the engine AI state machine
+     * (e.g. fishing, reading a book, autofarming). A <b>list</b> of structured
+     * {@link CustomActivity} entries because a character can be in several at
+     * once (e.g. autofarming while fishing). Each entry carries a required
+     * {@code type} discriminator (canonical values in
      * {@link WellKnownCustomActivities}) plus an open {@code metadata} map for
      * activity-specific extras (canonical keys in
      * {@link WellKnownCustomActivityMetadata}). The set varies per core, so the
      * envelope stays agnostic — hosts emit their own type / keys and consumers
      * tolerate unknowns. {@code null} when the character is in no special
-     * activity, the host does not report it, or on offline tombstones.
-     * Independent of {@link #getAiStatus() aiStatus} — no precedence between
-     * the two.
+     * activity, the host does not report it, or on offline tombstones; when
+     * non-null the returned list is unmodifiable. Independent of
+     * {@link #getAiStatus() aiStatus} — no precedence between the two.
      */
-    public @Nullable CustomActivity getCustomActivity() {
-        return customActivity;
+    public @Nullable List<CustomActivity> getCustomActivities() {
+        return customActivities;
     }
 
     /**
@@ -236,7 +246,7 @@ public final class CharacterRuntimeDto {
                 .z(z)
                 .online(online)
                 .aiStatus(aiStatus)
-                .customActivity(customActivity);
+                .customActivities(customActivities);
     }
 
     public static Builder builder() {
@@ -262,13 +272,13 @@ public final class CharacterRuntimeDto {
                 && Objects.equals(z, that.z)
                 && Objects.equals(online, that.online)
                 && Objects.equals(aiStatus, that.aiStatus)
-                && Objects.equals(customActivity, that.customActivity);
+                && Objects.equals(customActivities, that.customActivities);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(id, curHp, maxHp, curMp, maxMp, curCp, maxCp,
-                curVit, maxVit, x, y, z, online, aiStatus, customActivity);
+                curVit, maxVit, x, y, z, online, aiStatus, customActivities);
     }
 
     @Override
@@ -281,7 +291,7 @@ public final class CharacterRuntimeDto {
                 + ", x=" + x + ", y=" + y + ", z=" + z
                 + ", online=" + online
                 + ", aiStatus=" + aiStatus
-                + ", customActivity=" + customActivity + "]";
+                + ", customActivities=" + customActivities + "]";
     }
 
     public static final class Builder {
@@ -299,7 +309,7 @@ public final class CharacterRuntimeDto {
         private @Nullable Integer z;
         private @Nullable Boolean online;
         private @Nullable String aiStatus;
-        private @Nullable CustomActivity customActivity;
+        private @Nullable List<CustomActivity> customActivities;
 
         public Builder id(long id) {
             this.id = id;
@@ -376,19 +386,20 @@ public final class CharacterRuntimeDto {
         }
 
         /**
-         * Build-specific sustained activity — structured {@link CustomActivity}
-         * ({@code type} + open {@code metadata}). {@code null} when the character
-         * is in no special activity.
+         * Build-specific sustained activities — a list of structured
+         * {@link CustomActivity} entries ({@code type} + open {@code metadata}).
+         * {@code null} when the character is in no special activity. Defensively
+         * copied on {@link #build()}.
          */
-        public Builder customActivity(@Nullable CustomActivity customActivity) {
-            this.customActivity = customActivity;
+        public Builder customActivities(@Nullable List<CustomActivity> customActivities) {
+            this.customActivities = customActivities;
             return this;
         }
 
         public CharacterRuntimeDto build() {
             return new CharacterRuntimeDto(id, curHp, maxHp, curMp, maxMp,
                     curCp, maxCp, curVit, maxVit, x, y, z, online,
-                    aiStatus, customActivity);
+                    aiStatus, customActivities);
         }
     }
 }

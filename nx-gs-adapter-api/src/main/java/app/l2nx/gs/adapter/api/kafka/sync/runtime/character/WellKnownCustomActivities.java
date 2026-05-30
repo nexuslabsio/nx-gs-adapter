@@ -2,7 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 /**
  * Canonical {@code type} discriminator values for {@link CustomActivity#getType()}
- * (the structured value of {@link CharacterRuntimeDto#getCustomActivity()}). The
+ * (one entry of {@link CharacterRuntimeDto#getCustomActivities()}). The
  * custom activity is a <b>build-specific</b>, high-level "what the player is
  * occupied with" signal that lives outside the engine AI state machine —
  * sustained activities a particular core implements on its own state and timers
@@ -17,8 +17,8 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  * the {@code type} is an <b>open string</b> with the widest possible host
  * freedom: a host emits whatever lower_snake_case activity key its core supports,
  * and consumers map known values to a label / icon while falling back to the raw
- * string for unknowns. A {@code null} {@code customActivity} means "no special
- * activity".</p>
+ * string for unknowns. A {@code null} / empty {@code customActivities} means "no
+ * special activity".</p>
  *
  * <p>The constants below are merely the activities seen often enough to be worth
  * naming — they are NOT an exhaustive or required set, and a build that has none
@@ -33,6 +33,9 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  *     <li>{@link #FISHING} — the character is fishing.</li>
  *     <li>{@link #READING} — the character is reading a book (custom activity on
  *     cores that ship it in place of, or alongside, fishing).</li>
+ *     <li>{@link #AUTOFARMING} — the character is auto-farming (server-side
+ *     bot/auto-hunt). Time-limited builds ride a {@code seconds_remaining}
+ *     metadata key — see {@link WellKnownCustomActivityMetadata}.</li>
  * </ul>
  */
 public final class WellKnownCustomActivities {
@@ -49,4 +52,12 @@ public final class WellKnownCustomActivities {
      * The character is reading a book.
      */
     public static final String READING = "reading";
+
+    /**
+     * The character is auto-farming (server-side auto-hunt). On time-limited
+     * builds the remaining auto-farm time rides the
+     * {@link WellKnownCustomActivityMetadata#SECONDS_REMAINING} metadata key
+     * (absent when the farm is unlimited / free).
+     */
+    public static final String AUTOFARMING = "autofarming";
 }

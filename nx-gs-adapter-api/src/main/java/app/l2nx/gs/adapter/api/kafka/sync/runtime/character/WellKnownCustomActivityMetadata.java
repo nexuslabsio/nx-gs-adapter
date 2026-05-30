@@ -2,13 +2,13 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 /**
  * Canonical keys (and a few canonical values) for the open
- * {@link CustomActivity#getMetadata() customActivity.metadata} map. Mirrors the
+ * {@link CustomActivity#getMetadata() customActivities[].metadata} map. Mirrors the
  * {@code WellKnown*Metadata} constants on the discrete event DTOs
  * ({@code WellKnownPresenceMetadata}, {@code WellKnownGameEventMetadata}).
  *
  * <p>All metadata values are <b>stringified</b> — numbers and enums are carried
- * as their string form (the platform stores the whole {@code customActivity} as
- * JSONB and the dashboard parses what it needs). The key set is <b>open and
+ * as their string form (the platform stores the whole {@code customActivities}
+ * array as JSONB and the dashboard parses what it needs). The key set is <b>open and
  * non-exhaustive</b>: a host MAY publish arbitrary keys for its own activities
  * without an API release, and consumers ignore keys they do not understand.
  * Adding a constant here is a non-breaking minor-version change.</p>
@@ -31,6 +31,12 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  *   <li>{@link #SECONDS_TO_NEXT_TIER} — seconds of further active fishing until
  *   the next penalty tier kicks in. Omitted once at the worst tier (no next).</li>
  * </ul>
+ *
+ * <h2>Autofarming ({@link WellKnownCustomActivities#AUTOFARMING})</h2>
+ * <ul>
+ *   <li>{@link #SECONDS_REMAINING} — seconds of purchased auto-farm time left
+ *   before it expires. Omitted when the farm is unlimited / free (no countdown).</li>
+ * </ul>
  */
 public final class WellKnownCustomActivityMetadata {
 
@@ -43,6 +49,12 @@ public final class WellKnownCustomActivityMetadata {
      * Seconds the character has been in this activity (any timed activity).
      */
     public static final String ELAPSED_SECONDS = "elapsed_seconds";
+
+    /**
+     * Seconds remaining before a timed activity expires (e.g. purchased
+     * auto-farm time). Omitted when the activity has no countdown.
+     */
+    public static final String SECONDS_REMAINING = "seconds_remaining";
 
     // ── Fishing ─────────────────────────────────────────────────────────────
 

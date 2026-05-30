@@ -8,9 +8,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Structured value of {@link CharacterRuntimeDto#getCustomActivity()} — a
+ * One entry of {@link CharacterRuntimeDto#getCustomActivities()} — a
  * build-specific, high-level "what the player is occupied with" signal that lives
- * outside the engine AI state machine (e.g. fishing, reading a book).
+ * outside the engine AI state machine (e.g. fishing, reading a book, autofarming).
  *
  * <p>Deliberately a thin, build-agnostic envelope:
  * <ul>
@@ -30,8 +30,9 @@ import java.util.Objects;
  * <p>The contract intentionally does NOT type any per-activity field (not even
  * {@code elapsed_seconds}) — everything beyond {@code type} is the open
  * {@code metadata} map. This keeps the wire and the platform's JSONB storage
- * agnostic to which core ships which activity. {@code null} {@code customActivity}
- * on {@link CharacterRuntimeDto} means "no special activity".</p>
+ * agnostic to which core ships which activity. A {@code null} / empty
+ * {@code customActivities} on {@link CharacterRuntimeDto} means "no special
+ * activity".</p>
  *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor parameter
  * names so Gson / Jackson can deserialize without {@code @JsonProperty}.</p>
