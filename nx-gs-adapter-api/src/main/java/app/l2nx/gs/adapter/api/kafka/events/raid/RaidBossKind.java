@@ -4,7 +4,7 @@ package app.l2nx.gs.adapter.api.kafka.events.raid;
  * Coarse classification of the raid boss this kill event describes.
  *
  * <p>The host SHOULD apply the detection cascade in this order — first match
- * wins — when populating {@link RaidKillEvent#getBossKind()}:</p>
+ * wins — when populating {@code RaidKillEvent.getBossKind()}:</p>
  *
  * <ol>
  *     <li>Killed inside a reflection / instance zone

@@ -194,6 +194,7 @@ class EventsPublisherTest {
         topics.put("privatetrade", "acme.gs.events.privatetrade");
         topics.put("olympiad", "acme.gs.events.olympiad");
         topics.put("account", "acme.ls.events.account");
+        topics.put("gameevents", "acme.gs.events.gameevents");
         publisher = new EventsPublisher(topics, noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
 
         ModuleStatus status = publisher.currentStatus();

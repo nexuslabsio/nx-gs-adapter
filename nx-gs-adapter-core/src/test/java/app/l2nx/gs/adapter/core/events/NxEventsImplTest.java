@@ -5,7 +5,7 @@ import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEve
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
-import app.l2nx.gs.adapter.api.kafka.events.raid.RaidKillEvent;
+import app.l2nx.gs.adapter.api.kafka.events.raid.kill.RaidKillEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.WellKnownServerOnlineBuckets;
 import app.l2nx.gs.commons.UUIDv7;

@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.events.raid;
+package app.l2nx.gs.adapter.api.kafka.events.raid.kill;
 
 import org.jspecify.annotations.Nullable;
 

@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.kafka.events.account.AccountAuthAttemptEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
+import app.l2nx.gs.adapter.api.kafka.events.gameevents.GameEventSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailCancelledEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailReturnedEvent;
@@ -12,7 +13,8 @@ import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatetrade.PrivateTradeFinishedEvent;
-import app.l2nx.gs.adapter.api.kafka.events.raid.RaidKillEvent;
+import app.l2nx.gs.adapter.api.kafka.events.raid.kill.RaidKillEvent;
+import app.l2nx.gs.adapter.api.kafka.events.raid.respawn.BossRespawnSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.commons.bytes.LongBytes;
 import org.jspecify.annotations.Nullable;
@@ -48,6 +50,8 @@ final class EventTypeRegistry {
                 evt -> LongBytes.bigEndian(((PremiumPurchaseEvent) evt).getCharacterId()));
         register(map, families, ServerOnlineSnapshotEvent.class, "serveronline",
                 evt -> null);
+        register(map, families, GameEventSnapshotEvent.class, "gameevents",
+                evt -> null);
         register(map, families, PrivateStorePurchaseEvent.class, "privatestore",
                 evt -> null);
         register(map, families, PrivateStoreSnapshotEvent.class, "privatestore",
@@ -56,6 +60,10 @@ final class EventTypeRegistry {
                 evt -> LongBytes.bigEndian(((CharacterPresenceEvent) evt).getCharId()));
         register(map, families, RaidKillEvent.class, "raid",
                 evt -> LongBytes.bigEndian(((RaidKillEvent) evt).getBossNpcId()));
+        // Periodic boss-respawn snapshot shares the raid family/topic (related boss
+        // lifecycle); round-robin partition key like other snapshots.
+        register(map, families, BossRespawnSnapshotEvent.class, "raid",
+                evt -> null);
         register(map, families, MailSentEvent.class, "mail",
                 evt -> LongBytes.bigEndian(((MailSentEvent) evt).getMailId()));
         register(map, families, MailAcceptedEvent.class, "mail",

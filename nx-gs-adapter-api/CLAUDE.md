@@ -79,7 +79,8 @@ by the L2NX game-server adapter and its consumers. Published as
           purchase → `null` (round-robin, no single natural per-entity key).
     - `events.raid` — `RaidKillEvent` (final) + `RaidActor` /
       `RaidDropItem` sub-DTOs + `RaidBossKind` enum (`RAID` /
-      `GRAND_BOSS` / `INSTANCE_BOSS`). Single-event family; one event per
+      `GRAND_BOSS` / `INSTANCE_BOSS`). Multi-event family (kill fact +
+      boss-respawn snapshot, see below); one `RaidKillEvent` per
       `Attackable.isRaid() && !isRaidMinion()` death. Carries UUIDv7
       `eventId` (REQUIRED, derive `occurredAt`), `bossNpcId` (REQUIRED,
       partition key as 8-byte big-endian), `bossKind` (REQUIRED), boss
@@ -96,6 +97,31 @@ by the L2NX game-server adapter and its consumers. Published as
       stable across leader changes within the same group instance, reset
       on disband / restart). Topic retention 3h (platform default for
       event topics; long-term persistence is consumer-side).
+      Second message type in this family: `BossRespawnSnapshotEvent`
+      (final, UUIDv7 `eventId` + `List<BossRespawnEntry> bosses` +
+      `WellKnownBossStatuses` constants). Periodic FULL snapshot of every
+      tracked raid boss (grand / epic + open-world), host-pushed via
+      `NxEvents.publish(...)` on the same `raid` topic (dispatched by
+      `Nx-Message-Type`). Each `BossRespawnEntry` carries `npcId` (REQUIRED —
+      platform resolves the boss name from this id; names are NOT on the wire),
+      `level?`, `kind` (reuses `RaidBossKind` — only `RAID` / `GRAND_BOSS`
+      emitted), `status` (REQUIRED, open string; canonical
+      `alive` / `in_combat` / `dead` via `WellKnownBossStatuses`),
+      `nextRespawnAt?` (`Instant`, set when dead + known), and an open
+      `metadata` map. Partition key: `null` (round-robin; `RaidKillEvent`
+      keeps its `bossNpcId` key — per-type keys like `privatestore`). Platform
+      keeps last-known per server (mark-and-sweep) and counts the respawn down
+      locally.
+    - `events.gameevents` — `GameEventSnapshotEvent` (final, UUIDv7
+      `eventId` + `List<GameEventEntry> events`) + `WellKnownGameEventMetadata`
+      constants. Single-event family; periodic FULL snapshot of every
+      configured recurring event (TvT and others), host-pushed via
+      `NxEvents.publish(...)`. Each `GameEventEntry` carries `code`
+      (REQUIRED, stable build-agnostic id), `name?`, `enabled` / `running`
+      (REQUIRED), `nextStartAt?` (`Instant`), and an open `metadata` map
+      whose one canonical key today is `event_kind=tvt`
+      (`WellKnownGameEventMetadata`). Partition key: `null` (round-robin).
+      Build-agnostic — TvT is one mapping, not a contract assumption.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:

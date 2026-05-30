@@ -15,7 +15,7 @@ import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEve
 import app.l2nx.gs.adapter.api.kafka.events.privatetrade.PrivateTradeFinishedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatetrade.TradeParty;
 import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
-import app.l2nx.gs.adapter.api.kafka.events.raid.RaidKillEvent;
+import app.l2nx.gs.adapter.api.kafka.events.raid.kill.RaidKillEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.commons.UUIDv7;
 import org.junit.jupiter.api.Test;
