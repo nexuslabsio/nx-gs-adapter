@@ -3,8 +3,7 @@ package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Closed Olympiad 1v1 match — one event per participant (self-perspective).
@@ -14,6 +13,11 @@ import java.util.UUID;
  * cases (default / disconnect / timeout / both-offline) — see
  * {@link OlympiadMatchReason}. {@link #getFightStartedAt() fightStartedAt}
  * is {@code null} when no combat occurred.</p>
+ *
+ * <p>{@link #getMetadata() metadata} — optional open string&rarr;string map of
+ * build-agnostic attributes about this match. {@code null} when absent;
+ * hosts MAY publish arbitrary keys without an API release, and
+ * consumers ignore keys they do not understand.</p>
  */
 public final class OlympiadMatchResultEvent {
 
@@ -40,6 +44,7 @@ public final class OlympiadMatchResultEvent {
     private final int opponentDamageDealt;
     private final @Nullable Instant fightStartedAt;
     private final long fightDurationSec;
+    private final @Nullable Map<String, String> metadata;
 
     public OlympiadMatchResultEvent(UUID eventId,
                                     UUID matchId,
@@ -58,7 +63,8 @@ public final class OlympiadMatchResultEvent {
                                     int damageDealt,
                                     int opponentDamageDealt,
                                     @Nullable Instant fightStartedAt,
-                                    long fightDurationSec) {
+                                    long fightDurationSec,
+                                    @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.matchId = matchId;
         this.olympiadCycle = olympiadCycle;
@@ -77,6 +83,9 @@ public final class OlympiadMatchResultEvent {
         this.opponentDamageDealt = opponentDamageDealt;
         this.fightStartedAt = fightStartedAt;
         this.fightDurationSec = fightDurationSec;
+        this.metadata = metadata == null
+                ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {
@@ -160,6 +169,10 @@ public final class OlympiadMatchResultEvent {
         return fightDurationSec;
     }
 
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
@@ -179,7 +192,8 @@ public final class OlympiadMatchResultEvent {
                 .damageDealt(damageDealt)
                 .opponentDamageDealt(opponentDamageDealt)
                 .fightStartedAt(fightStartedAt)
-                .fightDurationSec(fightDurationSec);
+                .fightDurationSec(fightDurationSec)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -208,7 +222,8 @@ public final class OlympiadMatchResultEvent {
                 && Objects.equals(opponentClanId, that.opponentClanId)
                 && result == that.result
                 && reason == that.reason
-                && Objects.equals(fightStartedAt, that.fightStartedAt);
+                && Objects.equals(fightStartedAt, that.fightStartedAt)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
@@ -219,7 +234,7 @@ public final class OlympiadMatchResultEvent {
                 result, reason,
                 pointsBefore, pointsAfter,
                 damageDealt, opponentDamageDealt,
-                fightStartedAt, fightDurationSec);
+                fightStartedAt, fightDurationSec, metadata);
     }
 
     @Override
@@ -241,7 +256,8 @@ public final class OlympiadMatchResultEvent {
                 + ", damageDealt=" + damageDealt
                 + ", opponentDamageDealt=" + opponentDamageDealt
                 + ", fightStartedAt=" + fightStartedAt
-                + ", fightDurationSec=" + fightDurationSec + "]";
+                + ", fightDurationSec=" + fightDurationSec
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -263,6 +279,7 @@ public final class OlympiadMatchResultEvent {
         private int opponentDamageDealt;
         private @Nullable Instant fightStartedAt;
         private long fightDurationSec;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -354,6 +371,11 @@ public final class OlympiadMatchResultEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public OlympiadMatchResultEvent build() {
             return new OlympiadMatchResultEvent(eventId, matchId, olympiadCycle, gameType,
                     charId, classId, clanId,
@@ -361,7 +383,7 @@ public final class OlympiadMatchResultEvent {
                     result, reason,
                     pointsBefore, pointsAfter,
                     damageDealt, opponentDamageDealt,
-                    fightStartedAt, fightDurationSec);
+                    fightStartedAt, fightDurationSec, metadata);
         }
     }
 }

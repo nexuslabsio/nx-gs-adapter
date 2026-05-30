@@ -45,6 +45,10 @@ import java.util.*;
  *   fighters). Producers SHOULD emit sorted by
  *   {@link RaidActor#getDamageDealt() damageDealt} desc as a consumer
  *   convenience — support entries (damage=0) park at the tail.</li>
+ *   <li>{@link #getMetadata() metadata} — optional open string→string map of
+ *   build-agnostic attributes about this kill. {@code null} when absent;
+ *   hosts MAY add arbitrary keys without an API release and consumers
+ *   ignore keys they do not understand.</li>
  * </ul></p>
  *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
@@ -63,6 +67,7 @@ public final class RaidKillEvent {
     private final @Nullable RaidActor dropOwner;
     private final List<RaidActor> participants;
     private final List<RaidDropItem> drops;
+    private final @Nullable Map<String, String> metadata;
 
     public RaidKillEvent(UUID eventId,
                          int bossNpcId,
@@ -73,7 +78,8 @@ public final class RaidKillEvent {
                          @Nullable RaidActor lastHit,
                          @Nullable RaidActor dropOwner,
                          @Nullable List<RaidActor> participants,
-                         @Nullable List<RaidDropItem> drops) {
+                         @Nullable List<RaidDropItem> drops,
+                         @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "RaidKillEvent.eventId is required");
         this.bossNpcId = bossNpcId;
         this.bossName = bossName;
@@ -84,6 +90,7 @@ public final class RaidKillEvent {
         this.dropOwner = dropOwner;
         this.participants = freezeList(participants);
         this.drops = freezeList(drops);
+        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -167,6 +174,15 @@ public final class RaidKillEvent {
         return drops;
     }
 
+    /**
+     * Optional open string→string attributes about this kill — {@code null}
+     * when absent. Hosts MAY add arbitrary keys without
+     * an API release; consumers ignore keys they do not understand.
+     */
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
@@ -178,7 +194,8 @@ public final class RaidKillEvent {
                 .lastHit(lastHit)
                 .dropOwner(dropOwner)
                 .participants(participants)
-                .drops(drops);
+                .drops(drops)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -206,13 +223,14 @@ public final class RaidKillEvent {
                 && Objects.equals(lastHit, that.lastHit)
                 && Objects.equals(dropOwner, that.dropOwner)
                 && participants.equals(that.participants)
-                && drops.equals(that.drops);
+                && drops.equals(that.drops)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(eventId, bossNpcId, bossName, bossLevel, bossKind,
-                instanceId, lastHit, dropOwner, participants, drops);
+                instanceId, lastHit, dropOwner, participants, drops, metadata);
     }
 
     @Override
@@ -225,7 +243,8 @@ public final class RaidKillEvent {
                 + ", lastHit=" + lastHit
                 + ", dropOwner=" + dropOwner
                 + ", participants=" + participants.size()
-                + ", drops=" + drops.size() + "]";
+                + ", drops=" + drops.size()
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -239,6 +258,7 @@ public final class RaidKillEvent {
         private @Nullable RaidActor dropOwner;
         private @Nullable List<RaidActor> participants;
         private @Nullable List<RaidDropItem> drops;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -290,9 +310,14 @@ public final class RaidKillEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public RaidKillEvent build() {
             return new RaidKillEvent(eventId, bossNpcId, bossName, bossLevel, bossKind,
-                    instanceId, lastHit, dropOwner, participants, drops);
+                    instanceId, lastHit, dropOwner, participants, drops, metadata);
         }
     }
 }

@@ -21,6 +21,10 @@ import java.util.*;
  * MUST NOT emit an empty event; the wire schema permits it, the platform
  * consumer logs and dedupes rather than rejecting.</p>
  *
+ * <p>{@link #getMetadata() metadata} is an optional open string&rarr;string map
+ * of build-agnostic attributes, {@code null} when absent (the common path). Hosts
+ * MAY add arbitrary keys without an API release; consumers ignore unknown keys.</p>
+ *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
  * parameter names so Gson can deserialize without {@code @JsonProperty}.</p>
  */
@@ -32,19 +36,22 @@ public final class PremiumPurchaseEvent {
     private final @Nullable String accountName;
     private final List<PurchaseItem> items;
     private final List<PurchaseService> services;
+    private final @Nullable Map<String, String> metadata;
 
     public PremiumPurchaseEvent(UUID eventId,
                                 long characterId,
                                 @Nullable String characterName,
                                 @Nullable String accountName,
                                 @Nullable List<PurchaseItem> items,
-                                @Nullable List<PurchaseService> services) {
+                                @Nullable List<PurchaseService> services,
+                                @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.characterId = characterId;
         this.characterName = characterName;
         this.accountName = accountName;
         this.items = freezeList(items);
         this.services = freezeList(services);
+        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -94,6 +101,15 @@ public final class PremiumPurchaseEvent {
         return services == null ? Collections.emptyList() : services;
     }
 
+    /**
+     * Optional open string&rarr;string map of build-agnostic attributes.
+     * {@code null} when absent (the common path). Hosts MAY add arbitrary keys
+     * without an API release; consumers ignore unknown keys.
+     */
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
@@ -101,7 +117,8 @@ public final class PremiumPurchaseEvent {
                 .characterName(characterName)
                 .accountName(accountName)
                 .items(items)
-                .services(services);
+                .services(services)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -125,12 +142,13 @@ public final class PremiumPurchaseEvent {
                 && Objects.equals(characterName, that.characterName)
                 && Objects.equals(accountName, that.accountName)
                 && Objects.equals(items, that.items)
-                && Objects.equals(services, that.services);
+                && Objects.equals(services, that.services)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, characterId, characterName, accountName, items, services);
+        return Objects.hash(eventId, characterId, characterName, accountName, items, services, metadata);
     }
 
     @Override
@@ -140,7 +158,8 @@ public final class PremiumPurchaseEvent {
                 + ", characterName=" + characterName
                 + ", accountName=" + accountName
                 + ", items=" + items
-                + ", services=" + services + "]";
+                + ", services=" + services
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -150,6 +169,7 @@ public final class PremiumPurchaseEvent {
         private @Nullable String accountName;
         private @Nullable List<PurchaseItem> items;
         private @Nullable List<PurchaseService> services;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -181,9 +201,14 @@ public final class PremiumPurchaseEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public PremiumPurchaseEvent build() {
             return new PremiumPurchaseEvent(eventId, characterId, characterName,
-                    accountName, items, services);
+                    accountName, items, services, metadata);
         }
     }
 }

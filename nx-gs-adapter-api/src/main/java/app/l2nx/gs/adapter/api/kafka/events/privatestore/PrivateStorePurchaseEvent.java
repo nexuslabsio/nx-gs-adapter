@@ -38,6 +38,7 @@ public final class PrivateStorePurchaseEvent {
     private final long buyerId;
     private final @Nullable String buyerName;
     private final List<TradeLine> lines;
+    private final @Nullable Map<String, String> metadata;
 
     public PrivateStorePurchaseEvent(UUID eventId,
                                      PrivateStoreSide storeType,
@@ -45,7 +46,8 @@ public final class PrivateStorePurchaseEvent {
                                      @Nullable String sellerName,
                                      long buyerId,
                                      @Nullable String buyerName,
-                                     @Nullable List<TradeLine> lines) {
+                                     @Nullable List<TradeLine> lines,
+                                     @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.storeType = storeType;
         this.sellerId = sellerId;
@@ -53,6 +55,9 @@ public final class PrivateStorePurchaseEvent {
         this.buyerId = buyerId;
         this.buyerName = buyerName;
         this.lines = freezeList(lines);
+        this.metadata = metadata == null
+                ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -114,6 +119,16 @@ public final class PrivateStorePurchaseEvent {
         return lines;
     }
 
+    /**
+     * Optional open string&rarr;string map of build-agnostic attributes about
+     * this purchase. {@code null} when absent. Hosts MAY publish
+     * arbitrary keys without an API release; consumers ignore keys they do not
+     * understand.
+     */
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
@@ -122,7 +137,8 @@ public final class PrivateStorePurchaseEvent {
                 .sellerName(sellerName)
                 .buyerId(buyerId)
                 .buyerName(buyerName)
-                .lines(lines);
+                .lines(lines)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -147,12 +163,13 @@ public final class PrivateStorePurchaseEvent {
                 && storeType == that.storeType
                 && Objects.equals(sellerName, that.sellerName)
                 && Objects.equals(buyerName, that.buyerName)
-                && Objects.equals(lines, that.lines);
+                && Objects.equals(lines, that.lines)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, storeType, sellerId, sellerName, buyerId, buyerName, lines);
+        return Objects.hash(eventId, storeType, sellerId, sellerName, buyerId, buyerName, lines, metadata);
     }
 
     @Override
@@ -163,7 +180,8 @@ public final class PrivateStorePurchaseEvent {
                 + ", sellerName=" + sellerName
                 + ", buyerId=" + buyerId
                 + ", buyerName=" + buyerName
-                + ", lines=" + lines + "]";
+                + ", lines=" + lines
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -174,6 +192,7 @@ public final class PrivateStorePurchaseEvent {
         private long buyerId;
         private @Nullable String buyerName;
         private @Nullable List<TradeLine> lines;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -210,9 +229,14 @@ public final class PrivateStorePurchaseEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public PrivateStorePurchaseEvent build() {
             return new PrivateStorePurchaseEvent(
-                    eventId, storeType, sellerId, sellerName, buyerId, buyerName, lines);
+                    eventId, storeType, sellerId, sellerName, buyerId, buyerName, lines, metadata);
         }
     }
 }

@@ -30,6 +30,12 @@ import java.util.*;
  * directly. See {@link WellKnownServerOnlineBuckets} for the soft
  * cross-bucket invariant.</p>
  *
+ * <p>{@link #getMetadata() metadata} is a separate, optional open
+ * string→string map of build-agnostic attributes describing this snapshot
+ * (distinct from {@link #getBuckets() buckets}, which carries the numeric
+ * population breakdown). {@code null} when absent. Hosts MAY publish arbitrary
+ * keys without an API release; consumers ignore keys they do not understand.</p>
+ *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
  * parameter names so Gson can deserialize without {@code @JsonProperty}.</p>
  */
@@ -37,11 +43,14 @@ public final class ServerOnlineSnapshotEvent {
 
     private final UUID eventId;
     private final Map<String, Long> buckets;
+    private final @Nullable Map<String, String> metadata;
 
     public ServerOnlineSnapshotEvent(UUID eventId,
-                                     @Nullable Map<String, Long> buckets) {
+                                     @Nullable Map<String, Long> buckets,
+                                     @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.buckets = freezeMap(buckets);
+        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -65,10 +74,25 @@ public final class ServerOnlineSnapshotEvent {
         return buckets;
     }
 
+    /**
+     * Open string→string map of build-agnostic attributes about this
+     * snapshot. {@code null} when absent. When non-null the returned map is
+     * unmodifiable; mutation attempts throw
+     * {@link UnsupportedOperationException}.
+     *
+     * <p>Distinct from {@link #getBuckets() buckets}: this carries no
+     * population counts. Hosts MAY add arbitrary keys without an API release;
+     * consumers ignore keys they do not understand.</p>
+     */
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
-                .buckets(buckets);
+                .buckets(buckets)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -88,23 +112,26 @@ public final class ServerOnlineSnapshotEvent {
         if (!(o instanceof ServerOnlineSnapshotEvent)) return false;
         ServerOnlineSnapshotEvent that = (ServerOnlineSnapshotEvent) o;
         return Objects.equals(eventId, that.eventId)
-                && Objects.equals(buckets, that.buckets);
+                && Objects.equals(buckets, that.buckets)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, buckets);
+        return Objects.hash(eventId, buckets, metadata);
     }
 
     @Override
     public String toString() {
         return "ServerOnlineSnapshotEvent[eventId=" + eventId
-                + ", buckets=" + buckets + "]";
+                + ", buckets=" + buckets
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
         private UUID eventId;
         private @Nullable Map<String, Long> buckets;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -116,8 +143,13 @@ public final class ServerOnlineSnapshotEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public ServerOnlineSnapshotEvent build() {
-            return new ServerOnlineSnapshotEvent(eventId, buckets);
+            return new ServerOnlineSnapshotEvent(eventId, buckets, metadata);
         }
     }
 }

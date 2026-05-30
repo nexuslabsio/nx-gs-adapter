@@ -2,8 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Wire DTO published to the {@code olympiad} family topic
@@ -28,6 +27,11 @@ import java.util.UUID;
  * lives on the CDC {@code CharacterDbDto.hero} flag; this event is the durable
  * historical record of each crowning.</p>
  *
+ * <p>{@link #getMetadata() metadata} — optional open string→string map of
+ * build-agnostic attributes about this crowning. {@code null} when absent;
+ * hosts MAY add arbitrary keys without an API release, and consumers ignore
+ * keys they do not understand.</p>
+ *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
  * parameter names so Gson / Jackson can deserialize without
  * {@code @JsonProperty}.</p>
@@ -39,17 +43,20 @@ public final class HeroGrantedEvent {
     private final int classId;
     private final @Nullable Long clanId;
     private final int olympiadCycle;
+    private final @Nullable Map<String, String> metadata;
 
     public HeroGrantedEvent(UUID eventId,
                             long charId,
                             int classId,
                             @Nullable Long clanId,
-                            int olympiadCycle) {
+                            int olympiadCycle,
+                            @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "HeroGrantedEvent.eventId is required");
         this.charId = charId;
         this.classId = classId;
         this.clanId = clanId;
         this.olympiadCycle = olympiadCycle;
+        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -91,13 +98,23 @@ public final class HeroGrantedEvent {
         return olympiadCycle;
     }
 
+    /**
+     * Optional open string→string map of build-agnostic attributes about this
+     * crowning. {@code null} when absent; hosts MAY add arbitrary keys without
+     * an API release.
+     */
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
                 .charId(charId)
                 .classId(classId)
                 .clanId(clanId)
-                .olympiadCycle(olympiadCycle);
+                .olympiadCycle(olympiadCycle)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -113,12 +130,13 @@ public final class HeroGrantedEvent {
                 && classId == that.classId
                 && olympiadCycle == that.olympiadCycle
                 && eventId.equals(that.eventId)
-                && Objects.equals(clanId, that.clanId);
+                && Objects.equals(clanId, that.clanId)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, charId, classId, clanId, olympiadCycle);
+        return Objects.hash(eventId, charId, classId, clanId, olympiadCycle, metadata);
     }
 
     @Override
@@ -127,7 +145,8 @@ public final class HeroGrantedEvent {
                 + ", charId=" + charId
                 + ", classId=" + classId
                 + ", clanId=" + clanId
-                + ", olympiadCycle=" + olympiadCycle + "]";
+                + ", olympiadCycle=" + olympiadCycle
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -136,6 +155,7 @@ public final class HeroGrantedEvent {
         private int classId;
         private @Nullable Long clanId;
         private int olympiadCycle;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -162,8 +182,13 @@ public final class HeroGrantedEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public HeroGrantedEvent build() {
-            return new HeroGrantedEvent(eventId, charId, classId, clanId, olympiadCycle);
+            return new HeroGrantedEvent(eventId, charId, classId, clanId, olympiadCycle, metadata);
         }
     }
 }

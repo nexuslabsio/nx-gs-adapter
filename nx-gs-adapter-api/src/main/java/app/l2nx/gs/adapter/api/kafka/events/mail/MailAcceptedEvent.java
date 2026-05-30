@@ -8,6 +8,12 @@ import java.util.*;
  * Receiver claimed mail attachments. COD adena movement (if any) is
  * inferred consumer-side from the paired SENT event's
  * {@link MailSentEvent#getCodAmount() codAmount}.
+ *
+ * <ul>
+ *   <li>{@link #getMetadata() metadata} — optional open string→string map of
+ *   build-agnostic attributes about this mail claim. {@code null} when absent;
+ *   hosts MAY add arbitrary keys without an API release.</li>
+ * </ul>
  */
 public final class MailAcceptedEvent {
 
@@ -15,15 +21,20 @@ public final class MailAcceptedEvent {
     private final long mailId;
     private final long claimedByCharId;
     private final List<MailItemMovement> attachments;
+    private final @Nullable Map<String, String> metadata;
 
     public MailAcceptedEvent(UUID eventId,
                              long mailId,
                              long claimedByCharId,
-                             @Nullable List<MailItemMovement> attachments) {
+                             @Nullable List<MailItemMovement> attachments,
+                             @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.mailId = mailId;
         this.claimedByCharId = claimedByCharId;
         this.attachments = freezeList(attachments);
+        this.metadata = metadata == null
+                ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {
@@ -42,12 +53,17 @@ public final class MailAcceptedEvent {
         return attachments;
     }
 
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
                 .mailId(mailId)
                 .claimedByCharId(claimedByCharId)
-                .attachments(attachments);
+                .attachments(attachments)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -69,12 +85,13 @@ public final class MailAcceptedEvent {
         return mailId == that.mailId
                 && claimedByCharId == that.claimedByCharId
                 && Objects.equals(eventId, that.eventId)
-                && Objects.equals(attachments, that.attachments);
+                && Objects.equals(attachments, that.attachments)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, mailId, claimedByCharId, attachments);
+        return Objects.hash(eventId, mailId, claimedByCharId, attachments, metadata);
     }
 
     @Override
@@ -82,7 +99,8 @@ public final class MailAcceptedEvent {
         return "MailAcceptedEvent[eventId=" + eventId
                 + ", mailId=" + mailId
                 + ", claimedByCharId=" + claimedByCharId
-                + ", attachments=" + attachments + "]";
+                + ", attachments=" + attachments
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -90,6 +108,7 @@ public final class MailAcceptedEvent {
         private long mailId;
         private long claimedByCharId;
         private @Nullable List<MailItemMovement> attachments;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -111,8 +130,13 @@ public final class MailAcceptedEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public MailAcceptedEvent build() {
-            return new MailAcceptedEvent(eventId, mailId, claimedByCharId, attachments);
+            return new MailAcceptedEvent(eventId, mailId, claimedByCharId, attachments, metadata);
         }
     }
 }

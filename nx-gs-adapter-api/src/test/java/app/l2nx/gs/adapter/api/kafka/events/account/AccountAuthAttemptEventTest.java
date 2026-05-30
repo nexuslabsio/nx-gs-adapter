@@ -56,42 +56,42 @@ class AccountAuthAttemptEventTest {
     void constructor_shouldRejectNullEventId() {
         assertThrows(NullPointerException.class, () ->
                 new AccountAuthAttemptEvent(null, SAMPLE_SERVER_ID, "a", "1.1.1.1",
-                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null));
+                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
     }
 
     @Test
     void constructor_shouldRejectNullServerId() {
         assertThrows(NullPointerException.class, () ->
                 new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, null, "a", "1.1.1.1",
-                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null));
+                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
     }
 
     @Test
     void constructor_shouldRejectNullAccountName() {
         assertThrows(NullPointerException.class, () ->
                 new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, SAMPLE_SERVER_ID, null, "1.1.1.1",
-                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null));
+                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
     }
 
     @Test
     void constructor_shouldRejectNullClientIp() {
         assertThrows(NullPointerException.class, () ->
                 new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, SAMPLE_SERVER_ID, "a", null,
-                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null));
+                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
     }
 
     @Test
     void constructor_shouldRejectNullOutcome() {
         assertThrows(NullPointerException.class, () ->
                 new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, SAMPLE_SERVER_ID, "a", "1.1.1.1",
-                        null, null, SAMPLE_AT, null));
+                        null, null, SAMPLE_AT, null, null));
     }
 
     @Test
     void constructor_shouldRejectNullAttemptedAt() {
         assertThrows(NullPointerException.class, () ->
                 new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, SAMPLE_SERVER_ID, "a", "1.1.1.1",
-                        null, AuthOutcomes.SUCCESS, null, null));
+                        null, AuthOutcomes.SUCCESS, null, null, null));
     }
 
     @Test

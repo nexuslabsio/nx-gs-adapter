@@ -13,6 +13,13 @@ import java.util.*;
  *
  * <p>{@link #getSubject() subject} and {@link #getBody() body} are plaintext
  * — treat the topic as sensitive.</p>
+ *
+ * <ul>
+ *   <li>{@link #getMetadata() metadata} — optional open string→string map of
+ *   build-agnostic attributes about this mail. {@code null} when absent.
+ *   Hosts MAY add arbitrary keys without an API release; consumers
+ *   ignore keys they do not understand.</li>
+ * </ul>
  */
 public final class MailSentEvent {
 
@@ -26,6 +33,7 @@ public final class MailSentEvent {
     private final Instant expiresAt;
     private final long codAmount;
     private final List<MailItemMovement> attachments;
+    private final @Nullable Map<String, String> metadata;
 
     public MailSentEvent(UUID eventId,
                          long mailId,
@@ -36,7 +44,8 @@ public final class MailSentEvent {
                          @Nullable String body,
                          Instant expiresAt,
                          long codAmount,
-                         @Nullable List<MailItemMovement> attachments) {
+                         @Nullable List<MailItemMovement> attachments,
+                         @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.mailId = mailId;
         this.senderCharId = senderCharId;
@@ -47,6 +56,7 @@ public final class MailSentEvent {
         this.expiresAt = expiresAt;
         this.codAmount = codAmount;
         this.attachments = freezeList(attachments);
+        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -107,6 +117,10 @@ public final class MailSentEvent {
         return attachments;
     }
 
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
@@ -118,7 +132,8 @@ public final class MailSentEvent {
                 .body(body)
                 .expiresAt(expiresAt)
                 .codAmount(codAmount)
-                .attachments(attachments);
+                .attachments(attachments)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -146,13 +161,14 @@ public final class MailSentEvent {
                 && Objects.equals(subject, that.subject)
                 && Objects.equals(body, that.body)
                 && Objects.equals(expiresAt, that.expiresAt)
-                && Objects.equals(attachments, that.attachments);
+                && Objects.equals(attachments, that.attachments)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(eventId, mailId, senderCharId, senderName, receiverCharId,
-                subject, body, expiresAt, codAmount, attachments);
+                subject, body, expiresAt, codAmount, attachments, metadata);
     }
 
     @Override
@@ -166,7 +182,8 @@ public final class MailSentEvent {
                 + ", body=" + body
                 + ", expiresAt=" + expiresAt
                 + ", codAmount=" + codAmount
-                + ", attachments=" + attachments + "]";
+                + ", attachments=" + attachments
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -180,6 +197,7 @@ public final class MailSentEvent {
         private Instant expiresAt;
         private long codAmount;
         private @Nullable List<MailItemMovement> attachments;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -231,9 +249,14 @@ public final class MailSentEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public MailSentEvent build() {
             return new MailSentEvent(eventId, mailId, senderCharId, senderName, receiverCharId,
-                    subject, body, expiresAt, codAmount, attachments);
+                    subject, body, expiresAt, codAmount, attachments, metadata);
         }
     }
 }

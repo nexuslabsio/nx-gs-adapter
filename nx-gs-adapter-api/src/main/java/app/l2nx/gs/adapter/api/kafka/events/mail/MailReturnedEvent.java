@@ -8,6 +8,13 @@ import java.util.*;
  * Inbox mail rejected (or auto-bounced on expiry) — bounces back to sender
  * as a new mail that surfaces as its own {@link MailSentEvent}.
  * {@link #getMailId() mailId} is the rejected mail's id, NOT the bounce.
+ *
+ * <ul>
+ *   <li>{@link #getMetadata() metadata} — optional open string→string map of
+ *   build-agnostic attributes about this return. {@code null} when absent.
+ *   Hosts MAY add arbitrary keys without an API release; consumers
+ *   ignore keys they do not understand.</li>
+ * </ul>
  */
 public final class MailReturnedEvent {
 
@@ -15,15 +22,18 @@ public final class MailReturnedEvent {
     private final long mailId;
     private final long returnedToSenderId;
     private final List<MailItemMovement> attachments;
+    private final @Nullable Map<String, String> metadata;
 
     public MailReturnedEvent(UUID eventId,
                              long mailId,
                              long returnedToSenderId,
-                             @Nullable List<MailItemMovement> attachments) {
+                             @Nullable List<MailItemMovement> attachments,
+                             @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.mailId = mailId;
         this.returnedToSenderId = returnedToSenderId;
         this.attachments = freezeList(attachments);
+        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {
@@ -42,12 +52,17 @@ public final class MailReturnedEvent {
         return attachments;
     }
 
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
                 .mailId(mailId)
                 .returnedToSenderId(returnedToSenderId)
-                .attachments(attachments);
+                .attachments(attachments)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -69,12 +84,13 @@ public final class MailReturnedEvent {
         return mailId == that.mailId
                 && returnedToSenderId == that.returnedToSenderId
                 && Objects.equals(eventId, that.eventId)
-                && Objects.equals(attachments, that.attachments);
+                && Objects.equals(attachments, that.attachments)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, mailId, returnedToSenderId, attachments);
+        return Objects.hash(eventId, mailId, returnedToSenderId, attachments, metadata);
     }
 
     @Override
@@ -82,7 +98,8 @@ public final class MailReturnedEvent {
         return "MailReturnedEvent[eventId=" + eventId
                 + ", mailId=" + mailId
                 + ", returnedToSenderId=" + returnedToSenderId
-                + ", attachments=" + attachments + "]";
+                + ", attachments=" + attachments
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -90,6 +107,7 @@ public final class MailReturnedEvent {
         private long mailId;
         private long returnedToSenderId;
         private @Nullable List<MailItemMovement> attachments;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -111,8 +129,13 @@ public final class MailReturnedEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public MailReturnedEvent build() {
-            return new MailReturnedEvent(eventId, mailId, returnedToSenderId, attachments);
+            return new MailReturnedEvent(eventId, mailId, returnedToSenderId, attachments, metadata);
         }
     }
 }

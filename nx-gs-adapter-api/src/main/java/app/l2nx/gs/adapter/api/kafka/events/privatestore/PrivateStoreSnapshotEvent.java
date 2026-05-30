@@ -43,15 +43,18 @@ public final class PrivateStoreSnapshotEvent {
     private final long itemId;
     private final PrivateStoreSide side;
     private final List<Offer> offers;
+    private final @Nullable Map<String, String> metadata;
 
     public PrivateStoreSnapshotEvent(UUID eventId,
                                      long itemId,
                                      PrivateStoreSide side,
-                                     @Nullable List<Offer> offers) {
+                                     @Nullable List<Offer> offers,
+                                     @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.itemId = itemId;
         this.side = side;
         this.offers = freezeList(offers);
+        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -91,12 +94,23 @@ public final class PrivateStoreSnapshotEvent {
         return offers;
     }
 
+    /**
+     * Optional open string→string map of build-agnostic attributes about this
+     * snapshot. {@code null} when absent. Hosts MAY add
+     * arbitrary keys without an API release; consumers ignore keys they do not
+     * understand.
+     */
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
                 .itemId(itemId)
                 .side(side)
-                .offers(offers);
+                .offers(offers)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -118,12 +132,13 @@ public final class PrivateStoreSnapshotEvent {
         return itemId == that.itemId
                 && Objects.equals(eventId, that.eventId)
                 && side == that.side
-                && Objects.equals(offers, that.offers);
+                && Objects.equals(offers, that.offers)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, itemId, side, offers);
+        return Objects.hash(eventId, itemId, side, offers, metadata);
     }
 
     @Override
@@ -131,7 +146,8 @@ public final class PrivateStoreSnapshotEvent {
         return "PrivateStoreSnapshotEvent[eventId=" + eventId
                 + ", itemId=" + itemId
                 + ", side=" + side
-                + ", offers=" + offers + "]";
+                + ", offers=" + offers
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -139,6 +155,7 @@ public final class PrivateStoreSnapshotEvent {
         private long itemId;
         private PrivateStoreSide side;
         private @Nullable List<Offer> offers;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -160,8 +177,13 @@ public final class PrivateStoreSnapshotEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public PrivateStoreSnapshotEvent build() {
-            return new PrivateStoreSnapshotEvent(eventId, itemId, side, offers);
+            return new PrivateStoreSnapshotEvent(eventId, itemId, side, offers, metadata);
         }
     }
 }

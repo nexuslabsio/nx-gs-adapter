@@ -2,8 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.events.character;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Discrete presence-change fact — one event per login or logout, emitted
@@ -37,6 +36,14 @@ import java.util.UUID;
  *   <li>{@link #getIp() ip} — optional client IP captured at the event.</li>
  *   <li>{@link #getHwid() hwid} — optional hardware-id (build-specific
  *   format); only carries on cores with HWID tracking.</li>
+ *   <li>{@link #getMetadata() metadata} — optional open string→string map of
+ *   build-agnostic attributes about this presence change. {@code null} when
+ *   absent (the common path). Canonical keys/values are documented in
+ *   {@link WellKnownPresenceMetadata}; the one defined today is
+ *   {@code logout_reason=disconnect}, set on logout events that were caused
+ *   by an involuntary connection loss. Hosts MAY publish arbitrary
+ *   non-canonical keys without an API release; consumers ignore keys they do
+ *   not understand.</li>
  * </ul>
  */
 public final class CharacterPresenceEvent {
@@ -47,19 +54,24 @@ public final class CharacterPresenceEvent {
     private final @Nullable String accountName;
     private final @Nullable String ip;
     private final @Nullable String hwid;
+    private final @Nullable Map<String, String> metadata;
 
     public CharacterPresenceEvent(UUID eventId,
                                   long charId,
                                   boolean online,
                                   @Nullable String accountName,
                                   @Nullable String ip,
-                                  @Nullable String hwid) {
+                                  @Nullable String hwid,
+                                  @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "CharacterPresenceEvent.eventId is required");
         this.charId = charId;
         this.online = online;
         this.accountName = accountName;
         this.ip = ip;
         this.hwid = hwid;
+        this.metadata = metadata == null
+                ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {
@@ -86,6 +98,10 @@ public final class CharacterPresenceEvent {
         return hwid;
     }
 
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
@@ -93,7 +109,8 @@ public final class CharacterPresenceEvent {
                 .online(online)
                 .accountName(accountName)
                 .ip(ip)
-                .hwid(hwid);
+                .hwid(hwid)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -110,12 +127,13 @@ public final class CharacterPresenceEvent {
                 && eventId.equals(that.eventId)
                 && Objects.equals(accountName, that.accountName)
                 && Objects.equals(ip, that.ip)
-                && Objects.equals(hwid, that.hwid);
+                && Objects.equals(hwid, that.hwid)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, charId, online, accountName, ip, hwid);
+        return Objects.hash(eventId, charId, online, accountName, ip, hwid, metadata);
     }
 
     @Override
@@ -125,7 +143,8 @@ public final class CharacterPresenceEvent {
                 + ", online=" + online
                 + ", accountName=" + accountName
                 + ", ip=" + ip
-                + ", hwid=" + hwid + "]";
+                + ", hwid=" + hwid
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -135,6 +154,7 @@ public final class CharacterPresenceEvent {
         private @Nullable String accountName;
         private @Nullable String ip;
         private @Nullable String hwid;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -166,8 +186,13 @@ public final class CharacterPresenceEvent {
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public CharacterPresenceEvent build() {
-            return new CharacterPresenceEvent(eventId, charId, online, accountName, ip, hwid);
+            return new CharacterPresenceEvent(eventId, charId, online, accountName, ip, hwid, metadata);
         }
     }
 }
