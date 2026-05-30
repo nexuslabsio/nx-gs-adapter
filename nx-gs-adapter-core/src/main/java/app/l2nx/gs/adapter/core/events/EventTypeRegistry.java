@@ -1,6 +1,8 @@
 package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.kafka.events.account.AccountAuthAttemptEvent;
+import app.l2nx.gs.adapter.api.kafka.events.castle.CastleSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.castle.SiegeFinishedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.gameevents.GameEventSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
@@ -64,6 +66,12 @@ final class EventTypeRegistry {
         // lifecycle); round-robin partition key like other snapshots.
         register(map, families, BossRespawnSnapshotEvent.class, "raid",
                 evt -> null);
+        // Periodic castle snapshot (owner + next siege) shares the castle family/topic
+        // with the discrete SiegeFinishedEvent; round-robin like other snapshots.
+        register(map, families, CastleSnapshotEvent.class, "castle",
+                evt -> null);
+        register(map, families, SiegeFinishedEvent.class, "castle",
+                evt -> LongBytes.bigEndian(((SiegeFinishedEvent) evt).getCastleId()));
         register(map, families, MailSentEvent.class, "mail",
                 evt -> LongBytes.bigEndian(((MailSentEvent) evt).getMailId()));
         register(map, families, MailAcceptedEvent.class, "mail",

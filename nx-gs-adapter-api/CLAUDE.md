@@ -122,6 +122,21 @@ by the L2NX game-server adapter and its consumers. Published as
       whose one canonical key today is `event_kind=tvt`
       (`WellKnownGameEventMetadata`). Partition key: `null` (round-robin).
       Build-agnostic — TvT is one mapping, not a contract assumption.
+    - `events.castle` — `CastleSnapshotEvent` (final, UUIDv7 `eventId` +
+      `List<CastleSnapshotEntry> castles`) + `SiegeFinishedEvent` (final) +
+      `WellKnownSiegeOutcomes` constants. Multi-event family (snapshot +
+      discrete fact, like `raid`); both ride one `castle` topic, dispatched
+      by `Nx-Message-Type`. `CastleSnapshotEvent` is a periodic FULL snapshot
+      of every castle — each `CastleSnapshotEntry` carries `castleId`
+      (REQUIRED), `name?`, `ownerClanId?` (host maps no-owner sentinel → null),
+      `nextSiegeAt?` (`Instant`), open `metadata`. Partition key: `null`
+      (round-robin). `SiegeFinishedEvent` is one per ended siege: `eventId`
+      (UUIDv7, REQUIRED), `castleId` (REQUIRED, partition key 8-byte BE),
+      `castleName?`, `siegeStartedAt?`, `outcome` (REQUIRED, open string;
+      canonical `captured` / `defended` / `draw` via `WellKnownSiegeOutcomes`),
+      `winnerClanId?` (post-siege holder; null on draw),
+      `attackerClanIds` / `defenderClanIds` (registered clans), open `metadata`.
+      Build-agnostic — outcome is an open string, not a contract assumption.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:
