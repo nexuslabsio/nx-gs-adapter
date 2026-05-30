@@ -37,6 +37,23 @@ import java.util.Objects;
  * Why a runtime-channel signal and not a CDC column on {@code CharacterDbDto}:
  * login / logout would inflate CDC UPDATE volume per cycle, and CDC tick
  * cadence is too coarse to surface presence reactively.</p>
+ *
+ * <p>Activity signals ({@link #getAiStatus() aiStatus},
+ * {@link #getCustomActivity() customActivity}) describe "what the character is
+ * doing" for dashboard / presence consumers. They are two <b>independent</b>
+ * open strings — no precedence between them is implied by the wire:
+ * <ul>
+ *   <li>{@code aiStatus} — engine-native control intention (canonical values in
+ *   {@link WellKnownAiStatuses}). Transient: flips with movement / combat much
+ *   like {@code x}/{@code y}/{@code z}.</li>
+ *   <li>{@code customActivity} — build-specific sustained activity (canonical
+ *   values in {@link WellKnownCustomActivities}; e.g. fishing, reading). Long-lived;
+ *   {@code null} when the character is not in any special activity. The activity
+ *   set varies per core, so the field is open: hosts emit their own keys and
+ *   consumers tolerate unknown values.</li>
+ * </ul>
+ * Both are {@code null} on offline tombstones and on hosts that do not populate
+ * them.</p>
  */
 public final class CharacterRuntimeDto {
 
@@ -53,7 +70,13 @@ public final class CharacterRuntimeDto {
     private final @Nullable Integer y;
     private final @Nullable Integer z;
     private final @Nullable Boolean online;
+    private final @Nullable String aiStatus;
+    private final @Nullable String customActivity;
 
+    /**
+     * Canonical constructor. Prefer {@link #builder()} — positional construction
+     * of 15 mostly-nullable fields is error-prone.
+     */
     public CharacterRuntimeDto(long id,
                                @Nullable Integer curHp,
                                @Nullable Integer maxHp,
@@ -66,7 +89,9 @@ public final class CharacterRuntimeDto {
                                @Nullable Integer x,
                                @Nullable Integer y,
                                @Nullable Integer z,
-                               @Nullable Boolean online) {
+                               @Nullable Boolean online,
+                               @Nullable String aiStatus,
+                               @Nullable String customActivity) {
         this.id = id;
         this.curHp = curHp;
         this.maxHp = maxHp;
@@ -80,6 +105,8 @@ public final class CharacterRuntimeDto {
         this.y = y;
         this.z = z;
         this.online = online;
+        this.aiStatus = aiStatus;
+        this.customActivity = customActivity;
     }
 
     /**
@@ -151,6 +178,32 @@ public final class CharacterRuntimeDto {
     }
 
     /**
+     * Engine-native AI control intention — the reactive server-side state the
+     * core puts the character in (idle / moving / attack / cast / …). Open
+     * string; canonical lower_snake_case values in {@link WellKnownAiStatuses}.
+     * {@code null} when the host does not report it or on offline tombstones.
+     * Transient by nature — flips with movement / combat. Independent of
+     * {@link #getCustomActivity() customActivity}.
+     */
+    public @Nullable String getAiStatus() {
+        return aiStatus;
+    }
+
+    /**
+     * Build-specific sustained activity — the high-level "what the player is
+     * occupied with" signal that lives outside the engine AI state machine
+     * (e.g. fishing, reading a book). Open string; canonical values in
+     * {@link WellKnownCustomActivities}, but the set varies per core so hosts
+     * MAY emit their own keys and consumers tolerate unknowns. {@code null}
+     * when the character is in no special activity, the host does not report
+     * it, or on offline tombstones. Independent of
+     * {@link #getAiStatus() aiStatus} — no precedence between the two.
+     */
+    public @Nullable String getCustomActivity() {
+        return customActivity;
+    }
+
+    /**
      * Resolves the {@link #getOnline() online} wire field to a primitive
      * presence value per the wire convention: omitted / {@code null} /
      * {@code true} all mean ONLINE; only an explicit {@code false} (one-shot
@@ -176,7 +229,9 @@ public final class CharacterRuntimeDto {
                 .x(x)
                 .y(y)
                 .z(z)
-                .online(online);
+                .online(online)
+                .aiStatus(aiStatus)
+                .customActivity(customActivity);
     }
 
     public static Builder builder() {
@@ -200,13 +255,15 @@ public final class CharacterRuntimeDto {
                 && Objects.equals(x, that.x)
                 && Objects.equals(y, that.y)
                 && Objects.equals(z, that.z)
-                && Objects.equals(online, that.online);
+                && Objects.equals(online, that.online)
+                && Objects.equals(aiStatus, that.aiStatus)
+                && Objects.equals(customActivity, that.customActivity);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(id, curHp, maxHp, curMp, maxMp, curCp, maxCp,
-                curVit, maxVit, x, y, z, online);
+                curVit, maxVit, x, y, z, online, aiStatus, customActivity);
     }
 
     @Override
@@ -217,7 +274,9 @@ public final class CharacterRuntimeDto {
                 + ", curCp=" + curCp + ", maxCp=" + maxCp
                 + ", curVit=" + curVit + ", maxVit=" + maxVit
                 + ", x=" + x + ", y=" + y + ", z=" + z
-                + ", online=" + online + "]";
+                + ", online=" + online
+                + ", aiStatus=" + aiStatus
+                + ", customActivity=" + customActivity + "]";
     }
 
     public static final class Builder {
@@ -234,6 +293,8 @@ public final class CharacterRuntimeDto {
         private @Nullable Integer y;
         private @Nullable Integer z;
         private @Nullable Boolean online;
+        private @Nullable String aiStatus;
+        private @Nullable String customActivity;
 
         public Builder id(long id) {
             this.id = id;
@@ -300,9 +361,29 @@ public final class CharacterRuntimeDto {
             return this;
         }
 
+        /**
+         * Engine-native AI control intention — canonical values in
+         * {@link WellKnownAiStatuses}. Open string; {@code null} when not reported.
+         */
+        public Builder aiStatus(@Nullable String aiStatus) {
+            this.aiStatus = aiStatus;
+            return this;
+        }
+
+        /**
+         * Build-specific sustained activity — canonical values in
+         * {@link WellKnownCustomActivities}. Open string; {@code null} when the
+         * character is in no special activity.
+         */
+        public Builder customActivity(@Nullable String customActivity) {
+            this.customActivity = customActivity;
+            return this;
+        }
+
         public CharacterRuntimeDto build() {
             return new CharacterRuntimeDto(id, curHp, maxHp, curMp, maxMp,
-                    curCp, maxCp, curVit, maxVit, x, y, z, online);
+                    curCp, maxCp, curVit, maxVit, x, y, z, online,
+                    aiStatus, customActivity);
         }
     }
 }

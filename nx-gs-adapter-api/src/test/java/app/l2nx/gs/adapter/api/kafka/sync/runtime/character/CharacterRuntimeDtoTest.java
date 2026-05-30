@@ -51,7 +51,47 @@ class CharacterRuntimeDtoTest {
     void toBuilder_shouldRoundtrip() {
         CharacterRuntimeDto original = new CharacterRuntimeDto(
                 123L, 100, 200, 50, 100, 25, 50,
-                1000, 2000, 500, 600, -700, Boolean.TRUE);
+                1000, 2000, 500, 600, -700, Boolean.TRUE, "attack", "fishing");
+
+        assertEquals(original, original.toBuilder().build());
+    }
+
+    @Test
+    void builder_shouldCarryActivityFields() {
+        CharacterRuntimeDto dto = CharacterRuntimeDto.builder()
+                .id(42L)
+                .aiStatus("idle")
+                .customActivity("fishing")
+                .build();
+
+        assertEquals("idle", dto.getAiStatus());
+        assertEquals("fishing", dto.getCustomActivity());
+    }
+
+    @Test
+    void activityFields_shouldBeNullByDefault() {
+        CharacterRuntimeDto dto = CharacterRuntimeDto.builder().id(1L).build();
+
+        assertNull(dto.getAiStatus());
+        assertNull(dto.getCustomActivity());
+    }
+
+    @Test
+    void activityFields_shouldBeIndependentInEquals() {
+        CharacterRuntimeDto fishingIdle = CharacterRuntimeDto.builder()
+                .id(1L).aiStatus("idle").customActivity("fishing").build();
+        CharacterRuntimeDto plainIdle = CharacterRuntimeDto.builder()
+                .id(1L).aiStatus("idle").build();
+
+        // customActivity differs (fishing vs none) though aiStatus matches —
+        // the two fields are orthogonal and both participate in equality.
+        assertNotEquals(fishingIdle, plainIdle);
+    }
+
+    @Test
+    void toBuilder_shouldRoundtripActivityFields() {
+        CharacterRuntimeDto original = CharacterRuntimeDto.builder()
+                .id(9L).aiStatus("cast").customActivity("reading").build();
 
         assertEquals(original, original.toBuilder().build());
     }
@@ -61,7 +101,7 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto fromBuilder = CharacterRuntimeDto.builder().id(7L).build();
         CharacterRuntimeDto fromCtor = new CharacterRuntimeDto(
                 7L, null, null, null, null, null, null,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
