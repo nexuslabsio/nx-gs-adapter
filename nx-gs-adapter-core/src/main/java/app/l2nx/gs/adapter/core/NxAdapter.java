@@ -76,6 +76,10 @@ public final class NxAdapter {
     private static volatile String adapterVersion;
     private static volatile Thread shutdownHook;
     private static volatile KafkaFactory kafkaFactoryOverride;
+    // Test-only: forces startEventsPublisher to throw, simulating a host-classpath
+    // linkage failure (e.g. adapter-api/adapter-core version skew) so the regression
+    // test can assert sync-module discovery survives an events-bootstrap fault.
+    private static volatile boolean failEventsBootstrapForTesting;
     private static volatile EventsPublisher eventsPublisher;
     private static volatile EventsConfig eventsConfig;
     private static volatile CommandsConsumer commandsConsumer;
@@ -400,14 +404,31 @@ public final class NxAdapter {
             }
         }
 
-        NxEvents events = startEventsPublisher(active.topics());
+        // Events and commands bootstrap are isolated: a failure in either (e.g. a
+        // NoClassDefFoundError from an adapter-api/adapter-core version skew on the
+        // host classpath) must NOT abort sync-module discovery below, which is the
+        // adapter's primary job. ConnectContext null-coalesces a missing façade to a
+        // no-op, and the heartbeat surfaces the gap by omitting the events/commands slot.
+        NxEvents events = null;
+        try {
+            events = startEventsPublisher(active.topics());
+        } catch (Throwable t) {
+            log.error("Events publisher bootstrap failed — events disabled, continuing with sync/commands: {}",
+                    t.getClass().getName(), t);
+        }
         // Group ID lives under the per-tenant prefix so the `User:<tenant>` SCRAM
         // principal's group ACL (prefixed on `<tenant>.`) covers it.
         String commandsGroupId = active.tenantSlug() + ".gs.commands." + active.serverSlug();
         NxSync sync = startSyncFacade();
-        NxCommands commands = startCommandsConsumer(active.topics(),
-                active.kafka(), clientId, commandsGroupId, active.serverId(),
-                events, sync);
+        NxCommands commands = null;
+        try {
+            commands = startCommandsConsumer(active.topics(),
+                    active.kafka(), clientId, commandsGroupId, active.serverId(),
+                    events, sync);
+        } catch (Throwable t) {
+            log.error("Commands consumer bootstrap failed — commands disabled, continuing with sync: {}",
+                    t.getClass().getName(), t);
+        }
 
         ModuleRegistry registry = moduleRegistry;
         if (registry != null) {
@@ -462,6 +483,10 @@ public final class NxAdapter {
      * publishing into the live publisher with no re-binding.</p>
      */
     private static NxEvents startEventsPublisher(MessagingTopics messagingTopics) {
+        if (failEventsBootstrapForTesting) {
+            throw new NoClassDefFoundError(
+                    "app/l2nx/gs/adapter/api/kafka/events/raid/RaidKillEvent (simulated classpath skew)");
+        }
         EventsPublisher previous = eventsPublisher;
         if (previous != null) {
             try {
@@ -709,6 +734,11 @@ public final class NxAdapter {
         closed.set(false);
         wasActive.set(false);
         kafkaFactoryOverride = null;
+        failEventsBootstrapForTesting = false;
+    }
+
+    static void failEventsBootstrapForTesting(boolean fail) {
+        failEventsBootstrapForTesting = fail;
     }
 
     static void simulateKafkaStateChangeForTesting(KafkaState newState) {

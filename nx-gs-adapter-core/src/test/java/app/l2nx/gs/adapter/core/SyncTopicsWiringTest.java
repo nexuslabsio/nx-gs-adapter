@@ -84,6 +84,28 @@ class SyncTopicsWiringTest {
     }
 
     @Test
+    void initKafka_shouldStillConnectSyncModule_whenEventsBootstrapThrows() {
+        // Regression: an events-bootstrap failure (e.g. NoClassDefFoundError from an
+        // adapter-api/adapter-core version skew on the host classpath) must not abort
+        // sync-module discovery — otherwise heartbeat reports empty enabledModules and
+        // all DB/runtime sync silently stops.
+        NxAdapter.failEventsBootstrapForTesting(true);
+        SyncTopics topics = SyncTopics.builder()
+                .db(java.util.Collections.singletonMap("character", "bohpts.gs.sync.db.character"))
+                .build();
+
+        NxAdapter.simulateInitKafkaForTesting(
+                new KafkaInitializer(new CapturingKafkaFactory()),
+                response(topics));
+
+        ConnectContext ctx = CapturingAdapterModule.lastContext();
+        assertNotNull(ctx, "sync module.onConnect must still fire when events bootstrap fails");
+        assertTrue(CapturingAdapterModule.wasStarted(),
+                "sync module.start must fire even though events bootstrap threw");
+        assertEquals("bohpts.gs.sync.db.character", ctx.getSyncTopics().getDb().get("character"));
+    }
+
+    @Test
     void initKafka_shouldExposeUnmodifiableNamespaces_inConnectContext() {
         SyncTopics topics = SyncTopics.builder()
                 .db(java.util.Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
