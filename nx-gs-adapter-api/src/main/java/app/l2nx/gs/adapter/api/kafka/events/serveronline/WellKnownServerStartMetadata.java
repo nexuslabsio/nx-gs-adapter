@@ -1,15 +1,16 @@
 package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
 /**
- * Canonical key constants for the {@code metadata} map of
- * {@link ServerStartedEvent}. The map is open — hosts MAY publish arbitrary
- * additional keys; consumers treat unknown keys as opaque. Adding a constant
- * here is a non-breaking minor-version change.
+ * Canonical key constants for the {@code metadata} map of the server-lifecycle
+ * events {@link ServerStartedEvent} and {@link ServerStoppingEvent}. The map is
+ * open — hosts MAY publish arbitrary additional keys; consumers treat unknown
+ * keys as opaque. Adding a constant here is a non-breaking minor-version change.
  *
  * <ul>
  *   <li>{@link #GM_ONLY} — {@code "true"} / {@code "false"}: whether the server
- *   started in GM-only mode (only game masters may log in). A consumer SHOULD
- *   mute its "server is up" notification when this is {@code "true"}.</li>
+ *   is in GM-only mode (only game masters may log in). The host always reports
+ *   it; a consumer SHOULD mute its "server is up" / "server is stopping"
+ *   notification when this is {@code "true"} (GM-only runs are operator tests).</li>
  * </ul>
  */
 public final class WellKnownServerStartMetadata {

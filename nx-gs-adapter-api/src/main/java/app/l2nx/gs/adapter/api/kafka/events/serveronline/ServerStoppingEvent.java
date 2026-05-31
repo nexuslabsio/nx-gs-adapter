@@ -2,8 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Discrete server-lifecycle fact — emitted once on the graceful-shutdown path,
@@ -18,27 +17,45 @@ import java.util.UUID;
  * event during its scheduled maintenance restart window (see
  * {@link ServerStartedEvent}).</p>
  *
- * <p>Carries only {@link #getEventId() eventId} — UUIDv7, REQUIRED. Idempotency
- * key; the platform extracts {@code occurredAt} from the time-ordered prefix.
- * No stop-reason classification on the wire — the fact "the server is going
- * down" is the whole signal.</p>
+ * <p>Fields:
+ * <ul>
+ *   <li>{@link #getEventId() eventId} — UUIDv7, REQUIRED. Idempotency key; the
+ *   platform extracts {@code occurredAt} from the time-ordered prefix.</li>
+ *   <li>{@link #getMetadata() metadata} — optional open string→string map; same
+ *   canonical key as {@link ServerStartedEvent}: {@code gm_only} ("true"/"false")
+ *   via {@link WellKnownServerStartMetadata#GM_ONLY}. The host always reports the
+ *   server's GM-only state; the <b>platform</b> decides whether to suppress the
+ *   "server is stopping" notification when {@code gm_only=true} (GM-only runs are
+ *   operator tests, often several restarts in a row).</li>
+ * </ul>
  *
  * <p>Partition key: {@code null} (round-robin).</p>
  */
 public final class ServerStoppingEvent {
 
     private final UUID eventId;
+    private final @Nullable Map<String, String> metadata;
 
-    public ServerStoppingEvent(UUID eventId) {
+    public ServerStoppingEvent(UUID eventId,
+                               @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "ServerStoppingEvent.eventId is required");
+        this.metadata = metadata == null
+                ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {
         return eventId;
     }
 
+    public @Nullable Map<String, String> getMetadata() {
+        return metadata;
+    }
+
     public Builder toBuilder() {
-        return new Builder().eventId(eventId);
+        return new Builder()
+                .eventId(eventId)
+                .metadata(metadata);
     }
 
     public static Builder builder() {
@@ -50,29 +67,37 @@ public final class ServerStoppingEvent {
         if (this == o) return true;
         if (!(o instanceof ServerStoppingEvent)) return false;
         ServerStoppingEvent that = (ServerStoppingEvent) o;
-        return eventId.equals(that.eventId);
+        return eventId.equals(that.eventId)
+                && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId);
+        return Objects.hash(eventId, metadata);
     }
 
     @Override
     public String toString() {
-        return "ServerStoppingEvent[eventId=" + eventId + "]";
+        return "ServerStoppingEvent[eventId=" + eventId
+                + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
         private @Nullable UUID eventId;
+        private @Nullable Map<String, String> metadata;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
             return this;
         }
 
+        public Builder metadata(@Nullable Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+
         public ServerStoppingEvent build() {
-            return new ServerStoppingEvent(eventId);
+            return new ServerStoppingEvent(eventId, metadata);
         }
     }
 }

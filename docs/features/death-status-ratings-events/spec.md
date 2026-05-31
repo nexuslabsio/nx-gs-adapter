@@ -128,9 +128,11 @@ bot), operators (server-status menu section), and platform-side consumers
     - `ServerStartedEvent` — `UUID eventId` (REQUIRED, UUIDv7) +
       `@Nullable Map<String,String> metadata` carrying `gm_only` ("true"/"false")
       under the `WellKnownServerStartMetadata.GM_ONLY` key.
-    - `ServerStoppingEvent` — `UUID eventId` (REQUIRED, UUIDv7) only. No
-      stop-reason classification on the wire — "the server is going down" is
-      the whole signal.
+    - `ServerStoppingEvent` — `UUID eventId` (REQUIRED, UUIDv7) +
+      `@Nullable Map<String,String> metadata` carrying the same `gm_only` key
+      (`WellKnownServerStartMetadata.GM_ONLY`). No stop-reason on the wire. The
+      host always reports `gm_only`; the platform (not the host) decides to mute
+      the stop notification for GM-only runs.
 
   Both POJOs follow the api conventions (builder, Java-8, `-parameters`).
   Partition key `null` (round-robin); consumers group by `Nx-Server-Id` and order
@@ -176,8 +178,7 @@ bot), operators (server-status menu section), and platform-side consumers
     - A 🔔/🔕 toggle for START/STOP notifications, persisted via the existing
       `ActivitySubscriptionService` under a new `ActivityType.SERVER_STATUS`
       (server-scoped `activity_key`, e.g. the serverId).
-    - New `MenuFeatures` flag is NOT required — the section rides the existing
-      `info` feature flag.
+    - Gated by a new `MenuFeatures` flag `info-server` (default OFF) — see R26.
 
 - [todo] R13. `nx-telegram` MUST deliver server START/STOP notifications via a
   **new event-driven path** (the existing time-driven `ActivityNotificationScheduler`
@@ -185,10 +186,24 @@ bot), operators (server-status menu section), and platform-side consumers
     - A new Kafka consumer on the `*.gs.events.serveronline` family filtering
       `ServerStartedEvent` / `ServerStoppingEvent` (ignoring snapshots), fanning
       out to `SERVER_STATUS` subscribers of that server.
-    - **STARTED notifications MUST be suppressed when `gmOnly = true`**
-      (regardless of the subscriber's toggle). STOPPING is never gmOnly-gated.
+    - **Both STARTED and STOPPING notifications MUST be suppressed when
+      `gmOnly = true`** (read from the event `metadata`, regardless of the
+      subscriber's toggle) — GM-only runs are operator tests with frequent
+      restarts. The filter lives on the platform (telegram), not in the host:
+      bohpts always emits both facts with `gm_only` stamped.
     - Dedup by `eventId` (reuse the notification dedup machinery).
-    - `info.yml` ru + en templates for server up / server down.
+    - `info.yml` ru/en/uk templates for server up / server down (legacy copy:
+      start = "update the client" reminder, stop = "23 техника устанавливают
+      обновления").
+
+- [todo] R26. The whole server-status feature MUST be gated by a new per-bot
+  `MenuFeatures` flag `info-server`, **default OFF**. It gates all three entry
+  points: the "📡 Статус сервера" hub button, the SS/TS section callbacks
+  (bounce when off), and the event-driven START/STOP notifier (skip when off).
+  Implemented as a flat sibling flag (config key `info-server`), not a nested
+  `info.server`, so the live `bots.yml` `info: true` binding is not broken and
+  no config-shape migration is required. Ships to prod OFF; flipped to `true`
+  after review.
 
 ### Milestone C — Fisher ratings sync
 

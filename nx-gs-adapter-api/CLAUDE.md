@@ -62,10 +62,11 @@ by the L2NX game-server adapter and its consumers. Published as
       `null` (round-robin). Multi-event family — also carries the discrete
       server-lifecycle facts `ServerStartedEvent` (UUIDv7 `eventId` + open
       `metadata`; canonical key `gm_only` via `WellKnownServerStartMetadata`)
-      and `ServerStoppingEvent` (UUIDv7 `eventId` only — graceful-shutdown
-      signal, no stop-reason on the wire), dispatched by `Nx-Message-Type`.
-      `metadata.gm_only` lets a consumer mute its
-      "server is up" notification on a GM-only startup; the host owns
+      and `ServerStoppingEvent` (UUIDv7 `eventId` + open `metadata`; same
+      `gm_only` key — graceful-shutdown signal, no stop-reason on the wire),
+      dispatched by `Nx-Message-Type`. The host always reports `gm_only` on both
+      facts; the platform mutes its "server is up" / "server is stopping"
+      notification on a GM-only run (operator tests). The host owns
       suppression of both lifecycle facts during scheduled maintenance
       restarts (emits nothing inside its restart window). Both lifecycle
       facts use partition key `null`.
