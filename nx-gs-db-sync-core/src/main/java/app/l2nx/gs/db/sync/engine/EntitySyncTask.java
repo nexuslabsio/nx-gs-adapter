@@ -213,7 +213,7 @@ public final class EntitySyncTask {
         long rowCount = snapshot.sizeOf(entity);
         EntityState finalState = degradedFromTimeout ? EntityState.DEGRADED : EntityState.HEALTHY;
         long elapsedMs = elapsed(started);
-        log.info("Entity {} cycle {}: +{} ~{} -{}, rowCount={}, elapsedMs={}",
+        log.debug("Entity {} cycle {}: +{} ~{} -{}, rowCount={}, elapsedMs={}",
                 entity, finalState, createdCount, updatedCount, deletedCount, rowCount, elapsedMs);
         return new CycleResult(finalState, elapsedMs,
                 createdCount, updatedCount, deletedCount, rowCount);
