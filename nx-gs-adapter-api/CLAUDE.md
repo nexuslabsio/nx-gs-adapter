@@ -57,19 +57,37 @@ by the L2NX game-server adapter and its consumers. Published as
       required (`total` — full character presence, `unique` — distinct
       active humans by host-defined identity tuple) and optional canonical
       (`offline_trade`, `fishing`); hosts MAY publish arbitrary
-      non-canonical keys. Single-event family; periodic snapshots,
-      host-pushed via `NxEvents.publish(...)` on a host-managed cadence.
-      Partition key: `null` (round-robin).
-    - `events.character` — `CharacterPresenceEvent` (single-event family;
-      one event per login / logout, distinguished by the `online: boolean`
-      field — `true`=login, `false`=logout). Carries UUIDv7 `eventId`
+      non-canonical keys. Periodic snapshots, host-pushed via
+      `NxEvents.publish(...)` on a host-managed cadence. Partition key:
+      `null` (round-robin). Multi-event family — also carries the discrete
+      server-lifecycle facts `ServerStartedEvent` (UUIDv7 `eventId` + open
+      `metadata`; canonical key `gm_only` via `WellKnownServerStartMetadata`)
+      and `ServerStoppingEvent` (UUIDv7 `eventId` only — graceful-shutdown
+      signal, no stop-reason on the wire), dispatched by `Nx-Message-Type`.
+      `metadata.gm_only` lets a consumer mute its
+      "server is up" notification on a GM-only startup; the host owns
+      suppression of both lifecycle facts during scheduled maintenance
+      restarts (emits nothing inside its restart window). Both lifecycle
+      facts use partition key `null`.
+    - `events.character` — `CharacterPresenceEvent` (one event per login /
+      logout, distinguished by the `online: boolean` field — `true`=login,
+      `false`=logout). Carries UUIDv7 `eventId`
       (REQUIRED, derive `occurredAt`), `charId` (REQUIRED),
       `online` (REQUIRED), optional `accountName` / `ip` / `hwid`.
       Partitioned by `charId` so per-character presence history lands in
       one partition in occurrence order. One of three sources feeding
       `gs_characters.online` on the platform (others: CDC
       `CharacterDbDto.online`, runtime `CharacterRuntimeDto.online`);
-      timestamp-based last-writer-wins on the consumer.
+      timestamp-based last-writer-wins on the consumer. Multi-event family
+      — also carries `CharacterDeathEvent` (UUIDv7 `eventId` + `charId`
+      partition key + open `metadata`), dispatched by `Nx-Message-Type`.
+      Killer info rides `metadata` (`WellKnownDeathMetadata`): `killer_type`
+      (a `WellKnownKillerTypes` value — `monster` / `player` / `boss` /
+      `self`) and `killer_id` (the killer's char object-id for `player`, NPC
+      template-id for `monster` / `boss`); the platform resolves the killer
+      name from the id, no name on the wire. bohpts emits a death event only
+      when the dying character was on autofarm (legacy-bot "your fishing
+      character died" signal); no location on the wire.
     - `events.privatestore` — `PrivateStorePurchaseEvent` (closed-deal facts)
         + `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
           `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
@@ -137,6 +155,19 @@ by the L2NX game-server adapter and its consumers. Published as
       `winnerClanId?` (post-siege holder; null on draw),
       `attackerClanIds` / `defenderClanIds` (registered clans), open `metadata`.
       Build-agnostic — outcome is an open string, not a contract assumption.
+    - `events.ratings` — `RatingSnapshotEvent` (final, UUIDv7 `eventId` +
+      `ratingType` open string + `List<RatingEntry> entries`) + `RatingEntry`
+      (`charId` + `score` + host-computed `rank`; no char name on the wire —
+      platform joins the character catalog) + `WellKnownRatingTypes` constants
+      (`fishing`). Single-event family; the wire family / topic is `rating`
+      (singular — `<tenant>.gs.events.rating`; the Java package stays
+      `events.ratings`). Periodic FULL snapshot of one ranked
+      leaderboard, host-pushed via `NxEvents.publish(...)` (bohpts: fishing
+      championship top-1000 every 1 min). One family carries every leaderboard
+      kind, discriminated by `ratingType`, so a new leaderboard needs only a
+      new `WellKnownRatingTypes` constant — no new family / topic. Partition
+      key: `null` (round-robin); platform scope-replaces per
+      `(server, ratingType)` gated by the `eventId` timestamp.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:
