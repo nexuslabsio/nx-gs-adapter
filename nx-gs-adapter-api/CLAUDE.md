@@ -61,15 +61,15 @@ by the L2NX game-server adapter and its consumers. Published as
       `NxEvents.publish(...)` on a host-managed cadence. Partition key:
       `null` (round-robin). Multi-event family — also carries the discrete
       server-lifecycle facts `ServerStartedEvent` (UUIDv7 `eventId` + open
-      `metadata`; canonical key `gm_only` via `WellKnownServerStartMetadata`)
-      and `ServerStoppingEvent` (UUIDv7 `eventId` + open `metadata`; same
-      `gm_only` key — graceful-shutdown signal, no stop-reason on the wire),
-      dispatched by `Nx-Message-Type`. The host always reports `gm_only` on both
-      facts; the platform mutes its "server is up" / "server is stopping"
-      notification on a GM-only run (operator tests). The host owns
-      suppression of both lifecycle facts during scheduled maintenance
-      restarts (emits nothing inside its restart window). Both lifecycle
-      facts use partition key `null`.
+      `metadata`; canonical keys `gm_only` / `auto_restart` via
+      `WellKnownServerStartMetadata`) and `ServerStoppingEvent` (UUIDv7 `eventId`
+      + open `metadata`; same keys — graceful-shutdown signal, no stop-reason on
+      the wire), dispatched by `Nx-Message-Type`. The host always reports both
+      keys; the platform mutes its "server is up" / "server is stopping"
+      notification on a GM-only run (operator tests) or an automatic scheduled
+      restart (`auto_restart=true` — the host tags its daily maintenance restart
+      and keeps emitting the fact so the platform still persists it). Both
+      lifecycle facts use partition key `null`.
     - `events.character` — `CharacterPresenceEvent` (one event per login /
       logout, distinguished by the `online: boolean` field — `true`=login,
       `false`=logout). Carries UUIDv7 `eventId`
