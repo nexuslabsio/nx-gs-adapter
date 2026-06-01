@@ -6,6 +6,7 @@ import app.l2nx.gs.adapter.api.kafka.events.castle.SiegeFinishedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterDeathEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.gameevents.GameEventSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.leveldata.LevelExpTableSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailCancelledEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailReturnedEvent;
@@ -69,6 +70,8 @@ final class EventTypeRegistry {
                 evt -> LongBytes.bigEndian(((CharacterPresenceEvent) evt).getCharId()));
         register(map, families, CharacterDeathEvent.class, "character",
                 evt -> LongBytes.bigEndian(((CharacterDeathEvent) evt).getCharId()));
+        register(map, families, LevelExpTableSnapshotEvent.class, "character",
+                evt -> null);
         register(map, families, RaidKillEvent.class, "raid",
                 evt -> LongBytes.bigEndian(((RaidKillEvent) evt).getBossNpcId()));
         register(map, families, BossRespawnSnapshotEvent.class, "raid",

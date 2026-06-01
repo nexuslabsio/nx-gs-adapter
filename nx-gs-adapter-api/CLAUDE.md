@@ -36,7 +36,12 @@ by the L2NX game-server adapter and its consumers. Published as
   carries an optional `online: Boolean` presence marker — wire convention:
   `null`/omitted = ONLINE (byte-budget default), explicit `false` = one-shot
   OFFLINE tombstone, explicit `true` allowed but redundant. Consumers MUST
-  treat omitted / `null` as `true` for back-compat.
+  treat omitted / `null` as `true` for back-compat. CharacterRuntimeDto also
+  carries an optional `exp: Long` — the character's current raw (absolute,
+  cumulative) experience total. Volatile runtime state, so it rides the runtime
+  channel; `null` on cores that don't expose it and on offline tombstones.
+  Consumers combine it with the per-server level→exp table (see
+  `events.leveldata` below) to compute "% progress within the current level".
 - `app.l2nx.gs.adapter.api.kafka.events.<family>` — outbound discrete-fact event
   DTOs grouped by family. Single-event families take the concrete type on the
   publish method directly; multi-event families bind on an abstract base and
@@ -88,7 +93,10 @@ by the L2NX game-server adapter and its consumers. Published as
       template-id for `monster` / `boss`); the platform resolves the killer
       name from the id, no name on the wire. bohpts emits a death event only
       when the dying character was on autofarm (legacy-bot "your fishing
-      character died" signal); no location on the wire.
+      character died" signal); no location on the wire. This family ALSO carries
+      `LevelExpTableSnapshotEvent` (Java package `events.leveldata`; see below) —
+      the per-server level→exp table, dispatched by `Nx-Message-Type` on this same
+      topic rather than a dedicated one.
     - `events.privatestore` — `PrivateStorePurchaseEvent` (closed-deal facts)
         + `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
           `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
@@ -169,6 +177,22 @@ by the L2NX game-server adapter and its consumers. Published as
       new `WellKnownRatingTypes` constant — no new family / topic. Partition
       key: `null` (round-robin); platform scope-replaces per
       `(server, ratingType)` gated by the `eventId` timestamp.
+    - `events.leveldata` — `LevelExpTableSnapshotEvent` (final, UUIDv7 `eventId`
+      + `List<LevelExpEntry> levels` + optional open `Map<String,String>
+      metadata`) + `LevelExpEntry` (`int level` + `long requiredExp` — the
+      absolute / cumulative exp required to be at that level). The Java package
+      is `events.leveldata`, but the event RIDES the `character` family/topic
+      (`<tenant>.gs.events.character`), dispatched by `Nx-Message-Type` — the
+      level table is synced once on server start / datapack reload, not worth its
+      own topic/consumer/group. Periodic FULL
+      snapshot of the server's level→required-exp progression table, host-pushed
+      via `NxEvents.publish(...)` (bohpts emits it on server startup + datapack
+      reload, reading L2J `ExperienceData`). Mirrors `BossRespawnSnapshotEvent`
+      exactly (hand-written immutable + builder + getters, Gson-friendly,
+      JSpecify `@Nullable`). Partition key: `null` (round-robin); platform
+      scope-replaces per `(server)` keeping the newest snapshot. Combined with
+      `CharacterRuntimeDto.exp` to compute "% progress within current level":
+      `pct = (exp - requiredExp[level]) / (requiredExp[level + 1] - requiredExp[level])`.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:

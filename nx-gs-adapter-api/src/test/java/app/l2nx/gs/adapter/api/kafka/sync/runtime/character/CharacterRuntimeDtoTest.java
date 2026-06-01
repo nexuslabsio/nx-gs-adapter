@@ -64,7 +64,8 @@ class CharacterRuntimeDtoTest {
     void toBuilder_shouldRoundtrip() {
         CharacterRuntimeDto original = new CharacterRuntimeDto(
                 123L, 100, 200, 50, 100, 25, 50,
-                1000, 2000, 500, 600, -700, Boolean.TRUE, "attack", Collections.singletonList(fishing()));
+                1000, 2000, 500, 600, -700, Boolean.TRUE, "attack",
+                4_500_000_000L, Collections.singletonList(fishing()));
 
         assertEquals(original, original.toBuilder().build());
     }
@@ -147,9 +148,21 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto fromBuilder = CharacterRuntimeDto.builder().id(7L).build();
         CharacterRuntimeDto fromCtor = new CharacterRuntimeDto(
                 7L, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
+    }
+
+    @Test
+    void exp_shouldBeNullByDefaultAndRoundtrip() {
+        assertNull(CharacterRuntimeDto.builder().id(1L).build().getExp());
+
+        CharacterRuntimeDto withExp = CharacterRuntimeDto.builder().id(1L).exp(4_500_000_000L).build();
+        assertEquals(Long.valueOf(4_500_000_000L), withExp.getExp());
+        assertEquals(withExp, withExp.toBuilder().build());
+
+        CharacterRuntimeDto noExp = CharacterRuntimeDto.builder().id(1L).build();
+        assertNotEquals(withExp, noExp);
     }
 }

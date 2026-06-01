@@ -78,11 +78,12 @@ public final class CharacterRuntimeDto {
     private final @Nullable Integer z;
     private final @Nullable Boolean online;
     private final @Nullable String aiStatus;
+    private final @Nullable Long exp;
     private final @Nullable List<CustomActivity> customActivities;
 
     /**
      * Canonical constructor. Prefer {@link #builder()} — positional construction
-     * of 15 mostly-nullable fields is error-prone.
+     * of 16 mostly-nullable fields is error-prone.
      */
     public CharacterRuntimeDto(long id,
                                @Nullable Integer curHp,
@@ -98,6 +99,7 @@ public final class CharacterRuntimeDto {
                                @Nullable Integer z,
                                @Nullable Boolean online,
                                @Nullable String aiStatus,
+                               @Nullable Long exp,
                                @Nullable List<CustomActivity> customActivities) {
         this.id = id;
         this.curHp = curHp;
@@ -113,6 +115,7 @@ public final class CharacterRuntimeDto {
         this.z = z;
         this.online = online;
         this.aiStatus = aiStatus;
+        this.exp = exp;
         this.customActivities = customActivities == null
                 ? null
                 : Collections.unmodifiableList(new ArrayList<CustomActivity>(customActivities));
@@ -199,6 +202,20 @@ public final class CharacterRuntimeDto {
     }
 
     /**
+     * Character's current raw experience points — the absolute EXP total the
+     * character has accumulated, NOT a within-level delta. Volatile runtime
+     * state (climbs with every kill / quest), which is why it rides the runtime
+     * sync channel rather than the coarser CDC stream. {@code null} on cores
+     * that do not expose the character's EXP and on offline tombstones. A
+     * consumer derives "% progress within the current level" by joining this
+     * value against a per-server level→required-exp table:
+     * {@code pct = (exp - requiredExp[level]) / (requiredExp[level + 1] - requiredExp[level])}.
+     */
+    public @Nullable Long getExp() {
+        return exp;
+    }
+
+    /**
      * Build-specific sustained activities — the high-level "what the player is
      * occupied with" signals that live outside the engine AI state machine
      * (e.g. fishing, reading a book, autofarming). A <b>list</b> of structured
@@ -246,6 +263,7 @@ public final class CharacterRuntimeDto {
                 .z(z)
                 .online(online)
                 .aiStatus(aiStatus)
+                .exp(exp)
                 .customActivities(customActivities);
     }
 
@@ -272,13 +290,14 @@ public final class CharacterRuntimeDto {
                 && Objects.equals(z, that.z)
                 && Objects.equals(online, that.online)
                 && Objects.equals(aiStatus, that.aiStatus)
+                && Objects.equals(exp, that.exp)
                 && Objects.equals(customActivities, that.customActivities);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(id, curHp, maxHp, curMp, maxMp, curCp, maxCp,
-                curVit, maxVit, x, y, z, online, aiStatus, customActivities);
+                curVit, maxVit, x, y, z, online, aiStatus, exp, customActivities);
     }
 
     @Override
@@ -291,6 +310,7 @@ public final class CharacterRuntimeDto {
                 + ", x=" + x + ", y=" + y + ", z=" + z
                 + ", online=" + online
                 + ", aiStatus=" + aiStatus
+                + ", exp=" + exp
                 + ", customActivities=" + customActivities + "]";
     }
 
@@ -309,6 +329,7 @@ public final class CharacterRuntimeDto {
         private @Nullable Integer z;
         private @Nullable Boolean online;
         private @Nullable String aiStatus;
+        private @Nullable Long exp;
         private @Nullable List<CustomActivity> customActivities;
 
         public Builder id(long id) {
@@ -386,6 +407,15 @@ public final class CharacterRuntimeDto {
         }
 
         /**
+         * Character's current raw (absolute) experience total. {@code null} when
+         * the host does not expose it or on offline tombstones.
+         */
+        public Builder exp(@Nullable Long exp) {
+            this.exp = exp;
+            return this;
+        }
+
+        /**
          * Build-specific sustained activities — a list of structured
          * {@link CustomActivity} entries ({@code type} + open {@code metadata}).
          * {@code null} when the character is in no special activity. Defensively
@@ -399,7 +429,7 @@ public final class CharacterRuntimeDto {
         public CharacterRuntimeDto build() {
             return new CharacterRuntimeDto(id, curHp, maxHp, curMp, maxMp,
                     curCp, maxCp, curVit, maxVit, x, y, z, online,
-                    aiStatus, customActivities);
+                    aiStatus, exp, customActivities);
         }
     }
 }
