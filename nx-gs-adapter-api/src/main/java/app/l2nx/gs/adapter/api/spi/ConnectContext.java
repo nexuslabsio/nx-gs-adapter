@@ -42,6 +42,7 @@ public final class ConnectContext {
     private final NxCommands commands;
     private final Executor io;
     private final NxSync sync;
+    private final NxGameData gameData;
 
     public ConnectContext(UUID tenantId,
                           String tenantSlug,
@@ -53,7 +54,8 @@ public final class ConnectContext {
                           @Nullable NxEvents events,
                           @Nullable NxCommands commands,
                           @Nullable Executor io,
-                          @Nullable NxSync sync) {
+                          @Nullable NxSync sync,
+                          @Nullable NxGameData gameData) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
@@ -67,50 +69,7 @@ public final class ConnectContext {
         // production adapter-core injects a bounded pool.
         this.io = io == null ? DirectExecutor.INSTANCE : io;
         this.sync = sync == null ? NoOpSync.INSTANCE : sync;
-    }
-
-    public ConnectContext(UUID tenantId,
-                          String tenantSlug,
-                          UUID serverId,
-                          String serverSlug,
-                          String serverName,
-                          String adapterVersion,
-                          @Nullable SyncTopics syncTopics,
-                          @Nullable NxEvents events,
-                          @Nullable NxCommands commands,
-                          @Nullable Executor io) {
-        this(tenantId, tenantSlug, serverId, serverSlug, serverName, adapterVersion,
-                syncTopics, events, commands, io, null);
-    }
-
-    public ConnectContext(UUID tenantId,
-                          String tenantSlug,
-                          UUID serverId,
-                          String serverSlug,
-                          String serverName,
-                          String adapterVersion,
-                          @Nullable SyncTopics syncTopics,
-                          @Nullable NxEvents events,
-                          @Nullable NxCommands commands) {
-        this(tenantId, tenantSlug, serverId, serverSlug, serverName, adapterVersion,
-                syncTopics, events, commands, null);
-    }
-
-    /**
-     * Backward-compat constructor — pre-{@link NxCommands} callers continue
-     * to work and get a no-op commands façade plus the direct-run
-     * {@link #io()} fallback. New callers should prefer the {@link Builder}.
-     */
-    public ConnectContext(UUID tenantId,
-                          String tenantSlug,
-                          UUID serverId,
-                          String serverSlug,
-                          String serverName,
-                          String adapterVersion,
-                          @Nullable SyncTopics syncTopics,
-                          @Nullable NxEvents events) {
-        this(tenantId, tenantSlug, serverId, serverSlug, serverName, adapterVersion,
-                syncTopics, events, null);
+        this.gameData = gameData == null ? NoOpGameData.INSTANCE : gameData;
     }
 
     public UUID getTenantId() {
@@ -142,7 +101,7 @@ public final class ConnectContext {
      * non-null — a {@code null} {@code ConnectResponse.syncTopics} on the wire
      * is normalized here to an empty {@link SyncTopics} (every namespace
      * resolves to an empty map). Modules read their namespace via
-     * {@code getSyncTopics().getDb()} / {@code .getRuntime()} / {@code .getDp()}
+     * {@code getSyncTopics().getDb()} / {@code .getRuntime()} / {@code .getGd()}
      * and treat empty as {@code DISABLED}.
      */
     public SyncTopics getSyncTopics() {
@@ -201,6 +160,17 @@ public final class ConnectContext {
         return sync;
     }
 
+    /**
+     * Game-data sync capability. Modules / host hooks call
+     * {@code ctx.gameData().publishSnapshot()} to trigger a fresh full snapshot of
+     * static game-data templates onto the {@code gd} stream (e.g. after a datapack
+     * reload). Always non-null — a {@code null} passed to the constructor is
+     * normalized to a no-op that drops the request.
+     */
+    public NxGameData gameData() {
+        return gameData;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .tenantId(tenantId)
@@ -213,7 +183,8 @@ public final class ConnectContext {
                 .events(events)
                 .commands(commands)
                 .io(io)
-                .sync(sync);
+                .sync(sync)
+                .gameData(gameData);
     }
 
     public static Builder builder() {
@@ -263,6 +234,7 @@ public final class ConnectContext {
         private @Nullable NxCommands commands;
         private @Nullable Executor io;
         private @Nullable NxSync sync;
+        private @Nullable NxGameData gameData;
 
         public Builder tenantId(UUID tenantId) {
             this.tenantId = tenantId;
@@ -319,9 +291,14 @@ public final class ConnectContext {
             return this;
         }
 
+        public Builder gameData(@Nullable NxGameData gameData) {
+            this.gameData = gameData;
+            return this;
+        }
+
         public ConnectContext build() {
             return new ConnectContext(tenantId, tenantSlug, serverId, serverSlug,
-                    serverName, adapterVersion, syncTopics, events, commands, io, sync);
+                    serverName, adapterVersion, syncTopics, events, commands, io, sync, gameData);
         }
     }
 }

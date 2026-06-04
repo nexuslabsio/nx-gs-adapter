@@ -18,8 +18,9 @@ import java.util.Objects;
  *     <li>{@link #getRuntime()} — in-memory runtime sync via
  *     {@code runtime-sync} module ({@code <tenant>.gs.sync.runtime.<entity>}).
  *     Keys: {@code "character"}, …</li>
- *     <li>{@link #getDp()} — datapack-derived sync via future {@code dp-sync} modules
- *     ({@code <tenant>.gs.sync.dp.<entity>}). Reserved for follow-up slices.</li>
+ *     <li>{@link #getGd()} — game-data (datapack-derived static templates) sync via
+ *     the {@code gd-sync} module ({@code <tenant>.gs.sync.gd.<entity>}). Keys:
+ *     {@code "item-templates"}, … (skills / npc follow in later slices).</li>
  * </ul>
  *
  * <p>Per-namespace shape: {@code Map<entityName, fullyQualifiedTopic>}. Same entity
@@ -37,14 +38,14 @@ public final class SyncTopics {
 
     private final Map<String, String> db;
     private final Map<String, String> runtime;
-    private final Map<String, String> dp;
+    private final Map<String, String> gd;
 
     public SyncTopics(@Nullable Map<String, String> db,
                       @Nullable Map<String, String> runtime,
-                      @Nullable Map<String, String> dp) {
+                      @Nullable Map<String, String> gd) {
         this.db = freeze(db);
         this.runtime = freeze(runtime);
-        this.dp = freeze(dp);
+        this.gd = freeze(gd);
     }
 
     /**
@@ -67,15 +68,15 @@ public final class SyncTopics {
     }
 
     /**
-     * Datapack-derived per-entity topics (future {@code dp-sync} modules). Always
-     * non-null; empty map means no datapack sync entities are configured.
+     * Game-data per-entity topics ({@code gd-sync} module). Always non-null;
+     * empty map means no game-data sync entities are configured.
      */
-    public Map<String, String> getDp() {
-        return dp == null ? Collections.emptyMap() : dp;
+    public Map<String, String> getGd() {
+        return gd == null ? Collections.emptyMap() : gd;
     }
 
     public Builder toBuilder() {
-        return new Builder().db(db).runtime(runtime).dp(dp);
+        return new Builder().db(db).runtime(runtime).gd(gd);
     }
 
     public static Builder builder() {
@@ -96,23 +97,23 @@ public final class SyncTopics {
         SyncTopics that = (SyncTopics) o;
         return Objects.equals(db, that.db)
                 && Objects.equals(runtime, that.runtime)
-                && Objects.equals(dp, that.dp);
+                && Objects.equals(gd, that.gd);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(db, runtime, dp);
+        return Objects.hash(db, runtime, gd);
     }
 
     @Override
     public String toString() {
-        return "SyncTopics[db=" + db + ", runtime=" + runtime + ", dp=" + dp + "]";
+        return "SyncTopics[db=" + db + ", runtime=" + runtime + ", gd=" + gd + "]";
     }
 
     public static final class Builder {
         private @Nullable Map<String, String> db;
         private @Nullable Map<String, String> runtime;
-        private @Nullable Map<String, String> dp;
+        private @Nullable Map<String, String> gd;
 
         public Builder db(@Nullable Map<String, String> db) {
             this.db = db;
@@ -124,13 +125,13 @@ public final class SyncTopics {
             return this;
         }
 
-        public Builder dp(@Nullable Map<String, String> dp) {
-            this.dp = dp;
+        public Builder gd(@Nullable Map<String, String> gd) {
+            this.gd = gd;
             return this;
         }
 
         public SyncTopics build() {
-            return new SyncTopics(db, runtime, dp);
+            return new SyncTopics(db, runtime, gd);
         }
     }
 }

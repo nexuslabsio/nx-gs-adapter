@@ -63,7 +63,7 @@ class SyncTopicsWiringTest {
         assertNotNull(ctx, "module.onConnect was not invoked");
         assertEquals(dbTopics, ctx.getSyncTopics().getDb());
         assertEquals(runtimeTopics, ctx.getSyncTopics().getRuntime());
-        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
+        assertTrue(ctx.getSyncTopics().getGd().isEmpty());
         assertTrue(CapturingAdapterModule.wasStarted(),
                 "module.start should fire after a successful onConnect");
     }
@@ -80,7 +80,7 @@ class SyncTopicsWiringTest {
                 "ConnectContext normalizes wire-null syncTopics to empty SyncTopics");
         assertTrue(ctx.getSyncTopics().getDb().isEmpty());
         assertTrue(ctx.getSyncTopics().getRuntime().isEmpty());
-        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
+        assertTrue(ctx.getSyncTopics().getGd().isEmpty());
     }
 
     @Test

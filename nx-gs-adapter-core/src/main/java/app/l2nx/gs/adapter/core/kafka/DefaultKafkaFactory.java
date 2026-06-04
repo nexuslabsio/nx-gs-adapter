@@ -1,8 +1,10 @@
 package app.l2nx.gs.adapter.core.kafka;
 
+import app.l2nx.gs.adapter.api.localization.LocalizedText;
 import app.l2nx.gs.kafka.*;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
+import com.google.gson.Gson;
 
 import java.util.Map;
 import java.util.function.Consumer;
@@ -25,10 +27,16 @@ public final class DefaultKafkaFactory implements KafkaFactory {
                             Consumer<KafkaState> stateChangeListener) {
         shutdownExistingIfAlive();
 
+        // Build the producer Gson here (not in nx-gs-kafka's NxGsonAdapters) so the
+        // LocalizedText flat-object adapter can be registered — nx-gs-kafka must not
+        // depend on nx-gs-adapter-api where LocalizedText lives.
+        Gson gson = NxGsonAdapters.builder()
+                .registerTypeAdapter(LocalizedText.class, new LocalizedTextTypeAdapter())
+                .create();
         KafkaConfig.Builder builder = NxKafka.configure()
                 .brokers(brokers)
                 .clientId(clientId)
-                .gson(NxGsonAdapters.defaultGson())
+                .gson(gson)
                 .onStateChange(stateChangeListener);
         for (Map.Entry<String, Object> e : properties.entrySet()) {
             builder.property(e.getKey(), e.getValue());

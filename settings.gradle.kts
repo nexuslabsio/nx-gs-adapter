@@ -8,4 +8,5 @@ include(
     ":nx-gs-adapter-core",
     ":nx-gs-db-sync-core",
     ":nx-gs-runtime-sync-core",
+    ":nx-gs-gd-sync-core",
 )

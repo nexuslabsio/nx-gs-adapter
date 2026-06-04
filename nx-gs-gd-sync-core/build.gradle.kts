@@ -4,7 +4,7 @@ plugins {
     signing
 }
 
-version = findProperty("${project.name}.version") as String? ?: "0.38.0"
+version = findProperty("${project.name}.version") as String? ?: "0.1.0"
 
 java {
     withSourcesJar()
@@ -13,11 +13,7 @@ java {
 
 tasks.withType<JavaCompile> {
     options.release.set(8)
-    // -Xlint:-options suppresses "source/target value 8 is obsolete" — Java 8 target
-    // is intentional (host JVMs span Java 8 to 25+); JDK recommends this exact flag.
-    // -parameters preserves constructor parameter names so JSON binders (Spring/Jackson)
-    // can deserialize into the POJOs via parameter-name binding, without @JsonProperty.
-    options.compilerArgs.addAll(listOf("-Xlint:deprecation", "-Xlint:-options", "-parameters"))
+    options.compilerArgs.addAll(listOf("-Xlint:deprecation", "-Xlint:-options"))
 }
 
 repositories {
@@ -25,10 +21,24 @@ repositories {
 }
 
 dependencies {
-    api(libs.jspecify)
+    api(project(":nx-gs-adapter-api"))
+    implementation(project(":nx-gs-kafka"))
+    implementation(project(":nx-gs-commons"))
+    implementation(libs.gson)
+    compileOnly(libs.slf4j.api)
+
+    // :nx-gs-log is shadow-included into the published jar — not exposed as a Maven dep.
+    compileOnly(project(":nx-gs-log"))
+    testImplementation(project(":nx-gs-log"))
 
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockito.junit.jupiter)
+    testImplementation(libs.slf4j.simple)
+    testImplementation(libs.testcontainers.junit.jupiter)
+    testImplementation(libs.testcontainers.kafka)
+    testImplementation(libs.kafka.clients)
 }
 
 tasks.test {
@@ -37,10 +47,19 @@ tasks.test {
     }
 }
 
-// Silence "missing comment" javadoc warnings on getters / builder methods.
-// Keeps other doclint categories active (broken @link, syntax errors, etc.).
 tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:-missing", "-quiet")
+}
+
+tasks.named<Jar>("jar") {
+    manifest {
+        attributes("Implementation-Version" to project.version)
+    }
+    from(project(":nx-gs-log").sourceSets["main"].output)
+}
+
+tasks.named<Jar>("sourcesJar") {
+    from(project(":nx-gs-log").sourceSets["main"].allSource)
 }
 
 publishing {
@@ -53,11 +72,11 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
-            artifactId = "nx-gs-adapter-api"
+            artifactId = "nx-gs-gd-sync-core"
 
             pom {
-                name.set("nx-gs-adapter-api")
-                description.set("Wire contracts (DTOs + SPI) for the L2NX game-server adapter")
+                name.set("nx-gs-gd-sync-core")
+                description.set("L2NX game-server adapter — game-data (datapack) sync module")
                 url.set("https://github.com/nexuslabsio/nx-gs-adapter")
 
                 licenses {

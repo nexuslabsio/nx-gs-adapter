@@ -49,9 +49,10 @@ jobs:
             core)         GRADLE_MODULE="nx-gs-adapter-core" ;;
             db-sync)      GRADLE_MODULE="nx-gs-db-sync-core" ;;
             runtime-sync) GRADLE_MODULE="nx-gs-runtime-sync-core" ;;
+            gd-sync)      GRADLE_MODULE="nx-gs-gd-sync-core" ;;
             *)
               echo "Unknown module prefix in tag: $MODULE"
-              echo "Supported prefixes: api, commons, kafka, core, db-sync, runtime-sync"
+              echo "Supported prefixes: api, commons, kafka, core, db-sync, runtime-sync, gd-sync"
               exit 1
               ;;
           esac

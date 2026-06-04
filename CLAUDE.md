@@ -267,6 +267,20 @@ publish target; CI uses `signingKey`/`signingPassword` Gradle properties (GPG) a
 - nx-gs-kafka itself is exercised end-to-end via Testcontainers in its own repo — adapter tests treat
   the Kafka facade as a unit-under-test only at the wiring level
 
+## Comments
+
+- **Comment only the non-obvious — *why*, not *what*.** A legitimate comment explains a non-obvious
+  approach, edge case, workaround, constraint, invariant, reason for a choice, units, or
+  null-semantics. Code that is clear from names and signatures gets no comment.
+- **No comments that restate the code.** Junk like `// inject mapper`, `// loop over rows`,
+  `// serialize to JSON`, or obvious headers over trivial blocks — delete them. If a comment line
+  paraphrases the line below it, remove it.
+- **Don't comment DTO/POJO fields** when name + type already say it. Javadoc on the public wire
+  contract is required, but by substance (semantics, units, null-rules, invariants) — never a
+  restatement of the field name.
+- **Default to fewer comments.** When in doubt, leave it out — rename a variable or extract a method
+  instead of explaining with a comment.
+
 ## Docs
 
 - `docs/features/<feature-name>/spec.md` + `tech.md` — per-feature design, populated by the

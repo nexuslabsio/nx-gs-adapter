@@ -6,10 +6,7 @@ import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.adapter.api.rest.MessagingTopics;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
-import app.l2nx.gs.adapter.api.spi.ConnectContext;
-import app.l2nx.gs.adapter.api.spi.NxCommands;
-import app.l2nx.gs.adapter.api.spi.NxEvents;
-import app.l2nx.gs.adapter.api.spi.NxSync;
+import app.l2nx.gs.adapter.api.spi.*;
 import app.l2nx.gs.adapter.core.commands.CommandsBootstrap;
 import app.l2nx.gs.adapter.core.commands.CommandsConfig;
 import app.l2nx.gs.adapter.core.commands.CommandsConsumer;
@@ -19,6 +16,7 @@ import app.l2nx.gs.adapter.core.connect.*;
 import app.l2nx.gs.adapter.core.events.EventsBootstrap;
 import app.l2nx.gs.adapter.core.events.EventsConfig;
 import app.l2nx.gs.adapter.core.events.EventsPublisher;
+import app.l2nx.gs.adapter.core.gamedata.NxGameDataImpl;
 import app.l2nx.gs.adapter.core.heartbeat.HeartbeatService;
 import app.l2nx.gs.adapter.core.kafka.DefaultKafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaFactory;
@@ -92,6 +90,7 @@ public final class NxAdapter {
     private static volatile NxEvents eventsFacade;
     private static volatile NxCommands commandsFacade;
     private static volatile NxSyncImpl syncFacade;
+    private static volatile NxGameDataImpl gameDataFacade;
     private static final AtomicReference<Executor> hostExecutorRef = new AtomicReference<Executor>();
 
     private NxAdapter() {
@@ -420,6 +419,7 @@ public final class NxAdapter {
         // principal's group ACL (prefixed on `<tenant>.`) covers it.
         String commandsGroupId = active.tenantSlug() + ".gs.commands." + active.serverSlug();
         NxSync sync = startSyncFacade();
+        NxGameData gameData = startGameDataFacade();
         NxCommands commands = null;
         try {
             commands = startCommandsConsumer(active.topics(),
@@ -446,6 +446,7 @@ public final class NxAdapter {
                         .commands(commands)
                         .io(ioExecutor)
                         .sync(sync)
+                        .gameData(gameData)
                         .build();
                 registry.connect(ctx);
             } catch (Throwable t) {
@@ -560,6 +561,20 @@ public final class NxAdapter {
         NxSyncImpl fresh = new NxSyncImpl();
         syncFacade = fresh;
         return fresh;
+    }
+
+    private static NxGameData startGameDataFacade() {
+        NxGameDataImpl existing = gameDataFacade;
+        if (existing == null) {
+            existing = new NxGameDataImpl();
+            gameDataFacade = existing;
+        } else {
+            // Reconnect: drop stale triggers so the gd-sync module re-registers
+            // cleanly instead of stacking duplicates.
+            existing.clearTriggers();
+        }
+        existing.bindExecutor(ioExecutor);
+        return existing;
     }
 
     /**
@@ -724,6 +739,11 @@ public final class NxAdapter {
             syncImpl.clearTriggers();
         }
         syncFacade = null;
+        NxGameDataImpl gameDataImpl = gameDataFacade;
+        if (gameDataImpl != null) {
+            gameDataImpl.clearTriggers();
+        }
+        gameDataFacade = null;
         eventsConfig = null;
         commandsConfig = null;
         hostExecutorRef.set(null);

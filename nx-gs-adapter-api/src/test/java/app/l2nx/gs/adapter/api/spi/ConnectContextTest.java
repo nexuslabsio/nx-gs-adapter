@@ -39,7 +39,7 @@ class ConnectContextTest {
         assertNotNull(ctx.getSyncTopics());
         assertTrue(ctx.getSyncTopics().getDb().isEmpty());
         assertTrue(ctx.getSyncTopics().getRuntime().isEmpty());
-        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
+        assertTrue(ctx.getSyncTopics().getGd().isEmpty());
     }
 
     @Test
@@ -49,7 +49,7 @@ class ConnectContextTest {
         assertNotNull(ctx.getSyncTopics());
         assertTrue(ctx.getSyncTopics().getDb().isEmpty());
         assertTrue(ctx.getSyncTopics().getRuntime().isEmpty());
-        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
+        assertTrue(ctx.getSyncTopics().getGd().isEmpty());
     }
 
     @Test
@@ -64,7 +64,7 @@ class ConnectContextTest {
         assertEquals("bohpts.gs.sync.db.clan", ctx.getSyncTopics().getDb().get("clan"));
         assertEquals("bohpts.gs.sync.runtime.character",
                 ctx.getSyncTopics().getRuntime().get("character"));
-        assertTrue(ctx.getSyncTopics().getDp().isEmpty());
+        assertTrue(ctx.getSyncTopics().getGd().isEmpty());
     }
 
     @Test

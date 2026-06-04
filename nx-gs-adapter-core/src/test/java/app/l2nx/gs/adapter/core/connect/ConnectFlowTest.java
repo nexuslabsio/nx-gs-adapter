@@ -251,7 +251,7 @@ class ConnectFlowTest {
         assertEquals(expectedDb, response.getSyncTopics().getDb());
         assertEquals(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"),
                 response.getSyncTopics().getRuntime());
-        assertTrue(response.getSyncTopics().getDp().isEmpty());
+        assertTrue(response.getSyncTopics().getGd().isEmpty());
         assertEquals("hb", response.getHeartbeatTopic());
     }
 
@@ -311,7 +311,7 @@ class ConnectFlowTest {
         assertNotNull(response.getSyncTopics());
         assertTrue(response.getSyncTopics().getDb().isEmpty());
         assertTrue(response.getSyncTopics().getRuntime().isEmpty());
-        assertTrue(response.getSyncTopics().getDp().isEmpty());
+        assertTrue(response.getSyncTopics().getGd().isEmpty());
     }
 
     @Test
