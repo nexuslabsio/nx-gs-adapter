@@ -33,7 +33,7 @@ import java.util.UUID;
  * differs.</p>
  *
  * @param <T> payload type ({@link app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate.ItemTemplate}
- *            for the {@code item-templates} entity)
+ *            for the {@code itemtemplate} entity)
  */
 public final class GameDataSyncEvent<T> {
 
@@ -56,7 +56,7 @@ public final class GameDataSyncEvent<T> {
     }
 
     /**
-     * Entity name in singular/hyphenated form, e.g. {@code "item-templates"}.
+     * Entity name in singular form, e.g. {@code "itemtemplate"} (matches the db-sync entity-name style).
      */
     public String getEntityName() {
         return entityName;

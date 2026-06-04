@@ -3,7 +3,7 @@ package app.l2nx.gs.adapter.api.spi;
 /**
  * Game-data sync capability, acquired via {@link ConnectContext#gameData()}. Lets
  * the host trigger a fresh full-snapshot publish of static game-data templates
- * (item-templates today; skills / npc later) onto the {@code gd} sync stream.
+ * (itemtemplate today; skills / npc later) onto the {@code gd} sync stream.
  *
  * <p>The {@code gd-sync} module publishes an initial snapshot automatically once
  * connected. The host calls {@link #publishSnapshot()} to re-publish on demand —

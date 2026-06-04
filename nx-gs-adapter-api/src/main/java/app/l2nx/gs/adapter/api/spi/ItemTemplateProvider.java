@@ -23,7 +23,7 @@ public interface ItemTemplateProvider {
 
     /**
      * The gd-sync entity name this provider feeds — currently always
-     * {@code "item-templates"}. Used to resolve the Kafka topic from
+     * {@code "itemtemplate"}. Used to resolve the Kafka topic from
      * {@code ctx.getSyncTopics().getGd()} and to tag the wire envelope. Mirrors
      * {@code EntityMapping.entityName()} on the db-sync side.
      */

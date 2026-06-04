@@ -13,7 +13,7 @@ import java.util.Objects;
 /**
  * Build-agnostic item-template wire DTO — the common L2 denominator for static
  * item data, carried as the payload of {@code GameDataSyncEvent} on the {@code gd}
- * (game-data) sync stream's {@code item-templates} entity topic. Each host build
+ * (game-data) sync stream's {@code itemtemplate} entity topic. Each host build
  * supplies its own provider that maps its core's internal item representation into
  * this shape; nothing here names a specific core.
  *

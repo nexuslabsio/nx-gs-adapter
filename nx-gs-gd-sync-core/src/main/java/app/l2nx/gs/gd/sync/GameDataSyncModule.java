@@ -48,7 +48,7 @@ public final class GameDataSyncModule implements AdapterModule {
 
     static final String NAME = "gd-sync";
 
-    private static final String ENTITY_ITEM_TEMPLATES = "item-templates";
+    private static final String ENTITY_ITEM_TEMPLATES = "itemtemplate";
 
     static final String STATE_INIT = "INIT";
     static final String STATE_DISABLED = "DISABLED";
