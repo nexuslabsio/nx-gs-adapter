@@ -68,13 +68,13 @@ by the L2NX game-server adapter and its consumers. Published as
       server-lifecycle facts `ServerStartedEvent` (UUIDv7 `eventId` + open
       `metadata`; canonical keys `gm_only` / `auto_restart` via
       `WellKnownServerStartMetadata`) and `ServerStoppingEvent` (UUIDv7 `eventId`
-      + open `metadata`; same keys — graceful-shutdown signal, no stop-reason on
-      the wire), dispatched by `Nx-Message-Type`. The host always reports both
-      keys; the platform mutes its "server is up" / "server is stopping"
-      notification on a GM-only run (operator tests) or an automatic scheduled
-      restart (`auto_restart=true` — the host tags its daily maintenance restart
-      and keeps emitting the fact so the platform still persists it). Both
-      lifecycle facts use partition key `null`.
+        + open `metadata`; same keys — graceful-shutdown signal, no stop-reason on
+          the wire), dispatched by `Nx-Message-Type`. The host always reports both
+          keys; the platform mutes its "server is up" / "server is stopping"
+          notification on a GM-only run (operator tests) or an automatic scheduled
+          restart (`auto_restart=true` — the host tags its daily maintenance restart
+          and keeps emitting the fact so the platform still persists it). Both
+          lifecycle facts use partition key `null`.
     - `events.character` — `CharacterPresenceEvent` (one event per login /
       logout, distinguished by the `online: boolean` field — `true`=login,
       `false`=logout). Carries UUIDv7 `eventId`
@@ -89,11 +89,13 @@ by the L2NX game-server adapter and its consumers. Published as
       partition key + open `metadata`), dispatched by `Nx-Message-Type`.
       Killer info rides `metadata` (`WellKnownDeathMetadata`): `killer_type`
       (a `WellKnownKillerTypes` value — `monster` / `player` / `boss` /
-      `self`) and `killer_id` (the killer's char object-id for `player`, NPC
-      template-id for `monster` / `boss`); the platform resolves the killer
-      name from the id, no name on the wire. bohpts emits a death event only
-      when the dying character was on autofarm (legacy-bot "your fishing
-      character died" signal); no location on the wire. This family ALSO carries
+      `self`), `killer_id` (the killer's char object-id for `player`, NPC
+      template-id for `monster` / `boss`), and `farm_mode` (a `WellKnownFarmModes`
+      value — `autofarm` / `auto_macro` — classifying the unattended mode); the
+      platform resolves the killer name from the id, no name on the wire. bohpts
+      emits a death event only when the dying character was unattended — on
+      autofarm or on an auto-macro (legacy-bot "your unattended character died"
+      signal); no location on the wire. This family ALSO carries
       `LevelExpTableSnapshotEvent` (Java package `events.leveldata`; see below) —
       the per-server level→exp table, dispatched by `Nx-Message-Type` on this same
       topic rather than a dedicated one.
@@ -178,21 +180,21 @@ by the L2NX game-server adapter and its consumers. Published as
       key: `null` (round-robin); platform scope-replaces per
       `(server, ratingType)` gated by the `eventId` timestamp.
     - `events.leveldata` — `LevelExpTableSnapshotEvent` (final, UUIDv7 `eventId`
-      + `List<LevelExpEntry> levels` + optional open `Map<String,String>
+        + `List<LevelExpEntry> levels` + optional open `Map<String,String>
       metadata`) + `LevelExpEntry` (`int level` + `long requiredExp` — the
-      absolute / cumulative exp required to be at that level). The Java package
-      is `events.leveldata`, but the event RIDES the `character` family/topic
-      (`<tenant>.gs.events.character`), dispatched by `Nx-Message-Type` — the
-      level table is synced once on server start / datapack reload, not worth its
-      own topic/consumer/group. Periodic FULL
-      snapshot of the server's level→required-exp progression table, host-pushed
-      via `NxEvents.publish(...)` (bohpts emits it on server startup + datapack
-      reload, reading L2J `ExperienceData`). Mirrors `BossRespawnSnapshotEvent`
-      exactly (hand-written immutable + builder + getters, Gson-friendly,
-      JSpecify `@Nullable`). Partition key: `null` (round-robin); platform
-      scope-replaces per `(server)` keeping the newest snapshot. Combined with
-      `CharacterRuntimeDto.exp` to compute "% progress within current level":
-      `pct = (exp - requiredExp[level]) / (requiredExp[level + 1] - requiredExp[level])`.
+          absolute / cumulative exp required to be at that level). The Java package
+          is `events.leveldata`, but the event RIDES the `character` family/topic
+          (`<tenant>.gs.events.character`), dispatched by `Nx-Message-Type` — the
+          level table is synced once on server start / datapack reload, not worth its
+          own topic/consumer/group. Periodic FULL
+          snapshot of the server's level→required-exp progression table, host-pushed
+          via `NxEvents.publish(...)` (bohpts emits it on server startup + datapack
+          reload, reading L2J `ExperienceData`). Mirrors `BossRespawnSnapshotEvent`
+          exactly (hand-written immutable + builder + getters, Gson-friendly,
+          JSpecify `@Nullable`). Partition key: `null` (round-robin); platform
+          scope-replaces per `(server)` keeping the newest snapshot. Combined with
+          `CharacterRuntimeDto.exp` to compute "% progress within current level":
+          `pct = (exp - requiredExp[level]) / (requiredExp[level + 1] - requiredExp[level])`.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:
@@ -262,6 +264,11 @@ by the L2NX game-server adapter and its consumers. Published as
   Lombok).
 - **Public API → Javadoc mandatory** — every public type carries Javadoc; field-level JSON
   wire names documented next to the field.
+- **Encode units in field names, not in comments.** Any field/getter carrying a physical
+  unit puts the unit in its name: `Sec` (seconds), `Ms` (milliseconds), `Percent` (percent).
+  E.g. `respawnSec`, `respawnRandomSec`, `reuseDelayMs`, `chancePercent`, `groupChancePercent`.
+  Do NOT document a unit in a comment when it can live in the name. Non-physical counts/ids
+  (`level`, `weight`, world coordinates, stat values) stay unsuffixed.
 - **No framework annotations** — `@Component`, `@JsonProperty`, `@NotBlank` etc. are
   forbidden. The artifact is consumed by both Spring and non-Spring sides; framework
   coupling stays out of contracts.

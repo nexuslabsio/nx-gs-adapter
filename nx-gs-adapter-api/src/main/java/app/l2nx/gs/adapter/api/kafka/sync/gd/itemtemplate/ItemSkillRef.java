@@ -13,21 +13,21 @@ import java.util.Objects;
  * <p>{@code id}+{@code level} are the non-null identity of the reference. {@code type}
  * is an open, nullable string (build-agnostic vocabulary): {@code NORMAL},
  * {@code ENCHANT}, {@code EQUIP}, {@code UNEQUIP}, {@code CRITICAL_SKILL},
- * {@code MAGIC_SKILL}. {@code chance} is the proc chance (%), present for conditional
- * grants (on-crit / on-magic), {@code null} otherwise.</p>
+ * {@code MAGIC_SKILL}. {@code chancePercent} is the proc chance ({@code [0, 100]}), present
+ * for conditional grants (on-crit / on-magic), {@code null} otherwise.</p>
  */
 public final class ItemSkillRef {
 
     private final int id;
     private final int level;
     private final @Nullable String type;
-    private final @Nullable Integer chance;
+    private final @Nullable Integer chancePercent;
 
     private ItemSkillRef(Builder b) {
         this.id = b.id;
         this.level = b.level;
         this.type = b.type;
-        this.chance = b.chance;
+        this.chancePercent = b.chancePercent;
     }
 
     public int getId() {
@@ -42,8 +42,8 @@ public final class ItemSkillRef {
         return type;
     }
 
-    public @Nullable Integer getChance() {
-        return chance;
+    public @Nullable Integer getChancePercent() {
+        return chancePercent;
     }
 
     public Builder toBuilder() {
@@ -51,7 +51,7 @@ public final class ItemSkillRef {
                 .id(id)
                 .level(level)
                 .type(type)
-                .chance(chance);
+                .chancePercent(chancePercent);
     }
 
     public static Builder builder() {
@@ -66,24 +66,25 @@ public final class ItemSkillRef {
         return id == that.id
                 && level == that.level
                 && Objects.equals(type, that.type)
-                && Objects.equals(chance, that.chance);
+                && Objects.equals(chancePercent, that.chancePercent);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, level, type, chance);
+        return Objects.hash(id, level, type, chancePercent);
     }
 
     @Override
     public String toString() {
-        return "ItemSkillRef[id=" + id + ", level=" + level + ", type=" + type + ", chance=" + chance + "]";
+        return "ItemSkillRef[id=" + id + ", level=" + level + ", type=" + type
+                + ", chancePercent=" + chancePercent + "]";
     }
 
     public static final class Builder {
         private int id;
         private int level;
         private @Nullable String type;
-        private @Nullable Integer chance;
+        private @Nullable Integer chancePercent;
 
         public Builder id(int id) {
             this.id = id;
@@ -100,8 +101,8 @@ public final class ItemSkillRef {
             return this;
         }
 
-        public Builder chance(@Nullable Integer chance) {
-            this.chance = chance;
+        public Builder chancePercent(@Nullable Integer chancePercent) {
+            this.chancePercent = chancePercent;
             return this;
         }
 

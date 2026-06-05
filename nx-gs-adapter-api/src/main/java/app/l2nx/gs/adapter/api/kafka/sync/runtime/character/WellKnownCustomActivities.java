@@ -36,6 +36,10 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  *     <li>{@link #AUTOFARMING} — the character is auto-farming (server-side
  *     bot/auto-hunt). Time-limited builds ride a {@code seconds_remaining}
  *     metadata key — see {@link WellKnownCustomActivityMetadata}.</li>
+ *     <li>{@link #AUTO_MACRO} — the character is leveling on a server-managed
+ *     auto-macro (official cycle-macro session, distinct from {@link #AUTOFARMING}).
+ *     Carries {@code elapsed_seconds} and, on quota-limited builds,
+ *     {@code seconds_remaining} — see {@link WellKnownCustomActivityMetadata}.</li>
  * </ul>
  */
 public final class WellKnownCustomActivities {
@@ -60,4 +64,14 @@ public final class WellKnownCustomActivities {
      * (absent when the farm is unlimited / free).
      */
     public static final String AUTOFARMING = "autofarming";
+
+    /**
+     * The character is leveling on a server-managed auto-macro (official
+     * cycle-macro session) — distinct from {@link #AUTOFARMING}, which is the
+     * server-side auto-hunt bot. On quota-limited builds the remaining macro
+     * time rides {@link WellKnownCustomActivityMetadata#SECONDS_REMAINING}
+     * (absent when the macro is unlimited); elapsed time rides
+     * {@link WellKnownCustomActivityMetadata#ELAPSED_SECONDS}.
+     */
+    public static final String AUTO_MACRO = "auto_macro";
 }

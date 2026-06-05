@@ -2,8 +2,6 @@ package app.l2nx.gs.gd.sync;
 
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.GameDataSyncEvent;
-import app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate.ItemTemplate;
-import app.l2nx.gs.adapter.api.spi.ItemTemplateProvider;
 import app.l2nx.gs.commons.UUIDv7;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
@@ -12,21 +10,24 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.UUID;
+import java.util.function.ToLongFunction;
 
 /**
- * Builds one game-data snapshot burst for a single {@link ItemTemplateProvider}
- * and forwards it to a {@link GameDataSender}.
+ * Builds one game-data snapshot burst for a single gd entity and forwards it to a
+ * {@link GameDataSender}. Payload-agnostic: the caller supplies the entity name, the
+ * template collection, and a primary-key extractor, so the same engine publishes
+ * any gd entity (itemtemplate, npc, …).
  *
  * <p>A snapshot is a stateless burst keyed by {@code serverId} (raw 16-byte
  * UUID, so the whole burst lands in one partition, in order): one
- * {@link #OP_UPSERT} record per item template, then a single
- * {@link #OP_SNAPSHOT_COMPLETE} marker carrying the count. Every
- * record carries the {@code Nx-Message-Type=GameDataSyncEvent} header for
- * polymorphic dispatch on the platform consumer.</p>
+ * {@link #OP_UPSERT} record per template, then a single
+ * {@link #OP_SNAPSHOT_COMPLETE} marker carrying the count. Every record carries the
+ * {@code Nx-Message-Type=GameDataSyncEvent} header for polymorphic dispatch on the
+ * platform consumer.</p>
  *
- * <p>Never throws into the caller — a provider / send failure is caught and
- * logged. {@code publishSnapshot} returns the number of UPSERTs handed to the
- * sender so the module can track {@code itemsPublished}.</p>
+ * <p>Never throws into the caller — a send failure is caught and logged.
+ * {@code publishSnapshot} returns the number of UPSERTs handed to the sender so the
+ * module can track per-entity stats.</p>
  */
 public final class GameDataSnapshotPublisher {
 
@@ -46,37 +47,28 @@ public final class GameDataSnapshotPublisher {
     }
 
     /**
-     * Pull the provider's current template set and publish the full burst.
+     * Publish the full burst for one entity's template set.
      *
-     * @return result carrying the generated {@code syncId} and item count, or
-     * {@code null} when nothing was published (provider yielded null / the topic
-     * was absent / a failure was caught).
+     * @param entity   gd entity name (tags the wire envelope)
+     * @param items    the provider's current template set (must be non-null; empty is legal)
+     * @param pkOf     extracts the primary key from a template
+     * @param serverId partition key (raw-16-byte encoded), keeps the burst on one partition
+     * @param topic    destination topic
+     * @return result carrying the generated {@code syncId} and template count, or
+     * {@code null} when nothing was published (items null / topic absent).
      */
-    public Result publishSnapshot(ItemTemplateProvider provider, UUID serverId, String topic) {
-        if (provider == null) {
-            log.warn("gd-sync snapshot skipped — provider is null");
-            return null;
-        }
+    public <T> Result publishSnapshot(String entity, Collection<T> items, ToLongFunction<T> pkOf,
+                                      UUID serverId, String topic) {
         if (topic == null || topic.isEmpty()) {
-            log.warn("gd-sync snapshot for entity '{}' skipped — no topic configured", provider.entityName());
-            return null;
-        }
-        String entity;
-        Collection<ItemTemplate> items;
-        try {
-            entity = provider.entityName();
-            items = provider.snapshot();
-        } catch (Throwable t) {
-            log.error("ItemTemplateProvider threw {} pulling snapshot — gd-sync burst aborted",
-                    t.getClass().getName(), t);
+            log.warn("gd-sync snapshot for entity '{}' skipped — no topic configured", entity);
             return null;
         }
         if (items == null) {
             // null breaks the never-null contract; aborting (no marker) avoids a count=0
             // SNAPSHOT_COMPLETE that would reconcile-delete the whole catalog. Empty is legal and
             // still emits count=0 via the loop below.
-            log.error("ItemTemplateProvider for entity '{}' returned null snapshot (contract violation) "
-                    + "— gd-sync burst aborted, no SNAPSHOT_COMPLETE emitted", entity);
+            log.error("gd-sync provider for entity '{}' returned null snapshot (contract violation) "
+                    + "— burst aborted, no SNAPSHOT_COMPLETE emitted", entity);
             return null;
         }
 
@@ -86,12 +78,12 @@ public final class GameDataSnapshotPublisher {
         byte[] key = serverId != null ? NxHeaders.encodeUuid(serverId) : null;
         int count = 0;
         try {
-            for (ItemTemplate item : items) {
-                GameDataSyncEvent<ItemTemplate> upsert = GameDataSyncEvent.<ItemTemplate>builder()
+            for (T item : items) {
+                GameDataSyncEvent<T> upsert = GameDataSyncEvent.<T>builder()
                         .entityName(entity)
                         .op(OP_UPSERT)
                         .syncId(syncId)
-                        .pk((long) item.getId())
+                        .pk(pkOf.applyAsLong(item))
                         .payload(item)
                         .timestampEpochMs(System.currentTimeMillis())
                         .build();
@@ -99,7 +91,7 @@ public final class GameDataSnapshotPublisher {
                 count++;
             }
 
-            GameDataSyncEvent<ItemTemplate> complete = GameDataSyncEvent.<ItemTemplate>builder()
+            GameDataSyncEvent<T> complete = GameDataSyncEvent.<T>builder()
                     .entityName(entity)
                     .op(OP_SNAPSHOT_COMPLETE)
                     .syncId(syncId)
@@ -114,11 +106,11 @@ public final class GameDataSnapshotPublisher {
             return new Result(syncId, count, false);
         }
 
-        log.info("gd-sync published snapshot for entity '{}': {} item(s), syncId {}", entity, count, syncId);
+        log.info("gd-sync published snapshot for entity '{}': {} template(s), syncId {}", entity, count, syncId);
         return new Result(syncId, count, true);
     }
 
-    private void send(String topic, byte[] key, GameDataSyncEvent<ItemTemplate> value) {
+    private <T> void send(String topic, byte[] key, GameDataSyncEvent<T> value) {
         ProducerRecord<byte[], Object> record = new ProducerRecord<byte[], Object>(topic, key, value);
         record.headers().add(NxHeaders.NX_MESSAGE_TYPE, MESSAGE_TYPE.getBytes(StandardCharsets.UTF_8));
         sender.send(record, (metadata, exception) -> {

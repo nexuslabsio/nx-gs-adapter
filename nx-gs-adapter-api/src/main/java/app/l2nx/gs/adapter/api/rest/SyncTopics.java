@@ -19,8 +19,8 @@ import java.util.Objects;
  *     {@code runtime-sync} module ({@code <tenant>.gs.sync.runtime.<entity>}).
  *     Keys: {@code "character"}, …</li>
  *     <li>{@link #getGd()} — game-data (datapack-derived static templates) sync via
- *     the {@code gd-sync} module ({@code <tenant>.gs.sync.gd.<entity>}). Keys:
- *     {@code "itemtemplate"}, … (skills / npc follow in later slices).</li>
+ *     the {@code gd-sync} module ({@code <tenant>.gd.sync.<entity>}). Keys:
+ *     {@code "itemtemplate"}, {@code "npctemplate"}, {@code "skilltemplate"}, …</li>
  * </ul>
  *
  * <p>Per-namespace shape: {@code Map<entityName, fullyQualifiedTopic>}. Same entity

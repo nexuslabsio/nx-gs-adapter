@@ -267,6 +267,24 @@ publish target; CI uses `signingKey`/`signingPassword` Gradle properties (GPG) a
 - nx-gs-kafka itself is exercised end-to-end via Testcontainers in its own repo — adapter tests treat
   the Kafka facade as a unit-under-test only at the wiring level
 
+## Enum-like vocabulary values
+
+- **Any open-string field representing a closed / enum-like vocabulary** (`type`, `kind`, `category`, `element`,
+  `operateType`, `skillType`, `targetType`, `trait`, drop-category, …) carries **UPPER_SNAKE_CASE** values. Map a core
+  enum via `.name()` (Java enum constants are already UPPER_SNAKE) or translate a bitmask / int into a canonical
+  UPPER_SNAKE token — never lowercase / camelCase / PascalCase. Single-token codes (`A1`, `TG`) are fine as-is.
+- Free-form identifiers are NOT enum-like and stay verbatim: effect-handler names (`p_attack`), icon/resource names,
+  localized text. Don't force them to UPPER_SNAKE.
+
+## Item-template references
+
+- **Any field/column referencing an item template is named `itemTemplateId`** (wire/Java) / `item_template_id` (DB) —
+  never `itemId`, `itemConsumeId`, `consumeItemId`, etc. It is an FK to the item-template entity (`itemtemplate` /
+  `gd_item_templates`); the single canonical name keeps the relationship obvious in any DTO/table. The accompanying
+  quantity is `itemTemplateCount` / `item_template_count`.
+- Example: a skill level that consumes an item on cast carries `itemTemplateId` (+ `itemTemplateCount`), not
+  `itemConsumeId` / `itemConsumeCount`.
+
 ## Comments
 
 - **Comment only the non-obvious — *why*, not *what*.** A legitimate comment explains a non-obvious

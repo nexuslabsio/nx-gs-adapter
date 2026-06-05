@@ -59,7 +59,7 @@ public final class ItemTemplate {
     private final @Nullable String defaultAction;
     private final @Nullable String useHandler;
     private final @Nullable Integer duration;
-    private final @Nullable Integer reuseDelay;
+    private final @Nullable Integer reuseDelayMs;
     private final @Nullable List<ItemSkillRef> skills;
     private final @Nullable ItemStats stats;
     private final @Nullable ItemRestrictions restrictions;
@@ -85,7 +85,7 @@ public final class ItemTemplate {
         this.defaultAction = b.defaultAction;
         this.useHandler = b.useHandler;
         this.duration = b.duration;
-        this.reuseDelay = b.reuseDelay;
+        this.reuseDelayMs = b.reuseDelayMs;
         this.skills = b.skills == null ? null
                 : Collections.unmodifiableList(new ArrayList<ItemSkillRef>(b.skills));
         this.stats = b.stats;
@@ -181,8 +181,8 @@ public final class ItemTemplate {
         return duration;
     }
 
-    public @Nullable Integer getReuseDelay() {
-        return reuseDelay;
+    public @Nullable Integer getReuseDelayMs() {
+        return reuseDelayMs;
     }
 
     /**
@@ -234,7 +234,7 @@ public final class ItemTemplate {
                 .defaultAction(defaultAction)
                 .useHandler(useHandler)
                 .duration(duration)
-                .reuseDelay(reuseDelay)
+                .reuseDelayMs(reuseDelayMs)
                 .skills(skills)
                 .stats(stats)
                 .restrictions(restrictions)
@@ -269,7 +269,7 @@ public final class ItemTemplate {
                 && Objects.equals(defaultAction, that.defaultAction)
                 && Objects.equals(useHandler, that.useHandler)
                 && Objects.equals(duration, that.duration)
-                && Objects.equals(reuseDelay, that.reuseDelay)
+                && Objects.equals(reuseDelayMs, that.reuseDelayMs)
                 && Objects.equals(skills, that.skills)
                 && Objects.equals(stats, that.stats)
                 && Objects.equals(restrictions, that.restrictions)
@@ -280,7 +280,7 @@ public final class ItemTemplate {
     public int hashCode() {
         return Objects.hash(id, type, icon, name, displayId, weight, referencePrice, material,
                 grade, equipSlot, weaponType, armorType, etcItemType, stackable, questItem,
-                petUsable, defaultAction, useHandler, duration, reuseDelay, skills, stats,
+                petUsable, defaultAction, useHandler, duration, reuseDelayMs, skills, stats,
                 restrictions, upgrade);
     }
 
@@ -309,7 +309,7 @@ public final class ItemTemplate {
         private @Nullable String defaultAction;
         private @Nullable String useHandler;
         private @Nullable Integer duration;
-        private @Nullable Integer reuseDelay;
+        private @Nullable Integer reuseDelayMs;
         private @Nullable List<ItemSkillRef> skills;
         private @Nullable ItemStats stats;
         private @Nullable ItemRestrictions restrictions;
@@ -410,8 +410,8 @@ public final class ItemTemplate {
             return this;
         }
 
-        public Builder reuseDelay(@Nullable Integer reuseDelay) {
-            this.reuseDelay = reuseDelay;
+        public Builder reuseDelayMs(@Nullable Integer reuseDelayMs) {
+            this.reuseDelayMs = reuseDelayMs;
             return this;
         }
 

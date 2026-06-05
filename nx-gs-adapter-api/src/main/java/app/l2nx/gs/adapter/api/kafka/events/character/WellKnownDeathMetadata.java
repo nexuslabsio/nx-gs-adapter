@@ -17,6 +17,10 @@ package app.l2nx.gs.adapter.api.kafka.events.character;
  *   for {@code self} / unattributable deaths. The platform resolves the killer's
  *   display name from this id against its character / NPC catalogs — no killer
  *   name is carried on the wire.</li>
+ *   <li>{@link #FARM_MODE} — the unattended mode the character was in at death
+ *   (a {@link WellKnownFarmModes} value — {@code autofarm} / {@code auto_macro}).
+ *   Present only on the unattended-death signal bohpts emits; absent when the
+ *   host does not classify the mode.</li>
  * </ul>
  */
 public final class WellKnownDeathMetadata {
@@ -27,4 +31,12 @@ public final class WellKnownDeathMetadata {
     public static final String KILLER_TYPE = "killer_type";
 
     public static final String KILLER_ID = "killer_id";
+
+    /**
+     * The unattended mode the character was in at death — a
+     * {@link WellKnownFarmModes} value. Lets the platform word the
+     * "your unattended character died" notification per mode. Absent when the
+     * host does not classify.
+     */
+    public static final String FARM_MODE = "farm_mode";
 }

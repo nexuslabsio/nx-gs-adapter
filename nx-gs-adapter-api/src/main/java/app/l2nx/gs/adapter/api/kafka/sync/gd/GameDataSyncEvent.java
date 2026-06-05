@@ -8,7 +8,7 @@ import java.util.UUID;
 /**
  * Self-contained wire envelope for the {@code gd} (game-data) sync stream — the
  * gd analogue of db-sync's {@link app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent}.
- * One envelope per Kafka record on {@code <tenant>.gs.sync.gd.<entity>}; the
+ * One envelope per Kafka record on {@code <tenant>.gd.sync.<entity>}; the
  * consumer dispatches on {@link #getOp()}.
  *
  * <p>Field names mirror {@code SyncEvent} so the two envelopes stay consistent:

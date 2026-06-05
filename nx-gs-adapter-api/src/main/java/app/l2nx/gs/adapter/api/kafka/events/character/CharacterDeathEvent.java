@@ -2,17 +2,14 @@ package app.l2nx.gs.adapter.api.kafka.events.character;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Discrete death fact — one event per character death that the host chooses to
- * report. bohpts emits this <b>only</b> when the dying character was on autofarm
- * at the moment of death (the legacy-bot "your fishing character died" signal);
- * non-autofarm deaths produce no event.
+ * report. bohpts emits this <b>only</b> when the dying character was unattended
+ * at the moment of death — on autofarm or on an auto-macro (the legacy-bot
+ * "your unattended character died" signal); the {@code farm_mode} metadata key
+ * carries which mode. Attended deaths produce no event.
  *
  * <p>Second message type on the {@code character} family
  * ({@code <tenant>.gs.events.character}), alongside {@link CharacterPresenceEvent};
@@ -33,9 +30,10 @@ import java.util.UUID;
  *   Canonical keys in {@link WellKnownDeathMetadata}: {@code killer_type}
  *   (a {@link WellKnownKillerTypes} value) and {@code killer_id} (the killer's
  *   character object-id for a {@code player} killer, or the killer's NPC
- *   template-id for a {@code monster} / {@code boss} killer). The platform
- *   resolves the killer's display name from those ids against its own catalogs;
- *   no killer name is carried on the wire. Hosts MAY publish arbitrary
+ *   template-id for a {@code monster} / {@code boss} killer), plus {@code farm_mode}
+ *   (a {@link WellKnownFarmModes} value classifying the unattended mode). The
+ *   platform resolves the killer's display name from those ids against its own
+ *   catalogs; no killer name is carried on the wire. Hosts MAY publish arbitrary
  *   non-canonical keys; consumers ignore keys they do not understand.</li>
  * </ul>
  */
