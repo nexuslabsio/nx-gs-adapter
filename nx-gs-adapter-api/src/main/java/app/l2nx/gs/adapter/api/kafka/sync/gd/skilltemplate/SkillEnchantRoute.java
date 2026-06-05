@@ -42,6 +42,8 @@ public final class SkillEnchantRoute {
     private final @Nullable String enchantIcon;
     private final @Nullable LocalizedText enchantName;
     private final @Nullable LocalizedText enchantDescription;
+    private final @Nullable Long enchantAdena;
+    private final @Nullable Long enchantSp;
 
     private SkillEnchantRoute(Builder b) {
         this.baseLevel = b.baseLevel;
@@ -64,6 +66,8 @@ public final class SkillEnchantRoute {
         this.enchantIcon = b.enchantIcon;
         this.enchantName = b.enchantName;
         this.enchantDescription = b.enchantDescription;
+        this.enchantAdena = b.enchantAdena;
+        this.enchantSp = b.enchantSp;
     }
 
     /**
@@ -167,6 +171,20 @@ public final class SkillEnchantRoute {
         return enchantDescription;
     }
 
+    /**
+     * Adena cost to apply this enchant step; {@code null} if the build does not expose it.
+     */
+    public @Nullable Long getEnchantAdena() {
+        return enchantAdena;
+    }
+
+    /**
+     * SP cost to apply this enchant step; {@code null} if the build does not expose it.
+     */
+    public @Nullable Long getEnchantSp() {
+        return enchantSp;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .baseLevel(baseLevel)
@@ -188,7 +206,9 @@ public final class SkillEnchantRoute {
                 .power(power)
                 .enchantIcon(enchantIcon)
                 .enchantName(enchantName)
-                .enchantDescription(enchantDescription);
+                .enchantDescription(enchantDescription)
+                .enchantAdena(enchantAdena)
+                .enchantSp(enchantSp);
     }
 
     public static Builder builder() {
@@ -219,7 +239,9 @@ public final class SkillEnchantRoute {
                 && Objects.equals(power, that.power)
                 && Objects.equals(enchantIcon, that.enchantIcon)
                 && Objects.equals(enchantName, that.enchantName)
-                && Objects.equals(enchantDescription, that.enchantDescription);
+                && Objects.equals(enchantDescription, that.enchantDescription)
+                && Objects.equals(enchantAdena, that.enchantAdena)
+                && Objects.equals(enchantSp, that.enchantSp);
     }
 
     @Override
@@ -227,7 +249,7 @@ public final class SkillEnchantRoute {
         return Objects.hash(baseLevel, route, enchantLevel, mpConsume, mpInitialConsume, hpConsume,
                 itemTemplateId, itemTemplateCount, castRange, effectRange, magicLevel, abnormalLvl,
                 abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs, power, enchantIcon,
-                enchantName, enchantDescription);
+                enchantName, enchantDescription, enchantAdena, enchantSp);
     }
 
     @Override
@@ -257,6 +279,8 @@ public final class SkillEnchantRoute {
         private @Nullable String enchantIcon;
         private @Nullable LocalizedText enchantName;
         private @Nullable LocalizedText enchantDescription;
+        private @Nullable Long enchantAdena;
+        private @Nullable Long enchantSp;
 
         public Builder baseLevel(int baseLevel) {
             this.baseLevel = baseLevel;
@@ -355,6 +379,16 @@ public final class SkillEnchantRoute {
 
         public Builder enchantDescription(@Nullable LocalizedText enchantDescription) {
             this.enchantDescription = enchantDescription;
+            return this;
+        }
+
+        public Builder enchantAdena(@Nullable Long enchantAdena) {
+            this.enchantAdena = enchantAdena;
+            return this;
+        }
+
+        public Builder enchantSp(@Nullable Long enchantSp) {
+            this.enchantSp = enchantSp;
             return this;
         }
 

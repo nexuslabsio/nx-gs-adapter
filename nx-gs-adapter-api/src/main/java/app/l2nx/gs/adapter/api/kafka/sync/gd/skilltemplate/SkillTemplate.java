@@ -43,6 +43,7 @@ public final class SkillTemplate {
     private final @Nullable SkillFlags flags;
     private final @Nullable List<SkillLevel> levels;
     private final @Nullable List<SkillEnchantRoute> enchantRoutes;
+    private final @Nullable List<SkillClassLearn> classes;
 
     private SkillTemplate(Builder b) {
         this.id = b.id;
@@ -59,6 +60,8 @@ public final class SkillTemplate {
                 : Collections.unmodifiableList(new ArrayList<SkillLevel>(b.levels));
         this.enchantRoutes = b.enchantRoutes == null ? null
                 : Collections.unmodifiableList(new ArrayList<SkillEnchantRoute>(b.enchantRoutes));
+        this.classes = b.classes == null ? null
+                : Collections.unmodifiableList(new ArrayList<SkillClassLearn>(b.classes));
     }
 
     public int getId() {
@@ -138,6 +141,14 @@ public final class SkillTemplate {
         return enchantRoutes;
     }
 
+    /**
+     * Playable classes that learn this skill (inverted from the host's class skill trees);
+     * {@code null} if none (e.g. NPC-only / item-granted skills).
+     */
+    public @Nullable List<SkillClassLearn> getClasses() {
+        return classes;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .id(id)
@@ -151,7 +162,8 @@ public final class SkillTemplate {
                 .maxLevel(maxLevel)
                 .flags(flags)
                 .levels(levels)
-                .enchantRoutes(enchantRoutes);
+                .enchantRoutes(enchantRoutes)
+                .classes(classes);
     }
 
     public static Builder builder() {
@@ -174,13 +186,14 @@ public final class SkillTemplate {
                 && Objects.equals(maxLevel, that.maxLevel)
                 && Objects.equals(flags, that.flags)
                 && Objects.equals(levels, that.levels)
-                && Objects.equals(enchantRoutes, that.enchantRoutes);
+                && Objects.equals(enchantRoutes, that.enchantRoutes)
+                && Objects.equals(classes, that.classes);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(id, operateType, skillType, targetType, trait, element, elementPower,
-                icon, maxLevel, flags, levels, enchantRoutes);
+                icon, maxLevel, flags, levels, enchantRoutes, classes);
     }
 
     @Override
@@ -201,6 +214,7 @@ public final class SkillTemplate {
         private @Nullable SkillFlags flags;
         private @Nullable List<SkillLevel> levels;
         private @Nullable List<SkillEnchantRoute> enchantRoutes;
+        private @Nullable List<SkillClassLearn> classes;
 
         public Builder id(int id) {
             this.id = id;
@@ -259,6 +273,11 @@ public final class SkillTemplate {
 
         public Builder enchantRoutes(@Nullable List<SkillEnchantRoute> enchantRoutes) {
             this.enchantRoutes = enchantRoutes;
+            return this;
+        }
+
+        public Builder classes(@Nullable List<SkillClassLearn> classes) {
+            this.classes = classes;
             return this;
         }
 

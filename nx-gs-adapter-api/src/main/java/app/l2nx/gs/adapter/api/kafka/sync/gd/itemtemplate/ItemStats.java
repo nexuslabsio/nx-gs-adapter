@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -34,6 +35,7 @@ public final class ItemStats {
     private final @Nullable Integer spiritshots;
     private final @Nullable Integer mpConsume;
     private final @Nullable Boolean magicWeapon;
+    private final @Nullable Map<String, Double> statBonuses;
 
     private ItemStats(Builder b) {
         this.pAtk = b.pAtk;
@@ -48,6 +50,7 @@ public final class ItemStats {
         this.spiritshots = b.spiritshots;
         this.mpConsume = b.mpConsume;
         this.magicWeapon = b.magicWeapon;
+        this.statBonuses = b.statBonuses;
     }
 
     public @Nullable Integer getPAtk() {
@@ -98,6 +101,17 @@ public final class ItemStats {
         return magicWeapon;
     }
 
+    /**
+     * All stat bonuses the item grants, keyed by the canonical stat name
+     * (e.g. {@code MAX_HP}, {@code STAT_STR}, {@code MAGIC_ATTACK}). The open
+     * superset of the fixed combat fields above — carries the bonuses (mp bonus,
+     * base-stat bonuses on jewelry, …) that have no dedicated field. {@code null}
+     * if the item grants none.
+     */
+    public @Nullable Map<String, Double> getStatBonuses() {
+        return statBonuses;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .pAtk(pAtk)
@@ -111,7 +125,8 @@ public final class ItemStats {
                 .soulshots(soulshots)
                 .spiritshots(spiritshots)
                 .mpConsume(mpConsume)
-                .magicWeapon(magicWeapon);
+                .magicWeapon(magicWeapon)
+                .statBonuses(statBonuses);
     }
 
     public static Builder builder() {
@@ -134,13 +149,14 @@ public final class ItemStats {
                 && Objects.equals(soulshots, that.soulshots)
                 && Objects.equals(spiritshots, that.spiritshots)
                 && Objects.equals(mpConsume, that.mpConsume)
-                && Objects.equals(magicWeapon, that.magicWeapon);
+                && Objects.equals(magicWeapon, that.magicWeapon)
+                && Objects.equals(statBonuses, that.statBonuses);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(pAtk, mAtk, pDef, mDef, attackRange, attackSpeed, criticalRate,
-                randomDamage, soulshots, spiritshots, mpConsume, magicWeapon);
+                randomDamage, soulshots, spiritshots, mpConsume, magicWeapon, statBonuses);
     }
 
     @Override
@@ -161,6 +177,7 @@ public final class ItemStats {
         private @Nullable Integer spiritshots;
         private @Nullable Integer mpConsume;
         private @Nullable Boolean magicWeapon;
+        private @Nullable Map<String, Double> statBonuses;
 
         public Builder pAtk(@Nullable Integer pAtk) {
             this.pAtk = pAtk;
@@ -219,6 +236,11 @@ public final class ItemStats {
 
         public Builder magicWeapon(@Nullable Boolean magicWeapon) {
             this.magicWeapon = magicWeapon;
+            return this;
+        }
+
+        public Builder statBonuses(@Nullable Map<String, Double> statBonuses) {
+            this.statBonuses = statBonuses;
             return this;
         }
 

@@ -45,6 +45,7 @@ public final class NpcTemplate {
     private final @Nullable String aiType;
     private final @Nullable String shots;
     private final @Nullable String texture;
+    private final @Nullable String raceIcon;
     private final @Nullable Integer aggroRange;
     private final @Nullable Double collisionRadius;
     private final @Nullable Double collisionHeight;
@@ -71,6 +72,7 @@ public final class NpcTemplate {
         this.aiType = b.aiType;
         this.shots = b.shots;
         this.texture = b.texture;
+        this.raceIcon = b.raceIcon;
         this.aggroRange = b.aggroRange;
         this.collisionRadius = b.collisionRadius;
         this.collisionHeight = b.collisionHeight;
@@ -139,6 +141,14 @@ public final class NpcTemplate {
      */
     public @Nullable String getTexture() {
         return texture;
+    }
+
+    /**
+     * Icon of the NPC's race marker (resolved from the race-marker skill's per-level icon);
+     * {@code null} if the NPC has no race marker.
+     */
+    public @Nullable String getRaceIcon() {
+        return raceIcon;
     }
 
     public @Nullable Integer getAggroRange() {
@@ -252,6 +262,7 @@ public final class NpcTemplate {
                 .aiType(aiType)
                 .shots(shots)
                 .texture(texture)
+                .raceIcon(raceIcon)
                 .aggroRange(aggroRange)
                 .collisionRadius(collisionRadius)
                 .collisionHeight(collisionHeight)
@@ -287,6 +298,7 @@ public final class NpcTemplate {
                 && Objects.equals(aiType, that.aiType)
                 && Objects.equals(shots, that.shots)
                 && Objects.equals(texture, that.texture)
+                && Objects.equals(raceIcon, that.raceIcon)
                 && Objects.equals(aggroRange, that.aggroRange)
                 && Objects.equals(collisionRadius, that.collisionRadius)
                 && Objects.equals(collisionHeight, that.collisionHeight)
@@ -307,7 +319,7 @@ public final class NpcTemplate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, type, displayId, level, race, aiType, shots, texture, aggroRange,
+        return Objects.hash(id, type, displayId, level, race, aiType, shots, texture, raceIcon, aggroRange,
                 collisionRadius, collisionHeight, randomMinions, name, title, rightHand, leftHand,
                 stats, attributes, attribute, skills, drops, minions, absorbs, spawns);
     }
@@ -326,6 +338,7 @@ public final class NpcTemplate {
         private @Nullable String aiType;
         private @Nullable String shots;
         private @Nullable String texture;
+        private @Nullable String raceIcon;
         private @Nullable Integer aggroRange;
         private @Nullable Double collisionRadius;
         private @Nullable Double collisionHeight;
@@ -380,6 +393,11 @@ public final class NpcTemplate {
 
         public Builder texture(@Nullable String texture) {
             this.texture = texture;
+            return this;
+        }
+
+        public Builder raceIcon(@Nullable String raceIcon) {
+            this.raceIcon = raceIcon;
             return this;
         }
 
