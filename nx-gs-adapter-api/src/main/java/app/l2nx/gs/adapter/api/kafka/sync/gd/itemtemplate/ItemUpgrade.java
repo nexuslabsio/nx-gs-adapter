@@ -15,14 +15,14 @@ import java.util.Objects;
  */
 public final class ItemUpgrade {
 
-    private final @Nullable Integer enchantMax;
+    private final @Nullable Boolean enchantable;
     private final @Nullable Integer defaultEnchantLevel;
     private final @Nullable Boolean attributable;
     private final @Nullable Boolean crystallizable;
     private final @Nullable Integer crystalCount;
 
     private ItemUpgrade(Builder b) {
-        this.enchantMax = b.enchantMax;
+        this.enchantable = b.enchantable;
         this.defaultEnchantLevel = b.defaultEnchantLevel;
         this.attributable = b.attributable;
         this.crystallizable = b.crystallizable;
@@ -30,10 +30,12 @@ public final class ItemUpgrade {
     }
 
     /**
-     * Max enchant level; {@code 0} = not enchantable, {@code null} = unknown.
+     * Whether the item may be enchanted at all (server {@code enchant_enabled} flag);
+     * {@code null} = unknown. The datapack carries no per-item max enchant level — that
+     * is a global server config — so this is a boolean capability, not a level.
      */
-    public @Nullable Integer getEnchantMax() {
-        return enchantMax;
+    public @Nullable Boolean getEnchantable() {
+        return enchantable;
     }
 
     /**
@@ -66,7 +68,7 @@ public final class ItemUpgrade {
 
     public Builder toBuilder() {
         return new Builder()
-                .enchantMax(enchantMax)
+                .enchantable(enchantable)
                 .defaultEnchantLevel(defaultEnchantLevel)
                 .attributable(attributable)
                 .crystallizable(crystallizable)
@@ -82,7 +84,7 @@ public final class ItemUpgrade {
         if (this == o) return true;
         if (!(o instanceof ItemUpgrade)) return false;
         ItemUpgrade that = (ItemUpgrade) o;
-        return Objects.equals(enchantMax, that.enchantMax)
+        return Objects.equals(enchantable, that.enchantable)
                 && Objects.equals(defaultEnchantLevel, that.defaultEnchantLevel)
                 && Objects.equals(attributable, that.attributable)
                 && Objects.equals(crystallizable, that.crystallizable)
@@ -91,24 +93,24 @@ public final class ItemUpgrade {
 
     @Override
     public int hashCode() {
-        return Objects.hash(enchantMax, defaultEnchantLevel, attributable, crystallizable, crystalCount);
+        return Objects.hash(enchantable, defaultEnchantLevel, attributable, crystallizable, crystalCount);
     }
 
     @Override
     public String toString() {
-        return "ItemUpgrade[enchantMax=" + enchantMax + ", attributable=" + attributable
+        return "ItemUpgrade[enchantable=" + enchantable + ", attributable=" + attributable
                 + ", crystalCount=" + crystalCount + "]";
     }
 
     public static final class Builder {
-        private @Nullable Integer enchantMax;
+        private @Nullable Boolean enchantable;
         private @Nullable Integer defaultEnchantLevel;
         private @Nullable Boolean attributable;
         private @Nullable Boolean crystallizable;
         private @Nullable Integer crystalCount;
 
-        public Builder enchantMax(@Nullable Integer enchantMax) {
-            this.enchantMax = enchantMax;
+        public Builder enchantable(@Nullable Boolean enchantable) {
+            this.enchantable = enchantable;
             return this;
         }
 
