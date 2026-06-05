@@ -65,32 +65,55 @@ public final class ItemTemplate {
     private final @Nullable ItemRestrictions restrictions;
     private final @Nullable ItemUpgrade upgrade;
 
-    private ItemTemplate(Builder b) {
-        this.id = b.id;
-        this.type = Objects.requireNonNull(b.type, "type");
-        this.icon = b.icon;
-        this.name = b.name;
-        this.displayId = b.displayId;
-        this.weight = b.weight;
-        this.referencePrice = b.referencePrice;
-        this.material = b.material;
-        this.grade = b.grade;
-        this.equipSlot = b.equipSlot;
-        this.weaponType = b.weaponType;
-        this.armorType = b.armorType;
-        this.etcItemType = b.etcItemType;
-        this.stackable = b.stackable;
-        this.questItem = b.questItem;
-        this.petUsable = b.petUsable;
-        this.defaultAction = b.defaultAction;
-        this.useHandler = b.useHandler;
-        this.duration = b.duration;
-        this.reuseDelayMs = b.reuseDelayMs;
-        this.skills = b.skills == null ? null
-                : Collections.unmodifiableList(new ArrayList<ItemSkillRef>(b.skills));
-        this.stats = b.stats;
-        this.restrictions = b.restrictions;
-        this.upgrade = b.upgrade;
+    public ItemTemplate(int id,
+                        ItemClass type,
+                        @Nullable String icon,
+                        @Nullable LocalizedText name,
+                        @Nullable Integer displayId,
+                        @Nullable Integer weight,
+                        @Nullable Long referencePrice,
+                        @Nullable String material,
+                        @Nullable String grade,
+                        @Nullable ItemEquipSlot equipSlot,
+                        @Nullable String weaponType,
+                        @Nullable String armorType,
+                        @Nullable String etcItemType,
+                        @Nullable Boolean stackable,
+                        @Nullable Boolean questItem,
+                        @Nullable Boolean petUsable,
+                        @Nullable String defaultAction,
+                        @Nullable String useHandler,
+                        @Nullable Integer duration,
+                        @Nullable Integer reuseDelayMs,
+                        @Nullable List<ItemSkillRef> skills,
+                        @Nullable ItemStats stats,
+                        @Nullable ItemRestrictions restrictions,
+                        @Nullable ItemUpgrade upgrade) {
+        this.id = id;
+        this.type = Objects.requireNonNull(type, "type");
+        this.icon = icon;
+        this.name = name;
+        this.displayId = displayId;
+        this.weight = weight;
+        this.referencePrice = referencePrice;
+        this.material = material;
+        this.grade = grade;
+        this.equipSlot = equipSlot;
+        this.weaponType = weaponType;
+        this.armorType = armorType;
+        this.etcItemType = etcItemType;
+        this.stackable = stackable;
+        this.questItem = questItem;
+        this.petUsable = petUsable;
+        this.defaultAction = defaultAction;
+        this.useHandler = useHandler;
+        this.duration = duration;
+        this.reuseDelayMs = reuseDelayMs;
+        this.skills = skills == null ? null
+                : Collections.unmodifiableList(new ArrayList<ItemSkillRef>(skills));
+        this.stats = stats;
+        this.restrictions = restrictions;
+        this.upgrade = upgrade;
     }
 
     public int getId() {
@@ -436,7 +459,10 @@ public final class ItemTemplate {
         }
 
         public ItemTemplate build() {
-            return new ItemTemplate(this);
+            return new ItemTemplate(id, type, icon, name, displayId, weight, referencePrice, material,
+                    grade, equipSlot, weaponType, armorType, etcItemType, stackable, questItem,
+                    petUsable, defaultAction, useHandler, duration, reuseDelayMs, skills, stats,
+                    restrictions, upgrade);
         }
     }
 }

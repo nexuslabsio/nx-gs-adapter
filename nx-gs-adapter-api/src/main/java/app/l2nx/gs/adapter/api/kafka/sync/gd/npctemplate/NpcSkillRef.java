@@ -16,9 +16,9 @@ public final class NpcSkillRef {
     private final int id;
     private final int level;
 
-    private NpcSkillRef(Builder b) {
-        this.id = b.id;
-        this.level = b.level;
+    public NpcSkillRef(int id, int level) {
+        this.id = id;
+        this.level = level;
     }
 
     public int getId() {
@@ -72,7 +72,7 @@ public final class NpcSkillRef {
         }
 
         public NpcSkillRef build() {
-            return new NpcSkillRef(this);
+            return new NpcSkillRef(id, level);
         }
     }
 }

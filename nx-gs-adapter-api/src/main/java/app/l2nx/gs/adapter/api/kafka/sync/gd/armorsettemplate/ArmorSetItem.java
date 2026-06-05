@@ -13,9 +13,9 @@ public final class ArmorSetItem {
     private final String slot;
     private final int itemTemplateId;
 
-    private ArmorSetItem(Builder b) {
-        this.slot = Objects.requireNonNull(b.slot, "slot");
-        this.itemTemplateId = b.itemTemplateId;
+    public ArmorSetItem(String slot, int itemTemplateId) {
+        this.slot = Objects.requireNonNull(slot, "slot");
+        this.itemTemplateId = itemTemplateId;
     }
 
     /**
@@ -73,7 +73,7 @@ public final class ArmorSetItem {
         }
 
         public ArmorSetItem build() {
-            return new ArmorSetItem(this);
+            return new ArmorSetItem(slot, itemTemplateId);
         }
     }
 }

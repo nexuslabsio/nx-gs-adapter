@@ -18,9 +18,9 @@ public final class NpcMinionRef {
     private final int minionNpcTemplateId;
     private final @Nullable Integer count;
 
-    private NpcMinionRef(Builder b) {
-        this.minionNpcTemplateId = b.minionNpcTemplateId;
-        this.count = b.count;
+    public NpcMinionRef(int minionNpcTemplateId, @Nullable Integer count) {
+        this.minionNpcTemplateId = minionNpcTemplateId;
+        this.count = count;
     }
 
     public int getMinionNpcTemplateId() {
@@ -74,7 +74,7 @@ public final class NpcMinionRef {
         }
 
         public NpcMinionRef build() {
-            return new NpcMinionRef(this);
+            return new NpcMinionRef(minionNpcTemplateId, count);
         }
     }
 }

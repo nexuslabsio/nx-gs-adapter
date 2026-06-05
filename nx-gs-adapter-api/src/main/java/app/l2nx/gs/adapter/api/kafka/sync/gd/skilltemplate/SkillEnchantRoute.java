@@ -45,29 +45,50 @@ public final class SkillEnchantRoute {
     private final @Nullable Long enchantAdena;
     private final @Nullable Long enchantSp;
 
-    private SkillEnchantRoute(Builder b) {
-        this.baseLevel = b.baseLevel;
-        this.route = b.route;
-        this.enchantLevel = b.enchantLevel;
-        this.mpConsume = b.mpConsume;
-        this.mpInitialConsume = b.mpInitialConsume;
-        this.hpConsume = b.hpConsume;
-        this.itemTemplateId = b.itemTemplateId;
-        this.itemTemplateCount = b.itemTemplateCount;
-        this.castRange = b.castRange;
-        this.effectRange = b.effectRange;
-        this.magicLevel = b.magicLevel;
-        this.abnormalLvl = b.abnormalLvl;
-        this.abnormalTimeSec = b.abnormalTimeSec;
-        this.hitTimeMs = b.hitTimeMs;
-        this.coolTimeMs = b.coolTimeMs;
-        this.reuseDelayMs = b.reuseDelayMs;
-        this.power = b.power;
-        this.enchantIcon = b.enchantIcon;
-        this.enchantName = b.enchantName;
-        this.enchantDescription = b.enchantDescription;
-        this.enchantAdena = b.enchantAdena;
-        this.enchantSp = b.enchantSp;
+    public SkillEnchantRoute(int baseLevel,
+                             int route,
+                             int enchantLevel,
+                             @Nullable Integer mpConsume,
+                             @Nullable Integer mpInitialConsume,
+                             @Nullable Integer hpConsume,
+                             @Nullable Integer itemTemplateId,
+                             @Nullable Integer itemTemplateCount,
+                             @Nullable Integer castRange,
+                             @Nullable Integer effectRange,
+                             @Nullable Integer magicLevel,
+                             @Nullable Integer abnormalLvl,
+                             @Nullable Integer abnormalTimeSec,
+                             @Nullable Integer hitTimeMs,
+                             @Nullable Integer coolTimeMs,
+                             @Nullable Integer reuseDelayMs,
+                             @Nullable Double power,
+                             @Nullable String enchantIcon,
+                             @Nullable LocalizedText enchantName,
+                             @Nullable LocalizedText enchantDescription,
+                             @Nullable Long enchantAdena,
+                             @Nullable Long enchantSp) {
+        this.baseLevel = baseLevel;
+        this.route = route;
+        this.enchantLevel = enchantLevel;
+        this.mpConsume = mpConsume;
+        this.mpInitialConsume = mpInitialConsume;
+        this.hpConsume = hpConsume;
+        this.itemTemplateId = itemTemplateId;
+        this.itemTemplateCount = itemTemplateCount;
+        this.castRange = castRange;
+        this.effectRange = effectRange;
+        this.magicLevel = magicLevel;
+        this.abnormalLvl = abnormalLvl;
+        this.abnormalTimeSec = abnormalTimeSec;
+        this.hitTimeMs = hitTimeMs;
+        this.coolTimeMs = coolTimeMs;
+        this.reuseDelayMs = reuseDelayMs;
+        this.power = power;
+        this.enchantIcon = enchantIcon;
+        this.enchantName = enchantName;
+        this.enchantDescription = enchantDescription;
+        this.enchantAdena = enchantAdena;
+        this.enchantSp = enchantSp;
     }
 
     /**
@@ -393,7 +414,11 @@ public final class SkillEnchantRoute {
         }
 
         public SkillEnchantRoute build() {
-            return new SkillEnchantRoute(this);
+            return new SkillEnchantRoute(baseLevel, route, enchantLevel, mpConsume,
+                    mpInitialConsume, hpConsume, itemTemplateId, itemTemplateCount, castRange,
+                    effectRange, magicLevel, abnormalLvl, abnormalTimeSec, hitTimeMs, coolTimeMs,
+                    reuseDelayMs, power, enchantIcon, enchantName, enchantDescription, enchantAdena,
+                    enchantSp);
         }
     }
 }

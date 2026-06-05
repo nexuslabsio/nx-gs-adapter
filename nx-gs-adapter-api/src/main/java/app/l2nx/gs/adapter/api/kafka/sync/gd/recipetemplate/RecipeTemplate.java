@@ -40,22 +40,35 @@ public final class RecipeTemplate {
     private final @Nullable Integer hpConsume;
     private final @Nullable List<RecipeIngredient> ingredients;
 
-    private RecipeTemplate(Builder b) {
-        this.id = b.id;
-        this.recipeItemTemplateId = b.recipeItemTemplateId;
-        this.recipeName = b.recipeName;
-        this.craftLevel = b.craftLevel;
-        this.dwarven = b.dwarven;
-        this.successRatePercent = b.successRatePercent;
-        this.productItemTemplateId = b.productItemTemplateId;
-        this.productCount = b.productCount;
-        this.rareItemTemplateId = b.rareItemTemplateId;
-        this.rareCount = b.rareCount;
-        this.rarityPercent = b.rarityPercent;
-        this.mpConsume = b.mpConsume;
-        this.hpConsume = b.hpConsume;
-        this.ingredients = b.ingredients == null ? null
-                : Collections.unmodifiableList(new ArrayList<RecipeIngredient>(b.ingredients));
+    public RecipeTemplate(int id,
+                          @Nullable Integer recipeItemTemplateId,
+                          @Nullable String recipeName,
+                          @Nullable Integer craftLevel,
+                          @Nullable Boolean dwarven,
+                          @Nullable Integer successRatePercent,
+                          @Nullable Integer productItemTemplateId,
+                          @Nullable Integer productCount,
+                          @Nullable Integer rareItemTemplateId,
+                          @Nullable Integer rareCount,
+                          @Nullable Integer rarityPercent,
+                          @Nullable Integer mpConsume,
+                          @Nullable Integer hpConsume,
+                          @Nullable List<RecipeIngredient> ingredients) {
+        this.id = id;
+        this.recipeItemTemplateId = recipeItemTemplateId;
+        this.recipeName = recipeName;
+        this.craftLevel = craftLevel;
+        this.dwarven = dwarven;
+        this.successRatePercent = successRatePercent;
+        this.productItemTemplateId = productItemTemplateId;
+        this.productCount = productCount;
+        this.rareItemTemplateId = rareItemTemplateId;
+        this.rareCount = rareCount;
+        this.rarityPercent = rarityPercent;
+        this.mpConsume = mpConsume;
+        this.hpConsume = hpConsume;
+        this.ingredients = ingredients == null ? null
+                : Collections.unmodifiableList(new ArrayList<RecipeIngredient>(ingredients));
     }
 
     public int getId() {
@@ -285,7 +298,9 @@ public final class RecipeTemplate {
         }
 
         public RecipeTemplate build() {
-            return new RecipeTemplate(this);
+            return new RecipeTemplate(id, recipeItemTemplateId, recipeName, craftLevel, dwarven,
+                    successRatePercent, productItemTemplateId, productCount, rareItemTemplateId,
+                    rareCount, rarityPercent, mpConsume, hpConsume, ingredients);
         }
     }
 }

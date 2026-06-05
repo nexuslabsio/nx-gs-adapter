@@ -16,10 +16,12 @@ public final class SpecialAbilityOption {
     private final @Nullable Integer skillTemplateId;
     private final @Nullable Integer skillLevel;
 
-    private SpecialAbilityOption(Builder b) {
-        this.optionId = b.optionId;
-        this.skillTemplateId = b.skillTemplateId;
-        this.skillLevel = b.skillLevel;
+    public SpecialAbilityOption(int optionId,
+                                @Nullable Integer skillTemplateId,
+                                @Nullable Integer skillLevel) {
+        this.optionId = optionId;
+        this.skillTemplateId = skillTemplateId;
+        this.skillLevel = skillLevel;
     }
 
     public int getOptionId() {
@@ -87,7 +89,7 @@ public final class SpecialAbilityOption {
         }
 
         public SpecialAbilityOption build() {
-            return new SpecialAbilityOption(this);
+            return new SpecialAbilityOption(optionId, skillTemplateId, skillLevel);
         }
     }
 }

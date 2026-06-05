@@ -23,12 +23,15 @@ public final class NpcDropGroup {
     private final @Nullable Double groupChancePercent;
     private final @Nullable List<NpcDropItem> items;
 
-    private NpcDropGroup(Builder b) {
-        this.category = b.category;
-        this.groupIndex = b.groupIndex;
-        this.groupChancePercent = b.groupChancePercent;
-        this.items = b.items == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcDropItem>(b.items));
+    public NpcDropGroup(@Nullable NpcDropType category,
+                        @Nullable Integer groupIndex,
+                        @Nullable Double groupChancePercent,
+                        @Nullable List<NpcDropItem> items) {
+        this.category = category;
+        this.groupIndex = groupIndex;
+        this.groupChancePercent = groupChancePercent;
+        this.items = items == null ? null
+                : Collections.unmodifiableList(new ArrayList<NpcDropItem>(items));
     }
 
     public @Nullable NpcDropType getCategory() {
@@ -108,7 +111,7 @@ public final class NpcDropGroup {
         }
 
         public NpcDropGroup build() {
-            return new NpcDropGroup(this);
+            return new NpcDropGroup(category, groupIndex, groupChancePercent, items);
         }
     }
 }

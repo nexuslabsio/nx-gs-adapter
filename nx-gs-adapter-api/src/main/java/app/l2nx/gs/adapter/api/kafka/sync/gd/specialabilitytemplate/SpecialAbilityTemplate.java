@@ -33,14 +33,18 @@ public final class SpecialAbilityTemplate {
     private final @Nullable List<SpecialAbilityOption> options;
     private final @Nullable List<SpecialAbilityPrice> prices;
 
-    private SpecialAbilityTemplate(Builder b) {
-        this.id = b.id;
-        this.slotType = b.slotType;
-        this.crystalType = b.crystalType;
-        this.options = b.options == null ? null
-                : Collections.unmodifiableList(new ArrayList<SpecialAbilityOption>(b.options));
-        this.prices = b.prices == null ? null
-                : Collections.unmodifiableList(new ArrayList<SpecialAbilityPrice>(b.prices));
+    public SpecialAbilityTemplate(int id,
+                                  @Nullable Integer slotType,
+                                  @Nullable String crystalType,
+                                  @Nullable List<SpecialAbilityOption> options,
+                                  @Nullable List<SpecialAbilityPrice> prices) {
+        this.id = id;
+        this.slotType = slotType;
+        this.crystalType = crystalType;
+        this.options = options == null ? null
+                : Collections.unmodifiableList(new ArrayList<SpecialAbilityOption>(options));
+        this.prices = prices == null ? null
+                : Collections.unmodifiableList(new ArrayList<SpecialAbilityPrice>(prices));
     }
 
     public int getId() {
@@ -146,7 +150,7 @@ public final class SpecialAbilityTemplate {
         }
 
         public SpecialAbilityTemplate build() {
-            return new SpecialAbilityTemplate(this);
+            return new SpecialAbilityTemplate(id, slotType, crystalType, options, prices);
         }
     }
 }

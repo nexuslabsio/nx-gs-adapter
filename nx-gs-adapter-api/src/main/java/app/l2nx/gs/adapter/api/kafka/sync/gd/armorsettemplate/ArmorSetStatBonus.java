@@ -23,13 +23,18 @@ public final class ArmorSetStatBonus {
     private final @Nullable Integer wit;
     private final @Nullable Integer men;
 
-    private ArmorSetStatBonus(Builder b) {
-        this.str = b.str;
-        this.dex = b.dex;
-        this.con = b.con;
-        this.intBonus = b.intBonus;
-        this.wit = b.wit;
-        this.men = b.men;
+    public ArmorSetStatBonus(@Nullable Integer str,
+                             @Nullable Integer dex,
+                             @Nullable Integer con,
+                             @Nullable Integer intBonus,
+                             @Nullable Integer wit,
+                             @Nullable Integer men) {
+        this.str = str;
+        this.dex = dex;
+        this.con = con;
+        this.intBonus = intBonus;
+        this.wit = wit;
+        this.men = men;
     }
 
     public @Nullable Integer getStr() {
@@ -137,7 +142,7 @@ public final class ArmorSetStatBonus {
         }
 
         public ArmorSetStatBonus build() {
-            return new ArmorSetStatBonus(this);
+            return new ArmorSetStatBonus(str, dex, con, intBonus, wit, men);
         }
     }
 }

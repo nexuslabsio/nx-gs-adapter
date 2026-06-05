@@ -22,11 +22,12 @@ public final class NpcAttribute {
     private final @Nullable Map<String, Integer> attack;
     private final @Nullable Map<String, Integer> defence;
 
-    private NpcAttribute(Builder b) {
-        this.attack = b.attack == null ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, Integer>(b.attack));
-        this.defence = b.defence == null ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, Integer>(b.defence));
+    public NpcAttribute(@Nullable Map<String, Integer> attack,
+                        @Nullable Map<String, Integer> defence) {
+        this.attack = attack == null ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, Integer>(attack));
+        this.defence = defence == null ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, Integer>(defence));
     }
 
     public @Nullable Map<String, Integer> getAttack() {
@@ -80,7 +81,7 @@ public final class NpcAttribute {
         }
 
         public NpcAttribute build() {
-            return new NpcAttribute(this);
+            return new NpcAttribute(attack, defence);
         }
     }
 }

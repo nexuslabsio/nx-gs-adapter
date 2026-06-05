@@ -23,11 +23,14 @@ public final class ItemSkillRef {
     private final @Nullable String type;
     private final @Nullable Integer chancePercent;
 
-    private ItemSkillRef(Builder b) {
-        this.id = b.id;
-        this.level = b.level;
-        this.type = b.type;
-        this.chancePercent = b.chancePercent;
+    public ItemSkillRef(int id,
+                        int level,
+                        @Nullable String type,
+                        @Nullable Integer chancePercent) {
+        this.id = id;
+        this.level = level;
+        this.type = type;
+        this.chancePercent = chancePercent;
     }
 
     public int getId() {
@@ -107,7 +110,7 @@ public final class ItemSkillRef {
         }
 
         public ItemSkillRef build() {
-            return new ItemSkillRef(this);
+            return new ItemSkillRef(id, level, type, chancePercent);
         }
     }
 }

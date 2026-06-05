@@ -21,12 +21,16 @@ public final class ItemUpgrade {
     private final @Nullable Boolean crystallizable;
     private final @Nullable Integer crystalCount;
 
-    private ItemUpgrade(Builder b) {
-        this.enchantable = b.enchantable;
-        this.defaultEnchantLevel = b.defaultEnchantLevel;
-        this.attributable = b.attributable;
-        this.crystallizable = b.crystallizable;
-        this.crystalCount = b.crystalCount;
+    public ItemUpgrade(@Nullable Boolean enchantable,
+                       @Nullable Integer defaultEnchantLevel,
+                       @Nullable Boolean attributable,
+                       @Nullable Boolean crystallizable,
+                       @Nullable Integer crystalCount) {
+        this.enchantable = enchantable;
+        this.defaultEnchantLevel = defaultEnchantLevel;
+        this.attributable = attributable;
+        this.crystallizable = crystallizable;
+        this.crystalCount = crystalCount;
     }
 
     /**
@@ -135,7 +139,7 @@ public final class ItemUpgrade {
         }
 
         public ItemUpgrade build() {
-            return new ItemUpgrade(this);
+            return new ItemUpgrade(enchantable, defaultEnchantLevel, attributable, crystallizable, crystalCount);
         }
     }
 }

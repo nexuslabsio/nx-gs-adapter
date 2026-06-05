@@ -23,12 +23,16 @@ public final class ArmorSetSkill {
     private final @Nullable Integer minPieces;
     private final @Nullable Integer enchantLevel;
 
-    private ArmorSetSkill(Builder b) {
-        this.skillTemplateId = b.skillTemplateId;
-        this.skillLevel = b.skillLevel;
-        this.kind = Objects.requireNonNull(b.kind, "kind");
-        this.minPieces = b.minPieces;
-        this.enchantLevel = b.enchantLevel;
+    public ArmorSetSkill(int skillTemplateId,
+                         @Nullable Integer skillLevel,
+                         String kind,
+                         @Nullable Integer minPieces,
+                         @Nullable Integer enchantLevel) {
+        this.skillTemplateId = skillTemplateId;
+        this.skillLevel = skillLevel;
+        this.kind = Objects.requireNonNull(kind, "kind");
+        this.minPieces = minPieces;
+        this.enchantLevel = enchantLevel;
     }
 
     public int getSkillTemplateId() {
@@ -130,7 +134,7 @@ public final class ArmorSetSkill {
         }
 
         public ArmorSetSkill build() {
-            return new ArmorSetSkill(this);
+            return new ArmorSetSkill(skillTemplateId, skillLevel, kind, minPieces, enchantLevel);
         }
     }
 }

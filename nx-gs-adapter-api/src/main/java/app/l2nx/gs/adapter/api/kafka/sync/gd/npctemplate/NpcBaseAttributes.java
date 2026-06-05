@@ -20,13 +20,18 @@ public final class NpcBaseAttributes {
     private final @Nullable Integer wit;
     private final @Nullable Integer men;
 
-    private NpcBaseAttributes(Builder b) {
-        this.str = b.str;
-        this.dex = b.dex;
-        this.con = b.con;
-        this.intel = b.intel;
-        this.wit = b.wit;
-        this.men = b.men;
+    public NpcBaseAttributes(@Nullable Integer str,
+                             @Nullable Integer dex,
+                             @Nullable Integer con,
+                             @Nullable Integer intel,
+                             @Nullable Integer wit,
+                             @Nullable Integer men) {
+        this.str = str;
+        this.dex = dex;
+        this.con = con;
+        this.intel = intel;
+        this.wit = wit;
+        this.men = men;
     }
 
     public @Nullable Integer getStr() {
@@ -130,7 +135,7 @@ public final class NpcBaseAttributes {
         }
 
         public NpcBaseAttributes build() {
-            return new NpcBaseAttributes(this);
+            return new NpcBaseAttributes(str, dex, con, intel, wit, men);
         }
     }
 }

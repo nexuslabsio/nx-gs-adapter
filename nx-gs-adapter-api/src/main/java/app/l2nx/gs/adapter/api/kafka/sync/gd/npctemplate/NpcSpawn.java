@@ -31,18 +31,27 @@ public final class NpcSpawn {
     private final @Nullable String respawnPattern;
     private final @Nullable List<NpcSpawnPoint> territory;
 
-    private NpcSpawn(Builder b) {
-        this.x = b.x;
-        this.y = b.y;
-        this.z = b.z;
-        this.heading = b.heading;
-        this.count = b.count;
-        this.respawnSec = b.respawnSec;
-        this.respawnRandomSec = b.respawnRandomSec;
-        this.periodOfDay = b.periodOfDay;
-        this.respawnPattern = b.respawnPattern;
-        this.territory = b.territory == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcSpawnPoint>(b.territory));
+    public NpcSpawn(@Nullable Integer x,
+                    @Nullable Integer y,
+                    @Nullable Integer z,
+                    @Nullable Integer heading,
+                    @Nullable Integer count,
+                    @Nullable Integer respawnSec,
+                    @Nullable Integer respawnRandomSec,
+                    @Nullable String periodOfDay,
+                    @Nullable String respawnPattern,
+                    @Nullable List<NpcSpawnPoint> territory) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.heading = heading;
+        this.count = count;
+        this.respawnSec = respawnSec;
+        this.respawnRandomSec = respawnRandomSec;
+        this.periodOfDay = periodOfDay;
+        this.respawnPattern = respawnPattern;
+        this.territory = territory == null ? null
+                : Collections.unmodifiableList(new ArrayList<NpcSpawnPoint>(territory));
     }
 
     public @Nullable Integer getX() {
@@ -194,7 +203,8 @@ public final class NpcSpawn {
         }
 
         public NpcSpawn build() {
-            return new NpcSpawn(this);
+            return new NpcSpawn(x, y, z, heading, count, respawnSec, respawnRandomSec, periodOfDay,
+                    respawnPattern, territory);
         }
     }
 }

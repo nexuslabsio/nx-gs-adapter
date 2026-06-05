@@ -26,15 +26,22 @@ public final class ItemRestrictions {
     private final @Nullable Boolean olympiadRestricted;
     private final @Nullable Boolean eventRestricted;
 
-    private ItemRestrictions(Builder b) {
-        this.tradable = b.tradable;
-        this.dropable = b.dropable;
-        this.sellable = b.sellable;
-        this.destroyable = b.destroyable;
-        this.warehouseDepositable = b.warehouseDepositable;
-        this.freightable = b.freightable;
-        this.olympiadRestricted = b.olympiadRestricted;
-        this.eventRestricted = b.eventRestricted;
+    public ItemRestrictions(@Nullable Boolean tradable,
+                            @Nullable Boolean dropable,
+                            @Nullable Boolean sellable,
+                            @Nullable Boolean destroyable,
+                            @Nullable Boolean warehouseDepositable,
+                            @Nullable Boolean freightable,
+                            @Nullable Boolean olympiadRestricted,
+                            @Nullable Boolean eventRestricted) {
+        this.tradable = tradable;
+        this.dropable = dropable;
+        this.sellable = sellable;
+        this.destroyable = destroyable;
+        this.warehouseDepositable = warehouseDepositable;
+        this.freightable = freightable;
+        this.olympiadRestricted = olympiadRestricted;
+        this.eventRestricted = eventRestricted;
     }
 
     public @Nullable Boolean getTradable() {
@@ -175,7 +182,8 @@ public final class ItemRestrictions {
         }
 
         public ItemRestrictions build() {
-            return new ItemRestrictions(this);
+            return new ItemRestrictions(tradable, dropable, sellable, destroyable, warehouseDepositable,
+                    freightable, olympiadRestricted, eventRestricted);
         }
     }
 }

@@ -45,14 +45,20 @@ public final class GameDataSyncEvent<T> {
     private final @Nullable Integer count;
     private final long timestampEpochMs;
 
-    private GameDataSyncEvent(Builder<T> b) {
-        this.entityName = Objects.requireNonNull(b.entityName, "entityName");
-        this.op = Objects.requireNonNull(b.op, "op");
-        this.syncId = Objects.requireNonNull(b.syncId, "syncId");
-        this.pk = b.pk;
-        this.payload = b.payload;
-        this.count = b.count;
-        this.timestampEpochMs = b.timestampEpochMs;
+    public GameDataSyncEvent(String entityName,
+                             String op,
+                             UUID syncId,
+                             @Nullable Long pk,
+                             @Nullable T payload,
+                             @Nullable Integer count,
+                             long timestampEpochMs) {
+        this.entityName = Objects.requireNonNull(entityName, "entityName");
+        this.op = Objects.requireNonNull(op, "op");
+        this.syncId = Objects.requireNonNull(syncId, "syncId");
+        this.pk = pk;
+        this.payload = payload;
+        this.count = count;
+        this.timestampEpochMs = timestampEpochMs;
     }
 
     /**
@@ -186,7 +192,7 @@ public final class GameDataSyncEvent<T> {
         }
 
         public GameDataSyncEvent<T> build() {
-            return new GameDataSyncEvent<T>(this);
+            return new GameDataSyncEvent<T>(entityName, op, syncId, pk, payload, count, timestampEpochMs);
         }
     }
 }

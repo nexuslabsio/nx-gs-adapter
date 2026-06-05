@@ -20,11 +20,14 @@ public final class NpcDropItem {
     private final @Nullable Long max;
     private final @Nullable Double chancePercent;
 
-    private NpcDropItem(Builder b) {
-        this.itemTemplateId = b.itemTemplateId;
-        this.min = b.min;
-        this.max = b.max;
-        this.chancePercent = b.chancePercent;
+    public NpcDropItem(int itemTemplateId,
+                       @Nullable Long min,
+                       @Nullable Long max,
+                       @Nullable Double chancePercent) {
+        this.itemTemplateId = itemTemplateId;
+        this.min = min;
+        this.max = max;
+        this.chancePercent = chancePercent;
     }
 
     public int getItemTemplateId() {
@@ -104,7 +107,7 @@ public final class NpcDropItem {
         }
 
         public NpcDropItem build() {
-            return new NpcDropItem(this);
+            return new NpcDropItem(itemTemplateId, min, max, chancePercent);
         }
     }
 }

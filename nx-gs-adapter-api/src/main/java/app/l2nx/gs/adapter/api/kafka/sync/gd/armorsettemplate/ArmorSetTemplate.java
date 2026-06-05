@@ -29,13 +29,16 @@ public final class ArmorSetTemplate {
     private final @Nullable List<ArmorSetItem> items;
     private final @Nullable List<ArmorSetSkill> skills;
 
-    private ArmorSetTemplate(Builder b) {
-        this.id = b.id;
-        this.statBonus = b.statBonus;
-        this.items = b.items == null ? null
-                : Collections.unmodifiableList(new ArrayList<ArmorSetItem>(b.items));
-        this.skills = b.skills == null ? null
-                : Collections.unmodifiableList(new ArrayList<ArmorSetSkill>(b.skills));
+    public ArmorSetTemplate(int id,
+                            @Nullable ArmorSetStatBonus statBonus,
+                            @Nullable List<ArmorSetItem> items,
+                            @Nullable List<ArmorSetSkill> skills) {
+        this.id = id;
+        this.statBonus = statBonus;
+        this.items = items == null ? null
+                : Collections.unmodifiableList(new ArrayList<ArmorSetItem>(items));
+        this.skills = skills == null ? null
+                : Collections.unmodifiableList(new ArrayList<ArmorSetSkill>(skills));
     }
 
     public int getId() {
@@ -124,7 +127,7 @@ public final class ArmorSetTemplate {
         }
 
         public ArmorSetTemplate build() {
-            return new ArmorSetTemplate(this);
+            return new ArmorSetTemplate(id, statBonus, items, skills);
         }
     }
 }

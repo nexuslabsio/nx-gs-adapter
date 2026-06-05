@@ -21,12 +21,16 @@ public final class NpcAbsorb {
     private final @Nullable Integer chancePercent;
     private final @Nullable Integer cursedChancePercent;
 
-    private NpcAbsorb(Builder b) {
-        this.type = b.type;
-        this.minLevel = b.minLevel;
-        this.maxLevel = b.maxLevel;
-        this.chancePercent = b.chancePercent;
-        this.cursedChancePercent = b.cursedChancePercent;
+    public NpcAbsorb(@Nullable NpcAbsorbType type,
+                     @Nullable Integer minLevel,
+                     @Nullable Integer maxLevel,
+                     @Nullable Integer chancePercent,
+                     @Nullable Integer cursedChancePercent) {
+        this.type = type;
+        this.minLevel = minLevel;
+        this.maxLevel = maxLevel;
+        this.chancePercent = chancePercent;
+        this.cursedChancePercent = cursedChancePercent;
     }
 
     public @Nullable NpcAbsorbType getType() {
@@ -117,7 +121,7 @@ public final class NpcAbsorb {
         }
 
         public NpcAbsorb build() {
-            return new NpcAbsorb(this);
+            return new NpcAbsorb(type, minLevel, maxLevel, chancePercent, cursedChancePercent);
         }
     }
 }

@@ -37,26 +37,44 @@ public final class NpcStats {
     private final @Nullable Long rewardSp;
     private final @Nullable Integer rewardRp;
 
-    private NpcStats(Builder b) {
-        this.baseHpMax = b.baseHpMax;
-        this.baseMpMax = b.baseMpMax;
-        this.baseHpReg = b.baseHpReg;
-        this.baseMpReg = b.baseMpReg;
-        this.basePAtk = b.basePAtk;
-        this.basePDef = b.basePDef;
-        this.baseMAtk = b.baseMAtk;
-        this.baseMDef = b.baseMDef;
-        this.basePAtkSpd = b.basePAtkSpd;
-        this.baseMAtkSpd = b.baseMAtkSpd;
-        this.baseRunSpd = b.baseRunSpd;
-        this.baseWalkSpd = b.baseWalkSpd;
-        this.baseAtkRange = b.baseAtkRange;
-        this.baseCritRate = b.baseCritRate;
-        this.baseShldDef = b.baseShldDef;
-        this.baseShldRate = b.baseShldRate;
-        this.rewardExp = b.rewardExp;
-        this.rewardSp = b.rewardSp;
-        this.rewardRp = b.rewardRp;
+    public NpcStats(@Nullable Double baseHpMax,
+                    @Nullable Double baseMpMax,
+                    @Nullable Double baseHpReg,
+                    @Nullable Double baseMpReg,
+                    @Nullable Double basePAtk,
+                    @Nullable Double basePDef,
+                    @Nullable Double baseMAtk,
+                    @Nullable Double baseMDef,
+                    @Nullable Integer basePAtkSpd,
+                    @Nullable Integer baseMAtkSpd,
+                    @Nullable Integer baseRunSpd,
+                    @Nullable Integer baseWalkSpd,
+                    @Nullable Integer baseAtkRange,
+                    @Nullable Integer baseCritRate,
+                    @Nullable Integer baseShldDef,
+                    @Nullable Integer baseShldRate,
+                    @Nullable Long rewardExp,
+                    @Nullable Long rewardSp,
+                    @Nullable Integer rewardRp) {
+        this.baseHpMax = baseHpMax;
+        this.baseMpMax = baseMpMax;
+        this.baseHpReg = baseHpReg;
+        this.baseMpReg = baseMpReg;
+        this.basePAtk = basePAtk;
+        this.basePDef = basePDef;
+        this.baseMAtk = baseMAtk;
+        this.baseMDef = baseMDef;
+        this.basePAtkSpd = basePAtkSpd;
+        this.baseMAtkSpd = baseMAtkSpd;
+        this.baseRunSpd = baseRunSpd;
+        this.baseWalkSpd = baseWalkSpd;
+        this.baseAtkRange = baseAtkRange;
+        this.baseCritRate = baseCritRate;
+        this.baseShldDef = baseShldDef;
+        this.baseShldRate = baseShldRate;
+        this.rewardExp = rewardExp;
+        this.rewardSp = rewardSp;
+        this.rewardRp = rewardRp;
     }
 
     public @Nullable Double getBaseHpMax() {
@@ -317,7 +335,9 @@ public final class NpcStats {
         }
 
         public NpcStats build() {
-            return new NpcStats(this);
+            return new NpcStats(baseHpMax, baseMpMax, baseHpReg, baseMpReg, basePAtk, basePDef,
+                    baseMAtk, baseMDef, basePAtkSpd, baseMAtkSpd, baseRunSpd, baseWalkSpd, baseAtkRange,
+                    baseCritRate, baseShldDef, baseShldRate, rewardExp, rewardSp, rewardRp);
         }
     }
 }

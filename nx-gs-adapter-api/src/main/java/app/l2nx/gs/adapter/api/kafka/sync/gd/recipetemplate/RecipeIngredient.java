@@ -14,9 +14,9 @@ public final class RecipeIngredient {
     private final int itemTemplateId;
     private final @Nullable Integer count;
 
-    private RecipeIngredient(Builder b) {
-        this.itemTemplateId = b.itemTemplateId;
-        this.count = b.count;
+    public RecipeIngredient(int itemTemplateId, @Nullable Integer count) {
+        this.itemTemplateId = itemTemplateId;
+        this.count = count;
     }
 
     public int getItemTemplateId() {
@@ -70,7 +70,7 @@ public final class RecipeIngredient {
         }
 
         public RecipeIngredient build() {
-            return new RecipeIngredient(this);
+            return new RecipeIngredient(itemTemplateId, count);
         }
     }
 }

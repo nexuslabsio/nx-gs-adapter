@@ -37,20 +37,32 @@ public final class ItemStats {
     private final @Nullable Boolean magicWeapon;
     private final @Nullable Map<String, Double> statBonuses;
 
-    private ItemStats(Builder b) {
-        this.pAtk = b.pAtk;
-        this.mAtk = b.mAtk;
-        this.pDef = b.pDef;
-        this.mDef = b.mDef;
-        this.attackRange = b.attackRange;
-        this.attackSpeed = b.attackSpeed;
-        this.criticalRate = b.criticalRate;
-        this.randomDamage = b.randomDamage;
-        this.soulshots = b.soulshots;
-        this.spiritshots = b.spiritshots;
-        this.mpConsume = b.mpConsume;
-        this.magicWeapon = b.magicWeapon;
-        this.statBonuses = b.statBonuses;
+    public ItemStats(@Nullable Integer pAtk,
+                     @Nullable Integer mAtk,
+                     @Nullable Integer pDef,
+                     @Nullable Integer mDef,
+                     @Nullable Integer attackRange,
+                     @Nullable Integer attackSpeed,
+                     @Nullable Integer criticalRate,
+                     @Nullable Integer randomDamage,
+                     @Nullable Integer soulshots,
+                     @Nullable Integer spiritshots,
+                     @Nullable Integer mpConsume,
+                     @Nullable Boolean magicWeapon,
+                     @Nullable Map<String, Double> statBonuses) {
+        this.pAtk = pAtk;
+        this.mAtk = mAtk;
+        this.pDef = pDef;
+        this.mDef = mDef;
+        this.attackRange = attackRange;
+        this.attackSpeed = attackSpeed;
+        this.criticalRate = criticalRate;
+        this.randomDamage = randomDamage;
+        this.soulshots = soulshots;
+        this.spiritshots = spiritshots;
+        this.mpConsume = mpConsume;
+        this.magicWeapon = magicWeapon;
+        this.statBonuses = statBonuses;
     }
 
     public @Nullable Integer getPAtk() {
@@ -245,7 +257,8 @@ public final class ItemStats {
         }
 
         public ItemStats build() {
-            return new ItemStats(this);
+            return new ItemStats(pAtk, mAtk, pDef, mDef, attackRange, attackSpeed, criticalRate,
+                    randomDamage, soulshots, spiritshots, mpConsume, magicWeapon, statBonuses);
         }
     }
 }

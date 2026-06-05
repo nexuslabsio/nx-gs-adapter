@@ -24,10 +24,11 @@ public final class SkillEffect {
     private final String name;
     private final @Nullable Map<String, String> params;
 
-    private SkillEffect(Builder b) {
-        this.name = Objects.requireNonNull(b.name, "name");
-        this.params = b.params == null ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(b.params));
+    public SkillEffect(String name,
+                       @Nullable Map<String, String> params) {
+        this.name = Objects.requireNonNull(name, "name");
+        this.params = params == null ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(params));
     }
 
     public String getName() {
@@ -85,7 +86,7 @@ public final class SkillEffect {
         }
 
         public SkillEffect build() {
-            return new SkillEffect(this);
+            return new SkillEffect(name, params);
         }
     }
 }

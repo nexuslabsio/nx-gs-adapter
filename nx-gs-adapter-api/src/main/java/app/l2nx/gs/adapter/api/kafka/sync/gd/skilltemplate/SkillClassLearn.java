@@ -24,13 +24,18 @@ public final class SkillClassLearn {
     private final @Nullable Boolean autoGet;
     private final @Nullable Boolean learnedByNpc;
 
-    private SkillClassLearn(Builder b) {
-        this.classId = b.classId;
-        this.className = b.className;
-        this.requiredLevel = b.requiredLevel;
-        this.levelUpSp = b.levelUpSp;
-        this.autoGet = b.autoGet;
-        this.learnedByNpc = b.learnedByNpc;
+    public SkillClassLearn(int classId,
+                           @Nullable String className,
+                           @Nullable Integer requiredLevel,
+                           @Nullable Long levelUpSp,
+                           @Nullable Boolean autoGet,
+                           @Nullable Boolean learnedByNpc) {
+        this.classId = classId;
+        this.className = className;
+        this.requiredLevel = requiredLevel;
+        this.levelUpSp = levelUpSp;
+        this.autoGet = autoGet;
+        this.learnedByNpc = learnedByNpc;
     }
 
     public int getClassId() {
@@ -149,7 +154,8 @@ public final class SkillClassLearn {
         }
 
         public SkillClassLearn build() {
-            return new SkillClassLearn(this);
+            return new SkillClassLearn(classId, className, requiredLevel, levelUpSp, autoGet,
+                    learnedByNpc);
         }
     }
 }

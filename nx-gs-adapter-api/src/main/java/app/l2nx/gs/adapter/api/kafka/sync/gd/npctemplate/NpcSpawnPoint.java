@@ -16,11 +16,14 @@ public final class NpcSpawnPoint {
     private final @Nullable Integer zmin;
     private final @Nullable Integer zmax;
 
-    private NpcSpawnPoint(Builder b) {
-        this.x = b.x;
-        this.y = b.y;
-        this.zmin = b.zmin;
-        this.zmax = b.zmax;
+    public NpcSpawnPoint(@Nullable Integer x,
+                         @Nullable Integer y,
+                         @Nullable Integer zmin,
+                         @Nullable Integer zmax) {
+        this.x = x;
+        this.y = y;
+        this.zmin = zmin;
+        this.zmax = zmax;
     }
 
     public @Nullable Integer getX() {
@@ -99,7 +102,7 @@ public final class NpcSpawnPoint {
         }
 
         public NpcSpawnPoint build() {
-            return new NpcSpawnPoint(this);
+            return new NpcSpawnPoint(x, y, zmin, zmax);
         }
     }
 }

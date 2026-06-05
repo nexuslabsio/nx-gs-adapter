@@ -21,11 +21,14 @@ public final class SoulCrystalTemplate {
     private final @Nullable Integer nextItemTemplateId;
     private final @Nullable Integer cursedNextItemTemplateId;
 
-    private SoulCrystalTemplate(Builder b) {
-        this.id = b.id;
-        this.level = b.level;
-        this.nextItemTemplateId = b.nextItemTemplateId;
-        this.cursedNextItemTemplateId = b.cursedNextItemTemplateId;
+    public SoulCrystalTemplate(int id,
+                               @Nullable Integer level,
+                               @Nullable Integer nextItemTemplateId,
+                               @Nullable Integer cursedNextItemTemplateId) {
+        this.id = id;
+        this.level = level;
+        this.nextItemTemplateId = nextItemTemplateId;
+        this.cursedNextItemTemplateId = cursedNextItemTemplateId;
     }
 
     public int getId() {
@@ -113,7 +116,7 @@ public final class SoulCrystalTemplate {
         }
 
         public SoulCrystalTemplate build() {
-            return new SoulCrystalTemplate(this);
+            return new SoulCrystalTemplate(id, level, nextItemTemplateId, cursedNextItemTemplateId);
         }
     }
 }

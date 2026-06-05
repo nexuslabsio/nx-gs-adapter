@@ -63,37 +63,61 @@ public final class NpcTemplate {
     private final @Nullable List<NpcAbsorb> absorbs;
     private final @Nullable List<NpcSpawn> spawns;
 
-    private NpcTemplate(Builder b) {
-        this.id = b.id;
-        this.type = Objects.requireNonNull(b.type, "type");
-        this.displayId = b.displayId;
-        this.level = b.level;
-        this.race = b.race;
-        this.aiType = b.aiType;
-        this.shots = b.shots;
-        this.texture = b.texture;
-        this.raceIcon = b.raceIcon;
-        this.aggroRange = b.aggroRange;
-        this.collisionRadius = b.collisionRadius;
-        this.collisionHeight = b.collisionHeight;
-        this.randomMinions = b.randomMinions;
-        this.name = b.name;
-        this.title = b.title;
-        this.rightHand = b.rightHand;
-        this.leftHand = b.leftHand;
-        this.stats = b.stats;
-        this.attributes = b.attributes;
-        this.attribute = b.attribute;
-        this.skills = b.skills == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcSkillRef>(b.skills));
-        this.drops = b.drops == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcDropGroup>(b.drops));
-        this.minions = b.minions == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcMinionRef>(b.minions));
-        this.absorbs = b.absorbs == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcAbsorb>(b.absorbs));
-        this.spawns = b.spawns == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcSpawn>(b.spawns));
+    public NpcTemplate(int id,
+                       String type,
+                       @Nullable Integer displayId,
+                       @Nullable Integer level,
+                       @Nullable NpcRace race,
+                       @Nullable String aiType,
+                       @Nullable String shots,
+                       @Nullable String texture,
+                       @Nullable String raceIcon,
+                       @Nullable Integer aggroRange,
+                       @Nullable Double collisionRadius,
+                       @Nullable Double collisionHeight,
+                       @Nullable Boolean randomMinions,
+                       @Nullable LocalizedText name,
+                       @Nullable LocalizedText title,
+                       @Nullable Integer rightHand,
+                       @Nullable Integer leftHand,
+                       @Nullable NpcStats stats,
+                       @Nullable NpcBaseAttributes attributes,
+                       @Nullable NpcAttribute attribute,
+                       @Nullable List<NpcSkillRef> skills,
+                       @Nullable List<NpcDropGroup> drops,
+                       @Nullable List<NpcMinionRef> minions,
+                       @Nullable List<NpcAbsorb> absorbs,
+                       @Nullable List<NpcSpawn> spawns) {
+        this.id = id;
+        this.type = Objects.requireNonNull(type, "type");
+        this.displayId = displayId;
+        this.level = level;
+        this.race = race;
+        this.aiType = aiType;
+        this.shots = shots;
+        this.texture = texture;
+        this.raceIcon = raceIcon;
+        this.aggroRange = aggroRange;
+        this.collisionRadius = collisionRadius;
+        this.collisionHeight = collisionHeight;
+        this.randomMinions = randomMinions;
+        this.name = name;
+        this.title = title;
+        this.rightHand = rightHand;
+        this.leftHand = leftHand;
+        this.stats = stats;
+        this.attributes = attributes;
+        this.attribute = attribute;
+        this.skills = skills == null ? null
+                : Collections.unmodifiableList(new ArrayList<NpcSkillRef>(skills));
+        this.drops = drops == null ? null
+                : Collections.unmodifiableList(new ArrayList<NpcDropGroup>(drops));
+        this.minions = minions == null ? null
+                : Collections.unmodifiableList(new ArrayList<NpcMinionRef>(minions));
+        this.absorbs = absorbs == null ? null
+                : Collections.unmodifiableList(new ArrayList<NpcAbsorb>(absorbs));
+        this.spawns = spawns == null ? null
+                : Collections.unmodifiableList(new ArrayList<NpcSpawn>(spawns));
     }
 
     public int getId() {
@@ -482,7 +506,9 @@ public final class NpcTemplate {
         }
 
         public NpcTemplate build() {
-            return new NpcTemplate(this);
+            return new NpcTemplate(id, type, displayId, level, race, aiType, shots, texture, raceIcon,
+                    aggroRange, collisionRadius, collisionHeight, randomMinions, name, title, rightHand,
+                    leftHand, stats, attributes, attribute, skills, drops, minions, absorbs, spawns);
         }
     }
 }

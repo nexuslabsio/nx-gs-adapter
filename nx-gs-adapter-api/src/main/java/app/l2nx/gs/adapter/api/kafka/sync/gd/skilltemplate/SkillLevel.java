@@ -46,27 +46,45 @@ public final class SkillLevel {
     private final @Nullable LocalizedText description;
     private final @Nullable List<SkillEffect> effects;
 
-    private SkillLevel(Builder b) {
-        this.level = b.level;
-        this.icon = b.icon;
-        this.mpConsume = b.mpConsume;
-        this.mpInitialConsume = b.mpInitialConsume;
-        this.hpConsume = b.hpConsume;
-        this.itemTemplateId = b.itemTemplateId;
-        this.itemTemplateCount = b.itemTemplateCount;
-        this.castRange = b.castRange;
-        this.effectRange = b.effectRange;
-        this.magicLevel = b.magicLevel;
-        this.abnormalLvl = b.abnormalLvl;
-        this.abnormalTimeSec = b.abnormalTimeSec;
-        this.hitTimeMs = b.hitTimeMs;
-        this.coolTimeMs = b.coolTimeMs;
-        this.reuseDelayMs = b.reuseDelayMs;
-        this.power = b.power;
-        this.name = b.name;
-        this.description = b.description;
-        this.effects = b.effects == null ? null
-                : Collections.unmodifiableList(new ArrayList<SkillEffect>(b.effects));
+    public SkillLevel(int level,
+                      @Nullable String icon,
+                      @Nullable Integer mpConsume,
+                      @Nullable Integer mpInitialConsume,
+                      @Nullable Integer hpConsume,
+                      @Nullable Integer itemTemplateId,
+                      @Nullable Integer itemTemplateCount,
+                      @Nullable Integer castRange,
+                      @Nullable Integer effectRange,
+                      @Nullable Integer magicLevel,
+                      @Nullable Integer abnormalLvl,
+                      @Nullable Integer abnormalTimeSec,
+                      @Nullable Integer hitTimeMs,
+                      @Nullable Integer coolTimeMs,
+                      @Nullable Integer reuseDelayMs,
+                      @Nullable Double power,
+                      @Nullable LocalizedText name,
+                      @Nullable LocalizedText description,
+                      @Nullable List<SkillEffect> effects) {
+        this.level = level;
+        this.icon = icon;
+        this.mpConsume = mpConsume;
+        this.mpInitialConsume = mpInitialConsume;
+        this.hpConsume = hpConsume;
+        this.itemTemplateId = itemTemplateId;
+        this.itemTemplateCount = itemTemplateCount;
+        this.castRange = castRange;
+        this.effectRange = effectRange;
+        this.magicLevel = magicLevel;
+        this.abnormalLvl = abnormalLvl;
+        this.abnormalTimeSec = abnormalTimeSec;
+        this.hitTimeMs = hitTimeMs;
+        this.coolTimeMs = coolTimeMs;
+        this.reuseDelayMs = reuseDelayMs;
+        this.power = power;
+        this.name = name;
+        this.description = description;
+        this.effects = effects == null ? null
+                : Collections.unmodifiableList(new ArrayList<SkillEffect>(effects));
     }
 
     public int getLevel() {
@@ -351,7 +369,10 @@ public final class SkillLevel {
         }
 
         public SkillLevel build() {
-            return new SkillLevel(this);
+            return new SkillLevel(level, icon, mpConsume, mpInitialConsume, hpConsume,
+                    itemTemplateId, itemTemplateCount, castRange, effectRange, magicLevel,
+                    abnormalLvl, abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs, power,
+                    name, description, effects);
         }
     }
 }

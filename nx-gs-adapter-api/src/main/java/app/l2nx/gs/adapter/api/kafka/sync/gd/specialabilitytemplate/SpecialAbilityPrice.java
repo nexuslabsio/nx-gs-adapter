@@ -18,11 +18,14 @@ public final class SpecialAbilityPrice {
     private final int itemTemplateId;
     private final @Nullable Long count;
 
-    private SpecialAbilityPrice(Builder b) {
-        this.kind = Objects.requireNonNull(b.kind, "kind");
-        this.slotIndex = b.slotIndex;
-        this.itemTemplateId = b.itemTemplateId;
-        this.count = b.count;
+    public SpecialAbilityPrice(String kind,
+                               @Nullable Integer slotIndex,
+                               int itemTemplateId,
+                               @Nullable Long count) {
+        this.kind = Objects.requireNonNull(kind, "kind");
+        this.slotIndex = slotIndex;
+        this.itemTemplateId = itemTemplateId;
+        this.count = count;
     }
 
     /**
@@ -109,7 +112,7 @@ public final class SpecialAbilityPrice {
         }
 
         public SpecialAbilityPrice build() {
-            return new SpecialAbilityPrice(this);
+            return new SpecialAbilityPrice(kind, slotIndex, itemTemplateId, count);
         }
     }
 }

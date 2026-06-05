@@ -28,17 +28,26 @@ public final class SkillFlags {
     private final @Nullable Boolean ignoreShield;
     private final @Nullable Boolean nextActionAttack;
 
-    private SkillFlags(Builder b) {
-        this.magic = b.magic;
-        this.debuff = b.debuff;
-        this.offensive = b.offensive;
-        this.passive = b.passive;
-        this.toggle = b.toggle;
-        this.staticSkill = b.staticSkill;
-        this.blockedInOlympiad = b.blockedInOlympiad;
-        this.overHit = b.overHit;
-        this.ignoreShield = b.ignoreShield;
-        this.nextActionAttack = b.nextActionAttack;
+    public SkillFlags(@Nullable Boolean magic,
+                      @Nullable Boolean debuff,
+                      @Nullable Boolean offensive,
+                      @Nullable Boolean passive,
+                      @Nullable Boolean toggle,
+                      @Nullable Boolean staticSkill,
+                      @Nullable Boolean blockedInOlympiad,
+                      @Nullable Boolean overHit,
+                      @Nullable Boolean ignoreShield,
+                      @Nullable Boolean nextActionAttack) {
+        this.magic = magic;
+        this.debuff = debuff;
+        this.offensive = offensive;
+        this.passive = passive;
+        this.toggle = toggle;
+        this.staticSkill = staticSkill;
+        this.blockedInOlympiad = blockedInOlympiad;
+        this.overHit = overHit;
+        this.ignoreShield = ignoreShield;
+        this.nextActionAttack = nextActionAttack;
     }
 
     /**
@@ -206,7 +215,8 @@ public final class SkillFlags {
         }
 
         public SkillFlags build() {
-            return new SkillFlags(this);
+            return new SkillFlags(magic, debuff, offensive, passive, toggle, staticSkill,
+                    blockedInOlympiad, overHit, ignoreShield, nextActionAttack);
         }
     }
 }

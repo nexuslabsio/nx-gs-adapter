@@ -45,23 +45,35 @@ public final class SkillTemplate {
     private final @Nullable List<SkillEnchantRoute> enchantRoutes;
     private final @Nullable List<SkillClassLearn> classes;
 
-    private SkillTemplate(Builder b) {
-        this.id = b.id;
-        this.operateType = b.operateType;
-        this.skillType = b.skillType;
-        this.targetType = b.targetType;
-        this.trait = b.trait;
-        this.element = b.element;
-        this.elementPower = b.elementPower;
-        this.icon = b.icon;
-        this.maxLevel = b.maxLevel;
-        this.flags = b.flags;
-        this.levels = b.levels == null ? null
-                : Collections.unmodifiableList(new ArrayList<SkillLevel>(b.levels));
-        this.enchantRoutes = b.enchantRoutes == null ? null
-                : Collections.unmodifiableList(new ArrayList<SkillEnchantRoute>(b.enchantRoutes));
-        this.classes = b.classes == null ? null
-                : Collections.unmodifiableList(new ArrayList<SkillClassLearn>(b.classes));
+    public SkillTemplate(int id,
+                         @Nullable String operateType,
+                         @Nullable String skillType,
+                         @Nullable String targetType,
+                         @Nullable String trait,
+                         @Nullable String element,
+                         @Nullable Integer elementPower,
+                         @Nullable String icon,
+                         @Nullable Integer maxLevel,
+                         @Nullable SkillFlags flags,
+                         @Nullable List<SkillLevel> levels,
+                         @Nullable List<SkillEnchantRoute> enchantRoutes,
+                         @Nullable List<SkillClassLearn> classes) {
+        this.id = id;
+        this.operateType = operateType;
+        this.skillType = skillType;
+        this.targetType = targetType;
+        this.trait = trait;
+        this.element = element;
+        this.elementPower = elementPower;
+        this.icon = icon;
+        this.maxLevel = maxLevel;
+        this.flags = flags;
+        this.levels = levels == null ? null
+                : Collections.unmodifiableList(new ArrayList<SkillLevel>(levels));
+        this.enchantRoutes = enchantRoutes == null ? null
+                : Collections.unmodifiableList(new ArrayList<SkillEnchantRoute>(enchantRoutes));
+        this.classes = classes == null ? null
+                : Collections.unmodifiableList(new ArrayList<SkillClassLearn>(classes));
     }
 
     public int getId() {
@@ -282,7 +294,8 @@ public final class SkillTemplate {
         }
 
         public SkillTemplate build() {
-            return new SkillTemplate(this);
+            return new SkillTemplate(id, operateType, skillType, targetType, trait, element,
+                    elementPower, icon, maxLevel, flags, levels, enchantRoutes, classes);
         }
     }
 }
