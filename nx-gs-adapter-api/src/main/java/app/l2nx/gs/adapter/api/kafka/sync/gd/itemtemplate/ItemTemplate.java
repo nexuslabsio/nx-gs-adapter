@@ -44,7 +44,6 @@ public final class ItemTemplate {
     private final ItemClass type;
     private final @Nullable String icon;
     private final @Nullable LocalizedText name;
-    private final @Nullable Integer displayId;
     private final @Nullable Integer weight;
     private final @Nullable Long referencePrice;
     private final @Nullable String material;
@@ -69,7 +68,6 @@ public final class ItemTemplate {
                         ItemClass type,
                         @Nullable String icon,
                         @Nullable LocalizedText name,
-                        @Nullable Integer displayId,
                         @Nullable Integer weight,
                         @Nullable Long referencePrice,
                         @Nullable String material,
@@ -93,7 +91,6 @@ public final class ItemTemplate {
         this.type = Objects.requireNonNull(type, "type");
         this.icon = icon;
         this.name = name;
-        this.displayId = displayId;
         this.weight = weight;
         this.referencePrice = referencePrice;
         this.material = material;
@@ -130,13 +127,6 @@ public final class ItemTemplate {
 
     public @Nullable LocalizedText getName() {
         return name;
-    }
-
-    /**
-     * Visual-override id (item renders as another); {@code null} = renders as itself.
-     */
-    public @Nullable Integer getDisplayId() {
-        return displayId;
     }
 
     public @Nullable Integer getWeight() {
@@ -242,7 +232,6 @@ public final class ItemTemplate {
                 .type(type)
                 .icon(icon)
                 .name(name)
-                .displayId(displayId)
                 .weight(weight)
                 .referencePrice(referencePrice)
                 .material(material)
@@ -277,7 +266,6 @@ public final class ItemTemplate {
                 && type == that.type
                 && Objects.equals(icon, that.icon)
                 && Objects.equals(name, that.name)
-                && Objects.equals(displayId, that.displayId)
                 && Objects.equals(weight, that.weight)
                 && Objects.equals(referencePrice, that.referencePrice)
                 && Objects.equals(material, that.material)
@@ -301,7 +289,7 @@ public final class ItemTemplate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, type, icon, name, displayId, weight, referencePrice, material,
+        return Objects.hash(id, type, icon, name, weight, referencePrice, material,
                 grade, equipSlot, weaponType, armorType, etcItemType, stackable, questItem,
                 petUsable, defaultAction, useHandler, duration, reuseDelayMs, skills, stats,
                 restrictions, upgrade);
@@ -317,7 +305,6 @@ public final class ItemTemplate {
         private ItemClass type;
         private @Nullable String icon;
         private @Nullable LocalizedText name;
-        private @Nullable Integer displayId;
         private @Nullable Integer weight;
         private @Nullable Long referencePrice;
         private @Nullable String material;
@@ -355,11 +342,6 @@ public final class ItemTemplate {
 
         public Builder name(@Nullable LocalizedText name) {
             this.name = name;
-            return this;
-        }
-
-        public Builder displayId(@Nullable Integer displayId) {
-            this.displayId = displayId;
             return this;
         }
 
@@ -459,7 +441,7 @@ public final class ItemTemplate {
         }
 
         public ItemTemplate build() {
-            return new ItemTemplate(id, type, icon, name, displayId, weight, referencePrice, material,
+            return new ItemTemplate(id, type, icon, name, weight, referencePrice, material,
                     grade, equipSlot, weaponType, armorType, etcItemType, stackable, questItem,
                     petUsable, defaultAction, useHandler, duration, reuseDelayMs, skills, stats,
                     restrictions, upgrade);

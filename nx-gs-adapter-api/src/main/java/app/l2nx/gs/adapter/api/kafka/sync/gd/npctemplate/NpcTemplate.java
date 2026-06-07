@@ -44,7 +44,6 @@ public final class NpcTemplate {
     private final @Nullable NpcRace race;
     private final @Nullable String aiType;
     private final @Nullable String shots;
-    private final @Nullable String texture;
     private final @Nullable String raceIcon;
     private final @Nullable Integer aggroRange;
     private final @Nullable Double collisionRadius;
@@ -70,7 +69,6 @@ public final class NpcTemplate {
                        @Nullable NpcRace race,
                        @Nullable String aiType,
                        @Nullable String shots,
-                       @Nullable String texture,
                        @Nullable String raceIcon,
                        @Nullable Integer aggroRange,
                        @Nullable Double collisionRadius,
@@ -95,7 +93,6 @@ public final class NpcTemplate {
         this.race = race;
         this.aiType = aiType;
         this.shots = shots;
-        this.texture = texture;
         this.raceIcon = raceIcon;
         this.aggroRange = aggroRange;
         this.collisionRadius = collisionRadius;
@@ -158,13 +155,6 @@ public final class NpcTemplate {
      */
     public @Nullable String getShots() {
         return shots;
-    }
-
-    /**
-     * Server-side visual class / texture name.
-     */
-    public @Nullable String getTexture() {
-        return texture;
     }
 
     /**
@@ -285,7 +275,6 @@ public final class NpcTemplate {
                 .race(race)
                 .aiType(aiType)
                 .shots(shots)
-                .texture(texture)
                 .raceIcon(raceIcon)
                 .aggroRange(aggroRange)
                 .collisionRadius(collisionRadius)
@@ -321,7 +310,6 @@ public final class NpcTemplate {
                 && race == that.race
                 && Objects.equals(aiType, that.aiType)
                 && Objects.equals(shots, that.shots)
-                && Objects.equals(texture, that.texture)
                 && Objects.equals(raceIcon, that.raceIcon)
                 && Objects.equals(aggroRange, that.aggroRange)
                 && Objects.equals(collisionRadius, that.collisionRadius)
@@ -343,7 +331,7 @@ public final class NpcTemplate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, type, displayId, level, race, aiType, shots, texture, raceIcon, aggroRange,
+        return Objects.hash(id, type, displayId, level, race, aiType, shots, raceIcon, aggroRange,
                 collisionRadius, collisionHeight, randomMinions, name, title, rightHand, leftHand,
                 stats, attributes, attribute, skills, drops, minions, absorbs, spawns);
     }
@@ -361,7 +349,6 @@ public final class NpcTemplate {
         private @Nullable NpcRace race;
         private @Nullable String aiType;
         private @Nullable String shots;
-        private @Nullable String texture;
         private @Nullable String raceIcon;
         private @Nullable Integer aggroRange;
         private @Nullable Double collisionRadius;
@@ -412,11 +399,6 @@ public final class NpcTemplate {
 
         public Builder shots(@Nullable String shots) {
             this.shots = shots;
-            return this;
-        }
-
-        public Builder texture(@Nullable String texture) {
-            this.texture = texture;
             return this;
         }
 
@@ -506,7 +488,7 @@ public final class NpcTemplate {
         }
 
         public NpcTemplate build() {
-            return new NpcTemplate(id, type, displayId, level, race, aiType, shots, texture, raceIcon,
+            return new NpcTemplate(id, type, displayId, level, race, aiType, shots, raceIcon,
                     aggroRange, collisionRadius, collisionHeight, randomMinions, name, title, rightHand,
                     leftHand, stats, attributes, attribute, skills, drops, minions, absorbs, spawns);
         }
