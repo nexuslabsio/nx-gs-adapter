@@ -1,6 +1,6 @@
 package app.l2nx.gs.commons.privatestore;
 
-import app.l2nx.gs.adapter.api.domain.item.ItemAttribute;
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import app.l2nx.gs.commons.hash.Fnv1a64;
 import org.jspecify.annotations.Nullable;
 
@@ -64,14 +64,14 @@ public final class PrivateStoreOfferHasher {
         return Fnv1a64.mix(h, value.intValue());
     }
 
-    private static final ItemAttribute[] ATTR_ORDER = ItemAttribute.values();
+    private static final Attribute[] ATTR_ORDER = Attribute.values();
 
-    private static long mixAttributes(long state, @Nullable Map<ItemAttribute, Integer> attrs) {
+    private static long mixAttributes(long state, @Nullable Map<Attribute, Integer> attrs) {
         if (attrs == null || attrs.isEmpty()) {
             return Fnv1a64.mix(state, 0);
         }
         long h = Fnv1a64.mix(state, attrs.size());
-        for (ItemAttribute k : ATTR_ORDER) {
+        for (Attribute k : ATTR_ORDER) {
             Integer v = attrs.get(k);
             if (v == null) continue;
             h = Fnv1a64.mix(h, k.ordinal());

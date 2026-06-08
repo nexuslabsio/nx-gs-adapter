@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
-import app.l2nx.gs.adapter.api.domain.item.ItemAttribute;
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
@@ -17,14 +17,14 @@ public final class Offer {
 
     private final long traderId;
     private final @Nullable Integer enchantLevel;
-    private final @Nullable Map<ItemAttribute, Integer> attributes;
+    private final @Nullable Map<Attribute, Integer> attributes;
     private final long count;
     private final long unitPrice;
     private final long currencyItemId;
 
     public Offer(long traderId,
                  @Nullable Integer enchantLevel,
-                 @Nullable Map<ItemAttribute, Integer> attributes,
+                 @Nullable Map<Attribute, Integer> attributes,
                  long count,
                  long unitPrice,
                  long currencyItemId) {
@@ -51,7 +51,7 @@ public final class Offer {
         return enchantLevel;
     }
 
-    public Map<ItemAttribute, Integer> getAttributes() {
+    public Map<Attribute, Integer> getAttributes() {
         return attributes == null ? Collections.emptyMap() : attributes;
     }
 
@@ -84,11 +84,11 @@ public final class Offer {
         return new Builder();
     }
 
-    private static @Nullable Map<ItemAttribute, Integer> freezeMap(@Nullable Map<ItemAttribute, Integer> src) {
+    private static @Nullable Map<Attribute, Integer> freezeMap(@Nullable Map<Attribute, Integer> src) {
         if (src == null || src.isEmpty()) {
             return null;
         }
-        return Collections.unmodifiableMap(new EnumMap<ItemAttribute, Integer>(src));
+        return Collections.unmodifiableMap(new EnumMap<Attribute, Integer>(src));
     }
 
     @Override
@@ -122,7 +122,7 @@ public final class Offer {
     public static final class Builder {
         private long traderId;
         private @Nullable Integer enchantLevel;
-        private @Nullable Map<ItemAttribute, Integer> attributes;
+        private @Nullable Map<Attribute, Integer> attributes;
         private long count;
         private long unitPrice;
         private long currencyItemId;
@@ -137,7 +137,7 @@ public final class Offer {
             return this;
         }
 
-        public Builder attributes(@Nullable Map<ItemAttribute, Integer> attributes) {
+        public Builder attributes(@Nullable Map<Attribute, Integer> attributes) {
             this.attributes = attributes;
             return this;
         }

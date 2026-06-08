@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.item;
 
-import app.l2nx.gs.adapter.api.domain.item.ItemAttribute;
+import app.l2nx.gs.adapter.api.domain.Attribute;
 
 import java.util.Objects;
 
@@ -8,7 +8,7 @@ import java.util.Objects;
  * Wire DTO for one row of {@code item_elementals} (or its tenant-equivalent),
  * carried inside {@link ItemDbDto#getAttributes()}.
  *
- * <p>Surfaces the elemental kind ({@link ItemAttribute}) and the source-side
+ * <p>Surfaces the elemental kind ({@link Attribute}) and the source-side
  * numeric strength ({@code value}). The composite source-side key is
  * {@code (itemId, elemType)} — the {@code itemId} part is implicit (the
  * parent {@link ItemDbDto}'s {@code id}); only {@code type} disambiguates
@@ -16,10 +16,10 @@ import java.util.Objects;
  */
 public final class ItemAttributeDbDto {
 
-    private final ItemAttribute type;
+    private final Attribute type;
     private final int value;
 
-    public ItemAttributeDbDto(ItemAttribute type, int value) {
+    public ItemAttributeDbDto(Attribute type, int value) {
         this.type = type;
         this.value = value;
     }
@@ -27,7 +27,7 @@ public final class ItemAttributeDbDto {
     /**
      * Element kind — {@code NOT NULL} on the source side.
      */
-    public ItemAttribute getType() {
+    public Attribute getType() {
         return type;
     }
 
@@ -66,10 +66,10 @@ public final class ItemAttributeDbDto {
     }
 
     public static final class Builder {
-        private ItemAttribute type;
+        private Attribute type;
         private int value;
 
-        public Builder type(ItemAttribute type) {
+        public Builder type(Attribute type) {
             this.type = type;
             return this;
         }

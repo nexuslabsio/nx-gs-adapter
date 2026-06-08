@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
-import app.l2nx.gs.adapter.api.domain.item.ItemAttribute;
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -37,8 +37,8 @@ class MailItemMovementTest {
 
     @Test
     void getAttributes_shouldBeUnmodifiable() {
-        Map<ItemAttribute, Integer> source = new HashMap<ItemAttribute, Integer>();
-        source.put(ItemAttribute.FIRE, 300);
+        Map<Attribute, Integer> source = new HashMap<Attribute, Integer>();
+        source.put(Attribute.FIRE, 300);
 
         MailItemMovement movement = MailItemMovement.builder()
                 .itemTemplateId(6611L)
@@ -48,13 +48,13 @@ class MailItemMovementTest {
                 .build();
 
         assertThrows(UnsupportedOperationException.class,
-                () -> movement.getAttributes().put(ItemAttribute.WATER, 150));
+                () -> movement.getAttributes().put(Attribute.WATER, 150));
     }
 
     @Test
     void constructor_shouldDefensivelyCopyAttributes() {
-        Map<ItemAttribute, Integer> source = new HashMap<ItemAttribute, Integer>();
-        source.put(ItemAttribute.FIRE, 300);
+        Map<Attribute, Integer> source = new HashMap<Attribute, Integer>();
+        source.put(Attribute.FIRE, 300);
 
         MailItemMovement movement = MailItemMovement.builder()
                 .itemTemplateId(6611L)
@@ -63,10 +63,10 @@ class MailItemMovementTest {
                 .attributes(source)
                 .build();
 
-        source.put(ItemAttribute.WATER, 150);
+        source.put(Attribute.WATER, 150);
 
         assertEquals(1, movement.getAttributes().size());
-        assertEquals(Integer.valueOf(300), movement.getAttributes().get(ItemAttribute.FIRE));
+        assertEquals(Integer.valueOf(300), movement.getAttributes().get(Attribute.FIRE));
     }
 
     @Test
@@ -107,8 +107,8 @@ class MailItemMovementTest {
 
     @Test
     void toBuilder_shouldRoundtripAllFields() {
-        Map<ItemAttribute, Integer> attrs = new LinkedHashMap<ItemAttribute, Integer>();
-        attrs.put(ItemAttribute.FIRE, 300);
+        Map<Attribute, Integer> attrs = new LinkedHashMap<Attribute, Integer>();
+        attrs.put(Attribute.FIRE, 300);
 
         MailItemMovement original = MailItemMovement.builder()
                 .itemTemplateId(6611L)
@@ -138,11 +138,11 @@ class MailItemMovementTest {
     void equals_shouldDistinguishAttributes() {
         MailItemMovement a = MailItemMovement.builder()
                 .itemTemplateId(57L).itemId(1L).newItemId(1L).count(1L)
-                .attributes(Collections.singletonMap(ItemAttribute.FIRE, 300))
+                .attributes(Collections.singletonMap(Attribute.FIRE, 300))
                 .build();
         MailItemMovement b = MailItemMovement.builder()
                 .itemTemplateId(57L).itemId(1L).newItemId(1L).count(1L)
-                .attributes(Collections.singletonMap(ItemAttribute.WATER, 300))
+                .attributes(Collections.singletonMap(Attribute.WATER, 300))
                 .build();
 
         assertNotEquals(a, b);

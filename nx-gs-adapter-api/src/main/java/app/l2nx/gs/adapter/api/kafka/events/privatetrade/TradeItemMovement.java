@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatetrade;
 
-import app.l2nx.gs.adapter.api.domain.item.ItemAttribute;
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
@@ -19,14 +19,14 @@ public final class TradeItemMovement {
     private final long newItemId;
     private final long count;
     private final @Nullable Integer enchantLevel;
-    private final @Nullable Map<ItemAttribute, Integer> attributes;
+    private final @Nullable Map<Attribute, Integer> attributes;
 
     public TradeItemMovement(long itemTemplateId,
                              long itemId,
                              long newItemId,
                              long count,
                              @Nullable Integer enchantLevel,
-                             @Nullable Map<ItemAttribute, Integer> attributes) {
+                             @Nullable Map<Attribute, Integer> attributes) {
         this.itemTemplateId = itemTemplateId;
         this.itemId = itemId;
         this.newItemId = newItemId;
@@ -65,7 +65,7 @@ public final class TradeItemMovement {
         return enchantLevel;
     }
 
-    public Map<ItemAttribute, Integer> getAttributes() {
+    public Map<Attribute, Integer> getAttributes() {
         return attributes == null ? Collections.emptyMap() : attributes;
     }
 
@@ -83,11 +83,11 @@ public final class TradeItemMovement {
         return new Builder();
     }
 
-    private static @Nullable Map<ItemAttribute, Integer> freezeMap(@Nullable Map<ItemAttribute, Integer> src) {
+    private static @Nullable Map<Attribute, Integer> freezeMap(@Nullable Map<Attribute, Integer> src) {
         if (src == null || src.isEmpty()) {
             return null;
         }
-        return Collections.unmodifiableMap(new EnumMap<ItemAttribute, Integer>(src));
+        return Collections.unmodifiableMap(new EnumMap<Attribute, Integer>(src));
     }
 
     @Override
@@ -124,7 +124,7 @@ public final class TradeItemMovement {
         private long newItemId;
         private long count;
         private @Nullable Integer enchantLevel;
-        private @Nullable Map<ItemAttribute, Integer> attributes;
+        private @Nullable Map<Attribute, Integer> attributes;
 
         public Builder itemTemplateId(long itemTemplateId) {
             this.itemTemplateId = itemTemplateId;
@@ -151,7 +151,7 @@ public final class TradeItemMovement {
             return this;
         }
 
-        public Builder attributes(@Nullable Map<ItemAttribute, Integer> attributes) {
+        public Builder attributes(@Nullable Map<Attribute, Integer> attributes) {
             this.attributes = attributes;
             return this;
         }

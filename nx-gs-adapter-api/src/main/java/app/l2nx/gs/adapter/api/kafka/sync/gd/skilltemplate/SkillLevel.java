@@ -35,12 +35,15 @@ public final class SkillLevel {
     private final @Nullable Integer itemTemplateCount;
     private final @Nullable Integer castRange;
     private final @Nullable Integer effectRange;
+    private final @Nullable Integer affectRange;
+    private final @Nullable Integer affectLimit;
     private final @Nullable Integer magicLevel;
     private final @Nullable Integer abnormalLvl;
     private final @Nullable Integer abnormalTimeSec;
     private final @Nullable Integer hitTimeMs;
     private final @Nullable Integer coolTimeMs;
     private final @Nullable Integer reuseDelayMs;
+    private final @Nullable Integer baseCritRate;
     private final @Nullable Double power;
     private final @Nullable LocalizedText name;
     private final @Nullable LocalizedText description;
@@ -55,12 +58,15 @@ public final class SkillLevel {
                       @Nullable Integer itemTemplateCount,
                       @Nullable Integer castRange,
                       @Nullable Integer effectRange,
+                      @Nullable Integer affectRange,
+                      @Nullable Integer affectLimit,
                       @Nullable Integer magicLevel,
                       @Nullable Integer abnormalLvl,
                       @Nullable Integer abnormalTimeSec,
                       @Nullable Integer hitTimeMs,
                       @Nullable Integer coolTimeMs,
                       @Nullable Integer reuseDelayMs,
+                      @Nullable Integer baseCritRate,
                       @Nullable Double power,
                       @Nullable LocalizedText name,
                       @Nullable LocalizedText description,
@@ -74,12 +80,15 @@ public final class SkillLevel {
         this.itemTemplateCount = itemTemplateCount;
         this.castRange = castRange;
         this.effectRange = effectRange;
+        this.affectRange = affectRange;
+        this.affectLimit = affectLimit;
         this.magicLevel = magicLevel;
         this.abnormalLvl = abnormalLvl;
         this.abnormalTimeSec = abnormalTimeSec;
         this.hitTimeMs = hitTimeMs;
         this.coolTimeMs = coolTimeMs;
         this.reuseDelayMs = reuseDelayMs;
+        this.baseCritRate = baseCritRate;
         this.power = power;
         this.name = name;
         this.description = description;
@@ -126,6 +135,20 @@ public final class SkillLevel {
         return effectRange;
     }
 
+    /**
+     * Radius of the area of effect for AoE skills; {@code null} for single-target.
+     */
+    public @Nullable Integer getAffectRange() {
+        return affectRange;
+    }
+
+    /**
+     * Maximum number of targets an AoE skill affects; {@code null} if unbounded / single-target.
+     */
+    public @Nullable Integer getAffectLimit() {
+        return affectLimit;
+    }
+
     public @Nullable Integer getMagicLevel() {
         return magicLevel;
     }
@@ -166,6 +189,14 @@ public final class SkillLevel {
     }
 
     /**
+     * Base critical-hit chance of the skill (raw value as defined by the build);
+     * {@code null} / {@code 0} when the skill is not crit-capable.
+     */
+    public @Nullable Integer getBaseCritRate() {
+        return baseCritRate;
+    }
+
+    /**
      * SkillTemplate power (damage / heal magnitude) — a coefficient, no unit.
      */
     public @Nullable Double getPower() {
@@ -198,12 +229,15 @@ public final class SkillLevel {
                 .itemTemplateCount(itemTemplateCount)
                 .castRange(castRange)
                 .effectRange(effectRange)
+                .affectRange(affectRange)
+                .affectLimit(affectLimit)
                 .magicLevel(magicLevel)
                 .abnormalLvl(abnormalLvl)
                 .abnormalTimeSec(abnormalTimeSec)
                 .hitTimeMs(hitTimeMs)
                 .coolTimeMs(coolTimeMs)
                 .reuseDelayMs(reuseDelayMs)
+                .baseCritRate(baseCritRate)
                 .power(power)
                 .name(name)
                 .description(description)
@@ -228,12 +262,15 @@ public final class SkillLevel {
                 && Objects.equals(itemTemplateCount, that.itemTemplateCount)
                 && Objects.equals(castRange, that.castRange)
                 && Objects.equals(effectRange, that.effectRange)
+                && Objects.equals(affectRange, that.affectRange)
+                && Objects.equals(affectLimit, that.affectLimit)
                 && Objects.equals(magicLevel, that.magicLevel)
                 && Objects.equals(abnormalLvl, that.abnormalLvl)
                 && Objects.equals(abnormalTimeSec, that.abnormalTimeSec)
                 && Objects.equals(hitTimeMs, that.hitTimeMs)
                 && Objects.equals(coolTimeMs, that.coolTimeMs)
                 && Objects.equals(reuseDelayMs, that.reuseDelayMs)
+                && Objects.equals(baseCritRate, that.baseCritRate)
                 && Objects.equals(power, that.power)
                 && Objects.equals(name, that.name)
                 && Objects.equals(description, that.description)
@@ -243,8 +280,9 @@ public final class SkillLevel {
     @Override
     public int hashCode() {
         return Objects.hash(level, icon, mpConsume, mpInitialConsume, hpConsume, itemTemplateId,
-                itemTemplateCount, castRange, effectRange, magicLevel, abnormalLvl, abnormalTimeSec,
-                hitTimeMs, coolTimeMs, reuseDelayMs, power, name, description, effects);
+                itemTemplateCount, castRange, effectRange, affectRange, affectLimit, magicLevel,
+                abnormalLvl, abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs, baseCritRate,
+                power, name, description, effects);
     }
 
     @Override
@@ -262,12 +300,15 @@ public final class SkillLevel {
         private @Nullable Integer itemTemplateCount;
         private @Nullable Integer castRange;
         private @Nullable Integer effectRange;
+        private @Nullable Integer affectRange;
+        private @Nullable Integer affectLimit;
         private @Nullable Integer magicLevel;
         private @Nullable Integer abnormalLvl;
         private @Nullable Integer abnormalTimeSec;
         private @Nullable Integer hitTimeMs;
         private @Nullable Integer coolTimeMs;
         private @Nullable Integer reuseDelayMs;
+        private @Nullable Integer baseCritRate;
         private @Nullable Double power;
         private @Nullable LocalizedText name;
         private @Nullable LocalizedText description;
@@ -318,6 +359,16 @@ public final class SkillLevel {
             return this;
         }
 
+        public Builder affectRange(@Nullable Integer affectRange) {
+            this.affectRange = affectRange;
+            return this;
+        }
+
+        public Builder affectLimit(@Nullable Integer affectLimit) {
+            this.affectLimit = affectLimit;
+            return this;
+        }
+
         public Builder magicLevel(@Nullable Integer magicLevel) {
             this.magicLevel = magicLevel;
             return this;
@@ -348,6 +399,11 @@ public final class SkillLevel {
             return this;
         }
 
+        public Builder baseCritRate(@Nullable Integer baseCritRate) {
+            this.baseCritRate = baseCritRate;
+            return this;
+        }
+
         public Builder power(@Nullable Double power) {
             this.power = power;
             return this;
@@ -370,9 +426,9 @@ public final class SkillLevel {
 
         public SkillLevel build() {
             return new SkillLevel(level, icon, mpConsume, mpInitialConsume, hpConsume,
-                    itemTemplateId, itemTemplateCount, castRange, effectRange, magicLevel,
-                    abnormalLvl, abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs, power,
-                    name, description, effects);
+                    itemTemplateId, itemTemplateCount, castRange, effectRange, affectRange,
+                    affectLimit, magicLevel, abnormalLvl, abnormalTimeSec, hitTimeMs, coolTimeMs,
+                    reuseDelayMs, baseCritRate, power, name, description, effects);
         }
     }
 }

@@ -24,8 +24,8 @@ import java.util.Objects;
  * supply it" rather than a fabricated default.</p>
  *
  * <p><b>Vocabulary:</b> {@code operateType} / {@code skillType} / {@code targetType} /
- * {@code trait} / {@code element} are open canonical L2 strings (the value sets are
- * large and fork-variable; the provider emits the core's enum name / element name, not
+ * {@code trait} / {@code attribute} are open canonical L2 strings (the value sets are
+ * large and fork-variable; the provider emits the core's enum name / attribute name, not
  * a JVM ordinal). Boolean classification flags are grouped in {@link #getFlags()}
  * ({@link SkillFlags}), unwrapped flat into columns by the consumer.</p>
  */
@@ -36,8 +36,8 @@ public final class SkillTemplate {
     private final @Nullable String skillType;
     private final @Nullable String targetType;
     private final @Nullable String trait;
-    private final @Nullable String element;
-    private final @Nullable Integer elementPower;
+    private final @Nullable String attribute;
+    private final @Nullable Integer attributePower;
     private final @Nullable String icon;
     private final @Nullable Integer maxLevel;
     private final @Nullable SkillFlags flags;
@@ -50,8 +50,8 @@ public final class SkillTemplate {
                          @Nullable String skillType,
                          @Nullable String targetType,
                          @Nullable String trait,
-                         @Nullable String element,
-                         @Nullable Integer elementPower,
+                         @Nullable String attribute,
+                         @Nullable Integer attributePower,
                          @Nullable String icon,
                          @Nullable Integer maxLevel,
                          @Nullable SkillFlags flags,
@@ -63,8 +63,8 @@ public final class SkillTemplate {
         this.skillType = skillType;
         this.targetType = targetType;
         this.trait = trait;
-        this.element = element;
-        this.elementPower = elementPower;
+        this.attribute = attribute;
+        this.attributePower = attributePower;
         this.icon = icon;
         this.maxLevel = maxLevel;
         this.flags = flags;
@@ -110,15 +110,15 @@ public final class SkillTemplate {
     }
 
     /**
-     * Attack element name ({@code FIRE}/{@code WATER}/{@code WIND}/{@code EARTH}/
-     * {@code HOLY}/{@code DARK}/{@code NONE}).
+     * Attack attribute name ({@code FIRE}/{@code WATER}/{@code WIND}/{@code EARTH}/
+     * {@code HOLY}/{@code DARK}); {@code null} when the skill has no attribute.
      */
-    public @Nullable String getElement() {
-        return element;
+    public @Nullable String getAttribute() {
+        return attribute;
     }
 
-    public @Nullable Integer getElementPower() {
-        return elementPower;
+    public @Nullable Integer getAttributePower() {
+        return attributePower;
     }
 
     public @Nullable String getIcon() {
@@ -168,8 +168,8 @@ public final class SkillTemplate {
                 .skillType(skillType)
                 .targetType(targetType)
                 .trait(trait)
-                .element(element)
-                .elementPower(elementPower)
+                .attribute(attribute)
+                .attributePower(attributePower)
                 .icon(icon)
                 .maxLevel(maxLevel)
                 .flags(flags)
@@ -192,8 +192,8 @@ public final class SkillTemplate {
                 && Objects.equals(skillType, that.skillType)
                 && Objects.equals(targetType, that.targetType)
                 && Objects.equals(trait, that.trait)
-                && Objects.equals(element, that.element)
-                && Objects.equals(elementPower, that.elementPower)
+                && Objects.equals(attribute, that.attribute)
+                && Objects.equals(attributePower, that.attributePower)
                 && Objects.equals(icon, that.icon)
                 && Objects.equals(maxLevel, that.maxLevel)
                 && Objects.equals(flags, that.flags)
@@ -204,7 +204,7 @@ public final class SkillTemplate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, operateType, skillType, targetType, trait, element, elementPower,
+        return Objects.hash(id, operateType, skillType, targetType, trait, attribute, attributePower,
                 icon, maxLevel, flags, levels, enchantRoutes, classes);
     }
 
@@ -219,8 +219,8 @@ public final class SkillTemplate {
         private @Nullable String skillType;
         private @Nullable String targetType;
         private @Nullable String trait;
-        private @Nullable String element;
-        private @Nullable Integer elementPower;
+        private @Nullable String attribute;
+        private @Nullable Integer attributePower;
         private @Nullable String icon;
         private @Nullable Integer maxLevel;
         private @Nullable SkillFlags flags;
@@ -253,13 +253,13 @@ public final class SkillTemplate {
             return this;
         }
 
-        public Builder element(@Nullable String element) {
-            this.element = element;
+        public Builder attribute(@Nullable String attribute) {
+            this.attribute = attribute;
             return this;
         }
 
-        public Builder elementPower(@Nullable Integer elementPower) {
-            this.elementPower = elementPower;
+        public Builder attributePower(@Nullable Integer attributePower) {
+            this.attributePower = attributePower;
             return this;
         }
 
@@ -294,8 +294,8 @@ public final class SkillTemplate {
         }
 
         public SkillTemplate build() {
-            return new SkillTemplate(id, operateType, skillType, targetType, trait, element,
-                    elementPower, icon, maxLevel, flags, levels, enchantRoutes, classes);
+            return new SkillTemplate(id, operateType, skillType, targetType, trait, attribute,
+                    attributePower, icon, maxLevel, flags, levels, enchantRoutes, classes);
         }
     }
 }

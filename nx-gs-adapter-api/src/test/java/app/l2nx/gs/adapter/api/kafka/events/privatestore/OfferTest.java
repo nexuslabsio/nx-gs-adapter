@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
-import app.l2nx.gs.adapter.api.domain.item.ItemAttribute;
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -33,8 +33,8 @@ class OfferTest {
 
     @Test
     void getAttributes_shouldBeUnmodifiable() {
-        Map<ItemAttribute, Integer> source = new HashMap<ItemAttribute, Integer>();
-        source.put(ItemAttribute.FIRE, 300);
+        Map<Attribute, Integer> source = new HashMap<Attribute, Integer>();
+        source.put(Attribute.FIRE, 300);
 
         Offer offer = Offer.builder()
                 .traderId(42L).attributes(source)
@@ -42,29 +42,29 @@ class OfferTest {
                 .build();
 
         assertThrows(UnsupportedOperationException.class,
-                () -> offer.getAttributes().put(ItemAttribute.WATER, 150));
+                () -> offer.getAttributes().put(Attribute.WATER, 150));
     }
 
     @Test
     void constructor_shouldDefensivelyCopyAttributes() {
-        Map<ItemAttribute, Integer> source = new HashMap<ItemAttribute, Integer>();
-        source.put(ItemAttribute.FIRE, 300);
+        Map<Attribute, Integer> source = new HashMap<Attribute, Integer>();
+        source.put(Attribute.FIRE, 300);
 
         Offer offer = Offer.builder()
                 .traderId(42L).attributes(source)
                 .count(1L).unitPrice(100L).currencyItemId(57L)
                 .build();
 
-        source.put(ItemAttribute.WATER, 150);
+        source.put(Attribute.WATER, 150);
 
         assertEquals(1, offer.getAttributes().size());
-        assertEquals(Integer.valueOf(300), offer.getAttributes().get(ItemAttribute.FIRE));
+        assertEquals(Integer.valueOf(300), offer.getAttributes().get(Attribute.FIRE));
     }
 
     @Test
     void toBuilder_shouldRoundtripAllFields() {
-        Map<ItemAttribute, Integer> attrs = new LinkedHashMap<ItemAttribute, Integer>();
-        attrs.put(ItemAttribute.FIRE, 300);
+        Map<Attribute, Integer> attrs = new LinkedHashMap<Attribute, Integer>();
+        attrs.put(Attribute.FIRE, 300);
 
         Offer original = Offer.builder()
                 .traderId(268437521L)
@@ -94,11 +94,11 @@ class OfferTest {
     void equals_shouldDistinguishAttributes() {
         Offer a = Offer.builder()
                 .traderId(1L).count(1L).unitPrice(100L).currencyItemId(57L)
-                .attributes(Collections.singletonMap(ItemAttribute.FIRE, 300))
+                .attributes(Collections.singletonMap(Attribute.FIRE, 300))
                 .build();
         Offer b = Offer.builder()
                 .traderId(1L).count(1L).unitPrice(100L).currencyItemId(57L)
-                .attributes(Collections.singletonMap(ItemAttribute.FIRE, 301))
+                .attributes(Collections.singletonMap(Attribute.FIRE, 301))
                 .build();
 
         assertNotEquals(a, b);

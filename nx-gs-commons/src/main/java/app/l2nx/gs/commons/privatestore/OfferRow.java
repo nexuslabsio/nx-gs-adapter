@@ -1,6 +1,6 @@
 package app.l2nx.gs.commons.privatestore;
 
-import app.l2nx.gs.adapter.api.domain.item.ItemAttribute;
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
@@ -14,14 +14,14 @@ public final class OfferRow {
 
     public final long traderId;
     public final @Nullable Integer enchantLevel;
-    public final @Nullable Map<ItemAttribute, Integer> attributes;
+    public final @Nullable Map<Attribute, Integer> attributes;
     public final long count;
     public final long unitPrice;
     public final long currencyItemId;
 
     public OfferRow(long traderId,
                     @Nullable Integer enchantLevel,
-                    @Nullable Map<ItemAttribute, Integer> attributes,
+                    @Nullable Map<Attribute, Integer> attributes,
                     long count,
                     long unitPrice,
                     long currencyItemId) {
