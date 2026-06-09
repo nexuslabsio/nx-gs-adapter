@@ -1,5 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate;
 
+import app.l2nx.gs.adapter.api.domain.WeaponType;
+import app.l2nx.gs.adapter.api.domain.item.ArmorType;
+import app.l2nx.gs.adapter.api.domain.item.EtcItemType;
 import app.l2nx.gs.adapter.api.domain.item.ItemClass;
 import app.l2nx.gs.adapter.api.domain.item.ItemEquipSlot;
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
@@ -28,11 +31,13 @@ import java.util.Objects;
  * / crystallize mechanics). A group is {@code null} when the item has no profile
  * for it (e.g. etc-items carry no {@code stats}).</p>
  *
- * <p><b>Vocabulary:</b> {@link #getEquipSlot()} is the closed {@link ItemEquipSlot} domain
- * enum. The open-string vocabulary fields ({@code material}, {@code grade},
- * {@code weaponType}, {@code armorType}, {@code etcItemType}, {@code defaultAction},
- * {@code useHandler}) draw from a platform-canonical vocabulary in {@code UPPER_SNAKE_CASE};
- * the provider translates its core's internal enums/bitmasks into it.</p>
+ * <p><b>Vocabulary:</b> {@link #getType()}, {@link #getEquipSlot()}, {@link #getWeaponType()},
+ * {@link #getArmorType()} and {@link #getEtcItemType()} are closed domain enums
+ * ({@link ItemClass}, {@link ItemEquipSlot}, {@link WeaponType}, {@link ArmorType},
+ * {@link EtcItemType}) — the provider maps its core's internal enums/bitmasks onto them, or
+ * yields {@code null} when a source value has no canonical counterpart. The remaining
+ * open-string vocabulary fields ({@code material}, {@code grade}, {@code defaultAction},
+ * {@code useHandler}) draw from a platform-canonical vocabulary in {@code UPPER_SNAKE_CASE}.</p>
  *
  * <p>Phase 1 is sourced from the host's already-parsed in-memory templates only —
  * client-patch fields (description, additional name, colour, panel icon, and the
@@ -49,9 +54,9 @@ public final class ItemTemplate {
     private final @Nullable String material;
     private final @Nullable String grade;
     private final @Nullable ItemEquipSlot equipSlot;
-    private final @Nullable String weaponType;
-    private final @Nullable String armorType;
-    private final @Nullable String etcItemType;
+    private final @Nullable WeaponType weaponType;
+    private final @Nullable ArmorType armorType;
+    private final @Nullable EtcItemType etcItemType;
     private final @Nullable Boolean stackable;
     private final @Nullable Boolean questItem;
     private final @Nullable Boolean petUsable;
@@ -73,9 +78,9 @@ public final class ItemTemplate {
                         @Nullable String material,
                         @Nullable String grade,
                         @Nullable ItemEquipSlot equipSlot,
-                        @Nullable String weaponType,
-                        @Nullable String armorType,
-                        @Nullable String etcItemType,
+                        @Nullable WeaponType weaponType,
+                        @Nullable ArmorType armorType,
+                        @Nullable EtcItemType etcItemType,
                         @Nullable Boolean stackable,
                         @Nullable Boolean questItem,
                         @Nullable Boolean petUsable,
@@ -149,15 +154,15 @@ public final class ItemTemplate {
         return equipSlot;
     }
 
-    public @Nullable String getWeaponType() {
+    public @Nullable WeaponType getWeaponType() {
         return weaponType;
     }
 
-    public @Nullable String getArmorType() {
+    public @Nullable ArmorType getArmorType() {
         return armorType;
     }
 
-    public @Nullable String getEtcItemType() {
+    public @Nullable EtcItemType getEtcItemType() {
         return etcItemType;
     }
 
@@ -310,9 +315,9 @@ public final class ItemTemplate {
         private @Nullable String material;
         private @Nullable String grade;
         private @Nullable ItemEquipSlot equipSlot;
-        private @Nullable String weaponType;
-        private @Nullable String armorType;
-        private @Nullable String etcItemType;
+        private @Nullable WeaponType weaponType;
+        private @Nullable ArmorType armorType;
+        private @Nullable EtcItemType etcItemType;
         private @Nullable Boolean stackable;
         private @Nullable Boolean questItem;
         private @Nullable Boolean petUsable;
@@ -370,17 +375,17 @@ public final class ItemTemplate {
             return this;
         }
 
-        public Builder weaponType(@Nullable String weaponType) {
+        public Builder weaponType(@Nullable WeaponType weaponType) {
             this.weaponType = weaponType;
             return this;
         }
 
-        public Builder armorType(@Nullable String armorType) {
+        public Builder armorType(@Nullable ArmorType armorType) {
             this.armorType = armorType;
             return this;
         }
 
-        public Builder etcItemType(@Nullable String etcItemType) {
+        public Builder etcItemType(@Nullable EtcItemType etcItemType) {
             this.etcItemType = etcItemType;
             return this;
         }
