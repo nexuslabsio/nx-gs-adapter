@@ -40,7 +40,7 @@ class NpcTemplateTest {
         assertEquals("SOUL", t.getShots());
         assertEquals(Boolean.FALSE, t.getRandomMinions());
         assertEquals(Boolean.TRUE, t.getLethalImmune());
-        assertEquals(Boolean.TRUE, t.getChampionDisabled());
+        assertEquals(Boolean.FALSE, t.getChampionEligible());
         assertEquals(Boolean.TRUE, t.getNoRandomWalk());
         assertEquals(Boolean.TRUE, t.getMovementDisabled());
         assertEquals(Integer.valueOf(2000), t.getMaxPursueRange());
@@ -108,7 +108,7 @@ class NpcTemplateTest {
                 .shots("SOUL")
                 .randomMinions(Boolean.FALSE)
                 .lethalImmune(Boolean.TRUE)
-                .championDisabled(Boolean.TRUE)
+                .championEligible(Boolean.FALSE)
                 .noRandomWalk(Boolean.TRUE)
                 .movementDisabled(Boolean.TRUE)
                 .maxPursueRange(2000)

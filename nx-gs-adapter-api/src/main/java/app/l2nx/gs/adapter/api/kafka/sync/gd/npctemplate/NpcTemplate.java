@@ -56,7 +56,7 @@ public final class NpcTemplate {
     private final @Nullable String shots;
     private final @Nullable Boolean randomMinions;
     private final @Nullable Boolean lethalImmune;
-    private final @Nullable Boolean championDisabled;
+    private final @Nullable Boolean championEligible;
     private final @Nullable Boolean noRandomWalk;
     private final @Nullable Boolean movementDisabled;
     private final @Nullable Integer maxPursueRange;
@@ -94,7 +94,7 @@ public final class NpcTemplate {
                        @Nullable String shots,
                        @Nullable Boolean randomMinions,
                        @Nullable Boolean lethalImmune,
-                       @Nullable Boolean championDisabled,
+                       @Nullable Boolean championEligible,
                        @Nullable Boolean noRandomWalk,
                        @Nullable Boolean movementDisabled,
                        @Nullable Integer maxPursueRange,
@@ -131,7 +131,7 @@ public final class NpcTemplate {
         this.shots = shots;
         this.randomMinions = randomMinions;
         this.lethalImmune = lethalImmune;
-        this.championDisabled = championDisabled;
+        this.championEligible = championEligible;
         this.noRandomWalk = noRandomWalk;
         this.movementDisabled = movementDisabled;
         this.maxPursueRange = maxPursueRange;
@@ -222,10 +222,11 @@ public final class NpcTemplate {
     }
 
     /**
-     * Excluded from the champion-mob system; emitted only when {@code true}.
+     * Whether the npc can roll as a champion mob. Carried only when {@code false} — the
+     * datapack's explicit {@code noChampion} exclusions; {@code null} reads as eligible.
      */
-    public @Nullable Boolean getChampionDisabled() {
-        return championDisabled;
+    public @Nullable Boolean getChampionEligible() {
+        return championEligible;
     }
 
     /**
@@ -424,7 +425,7 @@ public final class NpcTemplate {
                 .shots(shots)
                 .randomMinions(randomMinions)
                 .lethalImmune(lethalImmune)
-                .championDisabled(championDisabled)
+                .championEligible(championEligible)
                 .noRandomWalk(noRandomWalk)
                 .movementDisabled(movementDisabled)
                 .maxPursueRange(maxPursueRange)
@@ -472,7 +473,7 @@ public final class NpcTemplate {
                 && Objects.equals(shots, that.shots)
                 && Objects.equals(randomMinions, that.randomMinions)
                 && Objects.equals(lethalImmune, that.lethalImmune)
-                && Objects.equals(championDisabled, that.championDisabled)
+                && Objects.equals(championEligible, that.championEligible)
                 && Objects.equals(noRandomWalk, that.noRandomWalk)
                 && Objects.equals(movementDisabled, that.movementDisabled)
                 && Objects.equals(maxPursueRange, that.maxPursueRange)
@@ -505,7 +506,7 @@ public final class NpcTemplate {
     @Override
     public int hashCode() {
         return Objects.hash(id, type, displayId, level, race, aiType, shots, randomMinions,
-                lethalImmune, championDisabled, noRandomWalk, movementDisabled, maxPursueRange,
+                lethalImmune, championEligible, noRandomWalk, movementDisabled, maxPursueRange,
                 canSeeInSilentMove, globalAggro, raceIcon, collisionRadius, collisionHeight,
                 atkType, stats, rewardExp, rewardSp, rewardRp, faction,
                 transformOnDeadNpcTemplateId, transformChancePercent, spawnOnDeathCount,
@@ -528,7 +529,7 @@ public final class NpcTemplate {
         private @Nullable String shots;
         private @Nullable Boolean randomMinions;
         private @Nullable Boolean lethalImmune;
-        private @Nullable Boolean championDisabled;
+        private @Nullable Boolean championEligible;
         private @Nullable Boolean noRandomWalk;
         private @Nullable Boolean movementDisabled;
         private @Nullable Integer maxPursueRange;
@@ -602,8 +603,8 @@ public final class NpcTemplate {
             return this;
         }
 
-        public Builder championDisabled(@Nullable Boolean championDisabled) {
-            this.championDisabled = championDisabled;
+        public Builder championEligible(@Nullable Boolean championEligible) {
+            this.championEligible = championEligible;
             return this;
         }
 
@@ -744,7 +745,7 @@ public final class NpcTemplate {
 
         public NpcTemplate build() {
             return new NpcTemplate(id, type, displayId, level, race, aiType, shots, randomMinions,
-                    lethalImmune, championDisabled, noRandomWalk, movementDisabled, maxPursueRange,
+                    lethalImmune, championEligible, noRandomWalk, movementDisabled, maxPursueRange,
                     canSeeInSilentMove, globalAggro, raceIcon, collisionRadius, collisionHeight,
                     atkType, stats, rewardExp, rewardSp, rewardRp, faction,
                     transformOnDeadNpcTemplateId, transformChancePercent, spawnOnDeathCount,
