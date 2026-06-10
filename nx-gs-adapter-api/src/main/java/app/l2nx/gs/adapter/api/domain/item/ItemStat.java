@@ -21,6 +21,7 @@ public enum ItemStat {
     P_ATK,
     M_ATK,
     ATK_SPD,
+    CAST_SPD,
     CRIT_RATE,
     M_CRIT_RATE,
     ACCURACY,

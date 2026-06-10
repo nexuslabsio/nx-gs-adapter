@@ -10,8 +10,10 @@ import java.util.Objects;
  * chance. Carried in {@link NpcTemplate#getAbsorbs()}.
  *
  * <p>All fields {@link Nullable}: {@code type} is the absorb mode, {@code minLevel}/{@code maxLevel}
- * the inclusive player-level band, {@code chancePercent} the base probability and
- * {@code cursedChancePercent} the cursed-weapon variant.</p>
+ * the inclusive player-level band, {@code chancePercent} the base probability,
+ * {@code cursedChancePercent} the cursed-weapon variant, and {@code skill} whether the
+ * absorb requires casting the soul-crystal absorb skill (vs implicit on-kill absorption);
+ * emitted only when {@code true}.</p>
  */
 public final class NpcAbsorb {
 
@@ -20,17 +22,20 @@ public final class NpcAbsorb {
     private final @Nullable Integer maxLevel;
     private final @Nullable Integer chancePercent;
     private final @Nullable Integer cursedChancePercent;
+    private final @Nullable Boolean skill;
 
     public NpcAbsorb(@Nullable NpcAbsorbType type,
                      @Nullable Integer minLevel,
                      @Nullable Integer maxLevel,
                      @Nullable Integer chancePercent,
-                     @Nullable Integer cursedChancePercent) {
+                     @Nullable Integer cursedChancePercent,
+                     @Nullable Boolean skill) {
         this.type = type;
         this.minLevel = minLevel;
         this.maxLevel = maxLevel;
         this.chancePercent = chancePercent;
         this.cursedChancePercent = cursedChancePercent;
+        this.skill = skill;
     }
 
     public @Nullable NpcAbsorbType getType() {
@@ -53,13 +58,22 @@ public final class NpcAbsorb {
         return cursedChancePercent;
     }
 
+    /**
+     * Whether the absorb requires casting the soul-crystal absorb skill (vs implicit
+     * on-kill absorption); emitted only when {@code true}.
+     */
+    public @Nullable Boolean getSkill() {
+        return skill;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .type(type)
                 .minLevel(minLevel)
                 .maxLevel(maxLevel)
                 .chancePercent(chancePercent)
-                .cursedChancePercent(cursedChancePercent);
+                .cursedChancePercent(cursedChancePercent)
+                .skill(skill);
     }
 
     public static Builder builder() {
@@ -75,12 +89,13 @@ public final class NpcAbsorb {
                 && Objects.equals(minLevel, that.minLevel)
                 && Objects.equals(maxLevel, that.maxLevel)
                 && Objects.equals(chancePercent, that.chancePercent)
-                && Objects.equals(cursedChancePercent, that.cursedChancePercent);
+                && Objects.equals(cursedChancePercent, that.cursedChancePercent)
+                && Objects.equals(skill, that.skill);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, minLevel, maxLevel, chancePercent, cursedChancePercent);
+        return Objects.hash(type, minLevel, maxLevel, chancePercent, cursedChancePercent, skill);
     }
 
     @Override
@@ -94,6 +109,7 @@ public final class NpcAbsorb {
         private @Nullable Integer maxLevel;
         private @Nullable Integer chancePercent;
         private @Nullable Integer cursedChancePercent;
+        private @Nullable Boolean skill;
 
         public Builder type(@Nullable NpcAbsorbType type) {
             this.type = type;
@@ -120,8 +136,13 @@ public final class NpcAbsorb {
             return this;
         }
 
+        public Builder skill(@Nullable Boolean skill) {
+            this.skill = skill;
+            return this;
+        }
+
         public NpcAbsorb build() {
-            return new NpcAbsorb(type, minLevel, maxLevel, chancePercent, cursedChancePercent);
+            return new NpcAbsorb(type, minLevel, maxLevel, chancePercent, cursedChancePercent, skill);
         }
     }
 }

@@ -1,12 +1,16 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
 import app.l2nx.gs.adapter.api.domain.npc.NpcRace;
+import app.l2nx.gs.adapter.api.domain.npc.NpcStat;
+import app.l2nx.gs.adapter.api.domain.WeaponType;
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -19,21 +23,27 @@ import java.util.Objects;
  * <p><b>Nullability:</b> only {@link #getId()} and {@link #getType()} are non-null.
  * Every other field is {@link Nullable} (former primitives boxed) so {@code null}
  * means "this build did not supply it". {@code type} is the host's server-side NPC
- * type (e.g. {@code Monster} / {@code RaidBoss}); kept as an open string since the
- * set is large and fork-dependent.</p>
+ * type (e.g. {@code MONSTER} / {@code RAID_BOSS}); kept as an open string since the
+ * set is large and fork-dependent. Behaviour flags ({@link #getLethalImmune()},
+ * {@link #getNoRandomWalk()}, …) are emitted only when {@code true} — {@code null}
+ * reads as {@code false}/unknown.</p>
  *
- * <p><b>Functional grouping:</b> cohesive areas are nested objects — {@link #getStats()}
- * (combat / progression numbers), {@link #getAttributes()} (STR/DEX/…),
- * {@link #getAttribute()} (elemental attack/defence). The list-collections
- * ({@link #getSkills()}, {@link #getDrops()}, {@link #getMinions()},
- * {@link #getAbsorbs()}, {@link #getSpawns()}) ride the same message and are
- * fanned out into child rows on the consumer side.</p>
+ * <p><b>Stats:</b> every numeric stat rides {@link #getStats()} — a single map keyed
+ * by the canonical {@link NpcStat} token names (vitals, combat numbers, movement
+ * speeds, base attributes, elemental power/resist, aggro range). The attack type is
+ * not a magnitude and rides {@link #getAtkType()} as a {@link WeaponType} token.
+ * Rewards are not stats and stay top-level ({@link #getRewardExp()} /
+ * {@link #getRewardSp()} / {@link #getRewardRp()}).</p>
+ *
+ * <p>The list-collections ({@link #getSkills()}, {@link #getDrops()},
+ * {@link #getMinions()}, {@link #getAbsorbs()}, {@link #getSpawns()}) ride the same
+ * message and are fanned out into child rows on the consumer side.</p>
  *
  * <p>Sourced from the host's already-parsed in-memory templates only — client-patch
  * visual fields (client npc type, mesh, icon, class name, draw scale, nick colour)
- * are a later slice and intentionally absent here. The race-marker skill (id
- * {@code 4416} on most cores) is consumed into {@link #getRace()} and not repeated
- * in {@link #getSkills()}.</p>
+ * are owned by the patch ingester and intentionally absent here. The race-marker
+ * skill (id {@code 4416} on most cores) is consumed into {@link #getRace()} and not
+ * repeated in {@link #getSkills()}.</p>
  */
 public final class NpcTemplate {
 
@@ -44,18 +54,31 @@ public final class NpcTemplate {
     private final @Nullable NpcRace race;
     private final @Nullable String aiType;
     private final @Nullable String shots;
+    private final @Nullable Boolean randomMinions;
+    private final @Nullable Boolean lethalImmune;
+    private final @Nullable Boolean championDisabled;
+    private final @Nullable Boolean noRandomWalk;
+    private final @Nullable Boolean movementDisabled;
+    private final @Nullable Integer maxPursueRange;
+    private final @Nullable Boolean canSeeInSilentMove;
+    private final @Nullable Boolean globalAggro;
     private final @Nullable String raceIcon;
-    private final @Nullable Integer aggroRange;
     private final @Nullable Double collisionRadius;
     private final @Nullable Double collisionHeight;
-    private final @Nullable Boolean randomMinions;
+    private final @Nullable String atkType;
+    private final @Nullable Map<String, Double> stats;
+    private final @Nullable Long rewardExp;
+    private final @Nullable Long rewardSp;
+    private final @Nullable Integer rewardRp;
+    private final @Nullable NpcFaction faction;
+    private final @Nullable Integer transformOnDeadNpcTemplateId;
+    private final @Nullable Integer transformChancePercent;
+    private final @Nullable Integer spawnOnDeathCount;
+    private final @Nullable Integer spawnOnDeathChancePercent;
     private final @Nullable LocalizedText name;
     private final @Nullable LocalizedText title;
     private final @Nullable Integer rightHand;
     private final @Nullable Integer leftHand;
-    private final @Nullable NpcStats stats;
-    private final @Nullable NpcBaseAttributes attributes;
-    private final @Nullable NpcAttribute attribute;
     private final @Nullable List<NpcSkillRef> skills;
     private final @Nullable List<NpcDropGroup> drops;
     private final @Nullable List<NpcMinionRef> minions;
@@ -69,18 +92,31 @@ public final class NpcTemplate {
                        @Nullable NpcRace race,
                        @Nullable String aiType,
                        @Nullable String shots,
+                       @Nullable Boolean randomMinions,
+                       @Nullable Boolean lethalImmune,
+                       @Nullable Boolean championDisabled,
+                       @Nullable Boolean noRandomWalk,
+                       @Nullable Boolean movementDisabled,
+                       @Nullable Integer maxPursueRange,
+                       @Nullable Boolean canSeeInSilentMove,
+                       @Nullable Boolean globalAggro,
                        @Nullable String raceIcon,
-                       @Nullable Integer aggroRange,
                        @Nullable Double collisionRadius,
                        @Nullable Double collisionHeight,
-                       @Nullable Boolean randomMinions,
+                       @Nullable String atkType,
+                       @Nullable Map<String, Double> stats,
+                       @Nullable Long rewardExp,
+                       @Nullable Long rewardSp,
+                       @Nullable Integer rewardRp,
+                       @Nullable NpcFaction faction,
+                       @Nullable Integer transformOnDeadNpcTemplateId,
+                       @Nullable Integer transformChancePercent,
+                       @Nullable Integer spawnOnDeathCount,
+                       @Nullable Integer spawnOnDeathChancePercent,
                        @Nullable LocalizedText name,
                        @Nullable LocalizedText title,
                        @Nullable Integer rightHand,
                        @Nullable Integer leftHand,
-                       @Nullable NpcStats stats,
-                       @Nullable NpcBaseAttributes attributes,
-                       @Nullable NpcAttribute attribute,
                        @Nullable List<NpcSkillRef> skills,
                        @Nullable List<NpcDropGroup> drops,
                        @Nullable List<NpcMinionRef> minions,
@@ -93,18 +129,32 @@ public final class NpcTemplate {
         this.race = race;
         this.aiType = aiType;
         this.shots = shots;
+        this.randomMinions = randomMinions;
+        this.lethalImmune = lethalImmune;
+        this.championDisabled = championDisabled;
+        this.noRandomWalk = noRandomWalk;
+        this.movementDisabled = movementDisabled;
+        this.maxPursueRange = maxPursueRange;
+        this.canSeeInSilentMove = canSeeInSilentMove;
+        this.globalAggro = globalAggro;
         this.raceIcon = raceIcon;
-        this.aggroRange = aggroRange;
         this.collisionRadius = collisionRadius;
         this.collisionHeight = collisionHeight;
-        this.randomMinions = randomMinions;
+        this.atkType = atkType;
+        this.stats = stats == null ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<String, Double>(stats));
+        this.rewardExp = rewardExp;
+        this.rewardSp = rewardSp;
+        this.rewardRp = rewardRp;
+        this.faction = faction;
+        this.transformOnDeadNpcTemplateId = transformOnDeadNpcTemplateId;
+        this.transformChancePercent = transformChancePercent;
+        this.spawnOnDeathCount = spawnOnDeathCount;
+        this.spawnOnDeathChancePercent = spawnOnDeathChancePercent;
         this.name = name;
         this.title = title;
         this.rightHand = rightHand;
         this.leftHand = leftHand;
-        this.stats = stats;
-        this.attributes = attributes;
-        this.attribute = attribute;
         this.skills = skills == null ? null
                 : Collections.unmodifiableList(new ArrayList<NpcSkillRef>(skills));
         this.drops = drops == null ? null
@@ -122,7 +172,7 @@ public final class NpcTemplate {
     }
 
     /**
-     * Server-side NPC type (open string, e.g. {@code Monster} / {@code RaidBoss}).
+     * Server-side NPC type (open string, e.g. {@code MONSTER} / {@code RAID_BOSS}).
      */
     public String getType() {
         return type;
@@ -144,7 +194,7 @@ public final class NpcTemplate {
     }
 
     /**
-     * AI behaviour type (open string, e.g. {@code Fighter}).
+     * AI behaviour type (open string, e.g. {@code FIGHTER}).
      */
     public @Nullable String getAiType() {
         return aiType;
@@ -158,15 +208,68 @@ public final class NpcTemplate {
     }
 
     /**
+     * Whether the NPC's minions spawn from a random pool (vs the fixed minion list).
+     */
+    public @Nullable Boolean getRandomMinions() {
+        return randomMinions;
+    }
+
+    /**
+     * Immune to lethal-strike effects; emitted only when {@code true}.
+     */
+    public @Nullable Boolean getLethalImmune() {
+        return lethalImmune;
+    }
+
+    /**
+     * Excluded from the champion-mob system; emitted only when {@code true}.
+     */
+    public @Nullable Boolean getChampionDisabled() {
+        return championDisabled;
+    }
+
+    /**
+     * Does not wander away from its spawn point; emitted only when {@code true}.
+     */
+    public @Nullable Boolean getNoRandomWalk() {
+        return noRandomWalk;
+    }
+
+    /**
+     * Cannot move at all; emitted only when {@code true}.
+     */
+    public @Nullable Boolean getMovementDisabled() {
+        return movementDisabled;
+    }
+
+    /**
+     * Maximum pursuit distance from the spawn point, world units. Carried only when the
+     * template sets it explicitly — server-config defaults are not materialized.
+     */
+    public @Nullable Integer getMaxPursueRange() {
+        return maxPursueRange;
+    }
+
+    /**
+     * Detects players sneaking with Silent Move; emitted only when {@code true}.
+     */
+    public @Nullable Boolean getCanSeeInSilentMove() {
+        return canSeeInSilentMove;
+    }
+
+    /**
+     * Aggroes regardless of distance (global aggro); emitted only when {@code true}.
+     */
+    public @Nullable Boolean getGlobalAggro() {
+        return globalAggro;
+    }
+
+    /**
      * Icon of the NPC's race marker (resolved from the race-marker skill's per-level icon);
      * {@code null} if the NPC has no race marker.
      */
     public @Nullable String getRaceIcon() {
         return raceIcon;
-    }
-
-    public @Nullable Integer getAggroRange() {
-        return aggroRange;
     }
 
     public @Nullable Double getCollisionRadius() {
@@ -178,10 +281,75 @@ public final class NpcTemplate {
     }
 
     /**
-     * Whether the NPC's minions spawn from a random pool (vs the fixed minion list).
+     * Attack weapon kind as a canonical {@link WeaponType} token
+     * ({@code SWORD} / {@code BOW} / {@code DUAL_FIST} / …).
      */
-    public @Nullable Boolean getRandomMinions() {
-        return randomMinions;
+    public @Nullable String getAtkType() {
+        return atkType;
+    }
+
+    /**
+     * Every numeric stat the NPC carries, keyed by the canonical {@link NpcStat} token name
+     * (e.g. {@code MAX_HP}, {@code P_ATK}, {@code AGGRO_RANGE}, {@code FIRE_RES}). Zero
+     * values are dropped by the producer ("not applicable"); {@code null} when the build
+     * supplied no stats.
+     */
+    public @Nullable Map<String, Double> getStats() {
+        return stats;
+    }
+
+    /**
+     * Experience reward on kill — raw template value, no server rates applied.
+     */
+    public @Nullable Long getRewardExp() {
+        return rewardExp;
+    }
+
+    public @Nullable Long getRewardSp() {
+        return rewardSp;
+    }
+
+    public @Nullable Integer getRewardRp() {
+        return rewardRp;
+    }
+
+    /**
+     * Social clan — same-faction NPCs within the faction range assist each other;
+     * {@code null} when the NPC belongs to no faction.
+     */
+    public @Nullable NpcFaction getFaction() {
+        return faction;
+    }
+
+    /**
+     * NPC template this one transforms into on death; {@code null} when it does not
+     * transform.
+     */
+    public @Nullable Integer getTransformOnDeadNpcTemplateId() {
+        return transformOnDeadNpcTemplateId;
+    }
+
+    /**
+     * Chance of the on-death transform, percent; carried only alongside
+     * {@link #getTransformOnDeadNpcTemplateId()}.
+     */
+    public @Nullable Integer getTransformChancePercent() {
+        return transformChancePercent;
+    }
+
+    /**
+     * Number of extra NPCs spawned on death. The spawned template id lives in the host's
+     * AI script, not in the template, and is not carried.
+     */
+    public @Nullable Integer getSpawnOnDeathCount() {
+        return spawnOnDeathCount;
+    }
+
+    /**
+     * Chance of the on-death extra spawn, percent.
+     */
+    public @Nullable Integer getSpawnOnDeathChancePercent() {
+        return spawnOnDeathChancePercent;
     }
 
     public @Nullable LocalizedText getName() {
@@ -207,27 +375,6 @@ public final class NpcTemplate {
      */
     public @Nullable Integer getLeftHand() {
         return leftHand;
-    }
-
-    /**
-     * Combat / progression stats; {@code null} if the build supplied none.
-     */
-    public @Nullable NpcStats getStats() {
-        return stats;
-    }
-
-    /**
-     * Base attributes (STR/DEX/CON/INT/WIT/MEN); {@code null} if none.
-     */
-    public @Nullable NpcBaseAttributes getAttributes() {
-        return attributes;
-    }
-
-    /**
-     * Elemental attack / defence; {@code null} if none.
-     */
-    public @Nullable NpcAttribute getAttribute() {
-        return attribute;
     }
 
     /**
@@ -275,18 +422,31 @@ public final class NpcTemplate {
                 .race(race)
                 .aiType(aiType)
                 .shots(shots)
+                .randomMinions(randomMinions)
+                .lethalImmune(lethalImmune)
+                .championDisabled(championDisabled)
+                .noRandomWalk(noRandomWalk)
+                .movementDisabled(movementDisabled)
+                .maxPursueRange(maxPursueRange)
+                .canSeeInSilentMove(canSeeInSilentMove)
+                .globalAggro(globalAggro)
                 .raceIcon(raceIcon)
-                .aggroRange(aggroRange)
                 .collisionRadius(collisionRadius)
                 .collisionHeight(collisionHeight)
-                .randomMinions(randomMinions)
+                .atkType(atkType)
+                .stats(stats)
+                .rewardExp(rewardExp)
+                .rewardSp(rewardSp)
+                .rewardRp(rewardRp)
+                .faction(faction)
+                .transformOnDeadNpcTemplateId(transformOnDeadNpcTemplateId)
+                .transformChancePercent(transformChancePercent)
+                .spawnOnDeathCount(spawnOnDeathCount)
+                .spawnOnDeathChancePercent(spawnOnDeathChancePercent)
                 .name(name)
                 .title(title)
                 .rightHand(rightHand)
                 .leftHand(leftHand)
-                .stats(stats)
-                .attributes(attributes)
-                .attribute(attribute)
                 .skills(skills)
                 .drops(drops)
                 .minions(minions)
@@ -310,18 +470,31 @@ public final class NpcTemplate {
                 && race == that.race
                 && Objects.equals(aiType, that.aiType)
                 && Objects.equals(shots, that.shots)
+                && Objects.equals(randomMinions, that.randomMinions)
+                && Objects.equals(lethalImmune, that.lethalImmune)
+                && Objects.equals(championDisabled, that.championDisabled)
+                && Objects.equals(noRandomWalk, that.noRandomWalk)
+                && Objects.equals(movementDisabled, that.movementDisabled)
+                && Objects.equals(maxPursueRange, that.maxPursueRange)
+                && Objects.equals(canSeeInSilentMove, that.canSeeInSilentMove)
+                && Objects.equals(globalAggro, that.globalAggro)
                 && Objects.equals(raceIcon, that.raceIcon)
-                && Objects.equals(aggroRange, that.aggroRange)
                 && Objects.equals(collisionRadius, that.collisionRadius)
                 && Objects.equals(collisionHeight, that.collisionHeight)
-                && Objects.equals(randomMinions, that.randomMinions)
+                && Objects.equals(atkType, that.atkType)
+                && Objects.equals(stats, that.stats)
+                && Objects.equals(rewardExp, that.rewardExp)
+                && Objects.equals(rewardSp, that.rewardSp)
+                && Objects.equals(rewardRp, that.rewardRp)
+                && Objects.equals(faction, that.faction)
+                && Objects.equals(transformOnDeadNpcTemplateId, that.transformOnDeadNpcTemplateId)
+                && Objects.equals(transformChancePercent, that.transformChancePercent)
+                && Objects.equals(spawnOnDeathCount, that.spawnOnDeathCount)
+                && Objects.equals(spawnOnDeathChancePercent, that.spawnOnDeathChancePercent)
                 && Objects.equals(name, that.name)
                 && Objects.equals(title, that.title)
                 && Objects.equals(rightHand, that.rightHand)
                 && Objects.equals(leftHand, that.leftHand)
-                && Objects.equals(stats, that.stats)
-                && Objects.equals(attributes, that.attributes)
-                && Objects.equals(attribute, that.attribute)
                 && Objects.equals(skills, that.skills)
                 && Objects.equals(drops, that.drops)
                 && Objects.equals(minions, that.minions)
@@ -331,9 +504,13 @@ public final class NpcTemplate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, type, displayId, level, race, aiType, shots, raceIcon, aggroRange,
-                collisionRadius, collisionHeight, randomMinions, name, title, rightHand, leftHand,
-                stats, attributes, attribute, skills, drops, minions, absorbs, spawns);
+        return Objects.hash(id, type, displayId, level, race, aiType, shots, randomMinions,
+                lethalImmune, championDisabled, noRandomWalk, movementDisabled, maxPursueRange,
+                canSeeInSilentMove, globalAggro, raceIcon, collisionRadius, collisionHeight,
+                atkType, stats, rewardExp, rewardSp, rewardRp, faction,
+                transformOnDeadNpcTemplateId, transformChancePercent, spawnOnDeathCount,
+                spawnOnDeathChancePercent, name, title, rightHand, leftHand,
+                skills, drops, minions, absorbs, spawns);
     }
 
     @Override
@@ -349,18 +526,31 @@ public final class NpcTemplate {
         private @Nullable NpcRace race;
         private @Nullable String aiType;
         private @Nullable String shots;
+        private @Nullable Boolean randomMinions;
+        private @Nullable Boolean lethalImmune;
+        private @Nullable Boolean championDisabled;
+        private @Nullable Boolean noRandomWalk;
+        private @Nullable Boolean movementDisabled;
+        private @Nullable Integer maxPursueRange;
+        private @Nullable Boolean canSeeInSilentMove;
+        private @Nullable Boolean globalAggro;
         private @Nullable String raceIcon;
-        private @Nullable Integer aggroRange;
         private @Nullable Double collisionRadius;
         private @Nullable Double collisionHeight;
-        private @Nullable Boolean randomMinions;
+        private @Nullable String atkType;
+        private @Nullable Map<String, Double> stats;
+        private @Nullable Long rewardExp;
+        private @Nullable Long rewardSp;
+        private @Nullable Integer rewardRp;
+        private @Nullable NpcFaction faction;
+        private @Nullable Integer transformOnDeadNpcTemplateId;
+        private @Nullable Integer transformChancePercent;
+        private @Nullable Integer spawnOnDeathCount;
+        private @Nullable Integer spawnOnDeathChancePercent;
         private @Nullable LocalizedText name;
         private @Nullable LocalizedText title;
         private @Nullable Integer rightHand;
         private @Nullable Integer leftHand;
-        private @Nullable NpcStats stats;
-        private @Nullable NpcBaseAttributes attributes;
-        private @Nullable NpcAttribute attribute;
         private @Nullable List<NpcSkillRef> skills;
         private @Nullable List<NpcDropGroup> drops;
         private @Nullable List<NpcMinionRef> minions;
@@ -402,13 +592,48 @@ public final class NpcTemplate {
             return this;
         }
 
-        public Builder raceIcon(@Nullable String raceIcon) {
-            this.raceIcon = raceIcon;
+        public Builder randomMinions(@Nullable Boolean randomMinions) {
+            this.randomMinions = randomMinions;
             return this;
         }
 
-        public Builder aggroRange(@Nullable Integer aggroRange) {
-            this.aggroRange = aggroRange;
+        public Builder lethalImmune(@Nullable Boolean lethalImmune) {
+            this.lethalImmune = lethalImmune;
+            return this;
+        }
+
+        public Builder championDisabled(@Nullable Boolean championDisabled) {
+            this.championDisabled = championDisabled;
+            return this;
+        }
+
+        public Builder noRandomWalk(@Nullable Boolean noRandomWalk) {
+            this.noRandomWalk = noRandomWalk;
+            return this;
+        }
+
+        public Builder movementDisabled(@Nullable Boolean movementDisabled) {
+            this.movementDisabled = movementDisabled;
+            return this;
+        }
+
+        public Builder maxPursueRange(@Nullable Integer maxPursueRange) {
+            this.maxPursueRange = maxPursueRange;
+            return this;
+        }
+
+        public Builder canSeeInSilentMove(@Nullable Boolean canSeeInSilentMove) {
+            this.canSeeInSilentMove = canSeeInSilentMove;
+            return this;
+        }
+
+        public Builder globalAggro(@Nullable Boolean globalAggro) {
+            this.globalAggro = globalAggro;
+            return this;
+        }
+
+        public Builder raceIcon(@Nullable String raceIcon) {
+            this.raceIcon = raceIcon;
             return this;
         }
 
@@ -422,8 +647,53 @@ public final class NpcTemplate {
             return this;
         }
 
-        public Builder randomMinions(@Nullable Boolean randomMinions) {
-            this.randomMinions = randomMinions;
+        public Builder atkType(@Nullable String atkType) {
+            this.atkType = atkType;
+            return this;
+        }
+
+        public Builder stats(@Nullable Map<String, Double> stats) {
+            this.stats = stats;
+            return this;
+        }
+
+        public Builder rewardExp(@Nullable Long rewardExp) {
+            this.rewardExp = rewardExp;
+            return this;
+        }
+
+        public Builder rewardSp(@Nullable Long rewardSp) {
+            this.rewardSp = rewardSp;
+            return this;
+        }
+
+        public Builder rewardRp(@Nullable Integer rewardRp) {
+            this.rewardRp = rewardRp;
+            return this;
+        }
+
+        public Builder faction(@Nullable NpcFaction faction) {
+            this.faction = faction;
+            return this;
+        }
+
+        public Builder transformOnDeadNpcTemplateId(@Nullable Integer transformOnDeadNpcTemplateId) {
+            this.transformOnDeadNpcTemplateId = transformOnDeadNpcTemplateId;
+            return this;
+        }
+
+        public Builder transformChancePercent(@Nullable Integer transformChancePercent) {
+            this.transformChancePercent = transformChancePercent;
+            return this;
+        }
+
+        public Builder spawnOnDeathCount(@Nullable Integer spawnOnDeathCount) {
+            this.spawnOnDeathCount = spawnOnDeathCount;
+            return this;
+        }
+
+        public Builder spawnOnDeathChancePercent(@Nullable Integer spawnOnDeathChancePercent) {
+            this.spawnOnDeathChancePercent = spawnOnDeathChancePercent;
             return this;
         }
 
@@ -444,21 +714,6 @@ public final class NpcTemplate {
 
         public Builder leftHand(@Nullable Integer leftHand) {
             this.leftHand = leftHand;
-            return this;
-        }
-
-        public Builder stats(@Nullable NpcStats stats) {
-            this.stats = stats;
-            return this;
-        }
-
-        public Builder attributes(@Nullable NpcBaseAttributes attributes) {
-            this.attributes = attributes;
-            return this;
-        }
-
-        public Builder attribute(@Nullable NpcAttribute attribute) {
-            this.attribute = attribute;
             return this;
         }
 
@@ -488,9 +743,13 @@ public final class NpcTemplate {
         }
 
         public NpcTemplate build() {
-            return new NpcTemplate(id, type, displayId, level, race, aiType, shots, raceIcon,
-                    aggroRange, collisionRadius, collisionHeight, randomMinions, name, title, rightHand,
-                    leftHand, stats, attributes, attribute, skills, drops, minions, absorbs, spawns);
+            return new NpcTemplate(id, type, displayId, level, race, aiType, shots, randomMinions,
+                    lethalImmune, championDisabled, noRandomWalk, movementDisabled, maxPursueRange,
+                    canSeeInSilentMove, globalAggro, raceIcon, collisionRadius, collisionHeight,
+                    atkType, stats, rewardExp, rewardSp, rewardRp, faction,
+                    transformOnDeadNpcTemplateId, transformChancePercent, spawnOnDeathCount,
+                    spawnOnDeathChancePercent, name, title, rightHand, leftHand,
+                    skills, drops, minions, absorbs, spawns);
         }
     }
 }
