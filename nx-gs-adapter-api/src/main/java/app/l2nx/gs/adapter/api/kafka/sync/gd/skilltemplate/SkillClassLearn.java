@@ -12,7 +12,7 @@ import java.util.Objects;
  * <p>{@code classId} (the host's numeric class id) is the non-null identity. {@code className} is the
  * canonical UPPER_SNAKE class token (the host enum name) for display without a id→name lookup;
  * localized class names are resolved consumer-side. {@code requiredLevel} is the character level
- * required to learn, {@code levelUpSp} the SP cost. {@code autoGet} marks skills granted
+ * required to learn, {@code learnSp} the SP cost. {@code autoLearned} marks skills granted
  * automatically on level-up; {@code learnedByNpc} marks skills taught by a trainer NPC.</p>
  */
 public final class SkillClassLearn {
@@ -20,21 +20,21 @@ public final class SkillClassLearn {
     private final int classId;
     private final @Nullable String className;
     private final @Nullable Integer requiredLevel;
-    private final @Nullable Long levelUpSp;
-    private final @Nullable Boolean autoGet;
+    private final @Nullable Long learnSp;
+    private final @Nullable Boolean autoLearned;
     private final @Nullable Boolean learnedByNpc;
 
     public SkillClassLearn(int classId,
                            @Nullable String className,
                            @Nullable Integer requiredLevel,
-                           @Nullable Long levelUpSp,
-                           @Nullable Boolean autoGet,
+                           @Nullable Long learnSp,
+                           @Nullable Boolean autoLearned,
                            @Nullable Boolean learnedByNpc) {
         this.classId = classId;
         this.className = className;
         this.requiredLevel = requiredLevel;
-        this.levelUpSp = levelUpSp;
-        this.autoGet = autoGet;
+        this.learnSp = learnSp;
+        this.autoLearned = autoLearned;
         this.learnedByNpc = learnedByNpc;
     }
 
@@ -59,15 +59,15 @@ public final class SkillClassLearn {
     /**
      * SP cost to learn the skill at this entry.
      */
-    public @Nullable Long getLevelUpSp() {
-        return levelUpSp;
+    public @Nullable Long getLearnSp() {
+        return learnSp;
     }
 
     /**
      * Whether the class receives this skill automatically on reaching {@code requiredLevel}.
      */
-    public @Nullable Boolean getAutoGet() {
-        return autoGet;
+    public @Nullable Boolean getAutoLearned() {
+        return autoLearned;
     }
 
     /**
@@ -82,8 +82,8 @@ public final class SkillClassLearn {
                 .classId(classId)
                 .className(className)
                 .requiredLevel(requiredLevel)
-                .levelUpSp(levelUpSp)
-                .autoGet(autoGet)
+                .learnSp(learnSp)
+                .autoLearned(autoLearned)
                 .learnedByNpc(learnedByNpc);
     }
 
@@ -99,14 +99,14 @@ public final class SkillClassLearn {
         return classId == that.classId
                 && Objects.equals(className, that.className)
                 && Objects.equals(requiredLevel, that.requiredLevel)
-                && Objects.equals(levelUpSp, that.levelUpSp)
-                && Objects.equals(autoGet, that.autoGet)
+                && Objects.equals(learnSp, that.learnSp)
+                && Objects.equals(autoLearned, that.autoLearned)
                 && Objects.equals(learnedByNpc, that.learnedByNpc);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(classId, className, requiredLevel, levelUpSp, autoGet, learnedByNpc);
+        return Objects.hash(classId, className, requiredLevel, learnSp, autoLearned, learnedByNpc);
     }
 
     @Override
@@ -119,8 +119,8 @@ public final class SkillClassLearn {
         private int classId;
         private @Nullable String className;
         private @Nullable Integer requiredLevel;
-        private @Nullable Long levelUpSp;
-        private @Nullable Boolean autoGet;
+        private @Nullable Long learnSp;
+        private @Nullable Boolean autoLearned;
         private @Nullable Boolean learnedByNpc;
 
         public Builder classId(int classId) {
@@ -138,13 +138,13 @@ public final class SkillClassLearn {
             return this;
         }
 
-        public Builder levelUpSp(@Nullable Long levelUpSp) {
-            this.levelUpSp = levelUpSp;
+        public Builder learnSp(@Nullable Long learnSp) {
+            this.learnSp = learnSp;
             return this;
         }
 
-        public Builder autoGet(@Nullable Boolean autoGet) {
-            this.autoGet = autoGet;
+        public Builder autoLearned(@Nullable Boolean autoLearned) {
+            this.autoLearned = autoLearned;
             return this;
         }
 
@@ -154,7 +154,7 @@ public final class SkillClassLearn {
         }
 
         public SkillClassLearn build() {
-            return new SkillClassLearn(classId, className, requiredLevel, levelUpSp, autoGet,
+            return new SkillClassLearn(classId, className, requiredLevel, learnSp, autoLearned,
                     learnedByNpc);
         }
     }

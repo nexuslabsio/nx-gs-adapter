@@ -27,6 +27,11 @@ public final class SkillFlags {
     private final @Nullable Boolean overHit;
     private final @Nullable Boolean ignoreShield;
     private final @Nullable Boolean nextActionAttack;
+    private final @Nullable Boolean heroSkill;
+    private final @Nullable Boolean clanSkill;
+    private final @Nullable Boolean dispellable;
+    private final @Nullable Boolean reflectable;
+    private final @Nullable Boolean stayAfterDeath;
 
     public SkillFlags(@Nullable Boolean magic,
                       @Nullable Boolean debuff,
@@ -37,7 +42,12 @@ public final class SkillFlags {
                       @Nullable Boolean blockedInOlympiad,
                       @Nullable Boolean overHit,
                       @Nullable Boolean ignoreShield,
-                      @Nullable Boolean nextActionAttack) {
+                      @Nullable Boolean nextActionAttack,
+                      @Nullable Boolean heroSkill,
+                      @Nullable Boolean clanSkill,
+                      @Nullable Boolean dispellable,
+                      @Nullable Boolean reflectable,
+                      @Nullable Boolean stayAfterDeath) {
         this.magic = magic;
         this.debuff = debuff;
         this.offensive = offensive;
@@ -48,6 +58,11 @@ public final class SkillFlags {
         this.overHit = overHit;
         this.ignoreShield = ignoreShield;
         this.nextActionAttack = nextActionAttack;
+        this.heroSkill = heroSkill;
+        this.clanSkill = clanSkill;
+        this.dispellable = dispellable;
+        this.reflectable = reflectable;
+        this.stayAfterDeath = stayAfterDeath;
     }
 
     /**
@@ -106,6 +121,41 @@ public final class SkillFlags {
         return nextActionAttack;
     }
 
+    /**
+     * Granted by hero status (monthly olympiad winner), not learned.
+     */
+    public @Nullable Boolean getHeroSkill() {
+        return heroSkill;
+    }
+
+    /**
+     * Granted through clan membership / clan level, not learned individually.
+     */
+    public @Nullable Boolean getClanSkill() {
+        return clanSkill;
+    }
+
+    /**
+     * Whether the applied buff/debuff can be removed by dispel/cleanse effects.
+     */
+    public @Nullable Boolean getDispellable() {
+        return dispellable;
+    }
+
+    /**
+     * Whether the skill can bounce back to the caster via reflect effects.
+     */
+    public @Nullable Boolean getReflectable() {
+        return reflectable;
+    }
+
+    /**
+     * Whether the applied effect persists on the target after death.
+     */
+    public @Nullable Boolean getStayAfterDeath() {
+        return stayAfterDeath;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .magic(magic)
@@ -117,7 +167,12 @@ public final class SkillFlags {
                 .blockedInOlympiad(blockedInOlympiad)
                 .overHit(overHit)
                 .ignoreShield(ignoreShield)
-                .nextActionAttack(nextActionAttack);
+                .nextActionAttack(nextActionAttack)
+                .heroSkill(heroSkill)
+                .clanSkill(clanSkill)
+                .dispellable(dispellable)
+                .reflectable(reflectable)
+                .stayAfterDeath(stayAfterDeath);
     }
 
     public static Builder builder() {
@@ -138,13 +193,19 @@ public final class SkillFlags {
                 && Objects.equals(blockedInOlympiad, that.blockedInOlympiad)
                 && Objects.equals(overHit, that.overHit)
                 && Objects.equals(ignoreShield, that.ignoreShield)
-                && Objects.equals(nextActionAttack, that.nextActionAttack);
+                && Objects.equals(nextActionAttack, that.nextActionAttack)
+                && Objects.equals(heroSkill, that.heroSkill)
+                && Objects.equals(clanSkill, that.clanSkill)
+                && Objects.equals(dispellable, that.dispellable)
+                && Objects.equals(reflectable, that.reflectable)
+                && Objects.equals(stayAfterDeath, that.stayAfterDeath);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(magic, debuff, offensive, passive, toggle, staticSkill,
-                blockedInOlympiad, overHit, ignoreShield, nextActionAttack);
+                blockedInOlympiad, overHit, ignoreShield, nextActionAttack, heroSkill, clanSkill,
+                dispellable, reflectable, stayAfterDeath);
     }
 
     @Override
@@ -163,6 +224,11 @@ public final class SkillFlags {
         private @Nullable Boolean overHit;
         private @Nullable Boolean ignoreShield;
         private @Nullable Boolean nextActionAttack;
+        private @Nullable Boolean heroSkill;
+        private @Nullable Boolean clanSkill;
+        private @Nullable Boolean dispellable;
+        private @Nullable Boolean reflectable;
+        private @Nullable Boolean stayAfterDeath;
 
         public Builder magic(@Nullable Boolean magic) {
             this.magic = magic;
@@ -214,9 +280,35 @@ public final class SkillFlags {
             return this;
         }
 
+        public Builder heroSkill(@Nullable Boolean heroSkill) {
+            this.heroSkill = heroSkill;
+            return this;
+        }
+
+        public Builder clanSkill(@Nullable Boolean clanSkill) {
+            this.clanSkill = clanSkill;
+            return this;
+        }
+
+        public Builder dispellable(@Nullable Boolean dispellable) {
+            this.dispellable = dispellable;
+            return this;
+        }
+
+        public Builder reflectable(@Nullable Boolean reflectable) {
+            this.reflectable = reflectable;
+            return this;
+        }
+
+        public Builder stayAfterDeath(@Nullable Boolean stayAfterDeath) {
+            this.stayAfterDeath = stayAfterDeath;
+            return this;
+        }
+
         public SkillFlags build() {
             return new SkillFlags(magic, debuff, offensive, passive, toggle, staticSkill,
-                    blockedInOlympiad, overHit, ignoreShield, nextActionAttack);
+                    blockedInOlympiad, overHit, ignoreShield, nextActionAttack, heroSkill,
+                    clanSkill, dispellable, reflectable, stayAfterDeath);
         }
     }
 }
