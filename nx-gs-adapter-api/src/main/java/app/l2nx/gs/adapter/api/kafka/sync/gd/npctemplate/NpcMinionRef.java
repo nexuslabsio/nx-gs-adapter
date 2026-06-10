@@ -12,15 +12,23 @@ import java.util.Objects;
  * <p>{@code minionNpcTemplateId} is the non-null identity. The minion template may not exist
  * in the snapshot's NPC set (a minion can be defined in an unloaded file), so no
  * referential guarantee is implied.</p>
+ *
+ * <p>{@code groupIndex} identifies the alternative minion set this ref belongs to when the
+ * leader spawns one of several random sets (see {@link NpcTemplate#getRandomMinions()}) —
+ * refs sharing a {@code groupIndex} spawn together, distinct indices are mutually exclusive
+ * alternatives. {@code null} when the leader has a single fixed set. Without it, random sets
+ * built from the same minion ids would collapse into duplicate {@code (leader, minion)} pairs.</p>
  */
 public final class NpcMinionRef {
 
     private final int minionNpcTemplateId;
     private final @Nullable Integer count;
+    private final @Nullable Integer groupIndex;
 
-    public NpcMinionRef(int minionNpcTemplateId, @Nullable Integer count) {
+    public NpcMinionRef(int minionNpcTemplateId, @Nullable Integer count, @Nullable Integer groupIndex) {
         this.minionNpcTemplateId = minionNpcTemplateId;
         this.count = count;
+        this.groupIndex = groupIndex;
     }
 
     public int getMinionNpcTemplateId() {
@@ -31,10 +39,15 @@ public final class NpcMinionRef {
         return count;
     }
 
+    public @Nullable Integer getGroupIndex() {
+        return groupIndex;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .minionNpcTemplateId(minionNpcTemplateId)
-                .count(count);
+                .count(count)
+                .groupIndex(groupIndex);
     }
 
     public static Builder builder() {
@@ -46,22 +59,26 @@ public final class NpcMinionRef {
         if (this == o) return true;
         if (!(o instanceof NpcMinionRef)) return false;
         NpcMinionRef that = (NpcMinionRef) o;
-        return minionNpcTemplateId == that.minionNpcTemplateId && Objects.equals(count, that.count);
+        return minionNpcTemplateId == that.minionNpcTemplateId
+                && Objects.equals(count, that.count)
+                && Objects.equals(groupIndex, that.groupIndex);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(minionNpcTemplateId, count);
+        return Objects.hash(minionNpcTemplateId, count, groupIndex);
     }
 
     @Override
     public String toString() {
-        return "NpcMinionRef[minionNpcTemplateId=" + minionNpcTemplateId + ", count=" + count + "]";
+        return "NpcMinionRef[minionNpcTemplateId=" + minionNpcTemplateId
+                + ", count=" + count + ", groupIndex=" + groupIndex + "]";
     }
 
     public static final class Builder {
         private int minionNpcTemplateId;
         private @Nullable Integer count;
+        private @Nullable Integer groupIndex;
 
         public Builder minionNpcTemplateId(int minionNpcTemplateId) {
             this.minionNpcTemplateId = minionNpcTemplateId;
@@ -73,8 +90,13 @@ public final class NpcMinionRef {
             return this;
         }
 
+        public Builder groupIndex(@Nullable Integer groupIndex) {
+            this.groupIndex = groupIndex;
+            return this;
+        }
+
         public NpcMinionRef build() {
-            return new NpcMinionRef(minionNpcTemplateId, count);
+            return new NpcMinionRef(minionNpcTemplateId, count, groupIndex);
         }
     }
 }
