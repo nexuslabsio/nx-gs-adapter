@@ -2,6 +2,7 @@ package app.l2nx.gs.db.sync;
 
 import app.l2nx.gs.adapter.api.spi.ChildSource;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.ParentRef;
 import app.l2nx.gs.adapter.api.spi.PrimarySource;
 import org.junit.jupiter.api.Test;
 
@@ -84,6 +85,84 @@ class DbSyncModuleIdentValidationTest {
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> DbSyncModule.validateIdentifiers(Collections.singletonList(bad)));
         assertTrue(ex.getMessage().contains("child.fkColumn"));
+    }
+
+    @Test
+    void validateIdentifiers_shouldAcceptParentRefReferencingDeclaredEntity() {
+        // mapping(...) declares entity "clan" — the parent the item refs point at.
+        EntityMapping<?> clan = mapping("clan_data", "clan_id",
+                Collections.singletonList("clan_name"), Collections.emptyList());
+        EntityMapping<?> item = withParentRefs(
+                mapping("items", "object_id", Collections.singletonList("count"),
+                        Collections.emptyList()),
+                "item",
+                Collections.singletonList(ParentRef.of("clan", "owner_id")));
+
+        DbSyncModule.validateIdentifiers(Arrays.asList(clan, item));
+    }
+
+    @Test
+    void validateIdentifiers_shouldRejectParentRefWithUnknownParentEntity() {
+        EntityMapping<?> item = withParentRefs(
+                mapping("items", "object_id", Collections.singletonList("count"),
+                        Collections.emptyList()),
+                "item",
+                Collections.singletonList(ParentRef.of("ghost", "owner_id")));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> DbSyncModule.validateIdentifiers(Collections.singletonList(item)));
+        assertTrue(ex.getMessage().contains("parentRef.parentEntityName"));
+    }
+
+    @Test
+    void validateIdentifiers_shouldRejectSqlInjectionInParentRefFkColumn() {
+        EntityMapping<?> clan = mapping("clan_data", "clan_id",
+                Collections.singletonList("clan_name"), Collections.emptyList());
+        EntityMapping<?> item = withParentRefs(
+                mapping("items", "object_id", Collections.singletonList("count"),
+                        Collections.emptyList()),
+                "item",
+                Collections.singletonList(ParentRef.of("clan", "owner_id; DROP TABLE x")));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> DbSyncModule.validateIdentifiers(Arrays.asList(clan, item)));
+        assertTrue(ex.getMessage().contains("parentRef.fkColumn"));
+    }
+
+    private static EntityMapping<Object> withParentRefs(final EntityMapping<Object> delegate,
+                                                        final String entityName,
+                                                        final List<ParentRef> refs) {
+        return new EntityMapping<Object>() {
+            @Override
+            public String entityName() {
+                return entityName;
+            }
+
+            @Override
+            public Class<Object> dtoType() {
+                return delegate.dtoType();
+            }
+
+            @Override
+            public PrimarySource<?> primary() {
+                return delegate.primary();
+            }
+
+            @Override
+            public List<ChildSource<?>> children() {
+                return delegate.children();
+            }
+
+            @Override
+            public List<ParentRef> parentRefs() {
+                return refs;
+            }
+
+            @Override
+            public Object mapEntity(Object primaryRow, Map<String, List<Object>> childRowsByTable) {
+                return delegate.mapEntity(primaryRow, childRowsByTable);
+            }
+        };
     }
 
     private static EntityMapping<Object> mapping(final String table, final String pk,

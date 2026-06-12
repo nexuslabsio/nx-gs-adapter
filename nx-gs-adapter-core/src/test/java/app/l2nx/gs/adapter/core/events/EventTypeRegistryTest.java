@@ -18,6 +18,7 @@ import app.l2nx.gs.adapter.api.kafka.events.privatetrade.TradeParty;
 import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
 import app.l2nx.gs.adapter.api.kafka.events.raid.kill.RaidKillEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
+import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
 import app.l2nx.gs.commons.UUIDv7;
 import org.junit.jupiter.api.Test;
 
@@ -443,5 +444,33 @@ class EventTypeRegistryTest {
     @Test
     void knownFamilies_shouldContainAccount() {
         assertTrue(new EventTypeRegistry().knownFamilies().contains("account"));
+    }
+
+    @Test
+    void lookup_shouldReturnBinding_forResyncCompletedEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(ResyncCompletedEvent.class);
+
+        assertNotNull(binding);
+        assertEquals("sync", binding.familyKey());
+        assertEquals("ResyncCompletedEvent", binding.messageType());
+    }
+
+    @Test
+    void partitionKey_shouldReturnNull_forResyncCompletedEvent() {
+        EventTypeBinding binding = new EventTypeRegistry().lookup(ResyncCompletedEvent.class);
+        ResyncCompletedEvent event = ResyncCompletedEvent.builder()
+                .eventId(UUIDv7.generate())
+                .resyncId(UUIDv7.generate())
+                .entityName("item")
+                .cycleStartedAt(Instant.parse("2026-06-12T10:00:00Z"))
+                .completedAt(Instant.parse("2026-06-12T10:05:00Z"))
+                .build();
+
+        assertNull(binding.partitionKeyExtractor().apply(event));
+    }
+
+    @Test
+    void knownFamilies_shouldContainSync() {
+        assertTrue(new EventTypeRegistry().knownFamilies().contains("sync"));
     }
 }

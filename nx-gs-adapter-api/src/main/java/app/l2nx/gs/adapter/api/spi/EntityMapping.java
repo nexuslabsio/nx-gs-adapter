@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -73,6 +74,25 @@ public interface EntityMapping<T> {
      * keyed-by-tableName map back into the DTO).
      */
     List<ChildSource<?>> children();
+
+    /**
+     * Cross-entity ownership declarations: which OTHER declared entities this
+     * entity's rows belong to, via an FK column on this entity's primary
+     * table (e.g. item &rarr; {@code ParentRef.of("character", "owner_id")}).
+     * Distinct from {@link #children()} — children are sub-rows folded INTO
+     * this entity's payload; a parent ref points OUT to a separate entity
+     * with its own sync stream.
+     *
+     * <p>Consumed by the force-resync cascade: a row-level resync of the
+     * parent entity with {@code cascade=true} resolves this entity's rows
+     * whose {@code fkColumn} matches the requested parent PKs and invalidates
+     * them too, so dependent entities re-publish together with their parent.
+     * Default empty — entities without a declared parent are never cascaded
+     * into.</p>
+     */
+    default List<ParentRef> parentRefs() {
+        return Collections.emptyList();
+    }
 
     /**
      * Phase-2 entity assembly hook. Called once per created or updated PK

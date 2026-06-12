@@ -196,15 +196,23 @@ by the L2NX game-server adapter and its consumers. Published as
           `CharacterRuntimeDto.exp` to compute "% progress within current level":
           `pct = (exp - requiredExp[level]) / (requiredExp[level + 1] - requiredExp[level])`.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
-  reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Future concrete
+  reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:
-  `character` / `item` / `mail` / `account`); the topic remains single, the
-  package split is for Javadoc / IDE discovery only.
+  `character` / `item` / `mail` / `account` / `sync`); the topic remains single,
+  the package split is for Javadoc / IDE discovery only. The `sync` group hosts
+  the force-resync pair `ResyncEntitiesCommand` / `ResyncRowsCommand` (pks cap
+  `MAX_PKS=1000`, optional `cascade`); their completion signal
+  `events.sync.ResyncCompletedEvent` (UUIDv7 `eventId` + `resyncId` +
+  `entityName` + adapter-clock `cycleStartedAt` / `completedAt`) is the single
+  message type of the `sync` event family, partition key `null`.
 - `app.l2nx.gs.adapter.api.kafka.ops` — operational telemetry payloads
   (`HeartbeatEvent`, `ModuleStatus`, `EntityStats`, `PoolStats`, `EventsStats`,
   `CommandsStats`)
 - `app.l2nx.gs.adapter.api.spi` — SPIs: Tier-1 `AdapterModule`, Tier-2
-  `DbSchemaProvider` / `RuntimeStateProvider`, Tier-3 `JdbcConnectionSource`,
+  `DbSchemaProvider` / `RuntimeStateProvider` (`EntityMapping` carries the
+  optional `parentRefs()` default — `ParentRef` cross-entity ownership
+  declarations consumed by the db-sync force-resync cascade), Tier-3
+  `JdbcConnectionSource`,
   context bundle `ConnectContext` (now includes `io()` returning an
   adapter-owned `java.util.concurrent.Executor` for module-level blocking IO),
   capabilities `NxEvents` and `NxCommands` (consumed by host hooks;
@@ -221,6 +229,9 @@ by the L2NX game-server adapter and its consumers. Published as
   constructor with a 9-arg back-compat constructor preserved for sources that
   built it positionally. Callers MUST hop blocking IO (JDBC, HTTP) onto these
   executors instead of running on the game thread or the Kafka consumer thread.
+  Sanctioned exception: the db-sync resync handlers run their cascade-resolution
+  JDBC synchronously on the consumer thread — the ack reply needs the resolved
+  counts and the `ResyncRowsCommand.MAX_PKS` cap bounds the stall.
 - **`SyncEvent` DELETED payload.** `payload=null` on `DELETED` ops no longer
   claims Kafka-tombstone semantics: topics use bounded retention, not log
   compaction, so consumers MUST explicitly handle the `DELETED` op (do not

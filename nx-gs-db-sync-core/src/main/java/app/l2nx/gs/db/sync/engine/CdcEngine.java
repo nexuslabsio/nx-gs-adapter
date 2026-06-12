@@ -2,6 +2,7 @@ package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.commons.concurrent.DaemonThreadFactory;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.db.sync.engine.persist.SnapshotPersistence;
@@ -12,11 +13,9 @@ import app.l2nx.gs.db.sync.engine.publish.TopicResolver;
 import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
+import it.unimi.dsi.fastutil.longs.LongSet;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -44,6 +43,7 @@ public final class CdcEngine {
     private final Phase2Fetcher phase2Fetcher;
     private final String schemaName;
     private final Function<String, String> configOverrideSource;
+    private final ResyncCoordinator resyncCoordinator;
 
     private final List<EntitySyncTask> tasks = new ArrayList<EntitySyncTask>();
     private final List<ScheduledFuture<?>> futures = new ArrayList<ScheduledFuture<?>>();
@@ -65,7 +65,8 @@ public final class CdcEngine {
                      WindowPlanner windowPlanner,
                      Phase1Hasher phase1Hasher,
                      Phase2Fetcher phase2Fetcher,
-                     Function<String, String> configOverrideSource) {
+                     Function<String, String> configOverrideSource,
+                     NxEvents events) {
         this.schemaName = schemaName;
         this.mappings = Collections.unmodifiableList(new ArrayList<EntityMapping<?>>(mappings));
         this.jdbcSource = jdbcSource;
@@ -79,6 +80,7 @@ public final class CdcEngine {
         this.phase1Hasher = phase1Hasher;
         this.phase2Fetcher = phase2Fetcher;
         this.configOverrideSource = configOverrideSource;
+        this.resyncCoordinator = new ResyncCoordinator(events);
     }
 
     public void start() {
@@ -173,14 +175,86 @@ public final class CdcEngine {
         }
     }
 
+    /**
+     * Force-resync request for a whole entity: every snapshot hash is
+     * invalidated on the entity's next cycle, re-publishing every live row
+     * and re-emitting DELETED for snapshot-known ghosts. Thread-safe,
+     * non-blocking — enqueues the request and submits an immediate cycle;
+     * never mutates {@link SnapshotStore} on the calling thread.
+     *
+     * @return {@code false} when the entity is unknown or the engine is not
+     * running (callers map this to their own error reply); the
+     * request is dropped in that case
+     */
+    public boolean requestForceResync(UUID resyncId, String entityName) {
+        if (!resyncRequestAccepted(resyncId, entityName)) {
+            return false;
+        }
+        resyncCoordinator.enqueueAll(resyncId, entityName);
+        log.info("Force resync requested for WHOLE entity {} (resyncId={}) — "
+                + "full re-publication burst on the next cycle", entityName, resyncId);
+        triggerEntityNow(entityName);
+        return true;
+    }
+
+    /**
+     * Force-resync request for selected rows of an entity. Same contract as
+     * {@link #requestForceResync(UUID, String)}; PK sets of concurrent
+     * requests union, a pending whole-entity request absorbs them.
+     */
+    public boolean requestForceResync(UUID resyncId, String entityName, LongSet pks) {
+        if (!resyncRequestAccepted(resyncId, entityName)) {
+            return false;
+        }
+        resyncCoordinator.enqueuePks(resyncId, entityName, pks);
+        triggerEntityNow(entityName);
+        return true;
+    }
+
+    private boolean resyncRequestAccepted(UUID resyncId, String entityName) {
+        if (!started.get() || stopped.get()) {
+            log.warn("CdcEngine.requestForceResync({}, {}) called before start or after stop — dropping",
+                    entityName, resyncId);
+            return false;
+        }
+        if (!slotsByEntity.containsKey(entityName)) {
+            log.warn("CdcEngine.requestForceResync({}, {}) — unknown entity, dropping",
+                    entityName, resyncId);
+            return false;
+        }
+        return true;
+    }
+
     private void runGuardedCycle(String entity, EntitySyncTask task, AtomicBoolean ticking) {
         if (!ticking.compareAndSet(false, true)) {
             log.debug("Entity {} cycle already running — out-of-band/scheduled tick skipped", entity);
             return;
         }
         try {
-            CycleResult result = task.runCycle();
+            // Drain BEFORE runCycle: the planner must see invalidation sentinels
+            // in the snapshot's PK envelope, otherwise out-of-range sentinel
+            // DELETEDs would slip to the next cycle.
+            resyncCoordinator.drainAndInvalidate(entity, snapshot);
+            long cycleStartedMs = System.currentTimeMillis();
+            CycleResult result;
+            try {
+                result = task.runCycle();
+            } catch (RuntimeException cycleFailure) {
+                // E.g. WindowPlanner's plan-size cap after a garbage PK inflated
+                // the snapshot envelope. Record a degraded result so the heartbeat
+                // does not keep showing the last pre-failure result forever and the
+                // resync completion gate stays deferred.
+                log.warn("Entity {} cycle threw {}: {} — recording DEGRADED result",
+                        entity, cycleFailure.getClass().getName(), cycleFailure.getMessage());
+                result = CycleResult.degraded(System.currentTimeMillis() - cycleStartedMs);
+                statsTracker.recordCycleResult(entity, result);
+                resyncCoordinator.onCycleResult(entity, result);
+                // No checkpoint: the cycle died mid-flight, the snapshot may hold
+                // partially-applied state not worth persisting.
+                return;
+            }
             statsTracker.recordCycleResult(entity, result);
+            resyncCoordinator.onCycleResult(entity, result);
             try {
                 persistence.checkpoint(entity, snapshot);
             } catch (Throwable persistError) {
@@ -189,6 +263,12 @@ public final class CdcEngine {
             }
         } finally {
             ticking.set(false);
+            // A resync request that landed mid-cycle hit the ticking guard as a
+            // no-op — re-submit so its invalidations run in the immediately
+            // following cycle instead of waiting for the next scheduled tick.
+            if (resyncCoordinator.hasPending(entity) && !stopped.get()) {
+                triggerEntityNow(entity);
+            }
         }
     }
 
@@ -233,6 +313,7 @@ public final class CdcEngine {
         scheduler = null;
         tasks.clear();
         slotsByEntity.clear();
+        resyncCoordinator.clear();
         try {
             persistence.flushAll(snapshot);
         } catch (Throwable t) {

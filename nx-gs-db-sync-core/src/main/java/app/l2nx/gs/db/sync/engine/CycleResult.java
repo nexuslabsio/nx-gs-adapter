@@ -9,6 +9,12 @@ import java.util.Objects;
  * {@link EntityStatsTracker}. Counters are post-publish-walk: only PKs whose
  * Kafka publish succeeded contribute to {@code created/updated/deleted}; failed
  * publishes leave the snapshot untouched and are replayed on the next cycle.
+ *
+ * <p>{@code failedPublishes} / {@code pendingPublishes} count the publishes
+ * that did NOT succeed within the cycle (failed exceptionally / still pending
+ * past the flush deadline). The force-resync completion gate requires both to
+ * be zero on top of a HEALTHY state — a cycle whose every publish failed
+ * still reports HEALTHY, so state alone cannot prove full publication.</p>
  */
 public final class CycleResult {
 
@@ -18,6 +24,8 @@ public final class CycleResult {
     private final long updated;
     private final long deleted;
     private final long rowCount;
+    private final long failedPublishes;
+    private final long pendingPublishes;
 
     public CycleResult(EntityState state,
                        long durationMs,
@@ -25,12 +33,25 @@ public final class CycleResult {
                        long updated,
                        long deleted,
                        long rowCount) {
+        this(state, durationMs, created, updated, deleted, rowCount, 0L, 0L);
+    }
+
+    public CycleResult(EntityState state,
+                       long durationMs,
+                       long created,
+                       long updated,
+                       long deleted,
+                       long rowCount,
+                       long failedPublishes,
+                       long pendingPublishes) {
         this.state = state;
         this.durationMs = durationMs;
         this.created = created;
         this.updated = updated;
         this.deleted = deleted;
         this.rowCount = rowCount;
+        this.failedPublishes = failedPublishes;
+        this.pendingPublishes = pendingPublishes;
     }
 
     public EntityState state() {
@@ -57,6 +78,14 @@ public final class CycleResult {
         return rowCount;
     }
 
+    public long failedPublishes() {
+        return failedPublishes;
+    }
+
+    public long pendingPublishes() {
+        return pendingPublishes;
+    }
+
     public static CycleResult degraded(long durationMs) {
         return new CycleResult(EntityState.DEGRADED, durationMs, 0L, 0L, 0L, 0L);
     }
@@ -71,12 +100,15 @@ public final class CycleResult {
                 && updated == that.updated
                 && deleted == that.deleted
                 && rowCount == that.rowCount
+                && failedPublishes == that.failedPublishes
+                && pendingPublishes == that.pendingPublishes
                 && state == that.state;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(state, durationMs, created, updated, deleted, rowCount);
+        return Objects.hash(state, durationMs, created, updated, deleted, rowCount,
+                failedPublishes, pendingPublishes);
     }
 
     @Override
@@ -86,6 +118,8 @@ public final class CycleResult {
                 + ", created=" + created
                 + ", updated=" + updated
                 + ", deleted=" + deleted
-                + ", rowCount=" + rowCount + "]";
+                + ", rowCount=" + rowCount
+                + ", failedPublishes=" + failedPublishes
+                + ", pendingPublishes=" + pendingPublishes + "]";
     }
 }

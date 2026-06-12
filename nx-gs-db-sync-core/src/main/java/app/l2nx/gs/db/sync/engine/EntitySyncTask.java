@@ -25,10 +25,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 /**
  * Runs one CDC cycle for one entity: plan windows, Phase-1 CRC (primary +
@@ -98,6 +95,8 @@ public final class EntitySyncTask {
         long createdCount = 0L;
         long updatedCount = 0L;
         long deletedCount = 0L;
+        long failedPublishCount = 0L;
+        long pendingPublishCount = 0L;
         boolean cycleAborted = false;
         boolean degradedFromTimeout = false;
 
@@ -191,6 +190,8 @@ public final class EntitySyncTask {
                 createdCount += applied[0];
                 updatedCount += applied[1];
                 deletedCount += applied[2];
+                failedPublishCount += applied[3];
+                pendingPublishCount += applied[4];
             }
         } catch (SQLException unexpectedSqlError) {
             log.error("Entity {} cycle SQL error: {} — aborting", entity, unexpectedSqlError.getMessage());
@@ -216,7 +217,8 @@ public final class EntitySyncTask {
         log.debug("Entity {} cycle {}: +{} ~{} -{}, rowCount={}, elapsedMs={}",
                 entity, finalState, createdCount, updatedCount, deletedCount, rowCount, elapsedMs);
         return new CycleResult(finalState, elapsedMs,
-                createdCount, updatedCount, deletedCount, rowCount);
+                createdCount, updatedCount, deletedCount, rowCount,
+                failedPublishCount, pendingPublishCount);
     }
 
     /**
@@ -348,13 +350,18 @@ public final class EntitySyncTask {
      * order can't starve already-acked publishes that follow. Remaining
      * pending futures share a single deadline; whatever's still pending past
      * the deadline replays next cycle.
+     *
+     * <p>Returns {@code [created, updated, deleted, failed, pending]} —
+     * indexes 3/4 count publishes that failed exceptionally / outlived the
+     * flush deadline; both feed the cycle's fully-successful gate.
+     * Package-private for the publish-walk unit tests.</p>
      */
-    private long[] walkInFlightAndAdvance(String entity,
-                                          Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
-                                          Long2IntMap pendingCrcAdvance,
-                                          LongSet pendingCreates,
-                                          LongSet pendingDeletes) {
-        long[] tally = new long[3];
+    long[] walkInFlightAndAdvance(String entity,
+                                  Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
+                                  Long2IntMap pendingCrcAdvance,
+                                  LongSet pendingCreates,
+                                  LongSet pendingDeletes) {
+        long[] tally = new long[5];
         long failed = 0L;
         long pending = 0L;
 
@@ -424,6 +431,8 @@ public final class EntitySyncTask {
             log.warn("Entity {} {} publishes still pending past flush deadline ({}s) — replaying next cycle",
                     entity, pending, config.publishFlushSeconds());
         }
+        tally[3] = failed;
+        tally[4] = pending;
         return tally;
     }
 
@@ -447,9 +456,9 @@ public final class EntitySyncTask {
     private static @Nullable Throwable extractCause(CompletableFuture<?> future) {
         try {
             future.getNow(null);
-        } catch (java.util.concurrent.CompletionException ce) {
+        } catch (CompletionException ce) {
             return ce.getCause() != null ? ce.getCause() : ce;
-        } catch (java.util.concurrent.CancellationException ce) {
+        } catch (CancellationException ce) {
             return ce;
         }
         return null;

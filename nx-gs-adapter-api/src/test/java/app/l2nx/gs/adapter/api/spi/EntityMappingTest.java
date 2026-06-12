@@ -133,6 +133,39 @@ class EntityMappingTest {
         assertNotNull(mapping.children());
     }
 
+    @Test
+    void parentRefs_shouldDefaultToEmpty() {
+        EntityMapping<String> mapping = new EntityMapping<String>() {
+            @Override
+            public String entityName() {
+                return "item";
+            }
+
+            @Override
+            public Class<String> dtoType() {
+                return String.class;
+            }
+
+            @Override
+            public PrimarySource<?> primary() {
+                return primaryStub();
+            }
+
+            @Override
+            public List<ChildSource<?>> children() {
+                return Collections.emptyList();
+            }
+
+            @Override
+            public String mapEntity(Object primaryRow, Map<String, List<Object>> childRowsByTable) {
+                return (String) primaryRow;
+            }
+        };
+
+        assertNotNull(mapping.parentRefs());
+        assertTrue(mapping.parentRefs().isEmpty());
+    }
+
     private static PrimarySource<String> primaryStub() {
         return new PrimarySource<String>() {
             @Override

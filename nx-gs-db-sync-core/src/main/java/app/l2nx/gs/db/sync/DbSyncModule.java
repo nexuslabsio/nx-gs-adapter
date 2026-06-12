@@ -1,5 +1,10 @@
 package app.l2nx.gs.db.sync;
 
+import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
+import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncEntitiesCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncEntitiesResult;
+import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncRowsCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncRowsResult;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
@@ -17,10 +22,14 @@ import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import org.apache.kafka.clients.producer.Callback;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.function.Function;
@@ -103,6 +112,9 @@ public final class DbSyncModule implements AdapterModule {
     @Override
     public void onConnect(ConnectContext ctx) {
         this.context = ctx;
+        if (ctx != null) {
+            registerResyncHandlers(ctx);
+        }
         if (ctx == null || ctx.getSyncTopics() == null
                 || ctx.getSyncTopics().getDb() == null
                 || ctx.getSyncTopics().getDb().isEmpty()) {
@@ -218,7 +230,8 @@ public final class DbSyncModule implements AdapterModule {
                 new WindowPlanner(),
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
-                configSource);
+                configSource,
+                ctx.events());
         this.engine = built;
         try {
             built.start();
@@ -312,7 +325,196 @@ public final class DbSyncModule implements AdapterModule {
                 .build();
     }
 
+    /**
+     * Chunk width of the cascade {@code IN (...)} resolution query. The
+     * {@link ResyncRowsCommand#MAX_PKS} cap bounds the total to two chunks.
+     */
+    static final int CASCADE_CHUNK_SIZE = 500;
+
+    private void registerResyncHandlers(ConnectContext ctx) {
+        try {
+            NxCommands commands = ctx.commands();
+            commands.on(ResyncEntitiesCommand.class, this::handleResyncEntities);
+            commands.on(ResyncRowsCommand.class, this::handleResyncRows);
+        } catch (Throwable t) {
+            // Registration failure must not take down the module — sync itself
+            // works without the resync RPC surface.
+            log.warn("Failed to register db-sync resync command handlers: {}",
+                    t.getClass().getName(), t);
+        }
+    }
+
+    CommandResult<ResyncEntitiesResult> handleResyncEntities(ResyncEntitiesCommand cmd,
+                                                             CommandContext cctx) {
+        if (cmd.getResyncId() == null) {
+            return CommandResult.validationFailed("resyncId is required", "resyncId");
+        }
+        CdcEngine running = engine;
+        if (running == null) {
+            return CommandResult.unavailable("db-sync engine is not running");
+        }
+        Set<String> known = mappedEntityNames(running);
+        List<String> requested = cmd.getEntities();
+        List<String> targets;
+        if (requested == null || requested.isEmpty()) {
+            targets = new ArrayList<String>(known);
+        } else {
+            targets = new ArrayList<String>(new LinkedHashSet<String>(requested));
+            for (String name : targets) {
+                if (name == null || !known.contains(name)) {
+                    return CommandResult.validationFailed(
+                            "Unknown entity '" + name + "' — no partial acceptance", "entities");
+                }
+            }
+        }
+        for (String name : targets) {
+            if (!running.requestForceResync(cmd.getResyncId(), name)) {
+                return CommandResult.unavailable("db-sync engine stopped while enqueuing resync");
+            }
+        }
+        return CommandResult.ok(ResyncEntitiesResult.builder().acceptedEntities(targets).build());
+    }
+
+    CommandResult<ResyncRowsResult> handleResyncRows(ResyncRowsCommand cmd, CommandContext cctx) {
+        if (cmd.getResyncId() == null) {
+            return CommandResult.validationFailed("resyncId is required", "resyncId");
+        }
+        CdcEngine running = engine;
+        JdbcConnectionSource src = source;
+        if (running == null || src == null) {
+            return CommandResult.unavailable("db-sync engine is not running");
+        }
+        String entityName = cmd.getEntityName();
+        if (entityName == null || !mappedEntityNames(running).contains(entityName)) {
+            return CommandResult.validationFailed("Unknown entity '" + entityName + "'", "entityName");
+        }
+        List<Long> pks = cmd.getPks();
+        if (pks == null || pks.isEmpty()) {
+            return CommandResult.validationFailed("pks is required and must be non-empty", "pks");
+        }
+        if (pks.size() > ResyncRowsCommand.MAX_PKS) {
+            return CommandResult.validationFailed(
+                    "pks must carry at most " + ResyncRowsCommand.MAX_PKS + " entries (got "
+                            + pks.size() + ")", "pks");
+        }
+        LongOpenHashSet targetPks = new LongOpenHashSet(pks.size());
+        for (Long pk : pks) {
+            if (pk == null) {
+                return CommandResult.validationFailed("pks must not contain null entries", "pks");
+            }
+            // L2J object ids are strictly positive; a garbage PK would enter the
+            // snapshot as a sentinel and inflate the window-planning envelope.
+            if (pk.longValue() <= 0L) {
+                return CommandResult.validationFailed(
+                        "pks must contain only positive values (got " + pk + ")", "pks");
+            }
+            targetPks.add(pk.longValue());
+        }
+
+        // Cascade resolution runs synchronously BEFORE any enqueue so a SQL
+        // failure replies INTERNAL_ERROR without a half-applied invalidation.
+        Map<String, LongOpenHashSet> cascadeByEntity = new LinkedHashMap<String, LongOpenHashSet>();
+        if (cmd.isCascade()) {
+            try {
+                for (EntityMapping<?> mapping : running.mappings()) {
+                    List<ParentRef> refs = mapping.parentRefs();
+                    if (refs == null) {
+                        continue;
+                    }
+                    for (ParentRef ref : refs) {
+                        if (!entityName.equals(ref.parentEntityName())) {
+                            continue;
+                        }
+                        LongOpenHashSet resolved = resolveChildPks(src, mapping, ref, targetPks);
+                        if (resolved.isEmpty()) {
+                            continue;
+                        }
+                        LongOpenHashSet bucket = cascadeByEntity.get(mapping.entityName());
+                        if (bucket == null) {
+                            cascadeByEntity.put(mapping.entityName(), resolved);
+                        } else {
+                            bucket.addAll(resolved);
+                        }
+                    }
+                }
+            } catch (SQLException resolutionFailure) {
+                log.error("Resync cascade resolution failed for entity {}: {}",
+                        entityName, resolutionFailure.getMessage());
+                return CommandResult.internalError(
+                        "Cascade resolution failed: " + resolutionFailure.getMessage());
+            }
+        }
+
+        if (!running.requestForceResync(cmd.getResyncId(), entityName, targetPks)) {
+            return CommandResult.unavailable("db-sync engine stopped while enqueuing resync");
+        }
+        Map<String, Integer> invalidatedByEntity = new LinkedHashMap<String, Integer>();
+        invalidatedByEntity.put(entityName, targetPks.size());
+        for (Map.Entry<String, LongOpenHashSet> e : cascadeByEntity.entrySet()) {
+            if (!running.requestForceResync(cmd.getResyncId(), e.getKey(), e.getValue())) {
+                return CommandResult.unavailable("db-sync engine stopped while enqueuing resync");
+            }
+            invalidatedByEntity.put(e.getKey(), e.getValue().size());
+        }
+        return CommandResult.ok(
+                ResyncRowsResult.builder().invalidatedByEntity(invalidatedByEntity).build());
+    }
+
+    private static Set<String> mappedEntityNames(CdcEngine engine) {
+        Set<String> names = new LinkedHashSet<String>();
+        for (EntityMapping<?> mapping : engine.mappings()) {
+            names.add(mapping.entityName());
+        }
+        return names;
+    }
+
+    /**
+     * Identifiers are pre-validated by {@link #validateIdentifiers} at module
+     * start, so the interpolation here is injection-safe.
+     */
+    private static LongOpenHashSet resolveChildPks(JdbcConnectionSource src,
+                                                   EntityMapping<?> child,
+                                                   ParentRef ref,
+                                                   LongOpenHashSet parentPks) throws SQLException {
+        LongOpenHashSet result = new LongOpenHashSet();
+        long[] parents = parentPks.toLongArray();
+        try (Connection conn = src.getConnection()) {
+            int from = 0;
+            while (from < parents.length) {
+                int len = Math.min(CASCADE_CHUNK_SIZE, parents.length - from);
+                String sql = "SELECT " + child.primary().pkColumn()
+                        + " FROM " + child.primary().tableName()
+                        + " WHERE " + ref.fkColumn() + " IN (" + placeholders(len) + ")";
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    for (int i = 0; i < len; i++) {
+                        ps.setLong(i + 1, parents[from + i]);
+                    }
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            result.add(rs.getLong(1));
+                        }
+                    }
+                }
+                from += len;
+            }
+        }
+        return result;
+    }
+
+    private static String placeholders(int count) {
+        StringBuilder sb = new StringBuilder(count * 2);
+        for (int i = 0; i < count; i++) {
+            if (i > 0) sb.append(',');
+            sb.append('?');
+        }
+        return sb.toString();
+    }
+
     static void validateIdentifiers(List<? extends EntityMapping<?>> mappings) {
+        Set<String> declaredEntities = new LinkedHashSet<String>();
+        for (EntityMapping<?> mapping : mappings) {
+            declaredEntities.add(mapping.entityName());
+        }
         for (EntityMapping<?> mapping : mappings) {
             String entity = mapping.entityName();
             // Validated as a filesystem-safe identifier too — entity name is
@@ -336,6 +538,19 @@ public final class DbSyncModule implements AdapterModule {
                         for (String col : childHashed) {
                             SqlIdent.validate(col, "entity '" + entity + "' child.hashedColumns entry");
                         }
+                    }
+                }
+            }
+            List<ParentRef> parentRefs = mapping.parentRefs();
+            if (parentRefs != null) {
+                for (ParentRef ref : parentRefs) {
+                    SqlIdent.validate(ref.fkColumn(), "entity '" + entity + "' parentRef.fkColumn");
+                    if (!declaredEntities.contains(ref.parentEntityName())) {
+                        throw new IllegalStateException(
+                                "entity '" + entity + "' parentRef.parentEntityName '"
+                                        + ref.parentEntityName()
+                                        + "' does not reference a declared entity (declared: "
+                                        + declaredEntities + ")");
                     }
                 }
             }
@@ -389,7 +604,7 @@ public final class DbSyncModule implements AdapterModule {
     }
 
     private static void sendViaNxKafka(String topic, byte[] key, Object value,
-                                       org.apache.kafka.clients.producer.Callback callback) {
+                                       Callback callback) {
         try {
             NxKafka.instance().send(topic, key, value, callback);
         } catch (KafkaException notConfigured) {

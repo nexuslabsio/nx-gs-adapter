@@ -1,11 +1,13 @@
 package app.l2nx.gs.db.sync.engine;
 
+import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
 import app.l2nx.gs.adapter.api.kafka.ops.*;
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanSkillDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.db.sync.engine.persist.NoopSnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
@@ -237,6 +239,71 @@ class CdcEngineE2ETest {
         assertEquals(EntityState.HEALTHY, heartbeatEntities.get(0).getState());
     }
 
+    @Test
+    void engine_shouldRepublishRowsAsUpdatedAndEmitCompletion_onWholeEntityForceResync() throws Exception {
+        // Own topic — the consumer group reads from earliest and must not see
+        // records produced by the other scenario; the clan_data rows themselves
+        // are whatever the shared schema currently holds (order-independent).
+        String topic = "test.gs.sync.clans.resync";
+        List<Object> adapterEvents = Collections.synchronizedList(new ArrayList<>());
+        engine = buildEngine(new EntityStatsTracker(), topic, adapterEvents::add);
+        engine.start();
+
+        int clanCount = countClans();
+        assertTrue(clanCount > 0, "pre-seeded clan rows expected");
+
+        try (KafkaConsumer<byte[], byte[]> consumer = newConsumer()) {
+            consumer.subscribe(Collections.singletonList(topic));
+
+            // Cycle 1 — full sync: snapshot now holds the real CRC of every row.
+            awaitTick();
+            List<ConsumerRecord<byte[], byte[]>> initial = poll(consumer, clanCount);
+            assertEquals(clanCount, initial.size(), "first cycle publishes every existing clan");
+            Set<Long> syncedPks = new HashSet<>();
+            for (ConsumerRecord<byte[], byte[]> record : initial) {
+                assertEquals("CREATED", decode(record.value()).getOp());
+                syncedPks.add(decodeKey(record.key()));
+            }
+
+            // No DB change — a forced whole-entity resync must still re-publish
+            // every row, as UPDATED with full payload.
+            UUID resyncId = UUID.fromString("018f0000-0000-7000-8000-0000000000ee");
+            assertTrue(engine.requestForceResync(resyncId, "clan"));
+
+            // requestForceResync submits an immediate guarded cycle on the pool.
+            List<ConsumerRecord<byte[], byte[]>> republished = poll(consumer, clanCount);
+            assertEquals(clanCount, republished.size(), "every synced row re-published");
+            Set<Long> republishedPks = new HashSet<>();
+            for (ConsumerRecord<byte[], byte[]> record : republished) {
+                SyncEvent<ClanDbDto> event = decode(record.value());
+                assertEquals("UPDATED", event.getOp(), "unchanged rows re-emit as UPDATED");
+                assertNotNull(event.getPayload(), "forced re-publication carries the full payload");
+                republishedPks.add(event.getPk());
+            }
+            assertEquals(syncedPks, republishedPks);
+
+            long deadline = System.currentTimeMillis() + 30_000L;
+            while (adapterEvents.isEmpty() && System.currentTimeMillis() < deadline) {
+                Thread.sleep(50L);
+            }
+            assertEquals(1, adapterEvents.size(), "exactly one completion for the single resyncId");
+            ResyncCompletedEvent completed = (ResyncCompletedEvent) adapterEvents.get(0);
+            assertNotNull(completed.getEventId());
+            assertEquals(resyncId, completed.getResyncId());
+            assertEquals("clan", completed.getEntityName());
+            assertFalse(completed.getCompletedAt().isBefore(completed.getCycleStartedAt()));
+        }
+    }
+
+    private static int countClans() throws SQLException {
+        try (Connection c = jdbc();
+             Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM clan_data")) {
+            rs.next();
+            return rs.getInt(1);
+        }
+    }
+
     private static void assertSkillsContain(ClanDbDto dto, int skillId, int skillLevel) {
         for (ClanSkillDbDto s : dto.getSkills()) {
             if (s.getId() == skillId && s.getLevel() == skillLevel) {
@@ -267,12 +334,17 @@ class CdcEngineE2ETest {
     }
 
     private CdcEngine buildEngine(EntityStatsTracker statsTracker) {
+        return buildEngine(statsTracker, TOPIC, evt -> {
+        });
+    }
+
+    private CdcEngine buildEngine(EntityStatsTracker statsTracker, String topic, NxEvents events) {
         EngineConfig config = new EngineConfig(
                 /* tickIntervalSeconds */ 60, // unused — driven by tickOnceSynchronously()
                 /* rowsPerWindow */ 500_000,
                 /* queryTimeoutSeconds */ 10,
                 /* publishFlushSeconds */ 5);
-        TopicResolver topicResolver = entityName -> "clan".equals(entityName) ? TOPIC : null;
+        TopicResolver topicResolver = entityName -> "clan".equals(entityName) ? topic : null;
         SyncEventPublisher publisher = new SyncEventPublisher(testKafkaSender());
         List<EntityMapping<?>> mappings = Collections.singletonList(TestMappings.clanWithSkills());
         return new CdcEngine(
@@ -288,7 +360,8 @@ class CdcEngineE2ETest {
                 new WindowPlanner(),
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
-                key -> null);
+                key -> null,
+                events);
     }
 
     private KafkaSender testKafkaSender() {

@@ -23,6 +23,7 @@ import app.l2nx.gs.adapter.api.kafka.events.ratings.RatingSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerStartedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerStoppingEvent;
+import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
 import app.l2nx.gs.commons.bytes.LongBytes;
 import org.jspecify.annotations.Nullable;
 
@@ -96,6 +97,8 @@ final class EventTypeRegistry {
                 evt -> LongBytes.bigEndian(((OlympiadMatchResultEvent) evt).getCharId()));
         register(map, families, HeroGrantedEvent.class, "olympiad",
                 evt -> LongBytes.bigEndian(((HeroGrantedEvent) evt).getCharId()));
+        register(map, families, ResyncCompletedEvent.class, "sync",
+                evt -> null);
         register(map, families, AccountAuthAttemptEvent.class, "account",
                 evt -> ((AccountAuthAttemptEvent) evt).getAccountName()
                         .toLowerCase(Locale.ROOT)

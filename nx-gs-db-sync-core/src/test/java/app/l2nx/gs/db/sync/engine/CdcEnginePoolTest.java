@@ -89,7 +89,9 @@ class CdcEnginePoolTest {
                 new WindowPlanner(),
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
-                k -> null);
+                k -> null,
+                evt -> {
+                });
 
         engine.start();
 

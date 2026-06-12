@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * In-memory primitive-keyed CRC32 snapshot, one {@link Long2IntOpenHashMap} per
@@ -18,14 +19,20 @@ import java.util.*;
  * directly without a separate {@code containsKey} round-trip when 0 is a
  * legitimate CRC32 value.</p>
  *
- * <p>Thread safety: NOT safe for concurrent mutation. Engine ticks a single
- * entity-task at a time on its own scheduler slot; all mutations for a given
- * entity happen on that single tick.</p>
+ * <p>Thread safety: the outer per-entity registries are concurrent — different
+ * entities' cycles run on different CDC pool threads, and the first
+ * {@code putCrc} / {@code invalidate} for an entity structurally modifies the
+ * outer map on that entity's thread while other entities' threads do the same.
+ * Each inner {@code Long2IntOpenHashMap} stays single-writer: every mutation
+ * for a given entity happens on that entity's cycle thread (under the engine's
+ * per-entity ticking guard), so the inner maps need no synchronization.</p>
  */
 public final class SnapshotStore {
 
-    private final Map<String, Long2IntOpenHashMap> byEntity = new HashMap<String, Long2IntOpenHashMap>();
-    private final Map<String, ExtremeCache> extremeCache = new HashMap<String, ExtremeCache>();
+    private final Map<String, Long2IntOpenHashMap> byEntity =
+            new ConcurrentHashMap<String, Long2IntOpenHashMap>();
+    private final Map<String, ExtremeCache> extremeCache =
+            new ConcurrentHashMap<String, ExtremeCache>();
 
     public int getCrc(String entityName, long pk) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
@@ -62,6 +69,59 @@ public final class SnapshotStore {
         if (cache != null) {
             cache.observeRemove(pk);
         }
+    }
+
+    /**
+     * Force-resync invalidation of one PK. MUST be called from the entity's
+     * cycle thread only (same single-writer contract as every other mutation).
+     *
+     * <p>A PK present in the snapshot gets its stored CRC perturbed to a value
+     * guaranteed to differ from the stored one and never equal to
+     * {@link Phase1Hasher#MISSING_HASH}, so the next cycle's diff classifies
+     * the row as UPDATED (live row) or DELETED (row gone from the host DB). A
+     * PK absent from the snapshot gets a sentinel entry inserted so the diff
+     * emits DELETED when the host DB has no such row — repairing platform-side
+     * ghost rows the snapshot never knew.</p>
+     */
+    public void invalidate(String entityName, long pk) {
+        Long2IntOpenHashMap map = byEntity.get(entityName);
+        if (map == null || !map.containsKey(pk)) {
+            putCrc(entityName, pk, INVALIDATION_SENTINEL);
+            return;
+        }
+        putCrc(entityName, pk, perturb(map.get(pk)));
+    }
+
+    /**
+     * Force-resync invalidation of every stored PK of one entity. MUST be
+     * called from the entity's cycle thread only. Perturbs every stored value
+     * in place (zero-alloc fastIterator walk); min/max extremes are unaffected
+     * because only values change.
+     */
+    public void invalidateAll(String entityName) {
+        Long2IntOpenHashMap map = byEntity.get(entityName);
+        if (map == null || map.isEmpty()) {
+            return;
+        }
+        ObjectIterator<Long2IntMap.Entry> it = map.long2IntEntrySet().fastIterator();
+        while (it.hasNext()) {
+            Long2IntMap.Entry e = it.next();
+            e.setValue(perturb(e.getIntValue()));
+        }
+    }
+
+    /**
+     * Stored value for an invalidated PK the snapshot never had. Any value
+     * works as long as it differs from {@link Phase1Hasher#MISSING_HASH} (the
+     * map's defaultReturnValue the put/remove bookkeeping keys on) — a live
+     * host row hashes to the real CRC and mismatches with probability
+     * 1 - 2^-32, an absent row diffs to DELETED regardless of the value.
+     */
+    static final int INVALIDATION_SENTINEL = Phase1Hasher.MISSING_HASH ^ 1;
+
+    private static int perturb(int crc) {
+        int flipped = crc ^ 1;
+        return flipped == Phase1Hasher.MISSING_HASH ? crc ^ 2 : flipped;
     }
 
     /**

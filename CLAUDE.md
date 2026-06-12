@@ -48,12 +48,23 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   `FORBIDDEN` / `RATE_LIMITED` / `UNAVAILABLE` / `VALIDATION_FAILED` /
   `INTERNAL_ERROR` / `UNSUPPORTED_COMMAND`). Concrete command DTOs ship under
   `kafka.commands.<group>.*` (group = code-org bucket: `character` / `item` /
-  `mail` / `account`); shipped today: `commands.item.DeleteItemCommand`
-  (`NxCommand<Void>`) and `commands.mail.SendMailCommand`
-  (`NxCommand<SendMailPayload>` carrying `Long charId` + `String author?` +
+  `mail` / `account` / `sync`); shipped today: `commands.item.DeleteItemCommand`
+  (`NxCommand<DeleteItemResult>`) and `commands.mail.SendMailCommand`
+  (`NxCommand<SendMailResult>` carrying `Long charId` + `String author?` +
   `String title` + `String body?` + `List<MailItem>` attachments;
-  `SendMailPayload` carries `List<Long> createdMailIds` + `List<ItemDeliveryError>`
-  partial-failure entries on the success envelope). Capability SPIs live in `spi.*`: `NxEvents` (events fanout,
+  `SendMailResult` carries `List<Long> createdMailIds` + `List<ItemDeliveryError>`
+  partial-failure entries on the success envelope), plus the force-resync pair
+  `commands.sync.ResyncEntitiesCommand` (`UUID resyncId` + `entities?`, null/empty
+  = all db-sync entities; ack = `acceptedEntities`) and
+  `commands.sync.ResyncRowsCommand` (`resyncId` + `entityName` + `pks` capped at
+  `MAX_PKS=1000` + `cascade`; ack = `invalidatedByEntity` counts). Single-event
+  family `events.sync.ResyncCompletedEvent` (UUIDv7 `eventId` + `resyncId` +
+  `entityName` + adapter-clock `cycleStartedAt` / `completedAt` Instants) signals
+  per-entity resync completion for the platform sweep; partition key `null`.
+  `spi.ParentRef` + `EntityMapping.parentRefs()` (default empty, binary-compatible)
+  let schema providers declare cross-entity ownership (item →
+  `("character", "owner_id")`) for the `cascade=true` row-resync fan-out.
+  Capability SPIs live in `spi.*`: `NxEvents` (events fanout,
   acquired via `ConnectContext.events()`), `NxCommands` (handler registration,
   acquired via `ConnectContext.commands()`), `CommandHandler<C, R>` SAM,
   `CommandContext` (per-invocation correlationId / host() / events()),
@@ -61,7 +72,9 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   / `async(Runnable)`). Both contexts also surface an adapter-owned IO `Executor`
   via `ConnectContext.io()` (module-level) and `CommandContext.io()` (handler-level)
   for blocking IO (JDBC, HTTP) — handlers MUST hop here instead of running JDBC on
-  the game thread or the Kafka consumer thread.
+  the game thread or the Kafka consumer thread (sanctioned exception: the db-sync
+  resync handlers' bounded cascade-resolution JDBC runs synchronously because the
+  ack reply needs the counts).
 - `:nx-gs-commons` — shared utilities for adapter modules and tenant providers:
   `concurrent.SafeRunnable` (exception-swallowing Runnable wrapper), `hash.Fnv1a64`
   (FNV-1a 64-bit hash), `Nulls` (sentinel-to-null), `jdbc.JdbcNulls` (null-aware
@@ -79,7 +92,9 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
 - `:nx-gs-adapter-core` — runtime: config resolution, POST `/connect`, heartbeat, ServiceLoader-based
   module discovery, lifecycle. Hosts the built-in `NxEvents` capability — bounded-queue
     + daemon-thread fan-out (`events.EventsPublisher`, `events.NxEventsImpl`,
-      `events.EventTypeRegistry`) reading per-family topic addressing from
+      `events.EventTypeRegistry` — one `register(...)` entry per concrete event
+      type, including the `sync` family for db-sync's `ResyncCompletedEvent`,
+      partition key `null`) reading per-family topic addressing from
       `ConnectResponse.messagingTopics.events`. Default `drop-policy` is `newest`
       (drop incoming on overflow — preserves queue order). `oldest` (evict head)
       remains an option but over-counts `dropped-total` under multi-producer
@@ -150,7 +165,23 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   the same dir → module `STATE_FAILED`. Closes the orphan-on-restart bug
   where rows deleted from the host DB while the adapter was offline were
   never observed by the next cycle (diff against empty snapshot
-  misclassified everything as CREATE). Depends on `:nx-gs-adapter-api` +
+  misclassified everything as CREATE). **Force resync**
+  (`docs/features/force-resync/spec.md`): `DbSyncModule` registers
+  `ResyncEntitiesCommand` / `ResyncRowsCommand` handlers in `onConnect`
+  (engine down → `UNAVAILABLE`; unknown entity / empty / >1000 pks →
+  `VALIDATION_FAILED`); requests enqueue snapshot-hash invalidation on
+  `CdcEngine.requestForceResync(...)` — applied strictly on the entity's
+  cycle thread before window planning (whole-entity in-place perturb, or
+  per-PK perturb + sentinel insert for ghost PKs) — and trigger an immediate
+  cycle; a request landing mid-cycle re-submits at cycle end. After the first
+  fully successful cycle (HEALTHY + zero failed/pending publishes —
+  `CycleResult` carries publish-outcome counters for this gate) the engine
+  emits one `events.sync.ResyncCompletedEvent` per drained `resyncId` via the
+  `NxEvents` facade threaded in from `ConnectContext`. `cascade=true` on a
+  row resync resolves dependent rows through the provider-declared
+  `EntityMapping.parentRefs()` (fkColumn/parent validated at start alongside
+  the identifier validation). Pending requests and in-flight resyncIds are
+  in-memory only — dropped on stop/reconnect. Depends on `:nx-gs-adapter-api` +
   `:nx-gs-kafka` + `:nx-gs-commons` + `fastutil-core` + `gson`. Package
   root `app.l2nx.gs.db.sync`. `:nx-gs-log` shadow-included.
 - `:nx-gs-runtime-sync-core` — Runtime-sync `AdapterModule` shipped to Maven Central.
@@ -275,6 +306,8 @@ publish target; CI uses `signingKey`/`signingPassword` Gradle properties (GPG) a
   UPPER_SNAKE token — never lowercase / camelCase / PascalCase. Single-token codes (`A1`, `TG`) are fine as-is.
 - Free-form identifiers are NOT enum-like and stay verbatim: effect-handler names (`p_attack`), icon/resource names,
   localized text. Don't force them to UPPER_SNAKE.
+- Icon names are emitted verbatim by the adapter; the platform lowercases them consumer-side (nx-gamedata
+  `IconPaths.normalize` — platform-wide lowercase icon canon). Do NOT normalize in the adapter.
 
 ## Item-template references
 
