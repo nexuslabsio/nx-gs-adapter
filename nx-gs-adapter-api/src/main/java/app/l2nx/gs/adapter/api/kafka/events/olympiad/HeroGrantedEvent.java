@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -41,6 +42,7 @@ public final class HeroGrantedEvent {
     private final UUID eventId;
     private final long charId;
     private final int classId;
+    private final @Nullable CharacterClass clazz;
     private final @Nullable Long clanId;
     private final int olympiadCycle;
     private final @Nullable Map<String, String> metadata;
@@ -48,12 +50,14 @@ public final class HeroGrantedEvent {
     public HeroGrantedEvent(UUID eventId,
                             long charId,
                             int classId,
+                            @Nullable CharacterClass clazz,
                             @Nullable Long clanId,
                             int olympiadCycle,
                             @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "HeroGrantedEvent.eventId is required");
         this.charId = charId;
         this.classId = classId;
+        this.clazz = clazz;
         this.clanId = clanId;
         this.olympiadCycle = olympiadCycle;
         this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
@@ -76,10 +80,23 @@ public final class HeroGrantedEvent {
     }
 
     /**
-     * Class the character was crowned hero with.
+     * Legacy numeric class id the character was crowned hero with. Source-side
+     * (host) numbering. Superseded by {@link #getClazz() clazz}; retained for
+     * back-compat while hosts migrate to the canonical token. Consumers MUST
+     * prefer {@code clazz} when it is non-null.
      */
     public int getClassId() {
         return classId;
+    }
+
+    /**
+     * Canonical, source-agnostic class token the character was crowned hero
+     * with. {@code null} from hosts that have not yet migrated off the numeric
+     * {@link #getClassId() classId} (consumers fall back to it then), or when
+     * the source class is not in the canonical {@link CharacterClass} set.
+     */
+    public @Nullable CharacterClass getClazz() {
+        return clazz;
     }
 
     /**
@@ -112,6 +129,7 @@ public final class HeroGrantedEvent {
                 .eventId(eventId)
                 .charId(charId)
                 .classId(classId)
+                .clazz(clazz)
                 .clanId(clanId)
                 .olympiadCycle(olympiadCycle)
                 .metadata(metadata);
@@ -130,13 +148,14 @@ public final class HeroGrantedEvent {
                 && classId == that.classId
                 && olympiadCycle == that.olympiadCycle
                 && eventId.equals(that.eventId)
+                && clazz == that.clazz
                 && Objects.equals(clanId, that.clanId)
                 && Objects.equals(metadata, that.metadata);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, charId, classId, clanId, olympiadCycle, metadata);
+        return Objects.hash(eventId, charId, classId, clazz, clanId, olympiadCycle, metadata);
     }
 
     @Override
@@ -144,6 +163,7 @@ public final class HeroGrantedEvent {
         return "HeroGrantedEvent[eventId=" + eventId
                 + ", charId=" + charId
                 + ", classId=" + classId
+                + ", clazz=" + clazz
                 + ", clanId=" + clanId
                 + ", olympiadCycle=" + olympiadCycle
                 + ", metadata=" + metadata + "]";
@@ -153,6 +173,7 @@ public final class HeroGrantedEvent {
         private @Nullable UUID eventId;
         private long charId;
         private int classId;
+        private @Nullable CharacterClass clazz;
         private @Nullable Long clanId;
         private int olympiadCycle;
         private @Nullable Map<String, String> metadata;
@@ -172,6 +193,11 @@ public final class HeroGrantedEvent {
             return this;
         }
 
+        public Builder clazz(@Nullable CharacterClass clazz) {
+            this.clazz = clazz;
+            return this;
+        }
+
         public Builder clanId(@Nullable Long clanId) {
             this.clanId = clanId;
             return this;
@@ -188,7 +214,7 @@ public final class HeroGrantedEvent {
         }
 
         public HeroGrantedEvent build() {
-            return new HeroGrantedEvent(eventId, charId, classId, clanId, olympiadCycle, metadata);
+            return new HeroGrantedEvent(eventId, charId, classId, clazz, clanId, olympiadCycle, metadata);
         }
     }
 }

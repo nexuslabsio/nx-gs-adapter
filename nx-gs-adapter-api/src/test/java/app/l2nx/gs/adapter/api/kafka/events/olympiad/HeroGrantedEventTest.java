@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -29,12 +30,14 @@ class HeroGrantedEventTest {
                 .eventId(UUID.randomUUID())
                 .charId(268437521L)
                 .classId(88)
+                .clazz(CharacterClass.DUELIST)
                 .clanId(101L)
                 .olympiadCycle(7)
                 .build();
 
         HeroGrantedEvent copy = original.toBuilder().build();
         assertEquals(original, copy);
+        assertEquals(CharacterClass.DUELIST, copy.getClazz());
         assertNotSame(original, copy);
     }
 
@@ -43,6 +46,18 @@ class HeroGrantedEventTest {
         HeroGrantedEvent.Builder base = newBuilder();
 
         assertNotEquals(base.classId(88).build(), base.classId(89).build());
+    }
+
+    @Test
+    void equals_shouldDistinguishClazz() {
+        assertNotEquals(
+                newBuilder().clazz(CharacterClass.DUELIST).build(),
+                newBuilder().clazz(CharacterClass.ADVENTURER).build());
+    }
+
+    @Test
+    void getClazz_shouldBeNull_whenLegacyNumericOnly() {
+        assertNull(newBuilder().build().getClazz());
     }
 
     @Test

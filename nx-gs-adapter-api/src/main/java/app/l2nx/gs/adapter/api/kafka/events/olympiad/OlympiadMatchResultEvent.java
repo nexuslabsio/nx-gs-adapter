@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
@@ -28,10 +29,12 @@ public final class OlympiadMatchResultEvent {
 
     private final long charId;
     private final int classId;
+    private final @Nullable CharacterClass clazz;
     private final @Nullable Long clanId;
 
     private final long opponentCharId;
     private final int opponentClassId;
+    private final @Nullable CharacterClass opponentClazz;
     private final @Nullable Long opponentClanId;
 
     private final OlympiadMatchResult result;
@@ -52,9 +55,11 @@ public final class OlympiadMatchResultEvent {
                                     OlympiadGameType gameType,
                                     long charId,
                                     int classId,
+                                    @Nullable CharacterClass clazz,
                                     @Nullable Long clanId,
                                     long opponentCharId,
                                     int opponentClassId,
+                                    @Nullable CharacterClass opponentClazz,
                                     @Nullable Long opponentClanId,
                                     OlympiadMatchResult result,
                                     OlympiadMatchReason reason,
@@ -71,9 +76,11 @@ public final class OlympiadMatchResultEvent {
         this.gameType = gameType;
         this.charId = charId;
         this.classId = classId;
+        this.clazz = clazz;
         this.clanId = clanId;
         this.opponentCharId = opponentCharId;
         this.opponentClassId = opponentClassId;
+        this.opponentClazz = opponentClazz;
         this.opponentClanId = opponentClanId;
         this.result = result;
         this.reason = reason;
@@ -111,8 +118,23 @@ public final class OlympiadMatchResultEvent {
         return charId;
     }
 
+    /**
+     * Legacy numeric class id (host numbering). Superseded by
+     * {@link #getClazz() clazz}; retained for back-compat while hosts migrate to
+     * the canonical token. Consumers MUST prefer {@code clazz} when it is non-null.
+     */
     public int getClassId() {
         return classId;
+    }
+
+    /**
+     * Canonical, source-agnostic class token. {@code null} from hosts that have
+     * not yet migrated off the numeric {@link #getClassId() classId} (consumers
+     * fall back to it then), or when the source class is not in the canonical
+     * {@link CharacterClass} set.
+     */
+    public @Nullable CharacterClass getClazz() {
+        return clazz;
     }
 
     /**
@@ -126,8 +148,22 @@ public final class OlympiadMatchResultEvent {
         return opponentCharId;
     }
 
+    /**
+     * Legacy numeric opponent class id (host numbering). Superseded by
+     * {@link #getOpponentClazz() opponentClazz}; consumers MUST prefer the token
+     * when it is non-null.
+     */
     public int getOpponentClassId() {
         return opponentClassId;
+    }
+
+    /**
+     * Canonical, source-agnostic opponent class token. {@code null} pre-migration
+     * (fall back to {@link #getOpponentClassId() opponentClassId}) or for a
+     * non-canonical source class.
+     */
+    public @Nullable CharacterClass getOpponentClazz() {
+        return opponentClazz;
     }
 
     public @Nullable Long getOpponentClanId() {
@@ -181,9 +217,11 @@ public final class OlympiadMatchResultEvent {
                 .gameType(gameType)
                 .charId(charId)
                 .classId(classId)
+                .clazz(clazz)
                 .clanId(clanId)
                 .opponentCharId(opponentCharId)
                 .opponentClassId(opponentClassId)
+                .opponentClazz(opponentClazz)
                 .opponentClanId(opponentClanId)
                 .result(result)
                 .reason(reason)
@@ -208,8 +246,10 @@ public final class OlympiadMatchResultEvent {
         return olympiadCycle == that.olympiadCycle
                 && charId == that.charId
                 && classId == that.classId
+                && clazz == that.clazz
                 && opponentCharId == that.opponentCharId
                 && opponentClassId == that.opponentClassId
+                && opponentClazz == that.opponentClazz
                 && pointsBefore == that.pointsBefore
                 && pointsAfter == that.pointsAfter
                 && damageDealt == that.damageDealt
@@ -229,8 +269,8 @@ public final class OlympiadMatchResultEvent {
     @Override
     public int hashCode() {
         return Objects.hash(eventId, matchId, olympiadCycle, gameType,
-                charId, classId, clanId,
-                opponentCharId, opponentClassId, opponentClanId,
+                charId, classId, clazz, clanId,
+                opponentCharId, opponentClassId, opponentClazz, opponentClanId,
                 result, reason,
                 pointsBefore, pointsAfter,
                 damageDealt, opponentDamageDealt,
@@ -245,9 +285,11 @@ public final class OlympiadMatchResultEvent {
                 + ", gameType=" + gameType
                 + ", charId=" + charId
                 + ", classId=" + classId
+                + ", clazz=" + clazz
                 + ", clanId=" + clanId
                 + ", opponentCharId=" + opponentCharId
                 + ", opponentClassId=" + opponentClassId
+                + ", opponentClazz=" + opponentClazz
                 + ", opponentClanId=" + opponentClanId
                 + ", result=" + result
                 + ", reason=" + reason
@@ -267,9 +309,11 @@ public final class OlympiadMatchResultEvent {
         private OlympiadGameType gameType;
         private long charId;
         private int classId;
+        private @Nullable CharacterClass clazz;
         private @Nullable Long clanId;
         private long opponentCharId;
         private int opponentClassId;
+        private @Nullable CharacterClass opponentClazz;
         private @Nullable Long opponentClanId;
         private OlympiadMatchResult result;
         private OlympiadMatchReason reason;
@@ -311,6 +355,11 @@ public final class OlympiadMatchResultEvent {
             return this;
         }
 
+        public Builder clazz(@Nullable CharacterClass clazz) {
+            this.clazz = clazz;
+            return this;
+        }
+
         public Builder clanId(@Nullable Long clanId) {
             this.clanId = clanId;
             return this;
@@ -323,6 +372,11 @@ public final class OlympiadMatchResultEvent {
 
         public Builder opponentClassId(int opponentClassId) {
             this.opponentClassId = opponentClassId;
+            return this;
+        }
+
+        public Builder opponentClazz(@Nullable CharacterClass opponentClazz) {
+            this.opponentClazz = opponentClazz;
             return this;
         }
 
@@ -378,8 +432,8 @@ public final class OlympiadMatchResultEvent {
 
         public OlympiadMatchResultEvent build() {
             return new OlympiadMatchResultEvent(eventId, matchId, olympiadCycle, gameType,
-                    charId, classId, clanId,
-                    opponentCharId, opponentClassId, opponentClanId,
+                    charId, classId, clazz, clanId,
+                    opponentCharId, opponentClassId, opponentClazz, opponentClanId,
                     result, reason,
                     pointsBefore, pointsAfter,
                     damageDealt, opponentDamageDealt,

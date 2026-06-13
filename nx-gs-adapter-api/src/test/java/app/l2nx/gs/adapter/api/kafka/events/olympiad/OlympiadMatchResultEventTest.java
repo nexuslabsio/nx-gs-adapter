@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -42,8 +43,9 @@ class OlympiadMatchResultEventTest {
                 .matchId(UUID.randomUUID())
                 .olympiadCycle(7)
                 .gameType(OlympiadGameType.CLASSED)
-                .charId(268437521L).classId(88).clanId(101L)
-                .opponentCharId(268437522L).opponentClassId(92).opponentClanId(102L)
+                .charId(268437521L).classId(88).clazz(CharacterClass.DUELIST).clanId(101L)
+                .opponentCharId(268437522L).opponentClassId(92).opponentClazz(CharacterClass.SAGITTARIUS)
+                .opponentClanId(102L)
                 .result(OlympiadMatchResult.WIN)
                 .reason(OlympiadMatchReason.NORMAL)
                 .pointsBefore(40).pointsAfter(43)
@@ -54,7 +56,23 @@ class OlympiadMatchResultEventTest {
 
         OlympiadMatchResultEvent copy = original.toBuilder().build();
         assertEquals(original, copy);
+        assertEquals(CharacterClass.DUELIST, copy.getClazz());
+        assertEquals(CharacterClass.SAGITTARIUS, copy.getOpponentClazz());
         assertNotSame(original, copy);
+    }
+
+    @Test
+    void equals_shouldDistinguishClazz() {
+        assertNotEquals(
+                newBuilder().clazz(CharacterClass.DUELIST).build(),
+                newBuilder().clazz(CharacterClass.ADVENTURER).build());
+    }
+
+    @Test
+    void getClazz_shouldBeNull_whenLegacyNumericOnly() {
+        OlympiadMatchResultEvent event = newBuilder().build();
+        assertNull(event.getClazz());
+        assertNull(event.getOpponentClazz());
     }
 
     @Test
