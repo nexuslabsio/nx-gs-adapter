@@ -13,13 +13,15 @@ event shape plus its platform consumers.
 Three gaps in the bohpts event pipeline, each reproducing or extending behaviour
 that the legacy Telegram bot had:
 
-1. **Autofarm death** — players who leave a character fishing/farming unattended
+1. **Unattended death** — players who leave a character fishing/farming unattended
    want to know the moment that character dies, the way the legacy bot pinged
    them. Today the only "your character is in trouble" signal is the involuntary
    *disconnect* notification (`events.character`, `logout_reason=disconnect`);
-   an in-world death while autofarming produces no signal at all. bohpts-core
-   already tracks autofarm state (`l2e.gameserver.instancemanager.AutoFarmManager`)
-   but nothing leaves the JVM on death.
+   an in-world death while autofarming or on an auto-macro produces no signal at
+   all. bohpts-core already tracks both unattended modes (autofarm via
+   `Player.getFarmSystem().isAutofarming()`, auto-macro sessions via
+   `l2e.gameserver.instancemanager.AutoMacroManager`) but nothing leaves the JVM
+   on death.
 
 2. **Server lifecycle** — operators and players have no in-bot signal that a
    server came up or is going down. The platform only sees periodic population
@@ -47,7 +49,7 @@ bot), operators (server-status menu section), and platform-side consumers
 > per-record header, UUIDv7 idempotency, host-pushed `NxEvents.publish(...)` +
 > `EventTypeRegistry` binding pattern.
 
-### Milestone A — Autofarm death notification
+### Milestone A — Unattended-death notification (autofarm / auto-macro)
 
 **Must:**
 
@@ -62,10 +64,13 @@ bot), operators (server-status menu section), and platform-side consumers
       partition in occurrence order, identical to `CharacterPresenceEvent`.
     - `@Nullable Map<String,String> metadata` — open string→string map carrying
       killer info under the `WellKnownDeathMetadata` keys: `killer_type`
-      (a `WellKnownKillerTypes` value, R2) and `killer_id` (the killer's char
+      (a `WellKnownKillerTypes` value, R2), `killer_id` (the killer's char
       object-id for a `player` killer, or NPC template-id for a `monster`/`boss`
-      killer; absent for `self`). No killer name on the wire — the platform
-      resolves it from `killer_id` against its character / NPC catalogs.
+      killer; absent for `self`), and `farm_mode` (a `WellKnownFarmModes` value —
+      `autofarm` / `auto_macro` — classifying the unattended mode the character
+      was in; open string, absent when the host does not classify). No killer
+      name on the wire — the platform resolves it from `killer_id` against its
+      character / NPC catalogs.
 
   POJO + hand-written Builder + `equals`/`hashCode`/`toString` + Java-8 source,
   constructor parameter names preserved for Gson `-parameters` deserialization.
@@ -77,7 +82,9 @@ bot), operators (server-status menu section), and platform-side consumers
   consumers treat unknown values as opaque. Initial set:
   `MONSTER = "monster"`, `PLAYER = "player"`, `BOSS = "boss"`, `SELF = "self"`.
   Companion `WellKnownDeathMetadata` ships the `metadata` keys
-  `KILLER_TYPE = "killer_type"` / `KILLER_ID = "killer_id"`.
+  `KILLER_TYPE = "killer_type"` / `KILLER_ID = "killer_id"` /
+  `FARM_MODE = "farm_mode"`; companion `WellKnownFarmModes` ships the canonical
+  `farm_mode` values `AUTOFARM = "autofarm"` / `AUTO_MACRO = "auto_macro"`.
   Adding a constant is a non-breaking minor-version change.
 
 - [todo] R3. `nx-gs-adapter-core.events.EventTypeRegistry` MUST register
@@ -87,15 +94,18 @@ bot), operators (server-status menu section), and platform-side consumers
   through the existing generic `NxEvents.publish(Object)` — no new SPI method.
 
 - [todo] R4. `bohpts-core` MUST publish a `CharacterDeathEvent` from the player
-  death path **only when the dying character was on autofarm** at time of death
-  (gated on `AutoFarmManager`). Non-autofarm deaths emit nothing. A new
+  death path **only when the dying character was unattended** at time of death —
+  on autofarm (`Player.getFarmSystem().isAutofarming()`) or on an auto-macro
+  session (`AutoMacroManager.isMacroActive`). Attended deaths emit nothing. A new
   `l2e.gameserver.l2nx.events.character.CharacterDeathPublisher` is bound in
   `BohptsEventsModule.onConnect` / released in `onDisconnect`, alongside the
   existing `CharacterPresencePublisher`. Killer type + killer id are resolved on
   the game thread and written into `metadata` (`killer_type` from
   `WellKnownKillerTypes`; `killer_id` = char object-id for a player killer, NPC
-  template-id for a monster/boss killer). Any uncaught `Throwable` is logged at
-  DEBUG and swallowed (game-loop safety, identical to the other publishers).
+  template-id for a monster/boss killer), along with `farm_mode` classifying the
+  unattended mode (`autofarm` wins when both modes are active simultaneously).
+  Any uncaught `Throwable` is logged at DEBUG and swallowed (game-loop safety,
+  identical to the other publishers).
 
 - [todo] R5. `nx-gameservers` `CharacterPresenceEventConsumer` (topic
   `*.gs.events.character`) MUST dispatch on `Nx-Message-Type` and **skip**
@@ -115,8 +125,14 @@ bot), operators (server-status menu section), and platform-side consumers
     - The consumer resolves the killer NAME from `metadata.killer_id`:
       `killer_type=player` → char name via `CharacterRepository`; `monster`/`boss`
       → NPC name via the wiki npc-name resolver (per subscriber language, inside
-      the render function). `notifications.yml` ru + en templates; PvP/PvE line
-      when the killer resolves, HTML-escaped; bare "your character died" otherwise.
+      the render function). `notifications.yml` ru + en + uk templates; PvP/PvE
+      line when the killer resolves, HTML-escaped; killer-less generic otherwise.
+    - The message template is selected per `metadata.farm_mode`: `autofarm` /
+      `auto_macro` pick a mode-specific headline ("Character X died on
+      autofarm" / "…on auto-macro"); absent / unknown mode falls back to the
+      mode-less headline. The dying character's name rides in the headline (it
+      must survive the Telegram push preview), so the footer carries only the
+      server name.
 
 ### Milestone B — Server-status section & start/stop notifications
 
@@ -302,9 +318,9 @@ bot), operators (server-status menu section), and platform-side consumers
 - **Death location / coordinates.** Deliberately omitted from
   `CharacterDeathEvent` — the notification value is "your fishing character
   died", not where. Adding a location field later is a non-breaking change.
-- **Emitting non-autofarm deaths.** The adapter emits only autofarm deaths
-  (lowest volume, exact legacy-bot behaviour). Emitting all deaths with a flag
-  is a rejected alternative.
+- **Emitting attended deaths.** The adapter emits only unattended deaths
+  (autofarm / auto-macro; lowest volume, exact legacy-bot behaviour). Emitting
+  all deaths with a flag is a rejected alternative.
 - **New `/connect` families for death or server-status.** Both ride existing
   families (`character`, `serveronline`) as new message types — no `/connect`
   change. Only `ratings` is a new family.
@@ -344,8 +360,9 @@ bot), operators (server-status menu section), and platform-side consumers
 
 ## Open questions
 
-- [resolved: adapter emits only autofarm deaths — user confirmed; lowest volume,
-  matches legacy bot.]
+- [resolved: adapter emits only unattended deaths (autofarm / auto-macro,
+  classified by `metadata.farm_mode`) — user confirmed; lowest volume, matches
+  legacy bot.]
 - [resolved: death + server-status ride existing `character` / `serveronline`
   families as new message types; only `ratings` is a new family — user
   confirmed.]
@@ -392,5 +409,5 @@ bot), operators (server-status menu section), and platform-side consumers
 - nx-tenants `/connect`:
   `app.l2nx.tenants.api.rest.adapter.AdapterController.connect()`
 - Kafka topic runbooks: `nx-infra/komodo/l2nx/{prod,dev}-kafka/tenants/`
-</content>
-</invoke>
+  </content>
+  </invoke>

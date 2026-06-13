@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.character;
 
-import app.l2nx.gs.adapter.api.domain.character.CharacterClass;
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

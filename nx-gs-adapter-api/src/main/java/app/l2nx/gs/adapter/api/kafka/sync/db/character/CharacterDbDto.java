@@ -1,9 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.character;
 
-import app.l2nx.gs.adapter.api.domain.character.CharacterClass;
 import app.l2nx.gs.adapter.api.domain.character.CharacterPrivateStore;
 import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
 import app.l2nx.gs.adapter.api.domain.character.CharacterSex;
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;

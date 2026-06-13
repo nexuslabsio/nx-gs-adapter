@@ -216,24 +216,43 @@ predates the cycle.
 
 **Must:**
 
-- [done] R17. Two REST endpoints following the existing command-RPC
-  pattern (`ServerRequestScope` + `CommandsSender.sendAndAwait` with
+- [done] R17. REST surface, split by trigger kind (all share the
+  command-RPC pattern: `CommandsSender.sendAndAwait` with
   `partitionKey = null` + `gs_command_audits`; `Command` enum +=
-  `RESYNC_ENTITIES`, `RESYNC_ROWS`):
-    - `POST /gameservers/v1/commands/sync/resync-entities`
-      `{entities?: string[]}` → creates a resync operation, sends
-      `ResyncEntitiesCommand`, returns `202 {operationId}` on ack.
-    - `POST /gameservers/v1/commands/sync/resync-rows`
-      `{entityName, pks: long[], cascade: boolean}` → same flow.
-    - `GET /gameservers/v1/sync/resync-operations/{id}` → operation status
-      with per-entity progress. Lives under `/sync/…`, not `/commands/…` —
-      intentional: it reads an operation resource, not a command audit.
-      On command timeout / infra error the POST maps through the existing
-      handler (504 / 502 `ProblemDetail`) **extended with the `operationId`
-      property** so the operator can find the FAILED operation.
-      Permissions: `SYNC_RESYNC` for the POSTs, `SYNC_READ` for the GET,
-      plus `SYNC_ALL` — seeded in nx-users `v1.2.1_permissions_seed.sql` with
-      `ON CONFLICT (name) DO NOTHING`.
+  `RESYNC_ENTITIES`, `RESYNC_ROWS`). On command timeout / infra error every
+  POST maps through the existing handler (504 / 502 `ProblemDetail`)
+  **extended with the `operationId` property** so the operator can find the
+  FAILED operation.
+    - **Full resync — internal (ops) surface.** Full-entity resync is an
+      operator/maintenance action, not an admin-UI action, so its trigger
+      lives on the network-isolated internal subtree
+      (`/gameservers/v1/internal/**` — JWT-bypassed via
+      `COMMON_UNAUTHORIZED_PATHS`, reachable only inside the docker network /
+      nginx ACL, no permission check). Path-scoped (no JWT to carry tenant
+      context): `POST /gameservers/v1/internal/tenants/{tenantSlug}/servers/{serverSlug}/resync`
+      `{entities?: string[]}` (null/empty = all) → creates a resync
+      operation, sends `ResyncEntitiesCommand`, returns `202 {operationId}`
+      on ack. `GET /gameservers/v1/internal/tenants/{tenantSlug}/servers/{serverSlug}/resync-operations/{id}`
+      → operation status (no permission — ops surface). Tenant/server
+      resolved from path slugs via `TenantReader`
+      (`ServerRequestScope.resolveOrThrow(tenantSlug, serverSlug)` overload).
+    - **Row resync — admin (JWT) surface.** Targeted PK repair stays a
+      day-to-day admin-UI action:
+      `POST /gameservers/v1/commands/sync/resync-rows`
+      `{entityName, pks: long[], cascade: boolean}` → `202 {operationId}`,
+      gated by `SYNC_RESYNC`, scoped by the `Server-Slug` / `App-Slug`
+      headers (`ServerRequestScope.resolveOrThrow()`).
+    - **Status read — admin (JWT) surface.**
+      `GET /gameservers/v1/sync/resync-operations/{id}` → operation status
+      with per-entity progress, gated by `SYNC_READ`. Lives under `/sync/…`,
+      not `/commands/…` — it reads an operation resource, not a command
+      audit. (The internal status GET above is the no-JWT counterpart for
+      ops scripts driving a full resync.)
+    - Permissions `SYNC_RESYNC` (row trigger) + `SYNC_READ` (admin status)
+        + `SYNC_ALL` seeded in nx-users `v1.2.1_permissions_seed.sql` with
+          `ON CONFLICT (name) DO NOTHING`. The internal full-resync trigger
+          carries no permission — gated by network isolation, the platform
+          convention for `internal/**`.
 
 - [done] R18. Operation tracking tables (one Liquibase file; name must
   sort after `v2.9.3` under the bare `includeAll` alpha-sort — e.g.

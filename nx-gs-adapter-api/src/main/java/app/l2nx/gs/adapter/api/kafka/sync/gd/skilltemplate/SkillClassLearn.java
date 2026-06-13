@@ -1,52 +1,45 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
 
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 
 /**
- * One class→skill learn entry of a {@link SkillTemplate} — a playable character class that learns
- * this skill, with the level at which it is acquired and its SP cost. Built by inverting the host's
- * per-class skill trees into a per-skill list, so a skill page can show "which classes learn this".
+ * One class→skill learn entry of a {@link SkillTemplate} — a playable class that learns this skill,
+ * with the level at which it is acquired and its SP cost. Built by inverting the host's per-class
+ * skill trees into a per-skill list, so a skill page can show "which classes learn this".
  *
- * <p>{@code classId} (the host's numeric class id) is the non-null identity. {@code className} is the
- * canonical UPPER_SNAKE class token (the host enum name) for display without a id→name lookup;
- * localized class names are resolved consumer-side. {@code requiredLevel} is the character level
- * required to learn, {@code learnSp} the SP cost. {@code autoLearned} marks skills granted
- * automatically on level-up; {@code learnedByNpc} marks skills taught by a trainer NPC.</p>
+ * <p>{@code clazz} (the canonical {@link CharacterClass} token) is the class identity — no
+ * source-side numeric id. {@code requiredLevel} is the character level required to learn,
+ * {@code learnSp} the SP cost. {@code autoLearned} marks skills granted automatically on level-up;
+ * {@code learnedByNpc} marks skills taught by a trainer NPC.</p>
  */
 public final class SkillClassLearn {
 
-    private final int classId;
-    private final @Nullable String className;
+    private final @Nullable CharacterClass clazz;
     private final @Nullable Integer requiredLevel;
     private final @Nullable Long learnSp;
     private final @Nullable Boolean autoLearned;
     private final @Nullable Boolean learnedByNpc;
 
-    public SkillClassLearn(int classId,
-                           @Nullable String className,
+    public SkillClassLearn(@Nullable CharacterClass clazz,
                            @Nullable Integer requiredLevel,
                            @Nullable Long learnSp,
                            @Nullable Boolean autoLearned,
                            @Nullable Boolean learnedByNpc) {
-        this.classId = classId;
-        this.className = className;
+        this.clazz = clazz;
         this.requiredLevel = requiredLevel;
         this.learnSp = learnSp;
         this.autoLearned = autoLearned;
         this.learnedByNpc = learnedByNpc;
     }
 
-    public int getClassId() {
-        return classId;
-    }
-
     /**
-     * Canonical UPPER_SNAKE class token (host class-enum name); {@code null} if not resolvable.
+     * Canonical class that learns the skill; non-null for a playable class.
      */
-    public @Nullable String getClassName() {
-        return className;
+    public @Nullable CharacterClass getClazz() {
+        return clazz;
     }
 
     /**
@@ -79,8 +72,7 @@ public final class SkillClassLearn {
 
     public Builder toBuilder() {
         return new Builder()
-                .classId(classId)
-                .className(className)
+                .clazz(clazz)
                 .requiredLevel(requiredLevel)
                 .learnSp(learnSp)
                 .autoLearned(autoLearned)
@@ -96,8 +88,7 @@ public final class SkillClassLearn {
         if (this == o) return true;
         if (!(o instanceof SkillClassLearn)) return false;
         SkillClassLearn that = (SkillClassLearn) o;
-        return classId == that.classId
-                && Objects.equals(className, that.className)
+        return clazz == that.clazz
                 && Objects.equals(requiredLevel, that.requiredLevel)
                 && Objects.equals(learnSp, that.learnSp)
                 && Objects.equals(autoLearned, that.autoLearned)
@@ -106,30 +97,23 @@ public final class SkillClassLearn {
 
     @Override
     public int hashCode() {
-        return Objects.hash(classId, className, requiredLevel, learnSp, autoLearned, learnedByNpc);
+        return Objects.hash(clazz, requiredLevel, learnSp, autoLearned, learnedByNpc);
     }
 
     @Override
     public String toString() {
-        return "SkillClassLearn[classId=" + classId + ", className=" + className
-                + ", requiredLevel=" + requiredLevel + "]";
+        return "SkillClassLearn[clazz=" + clazz + ", requiredLevel=" + requiredLevel + "]";
     }
 
     public static final class Builder {
-        private int classId;
-        private @Nullable String className;
+        private @Nullable CharacterClass clazz;
         private @Nullable Integer requiredLevel;
         private @Nullable Long learnSp;
         private @Nullable Boolean autoLearned;
         private @Nullable Boolean learnedByNpc;
 
-        public Builder classId(int classId) {
-            this.classId = classId;
-            return this;
-        }
-
-        public Builder className(@Nullable String className) {
-            this.className = className;
+        public Builder clazz(@Nullable CharacterClass clazz) {
+            this.clazz = clazz;
             return this;
         }
 
@@ -154,8 +138,7 @@ public final class SkillClassLearn {
         }
 
         public SkillClassLearn build() {
-            return new SkillClassLearn(classId, className, requiredLevel, learnSp, autoLearned,
-                    learnedByNpc);
+            return new SkillClassLearn(clazz, requiredLevel, learnSp, autoLearned, learnedByNpc);
         }
     }
 }
