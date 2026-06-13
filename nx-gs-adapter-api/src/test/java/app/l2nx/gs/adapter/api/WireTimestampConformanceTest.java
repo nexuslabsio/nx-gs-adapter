@@ -88,7 +88,9 @@ class WireTimestampConformanceTest {
 
     private static void checkClass(Path classesRoot, Path classFile, List<String> violations) {
         String relPath = classesRoot.relativize(classFile).toString().replace('\\', '/');
-        String className = relPath.replace('/', '.').replace(".class", "");
+        // Strip only the trailing ".class" extension — a plain replace(".class","") would also
+        // mangle package segments containing that substring (e.g. gd/classtemplate).
+        String className = relPath.substring(0, relPath.length() - ".class".length()).replace('/', '.');
         Class<?> clazz;
         try {
             clazz = Class.forName(className, false, WireTimestampConformanceTest.class.getClassLoader());
