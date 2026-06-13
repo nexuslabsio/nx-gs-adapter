@@ -64,9 +64,9 @@ public final class NxAdapter {
      */
     private static final AtomicBoolean wasActive = new AtomicBoolean(false);
     private static final Object transitionLock = new Object();
+    private static final Object shutdownLock = new Object();
     private static volatile Consumer<AdapterState> stateCallback;
     private static final NxAdapter INSTANCE = new NxAdapter();
-
     private static volatile ScheduledExecutorService connectScheduler;
     private static volatile ScheduledExecutorService heartbeatScheduler;
     private static volatile HeartbeatService heartbeatService;
@@ -74,19 +74,12 @@ public final class NxAdapter {
     private static volatile String adapterVersion;
     private static volatile Thread shutdownHook;
     private static volatile KafkaFactory kafkaFactoryOverride;
-    // Test-only: forces startEventsPublisher to throw, simulating a host-classpath
-    // linkage failure (e.g. adapter-api/adapter-core version skew) so the regression
-    // test can assert sync-module discovery survives an events-bootstrap fault.
     private static volatile boolean failEventsBootstrapForTesting;
     private static volatile EventsPublisher eventsPublisher;
     private static volatile EventsConfig eventsConfig;
     private static volatile CommandsConsumer commandsConsumer;
     private static volatile CommandsConfig commandsConfig;
-    // Adapter-owned bounded pool for handler/module IO (JDBC/HTTP); never use
-    // ForkJoinPool.commonPool — host JVM may share it.
     private static volatile ExecutorService ioExecutor;
-    // Stable cross-reconnect façades — underlying publisher/consumer is swapped
-    // on every handshake, captured references keep working.
     private static volatile NxEvents eventsFacade;
     private static volatile NxCommands commandsFacade;
     private static volatile NxSyncImpl syncFacade;
@@ -206,8 +199,21 @@ public final class NxAdapter {
      * Idempotent shutdown — cancel heartbeat, cancel connect scheduler, shut down the
      * Kafka client if alive, and transition to {@link AdapterState#CLOSED}. Safe to call
      * from any thread; safe to call repeatedly.
+     *
+     * <p>Blocking-idempotent: a concurrent second caller does not return early — it
+     * waits until the in-flight shutdown completes. This lets a host drive shutdown
+     * synchronously before a hard {@code Runtime.halt()} (which skips the
+     * auto-registered JVM hook) and rely on the event queue being drained and the
+     * Kafka producer flushed by the time this returns, even if the auto hook is
+     * running the shutdown on another thread.</p>
      */
     public void shutdown() {
+        synchronized (shutdownLock) {
+            shutdownLocked();
+        }
+    }
+
+    private void shutdownLocked() {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
