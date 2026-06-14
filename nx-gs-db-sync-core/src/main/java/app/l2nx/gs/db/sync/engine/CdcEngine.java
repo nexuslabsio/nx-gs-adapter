@@ -290,6 +290,7 @@ public final class CdcEngine {
             handle.cancel(false);
         }
         futures.clear();
+        boolean terminated = true;
         ScheduledThreadPoolExecutor pool = scheduler;
         if (pool != null) {
             pool.shutdownNow();
@@ -302,11 +303,12 @@ public final class CdcEngine {
                 }
             }
             try {
-                boolean terminated = pool.awaitTermination(2L, TimeUnit.SECONDS);
+                terminated = pool.awaitTermination(2L, TimeUnit.SECONDS);
                 if (!terminated) {
                     log.warn("CdcEngine pool did not terminate within 2s — daemon threads will exit on JVM shutdown");
                 }
             } catch (InterruptedException ie) {
+                terminated = false;
                 Thread.currentThread().interrupt();
             }
         }
@@ -314,11 +316,21 @@ public final class CdcEngine {
         tasks.clear();
         slotsByEntity.clear();
         resyncCoordinator.clear();
-        try {
-            persistence.flushAll(snapshot);
-        } catch (Throwable t) {
-            log.warn("SnapshotPersistence.flushAll threw {}: {} — shutdown continues",
-                    t.getClass().getName(), t.getMessage());
+        // Persist only when every cycle thread has actually stopped. A flush that
+        // races a still-running cycle traverses an entity's Long2IntOpenHashMap
+        // while that thread mutates it (the snapshot single-writer invariant) —
+        // fastutil UB. A stale-but-intact prior checkpoint beats a snapshot
+        // written under that race.
+        if (terminated) {
+            try {
+                persistence.flushAll(snapshot);
+            } catch (Throwable t) {
+                log.warn("SnapshotPersistence.flushAll threw {}: {} — shutdown continues",
+                        t.getClass().getName(), t.getMessage());
+            }
+        } else {
+            log.warn("CdcEngine skipping final snapshot flush — a cycle thread is still running; "
+                    + "freshest state not persisted, prior checkpoint retained");
         }
         try {
             persistence.close();
