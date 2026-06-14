@@ -3,6 +3,9 @@ package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -12,27 +15,37 @@ import java.util.Objects;
  *
  * <p>{@code clazz} (the canonical {@link CharacterClass} token) is the class identity — no
  * source-side numeric id. {@code requiredLevel} is the character level required to learn,
- * {@code learnSp} the SP cost. {@code autoLearned} marks skills granted automatically on level-up;
- * {@code learnedByNpc} marks skills taught by a trainer NPC.</p>
+ * {@code learnSp} the SP cost, {@code skillLevel} the skill's own level granted by this entry.
+ * {@code autoLearn} marks skills granted automatically on level-up; {@code learnedByNpc} marks
+ * skills taught by a trainer NPC. {@code requiredItems} lists the items consumed to learn the
+ * skill at this entry.</p>
  */
 public final class SkillClassLearn {
 
     private final @Nullable CharacterClass clazz;
     private final @Nullable Integer requiredLevel;
     private final @Nullable Long learnSp;
-    private final @Nullable Boolean autoLearned;
+    private final @Nullable Boolean autoLearn;
     private final @Nullable Boolean learnedByNpc;
+    private final @Nullable Integer skillLevel;
+    private final @Nullable List<SkillLearnItem> requiredItems;
 
     public SkillClassLearn(@Nullable CharacterClass clazz,
                            @Nullable Integer requiredLevel,
                            @Nullable Long learnSp,
-                           @Nullable Boolean autoLearned,
-                           @Nullable Boolean learnedByNpc) {
+                           @Nullable Boolean autoLearn,
+                           @Nullable Boolean learnedByNpc,
+                           @Nullable Integer skillLevel,
+                           @Nullable List<SkillLearnItem> requiredItems) {
         this.clazz = clazz;
         this.requiredLevel = requiredLevel;
         this.learnSp = learnSp;
-        this.autoLearned = autoLearned;
+        this.autoLearn = autoLearn;
         this.learnedByNpc = learnedByNpc;
+        this.skillLevel = skillLevel;
+        this.requiredItems = requiredItems == null
+                ? null
+                : Collections.unmodifiableList(new ArrayList<SkillLearnItem>(requiredItems));
     }
 
     /**
@@ -59,8 +72,8 @@ public final class SkillClassLearn {
     /**
      * Whether the class receives this skill automatically on reaching {@code requiredLevel}.
      */
-    public @Nullable Boolean getAutoLearned() {
-        return autoLearned;
+    public @Nullable Boolean getAutoLearn() {
+        return autoLearn;
     }
 
     /**
@@ -70,13 +83,29 @@ public final class SkillClassLearn {
         return learnedByNpc;
     }
 
+    /**
+     * The skill level this acquisition entry grants (the skill's own level, e.g. Lv.2).
+     */
+    public @Nullable Integer getSkillLevel() {
+        return skillLevel;
+    }
+
+    /**
+     * Items consumed to learn the skill at this entry; {@code null}/empty = no item cost.
+     */
+    public @Nullable List<SkillLearnItem> getRequiredItems() {
+        return requiredItems;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .clazz(clazz)
                 .requiredLevel(requiredLevel)
                 .learnSp(learnSp)
-                .autoLearned(autoLearned)
-                .learnedByNpc(learnedByNpc);
+                .autoLearn(autoLearn)
+                .learnedByNpc(learnedByNpc)
+                .skillLevel(skillLevel)
+                .requiredItems(requiredItems);
     }
 
     public static Builder builder() {
@@ -91,13 +120,15 @@ public final class SkillClassLearn {
         return clazz == that.clazz
                 && Objects.equals(requiredLevel, that.requiredLevel)
                 && Objects.equals(learnSp, that.learnSp)
-                && Objects.equals(autoLearned, that.autoLearned)
-                && Objects.equals(learnedByNpc, that.learnedByNpc);
+                && Objects.equals(autoLearn, that.autoLearn)
+                && Objects.equals(learnedByNpc, that.learnedByNpc)
+                && Objects.equals(skillLevel, that.skillLevel)
+                && Objects.equals(requiredItems, that.requiredItems);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(clazz, requiredLevel, learnSp, autoLearned, learnedByNpc);
+        return Objects.hash(clazz, requiredLevel, learnSp, autoLearn, learnedByNpc, skillLevel, requiredItems);
     }
 
     @Override
@@ -109,8 +140,10 @@ public final class SkillClassLearn {
         private @Nullable CharacterClass clazz;
         private @Nullable Integer requiredLevel;
         private @Nullable Long learnSp;
-        private @Nullable Boolean autoLearned;
+        private @Nullable Boolean autoLearn;
         private @Nullable Boolean learnedByNpc;
+        private @Nullable Integer skillLevel;
+        private @Nullable List<SkillLearnItem> requiredItems;
 
         public Builder clazz(@Nullable CharacterClass clazz) {
             this.clazz = clazz;
@@ -127,8 +160,8 @@ public final class SkillClassLearn {
             return this;
         }
 
-        public Builder autoLearned(@Nullable Boolean autoLearned) {
-            this.autoLearned = autoLearned;
+        public Builder autoLearn(@Nullable Boolean autoLearn) {
+            this.autoLearn = autoLearn;
             return this;
         }
 
@@ -137,8 +170,18 @@ public final class SkillClassLearn {
             return this;
         }
 
+        public Builder skillLevel(@Nullable Integer skillLevel) {
+            this.skillLevel = skillLevel;
+            return this;
+        }
+
+        public Builder requiredItems(@Nullable List<SkillLearnItem> requiredItems) {
+            this.requiredItems = requiredItems;
+            return this;
+        }
+
         public SkillClassLearn build() {
-            return new SkillClassLearn(clazz, requiredLevel, learnSp, autoLearned, learnedByNpc);
+            return new SkillClassLearn(clazz, requiredLevel, learnSp, autoLearn, learnedByNpc, skillLevel, requiredItems);
         }
     }
 }
