@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import org.jspecify.annotations.Nullable;
 
@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * One cast precondition of a {@link SkillTemplate} — the build-agnostic projection of a
+ * One cast precondition of a {@link Skill} — the build-agnostic projection of a
  * core condition node ({@code <cond>} subtrees in L2J-family datapacks): "requires a
  * blunt weapon", "target must be undead", "caster level ≥ N", and so on.
  *

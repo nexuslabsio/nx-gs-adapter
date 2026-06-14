@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import org.jspecify.annotations.Nullable;
 

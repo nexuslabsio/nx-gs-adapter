@@ -1,13 +1,8 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * One effect a {@link SkillLevel} applies — the build-agnostic projection of a core

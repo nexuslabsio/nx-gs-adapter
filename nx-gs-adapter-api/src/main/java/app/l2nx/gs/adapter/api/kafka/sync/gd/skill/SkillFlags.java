@@ -1,11 +1,11 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 
 /**
- * Cohesive cluster of a {@link SkillTemplate}'s boolean classification flags — "what kind of
+ * Cohesive cluster of a {@link Skill}'s boolean classification flags — "what kind of
  * skill is this". Grouped (the same way {@code ItemRestrictions} groups an item's
  * permission flags) so the header surface is one object instead of a scatter of
  * booleans; the consumer unwraps it flat into queryable columns.

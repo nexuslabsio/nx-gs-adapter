@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate.SkillTemplate;
+import app.l2nx.gs.adapter.api.kafka.sync.gd.skill.Skill;
 
 import java.util.Collection;
 
@@ -11,7 +11,7 @@ import java.util.Collection;
  *
  * <p>The host implements this over its already-parsed in-memory skill catalog (e.g. an
  * L2J/Lucera {@code SkillsParser}), grouping the core's per-level skill objects by
- * {@code skillId} into the build-agnostic {@link SkillTemplate} aggregate (base level ladder +
+ * {@code skillId} into the build-agnostic {@link Skill} aggregate (base level ladder +
  * enchant-route variants + per-level effects). Discovered via
  * {@link java.util.ServiceLoader} exactly like {@code ItemTemplateProvider}; the
  * {@code gd-sync} module pulls a fresh {@link #snapshot()} on connect and whenever the
@@ -21,10 +21,10 @@ import java.util.Collection;
  * loaded) and SHOULD be cheap to call repeatedly — the module owns
  * snapshot/diff/publish; the provider only yields the current skill set.</p>
  */
-public interface SkillTemplateProvider {
+public interface SkillProvider {
 
     /**
-     * The gd-sync entity name this provider feeds — currently always {@code "skilltemplate"}.
+     * The gd-sync entity name this provider feeds — {@code "skill"}.
      * Used to resolve the Kafka topic from {@code ctx.getSyncTopics().getGd()} and to
      * tag the wire envelope.
      */
@@ -35,5 +35,5 @@ public interface SkillTemplateProvider {
      * one shot; the module keys, diffs and publishes them. Never {@code null} (empty is
      * valid).
      */
-    Collection<SkillTemplate> snapshot();
+    Collection<Skill> snapshot();
 }

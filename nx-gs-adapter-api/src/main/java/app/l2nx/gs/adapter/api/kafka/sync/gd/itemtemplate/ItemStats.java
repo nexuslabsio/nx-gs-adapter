@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate;
 
-import app.l2nx.gs.adapter.api.domain.item.ItemStat;
+import app.l2nx.gs.adapter.api.domain.stat.Stat;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
@@ -15,7 +15,7 @@ import java.util.Objects;
  * <p>{@link #getStats()} is the single home for every stat value — combat numbers,
  * elemental power/resist, base-stat bonuses, and weapon mechanics (soulshot/spiritshot
  * count, MP-per-attack, random damage, attack range) — keyed by the canonical
- * {@link ItemStat} token name. {@code magicWeapon} is the only stat datum kept out of the
+ * {@link Stat} token name. {@code magicWeapon} is the only stat datum kept out of the
  * map (it is a boolean, not a magnitude).</p>
  */
 public final class ItemStats {
@@ -34,10 +34,10 @@ public final class ItemStats {
     }
 
     /**
-     * Every stat the item carries, keyed by the canonical {@link ItemStat} token name
+     * Every stat the item carries, keyed by the canonical {@link Stat} token name
      * (e.g. {@code P_ATK}, {@code MAX_HP}, {@code FIRE_RES}, {@code SOULSHOT_COUNT}).
      * {@code null} when the item carries no stats. The producer maps its build-specific
-     * stat representation onto {@link ItemStat} tokens; unmappable stats are dropped so
+     * stat representation onto {@link Stat} tokens; unmappable stats are dropped so
      * the key set stays within the closed vocabulary.
      */
     public @Nullable Map<String, Double> getStats() {

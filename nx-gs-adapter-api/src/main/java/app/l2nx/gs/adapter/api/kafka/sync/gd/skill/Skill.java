@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import org.jspecify.annotations.Nullable;
 
@@ -14,7 +14,7 @@ import java.util.Objects;
  * that maps its core's internal skill representation into this shape; nothing here
  * names a specific core.
  *
- * <p>One {@code SkillTemplate} is the whole aggregate for a {@code skillId}: the level-invariant
+ * <p>One {@code Skill} is the whole aggregate for a {@code skillId}: the level-invariant
  * header plus the nested level ladder ({@link #getLevels()}) and enchant-route variants
  * ({@link #getEnchantRoutes()}). The consumer upserts the parent and replaces its
  * children atomically.</p>
@@ -24,21 +24,24 @@ import java.util.Objects;
  * supply it" rather than a fabricated default.</p>
  *
  * <p><b>Vocabulary:</b> {@code operateType} / {@code skillType} / {@code targetType} /
- * {@code trait} / {@code attribute} / {@code abnormalType} / {@code saveVs} are open
- * canonical L2 strings (the value sets are large and fork-variable; the provider emits
- * the core's enum name / attribute name, not a JVM ordinal). Boolean classification
- * flags are grouped in {@link #getFlags()} ({@link SkillFlags}), unwrapped flat into
- * columns by the consumer.</p>
+ * {@code trait} / {@code abnormalType} / {@code saveVs} are open canonical L2 strings
+ * (the value sets are large and fork-variable; the provider emits the core's enum name,
+ * not a JVM ordinal). Boolean classification flags are grouped in {@link #getFlags()}
+ * ({@link SkillFlags}), unwrapped flat into columns by the consumer.</p>
+ *
+ * <p><b>Attribute:</b> the offensive element ({@code FIRE}/{@code WATER}/…) and its
+ * power are per-resolve-node, not per-aggregate header. They live on each
+ * {@link SkillLevel} and {@link SkillEnchantRoute} so enchant routes that add an
+ * element (e.g. "+3 Fire Attack") can carry their own attribute independently of the
+ * base levels.</p>
  */
-public final class SkillTemplate {
+public final class Skill {
 
     private final int id;
     private final @Nullable String operateType;
     private final @Nullable String skillType;
     private final @Nullable String targetType;
     private final @Nullable String trait;
-    private final @Nullable String attribute;
-    private final @Nullable Integer attributePower;
     private final @Nullable String abnormalType;
     private final @Nullable List<String> abnormalVisualEffects;
     private final @Nullable String saveVs;
@@ -56,36 +59,32 @@ public final class SkillTemplate {
     private final @Nullable List<SkillEnchantRoute> enchantRoutes;
     private final @Nullable List<SkillClassLearn> classes;
 
-    public SkillTemplate(int id,
-                         @Nullable String operateType,
-                         @Nullable String skillType,
-                         @Nullable String targetType,
-                         @Nullable String trait,
-                         @Nullable String attribute,
-                         @Nullable Integer attributePower,
-                         @Nullable String abnormalType,
-                         @Nullable List<String> abnormalVisualEffects,
-                         @Nullable String saveVs,
-                         @Nullable Integer sharedReuseGroup,
-                         @Nullable Integer minPledgeClass,
-                         @Nullable Integer triggeredSkillId,
-                         @Nullable Integer triggeredSkillLevel,
-                         @Nullable String triggeredChanceType,
-                         @Nullable Integer triggeredChancePercent,
-                         @Nullable String icon,
-                         @Nullable Integer maxLevel,
-                         @Nullable SkillFlags flags,
-                         @Nullable List<SkillCondition> conditions,
-                         @Nullable List<SkillLevel> levels,
-                         @Nullable List<SkillEnchantRoute> enchantRoutes,
-                         @Nullable List<SkillClassLearn> classes) {
+    public Skill(int id,
+                 @Nullable String operateType,
+                 @Nullable String skillType,
+                 @Nullable String targetType,
+                 @Nullable String trait,
+                 @Nullable String abnormalType,
+                 @Nullable List<String> abnormalVisualEffects,
+                 @Nullable String saveVs,
+                 @Nullable Integer sharedReuseGroup,
+                 @Nullable Integer minPledgeClass,
+                 @Nullable Integer triggeredSkillId,
+                 @Nullable Integer triggeredSkillLevel,
+                 @Nullable String triggeredChanceType,
+                 @Nullable Integer triggeredChancePercent,
+                 @Nullable String icon,
+                 @Nullable Integer maxLevel,
+                 @Nullable SkillFlags flags,
+                 @Nullable List<SkillCondition> conditions,
+                 @Nullable List<SkillLevel> levels,
+                 @Nullable List<SkillEnchantRoute> enchantRoutes,
+                 @Nullable List<SkillClassLearn> classes) {
         this.id = id;
         this.operateType = operateType;
         this.skillType = skillType;
         this.targetType = targetType;
         this.trait = trait;
-        this.attribute = attribute;
-        this.attributePower = attributePower;
         this.abnormalType = abnormalType;
         this.abnormalVisualEffects = abnormalVisualEffects == null ? null
                 : Collections.unmodifiableList(new ArrayList<String>(abnormalVisualEffects));
@@ -122,7 +121,7 @@ public final class SkillTemplate {
     }
 
     /**
-     * SkillTemplate type (e.g. {@code PDAM}, {@code BUFF}, {@code DEBUFF}, {@code HEAL}).
+     * Skill type (e.g. {@code PDAM}, {@code BUFF}, {@code DEBUFF}, {@code HEAL}).
      */
     public @Nullable String getSkillType() {
         return skillType;
@@ -140,18 +139,6 @@ public final class SkillTemplate {
      */
     public @Nullable String getTrait() {
         return trait;
-    }
-
-    /**
-     * Attack attribute name ({@code FIRE}/{@code WATER}/{@code WIND}/{@code EARTH}/
-     * {@code HOLY}/{@code DARK}); {@code null} when the skill has no attribute.
-     */
-    public @Nullable String getAttribute() {
-        return attribute;
-    }
-
-    public @Nullable Integer getAttributePower() {
-        return attributePower;
     }
 
     /**
@@ -281,8 +268,6 @@ public final class SkillTemplate {
                 .skillType(skillType)
                 .targetType(targetType)
                 .trait(trait)
-                .attribute(attribute)
-                .attributePower(attributePower)
                 .abnormalType(abnormalType)
                 .abnormalVisualEffects(abnormalVisualEffects)
                 .saveVs(saveVs)
@@ -308,15 +293,13 @@ public final class SkillTemplate {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof SkillTemplate)) return false;
-        SkillTemplate that = (SkillTemplate) o;
+        if (!(o instanceof Skill)) return false;
+        Skill that = (Skill) o;
         return id == that.id
                 && Objects.equals(operateType, that.operateType)
                 && Objects.equals(skillType, that.skillType)
                 && Objects.equals(targetType, that.targetType)
                 && Objects.equals(trait, that.trait)
-                && Objects.equals(attribute, that.attribute)
-                && Objects.equals(attributePower, that.attributePower)
                 && Objects.equals(abnormalType, that.abnormalType)
                 && Objects.equals(abnormalVisualEffects, that.abnormalVisualEffects)
                 && Objects.equals(saveVs, that.saveVs)
@@ -337,8 +320,8 @@ public final class SkillTemplate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, operateType, skillType, targetType, trait, attribute,
-                attributePower, abnormalType, abnormalVisualEffects, saveVs, sharedReuseGroup,
+        return Objects.hash(id, operateType, skillType, targetType, trait,
+                abnormalType, abnormalVisualEffects, saveVs, sharedReuseGroup,
                 minPledgeClass, triggeredSkillId, triggeredSkillLevel, triggeredChanceType,
                 triggeredChancePercent, icon, maxLevel, flags, conditions, levels, enchantRoutes,
                 classes);
@@ -346,7 +329,7 @@ public final class SkillTemplate {
 
     @Override
     public String toString() {
-        return "SkillTemplate[id=" + id + ", skillType=" + skillType + ", maxLevel=" + maxLevel + "]";
+        return "Skill[id=" + id + ", skillType=" + skillType + ", maxLevel=" + maxLevel + "]";
     }
 
     public static final class Builder {
@@ -355,8 +338,6 @@ public final class SkillTemplate {
         private @Nullable String skillType;
         private @Nullable String targetType;
         private @Nullable String trait;
-        private @Nullable String attribute;
-        private @Nullable Integer attributePower;
         private @Nullable String abnormalType;
         private @Nullable List<String> abnormalVisualEffects;
         private @Nullable String saveVs;
@@ -396,16 +377,6 @@ public final class SkillTemplate {
 
         public Builder trait(@Nullable String trait) {
             this.trait = trait;
-            return this;
-        }
-
-        public Builder attribute(@Nullable String attribute) {
-            this.attribute = attribute;
-            return this;
-        }
-
-        public Builder attributePower(@Nullable Integer attributePower) {
-            this.attributePower = attributePower;
             return this;
         }
 
@@ -489,9 +460,9 @@ public final class SkillTemplate {
             return this;
         }
 
-        public SkillTemplate build() {
-            return new SkillTemplate(id, operateType, skillType, targetType, trait, attribute,
-                    attributePower, abnormalType, abnormalVisualEffects, saveVs, sharedReuseGroup,
+        public Skill build() {
+            return new Skill(id, operateType, skillType, targetType, trait,
+                    abnormalType, abnormalVisualEffects, saveVs, sharedReuseGroup,
                     minPledgeClass, triggeredSkillId, triggeredSkillLevel, triggeredChanceType,
                     triggeredChancePercent, icon, maxLevel, flags, conditions, levels,
                     enchantRoutes, classes);

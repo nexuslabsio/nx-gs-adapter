@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import org.jspecify.annotations.Nullable;
 
@@ -8,28 +8,28 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * One product group of an extractable {@link SkillLevel} — skills that open / convert an
- * item into other items (capsules, event boxes, lottery-style extractors) roll one of
- * several product groups; the rolled group grants all of its {@link SkillExtractItem}
+ * One produced item group of an extractable {@link SkillLevel} — skills that open /
+ * convert an item into other items (capsules, event boxes, lottery-style extractors)
+ * roll one of several groups; the rolled group grants all of its {@link SkillProducedItem}
  * entries together.
  *
  * <p>{@code chancePercent} is the group's roll chance; {@code enchantLevel} is the
- * enchant applied to the granted items ({@code null} when none). {@code items} is the
- * non-null granted bundle (≥1 entry).</p>
+ * enchant applied to the produced items ({@code null} when none). {@code items} is the
+ * non-null produced bundle (≥1 entry).</p>
  */
-public final class SkillExtractProduct {
+public final class SkillProducedItemGroup {
 
     private final @Nullable Double chancePercent;
     private final @Nullable Integer enchantLevel;
-    private final List<SkillExtractItem> items;
+    private final List<SkillProducedItem> items;
 
-    public SkillExtractProduct(@Nullable Double chancePercent,
-                               @Nullable Integer enchantLevel,
-                               List<SkillExtractItem> items) {
+    public SkillProducedItemGroup(@Nullable Double chancePercent,
+                                  @Nullable Integer enchantLevel,
+                                  List<SkillProducedItem> items) {
         this.chancePercent = chancePercent;
         this.enchantLevel = enchantLevel;
         this.items = Collections.unmodifiableList(
-                new ArrayList<SkillExtractItem>(Objects.requireNonNull(items, "items")));
+                new ArrayList<SkillProducedItem>(Objects.requireNonNull(items, "items")));
     }
 
     public @Nullable Double getChancePercent() {
@@ -37,16 +37,16 @@ public final class SkillExtractProduct {
     }
 
     /**
-     * Enchant level applied to the granted items; {@code null} when none.
+     * Enchant level applied to the produced items; {@code null} when none.
      */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }
 
     /**
-     * Items granted together when this group is rolled.
+     * Items produced together when this group is rolled.
      */
-    public List<SkillExtractItem> getItems() {
+    public List<SkillProducedItem> getItems() {
         return items;
     }
 
@@ -64,8 +64,8 @@ public final class SkillExtractProduct {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof SkillExtractProduct)) return false;
-        SkillExtractProduct that = (SkillExtractProduct) o;
+        if (!(o instanceof SkillProducedItemGroup)) return false;
+        SkillProducedItemGroup that = (SkillProducedItemGroup) o;
         return Objects.equals(chancePercent, that.chancePercent)
                 && Objects.equals(enchantLevel, that.enchantLevel)
                 && Objects.equals(items, that.items);
@@ -78,14 +78,14 @@ public final class SkillExtractProduct {
 
     @Override
     public String toString() {
-        return "SkillExtractProduct[chancePercent=" + chancePercent
+        return "SkillProducedItemGroup[chancePercent=" + chancePercent
                 + ", items=" + items.size() + "]";
     }
 
     public static final class Builder {
         private @Nullable Double chancePercent;
         private @Nullable Integer enchantLevel;
-        private List<SkillExtractItem> items;
+        private List<SkillProducedItem> items;
 
         public Builder chancePercent(@Nullable Double chancePercent) {
             this.chancePercent = chancePercent;
@@ -97,13 +97,13 @@ public final class SkillExtractProduct {
             return this;
         }
 
-        public Builder items(List<SkillExtractItem> items) {
+        public Builder items(List<SkillProducedItem> items) {
             this.items = items;
             return this;
         }
 
-        public SkillExtractProduct build() {
-            return new SkillExtractProduct(chancePercent, enchantLevel, items);
+        public SkillProducedItemGroup build() {
+            return new SkillProducedItemGroup(chancePercent, enchantLevel, items);
         }
     }
 }

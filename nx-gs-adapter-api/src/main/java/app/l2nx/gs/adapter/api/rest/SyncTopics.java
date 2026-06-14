@@ -20,7 +20,7 @@ import java.util.Objects;
  *     Keys: {@code "character"}, …</li>
  *     <li>{@link #getGd()} — game-data (datapack-derived static templates) sync via
  *     the {@code gd-sync} module ({@code <tenant>.gd.sync.<entity>}). Keys:
- *     {@code "itemtemplate"}, {@code "npctemplate"}, {@code "skilltemplate"}, …</li>
+ *     {@code "itemtemplate"}, {@code "npctemplate"}, {@code "skill"}, …</li>
  * </ul>
  *
  * <p>Per-namespace shape: {@code Map<entityName, fullyQualifiedTopic>}. Same entity

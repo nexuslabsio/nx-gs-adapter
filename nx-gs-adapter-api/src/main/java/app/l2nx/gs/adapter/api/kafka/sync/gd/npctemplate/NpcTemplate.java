@@ -1,17 +1,12 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
-import app.l2nx.gs.adapter.api.domain.npc.NpcRace;
-import app.l2nx.gs.adapter.api.domain.npc.NpcStat;
 import app.l2nx.gs.adapter.api.domain.WeaponType;
+import app.l2nx.gs.adapter.api.domain.npc.NpcRace;
+import app.l2nx.gs.adapter.api.domain.stat.Stat;
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Build-agnostic NPC-template wire DTO — the common L2 denominator for static NPC
@@ -29,7 +24,7 @@ import java.util.Objects;
  * reads as {@code false}/unknown.</p>
  *
  * <p><b>Stats:</b> every numeric stat rides {@link #getStats()} — a single map keyed
- * by the canonical {@link NpcStat} token names (vitals, combat numbers, movement
+ * by the canonical {@link Stat} token names (vitals, combat numbers, movement
  * speeds, base attributes, elemental power/resist, aggro range). The attack type is
  * not a magnitude and rides {@link #getAtkType()} as a {@link WeaponType} token.
  * Rewards are not stats and stay top-level ({@link #getRewardExp()} /
@@ -290,7 +285,7 @@ public final class NpcTemplate {
     }
 
     /**
-     * Every numeric stat the NPC carries, keyed by the canonical {@link NpcStat} token name
+     * Every numeric stat the NPC carries, keyed by the canonical {@link Stat} token name
      * (e.g. {@code MAX_HP}, {@code P_ATK}, {@code AGGRO_RANGE}, {@code FIRE_RES}). Zero
      * values are dropped by the producer ("not applicable"); {@code null} when the build
      * supplied no stats.

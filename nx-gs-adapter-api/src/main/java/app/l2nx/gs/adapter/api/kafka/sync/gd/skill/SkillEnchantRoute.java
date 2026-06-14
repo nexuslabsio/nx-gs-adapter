@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
 import org.jspecify.annotations.Nullable;
@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * One enchant-route variant of a {@link SkillTemplate} — an enchanted level beyond the base
+ * One enchant-route variant of a {@link Skill} — an enchanted level beyond the base
  * ladder. In L2 a max-level skill can be enchanted along one of several routes
  * (power / cost / range / time tracks), each with its own enchant levels
  * ({@code +1..+N}); the core models these as the same skill object with a non-zero
@@ -28,6 +28,12 @@ import java.util.Objects;
  * <p>{@code enchantAdena} / {@code enchantExp} / {@code enchantSp} are the costs of
  * applying this enchant step; {@code enchantChanceByCharLevelPercent} is the success
  * chance keyed by the enchanting character's level (e.g. {@code 76 → 82}).</p>
+ *
+ * <p>{@code attribute} is the offensive element this enchant route adds
+ * ({@code FIRE}/{@code WATER}/{@code WIND}/{@code EARTH}/{@code HOLY}/{@code DARK});
+ * {@code attributePower} is the element value. Enchant routes like "+3 Fire Attack"
+ * supply an element that the base levels do not carry — this is the primary motivation
+ * for having attribute per-node rather than on the aggregate header.</p>
  */
 public final class SkillEnchantRoute {
 
@@ -48,6 +54,8 @@ public final class SkillEnchantRoute {
     private final @Nullable Integer coolTimeMs;
     private final @Nullable Integer reuseDelayMs;
     private final @Nullable Double power;
+    private final @Nullable String attribute;
+    private final @Nullable Integer attributePower;
     private final @Nullable String enchantIcon;
     private final @Nullable LocalizedText enchantName;
     private final @Nullable LocalizedText enchantDescription;
@@ -73,6 +81,8 @@ public final class SkillEnchantRoute {
                              @Nullable Integer coolTimeMs,
                              @Nullable Integer reuseDelayMs,
                              @Nullable Double power,
+                             @Nullable String attribute,
+                             @Nullable Integer attributePower,
                              @Nullable String enchantIcon,
                              @Nullable LocalizedText enchantName,
                              @Nullable LocalizedText enchantDescription,
@@ -97,6 +107,8 @@ public final class SkillEnchantRoute {
         this.coolTimeMs = coolTimeMs;
         this.reuseDelayMs = reuseDelayMs;
         this.power = power;
+        this.attribute = attribute;
+        this.attributePower = attributePower;
         this.enchantIcon = enchantIcon;
         this.enchantName = enchantName;
         this.enchantDescription = enchantDescription;
@@ -105,7 +117,7 @@ public final class SkillEnchantRoute {
         this.enchantSp = enchantSp;
         this.enchantChanceByCharLevelPercent = enchantChanceByCharLevelPercent == null ? null
                 : Collections.unmodifiableMap(
-                        new LinkedHashMap<Integer, Integer>(enchantChanceByCharLevelPercent));
+                new LinkedHashMap<Integer, Integer>(enchantChanceByCharLevelPercent));
     }
 
     /**
@@ -198,6 +210,23 @@ public final class SkillEnchantRoute {
         return power;
     }
 
+    /**
+     * Offensive element added by this enchant route ({@code FIRE}/{@code WATER}/
+     * {@code WIND}/{@code EARTH}/{@code HOLY}/{@code DARK}); {@code null} when the
+     * route carries no offensive attribute.
+     */
+    public @Nullable String getAttribute() {
+        return attribute;
+    }
+
+    /**
+     * Offensive element power added by this enchant route; {@code null} when
+     * {@code attribute} is null.
+     */
+    public @Nullable Integer getAttributePower() {
+        return attributePower;
+    }
+
     public @Nullable String getEnchantIcon() {
         return enchantIcon;
     }
@@ -260,6 +289,8 @@ public final class SkillEnchantRoute {
                 .coolTimeMs(coolTimeMs)
                 .reuseDelayMs(reuseDelayMs)
                 .power(power)
+                .attribute(attribute)
+                .attributePower(attributePower)
                 .enchantIcon(enchantIcon)
                 .enchantName(enchantName)
                 .enchantDescription(enchantDescription)
@@ -295,6 +326,8 @@ public final class SkillEnchantRoute {
                 && Objects.equals(coolTimeMs, that.coolTimeMs)
                 && Objects.equals(reuseDelayMs, that.reuseDelayMs)
                 && Objects.equals(power, that.power)
+                && Objects.equals(attribute, that.attribute)
+                && Objects.equals(attributePower, that.attributePower)
                 && Objects.equals(enchantIcon, that.enchantIcon)
                 && Objects.equals(enchantName, that.enchantName)
                 && Objects.equals(enchantDescription, that.enchantDescription)
@@ -302,7 +335,7 @@ public final class SkillEnchantRoute {
                 && Objects.equals(enchantExp, that.enchantExp)
                 && Objects.equals(enchantSp, that.enchantSp)
                 && Objects.equals(enchantChanceByCharLevelPercent,
-                        that.enchantChanceByCharLevelPercent);
+                that.enchantChanceByCharLevelPercent);
     }
 
     @Override
@@ -310,8 +343,8 @@ public final class SkillEnchantRoute {
         return Objects.hash(baseLevel, route, enchantLevel, mpConsume, mpInitialConsume, hpConsume,
                 itemTemplateId, itemTemplateCount, castRange, effectRange, magicLevel,
                 abnormalLevel, abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs, power,
-                enchantIcon, enchantName, enchantDescription, enchantAdena, enchantExp, enchantSp,
-                enchantChanceByCharLevelPercent);
+                attribute, attributePower, enchantIcon, enchantName, enchantDescription,
+                enchantAdena, enchantExp, enchantSp, enchantChanceByCharLevelPercent);
     }
 
     @Override
@@ -338,6 +371,8 @@ public final class SkillEnchantRoute {
         private @Nullable Integer coolTimeMs;
         private @Nullable Integer reuseDelayMs;
         private @Nullable Double power;
+        private @Nullable String attribute;
+        private @Nullable Integer attributePower;
         private @Nullable String enchantIcon;
         private @Nullable LocalizedText enchantName;
         private @Nullable LocalizedText enchantDescription;
@@ -431,6 +466,16 @@ public final class SkillEnchantRoute {
             return this;
         }
 
+        public Builder attribute(@Nullable String attribute) {
+            this.attribute = attribute;
+            return this;
+        }
+
+        public Builder attributePower(@Nullable Integer attributePower) {
+            this.attributePower = attributePower;
+            return this;
+        }
+
         public Builder enchantIcon(@Nullable String enchantIcon) {
             this.enchantIcon = enchantIcon;
             return this;
@@ -471,8 +516,9 @@ public final class SkillEnchantRoute {
             return new SkillEnchantRoute(baseLevel, route, enchantLevel, mpConsume,
                     mpInitialConsume, hpConsume, itemTemplateId, itemTemplateCount, castRange,
                     effectRange, magicLevel, abnormalLevel, abnormalTimeSec, hitTimeMs, coolTimeMs,
-                    reuseDelayMs, power, enchantIcon, enchantName, enchantDescription, enchantAdena,
-                    enchantExp, enchantSp, enchantChanceByCharLevelPercent);
+                    reuseDelayMs, power, attribute, attributePower, enchantIcon, enchantName,
+                    enchantDescription, enchantAdena, enchantExp, enchantSp,
+                    enchantChanceByCharLevelPercent);
         }
     }
 }

@@ -8,7 +8,7 @@ import app.l2nx.gs.adapter.api.kafka.sync.gd.classtemplate.ClassTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate.ItemTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate.NpcTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.recipetemplate.RecipeTemplate;
-import app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate.SkillTemplate;
+import app.l2nx.gs.adapter.api.kafka.sync.gd.skill.Skill;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.soulcrystaltemplate.SoulCrystalTemplate;
 import app.l2nx.gs.adapter.api.spi.*;
 import app.l2nx.gs.kafka.KafkaException;
@@ -28,7 +28,7 @@ import java.util.function.ToLongFunction;
 /**
  * Tier-1 module that publishes static game-data (datapack-derived) templates onto
  * the {@code gd} sync stream. Multi-entity and data-driven: a static registry of
- * {@link EntityDescriptor}s (itemtemplate, npctemplate, skilltemplate, recipetemplate,
+ * {@link EntityDescriptor}s (itemtemplate, npctemplate, skill, recipetemplate,
  * armorsettemplate, soulcrystaltemplate, classtemplate) pairs each gd entity's
  * Tier-2 SPI with its snapshot accessor and primary-key extractor, so adding an entity is
  * one registry line rather than another field / discovery block. Each present provider
@@ -90,8 +90,8 @@ public final class GameDataSyncModule implements AdapterModule {
                 ItemTemplateProvider::entityName, ItemTemplateProvider::snapshot, t -> (long) t.getId()));
         list.add(new EntityDescriptor<NpcTemplateProvider, NpcTemplate>(NpcTemplateProvider.class,
                 NpcTemplateProvider::entityName, NpcTemplateProvider::snapshot, t -> (long) t.getId()));
-        list.add(new EntityDescriptor<SkillTemplateProvider, SkillTemplate>(SkillTemplateProvider.class,
-                SkillTemplateProvider::entityName, SkillTemplateProvider::snapshot, t -> (long) t.getId()));
+        list.add(new EntityDescriptor<SkillProvider, Skill>(SkillProvider.class,
+                SkillProvider::entityName, SkillProvider::snapshot, t -> (long) t.getId()));
         list.add(new EntityDescriptor<RecipeTemplateProvider, RecipeTemplate>(RecipeTemplateProvider.class,
                 RecipeTemplateProvider::entityName, RecipeTemplateProvider::snapshot, t -> (long) t.getId()));
         list.add(new EntityDescriptor<ArmorSetTemplateProvider, ArmorSetTemplate>(ArmorSetTemplateProvider.class,
@@ -139,7 +139,7 @@ public final class GameDataSyncModule implements AdapterModule {
         }
         if (resolved.isEmpty()) {
             log.warn("No gd template provider SPI registered — gd-sync DISABLED. Register an "
-                    + "ItemTemplateProvider, NpcTemplateProvider, SkillTemplateProvider and/or one of the "
+                    + "ItemTemplateProvider, NpcTemplateProvider, SkillProvider and/or one of the "
                     + "recipe/armor-set/soul-crystal/class providers via META-INF/services to "
                     + "enable game-data sync.");
             state = STATE_DISABLED;

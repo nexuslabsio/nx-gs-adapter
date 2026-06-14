@@ -1,24 +1,24 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 
 /**
- * One granted item of a {@link SkillExtractProduct} — an item-template reference with its
- * quantity range. {@code itemTemplateId} is the non-null identity. {@code minCount} /
- * {@code maxCount} bound the granted quantity; a fixed quantity carries
- * {@code minCount} only ({@code maxCount} {@code null}).
+ * One produced item of a {@link SkillProducedItemGroup} — an item-template reference
+ * with its quantity range. {@code itemTemplateId} is the non-null identity.
+ * {@code minCount} / {@code maxCount} bound the produced quantity; a fixed quantity
+ * carries {@code minCount} only ({@code maxCount} {@code null}).
  */
-public final class SkillExtractItem {
+public final class SkillProducedItem {
 
     private final int itemTemplateId;
     private final @Nullable Long minCount;
     private final @Nullable Long maxCount;
 
-    public SkillExtractItem(int itemTemplateId,
-                            @Nullable Long minCount,
-                            @Nullable Long maxCount) {
+    public SkillProducedItem(int itemTemplateId,
+                             @Nullable Long minCount,
+                             @Nullable Long maxCount) {
         this.itemTemplateId = itemTemplateId;
         this.minCount = minCount;
         this.maxCount = maxCount;
@@ -33,7 +33,7 @@ public final class SkillExtractItem {
     }
 
     /**
-     * Upper bound of the granted quantity; {@code null} when the quantity is fixed at
+     * Upper bound of the produced quantity; {@code null} when the quantity is fixed at
      * {@code minCount}.
      */
     public @Nullable Long getMaxCount() {
@@ -54,8 +54,8 @@ public final class SkillExtractItem {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof SkillExtractItem)) return false;
-        SkillExtractItem that = (SkillExtractItem) o;
+        if (!(o instanceof SkillProducedItem)) return false;
+        SkillProducedItem that = (SkillProducedItem) o;
         return itemTemplateId == that.itemTemplateId
                 && Objects.equals(minCount, that.minCount)
                 && Objects.equals(maxCount, that.maxCount);
@@ -68,7 +68,7 @@ public final class SkillExtractItem {
 
     @Override
     public String toString() {
-        return "SkillExtractItem[itemTemplateId=" + itemTemplateId
+        return "SkillProducedItem[itemTemplateId=" + itemTemplateId
                 + ", minCount=" + minCount + ", maxCount=" + maxCount + "]";
     }
 
@@ -92,8 +92,8 @@ public final class SkillExtractItem {
             return this;
         }
 
-        public SkillExtractItem build() {
-            return new SkillExtractItem(itemTemplateId, minCount, maxCount);
+        public SkillProducedItem build() {
+            return new SkillProducedItem(itemTemplateId, minCount, maxCount);
         }
     }
 }

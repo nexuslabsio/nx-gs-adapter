@@ -1,19 +1,14 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
- * One base level of a {@link SkillTemplate} — the per-level stats, localization and effects.
+ * One base level of a {@link Skill} — the per-level stats, localization and effects.
  * In L2 a skill scales across levels (mp cost, power, cool/reuse times grow); each
- * level is a distinct row carried in {@link SkillTemplate#getLevels()}.
+ * level is a distinct row carried in {@link Skill#getLevels()}.
  *
  * <p>{@code level} is the non-null identity within the skill. Every other field is
  * {@link Nullable}. Fields with a unit carry it in the name: time fields are
@@ -25,8 +20,13 @@ import java.util.Objects;
  * {@link SkillEffect#getKind()}); {@code statModifiers} are stat modifications attached
  * directly to the skill (no effect wrapper — typical for simple passives).</p>
  *
+ * <p>{@code attribute} is the offensive element this level carries
+ * ({@code FIRE}/{@code WATER}/{@code WIND}/{@code EARTH}/{@code HOLY}/{@code DARK});
+ * {@code attributePower} is the element value. Both {@code null} when the level has no
+ * offensive attribute.</p>
+ *
  * <p>Enchant variants (route-enchanted levels) are NOT here — they ride
- * {@link SkillTemplate#getEnchantRoutes()} as {@link SkillEnchantRoute}. This list is the
+ * {@link Skill#getEnchantRoutes()} as {@link SkillEnchantRoute}. This list is the
  * base ladder only.</p>
  */
 public final class SkillLevel {
@@ -67,11 +67,13 @@ public final class SkillLevel {
     private final @Nullable Integer negateRatePercent;
     private final @Nullable Map<String, Integer> negateAbnormalTypes;
     private final @Nullable Integer aggroPoints;
+    private final @Nullable String attribute;
+    private final @Nullable Integer attributePower;
     private final @Nullable LocalizedText name;
     private final @Nullable LocalizedText description;
     private final @Nullable List<SkillEffect> effects;
     private final @Nullable List<SkillStatModifier> statModifiers;
-    private final @Nullable List<SkillExtractProduct> extractProducts;
+    private final @Nullable List<SkillProducedItemGroup> producedItems;
 
     public SkillLevel(int level,
                       @Nullable String icon,
@@ -109,11 +111,13 @@ public final class SkillLevel {
                       @Nullable Integer negateRatePercent,
                       @Nullable Map<String, Integer> negateAbnormalTypes,
                       @Nullable Integer aggroPoints,
+                      @Nullable String attribute,
+                      @Nullable Integer attributePower,
                       @Nullable LocalizedText name,
                       @Nullable LocalizedText description,
                       @Nullable List<SkillEffect> effects,
                       @Nullable List<SkillStatModifier> statModifiers,
-                      @Nullable List<SkillExtractProduct> extractProducts) {
+                      @Nullable List<SkillProducedItemGroup> producedItems) {
         this.level = level;
         this.icon = icon;
         this.mpConsume = mpConsume;
@@ -151,14 +155,16 @@ public final class SkillLevel {
         this.negateAbnormalTypes = negateAbnormalTypes == null ? null
                 : Collections.unmodifiableMap(new LinkedHashMap<String, Integer>(negateAbnormalTypes));
         this.aggroPoints = aggroPoints;
+        this.attribute = attribute;
+        this.attributePower = attributePower;
         this.name = name;
         this.description = description;
         this.effects = effects == null ? null
                 : Collections.unmodifiableList(new ArrayList<SkillEffect>(effects));
         this.statModifiers = statModifiers == null ? null
                 : Collections.unmodifiableList(new ArrayList<SkillStatModifier>(statModifiers));
-        this.extractProducts = extractProducts == null ? null
-                : Collections.unmodifiableList(new ArrayList<SkillExtractProduct>(extractProducts));
+        this.producedItems = producedItems == null ? null
+                : Collections.unmodifiableList(new ArrayList<SkillProducedItemGroup>(producedItems));
     }
 
     public int getLevel() {
@@ -306,7 +312,7 @@ public final class SkillLevel {
     }
 
     /**
-     * SkillTemplate power (damage / heal magnitude) — a coefficient, no unit.
+     * Skill power (damage / heal magnitude) — a coefficient, no unit.
      */
     public @Nullable Double getPower() {
         return power;
@@ -393,6 +399,22 @@ public final class SkillLevel {
         return aggroPoints;
     }
 
+    /**
+     * Offensive element at this level ({@code FIRE}/{@code WATER}/{@code WIND}/
+     * {@code EARTH}/{@code HOLY}/{@code DARK}); {@code null} when the level carries no
+     * offensive attribute.
+     */
+    public @Nullable String getAttribute() {
+        return attribute;
+    }
+
+    /**
+     * Offensive element power at this level; {@code null} when {@code attribute} is null.
+     */
+    public @Nullable Integer getAttributePower() {
+        return attributePower;
+    }
+
     public @Nullable LocalizedText getName() {
         return name;
     }
@@ -417,11 +439,11 @@ public final class SkillLevel {
     }
 
     /**
-     * Product groups for extractable skills (item-opening / conversion); {@code null}
-     * when the skill extracts nothing.
+     * Produced item groups for extractable skills (item-opening / conversion); {@code null}
+     * when the skill produces nothing.
      */
-    public @Nullable List<SkillExtractProduct> getExtractProducts() {
-        return extractProducts;
+    public @Nullable List<SkillProducedItemGroup> getProducedItems() {
+        return producedItems;
     }
 
     public Builder toBuilder() {
@@ -462,11 +484,13 @@ public final class SkillLevel {
                 .negateRatePercent(negateRatePercent)
                 .negateAbnormalTypes(negateAbnormalTypes)
                 .aggroPoints(aggroPoints)
+                .attribute(attribute)
+                .attributePower(attributePower)
                 .name(name)
                 .description(description)
                 .effects(effects)
                 .statModifiers(statModifiers)
-                .extractProducts(extractProducts);
+                .producedItems(producedItems);
     }
 
     public static Builder builder() {
@@ -514,11 +538,13 @@ public final class SkillLevel {
                 && Objects.equals(negateRatePercent, that.negateRatePercent)
                 && Objects.equals(negateAbnormalTypes, that.negateAbnormalTypes)
                 && Objects.equals(aggroPoints, that.aggroPoints)
+                && Objects.equals(attribute, that.attribute)
+                && Objects.equals(attributePower, that.attributePower)
                 && Objects.equals(name, that.name)
                 && Objects.equals(description, that.description)
                 && Objects.equals(effects, that.effects)
                 && Objects.equals(statModifiers, that.statModifiers)
-                && Objects.equals(extractProducts, that.extractProducts);
+                && Objects.equals(producedItems, that.producedItems);
     }
 
     @Override
@@ -529,8 +555,8 @@ public final class SkillLevel {
                 magicLevel, abnormalLevel, abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs,
                 baseCritRate, power, pvpPower, pvePower, minChancePercent, maxChancePercent,
                 activateRatePercent, levelModifier, lethalStrikeRatePercent, halfKillRatePercent,
-                negateRatePercent, negateAbnormalTypes, aggroPoints, name, description, effects,
-                statModifiers, extractProducts);
+                negateRatePercent, negateAbnormalTypes, aggroPoints, attribute, attributePower,
+                name, description, effects, statModifiers, producedItems);
     }
 
     @Override
@@ -575,11 +601,13 @@ public final class SkillLevel {
         private @Nullable Integer negateRatePercent;
         private @Nullable Map<String, Integer> negateAbnormalTypes;
         private @Nullable Integer aggroPoints;
+        private @Nullable String attribute;
+        private @Nullable Integer attributePower;
         private @Nullable LocalizedText name;
         private @Nullable LocalizedText description;
         private @Nullable List<SkillEffect> effects;
         private @Nullable List<SkillStatModifier> statModifiers;
-        private @Nullable List<SkillExtractProduct> extractProducts;
+        private @Nullable List<SkillProducedItemGroup> producedItems;
 
         public Builder level(int level) {
             this.level = level;
@@ -761,6 +789,16 @@ public final class SkillLevel {
             return this;
         }
 
+        public Builder attribute(@Nullable String attribute) {
+            this.attribute = attribute;
+            return this;
+        }
+
+        public Builder attributePower(@Nullable Integer attributePower) {
+            this.attributePower = attributePower;
+            return this;
+        }
+
         public Builder name(@Nullable LocalizedText name) {
             this.name = name;
             return this;
@@ -781,8 +819,8 @@ public final class SkillLevel {
             return this;
         }
 
-        public Builder extractProducts(@Nullable List<SkillExtractProduct> extractProducts) {
-            this.extractProducts = extractProducts;
+        public Builder producedItems(@Nullable List<SkillProducedItemGroup> producedItems) {
+            this.producedItems = producedItems;
             return this;
         }
 
@@ -794,8 +832,8 @@ public final class SkillLevel {
                     abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs, baseCritRate, power,
                     pvpPower, pvePower, minChancePercent, maxChancePercent, activateRatePercent,
                     levelModifier, lethalStrikeRatePercent, halfKillRatePercent,
-                    negateRatePercent, negateAbnormalTypes, aggroPoints, name, description,
-                    effects, statModifiers, extractProducts);
+                    negateRatePercent, negateAbnormalTypes, aggroPoints, attribute, attributePower,
+                    name, description, effects, statModifiers, producedItems);
         }
     }
 }

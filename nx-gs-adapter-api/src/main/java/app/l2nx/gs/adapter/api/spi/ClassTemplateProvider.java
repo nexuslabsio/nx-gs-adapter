@@ -12,7 +12,7 @@ import java.util.Collection;
  * <p>The host implements this over its already-parsed in-memory class registry (e.g. an
  * L2J/Lucera {@code ClassId} enum), emitting one build-agnostic {@link ClassTemplate} per
  * playable class (race / type / tier facets + the profession-parent link). Discovered via
- * {@link java.util.ServiceLoader} exactly like {@code SkillTemplateProvider}; the
+ * {@link java.util.ServiceLoader} exactly like {@code SkillProvider}; the
  * {@code gd-sync} module pulls a fresh {@link #snapshot()} on connect and whenever the host
  * triggers a re-publish.</p>
  *

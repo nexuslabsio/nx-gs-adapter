@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.sync.gd.skilltemplate;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.jspecify.annotations.Nullable;
@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * One class→skill learn entry of a {@link SkillTemplate} — a playable class that learns this skill,
+ * One class→skill learn entry of a {@link Skill} — a playable class that learns this skill,
  * with the level at which it is acquired and its SP cost. Built by inverting the host's per-class
  * skill trees into a per-skill list, so a skill page can show "which classes learn this".
  *
