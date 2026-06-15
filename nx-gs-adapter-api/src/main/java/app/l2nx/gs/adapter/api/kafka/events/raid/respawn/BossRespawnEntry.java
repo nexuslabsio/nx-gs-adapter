@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.respawn;
 
 import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
+import app.l2nx.gs.adapter.api.kafka.events.schedule.RecurringSchedule;
 
 import org.jspecify.annotations.Nullable;
 
@@ -53,13 +54,15 @@ public final class BossRespawnEntry {
     private final String status;
     private final @Nullable Instant nextRespawnAt;
     private final @Nullable Map<String, String> metadata;
+    private final @Nullable RecurringSchedule schedule;
 
     public BossRespawnEntry(int npcId,
                             @Nullable Integer level,
                             RaidBossKind kind,
                             String status,
                             @Nullable Instant nextRespawnAt,
-                            @Nullable Map<String, String> metadata) {
+                            @Nullable Map<String, String> metadata,
+                            @Nullable RecurringSchedule schedule) {
         this.npcId = npcId;
         this.level = level;
         this.kind = kind;
@@ -68,6 +71,7 @@ public final class BossRespawnEntry {
         this.metadata = metadata == null
                 ? null
                 : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.schedule = schedule;
     }
 
     /**
@@ -114,6 +118,15 @@ public final class BossRespawnEntry {
         return metadata;
     }
 
+    /**
+     * Recurring respawn rule ("every weekday(s) at HH:MM") for bosses on a fixed
+     * schedule, or {@code null} for respawn-window bosses / patterns that don't
+     * reduce to a weekly rule.
+     */
+    public @Nullable RecurringSchedule getSchedule() {
+        return schedule;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .npcId(npcId)
@@ -121,7 +134,8 @@ public final class BossRespawnEntry {
                 .kind(kind)
                 .status(status)
                 .nextRespawnAt(nextRespawnAt)
-                .metadata(metadata);
+                .metadata(metadata)
+                .schedule(schedule);
     }
 
     public static Builder builder() {
@@ -138,12 +152,13 @@ public final class BossRespawnEntry {
                 && kind == that.kind
                 && Objects.equals(status, that.status)
                 && Objects.equals(nextRespawnAt, that.nextRespawnAt)
-                && Objects.equals(metadata, that.metadata);
+                && Objects.equals(metadata, that.metadata)
+                && Objects.equals(schedule, that.schedule);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(npcId, level, kind, status, nextRespawnAt, metadata);
+        return Objects.hash(npcId, level, kind, status, nextRespawnAt, metadata, schedule);
     }
 
     @Override
@@ -153,7 +168,8 @@ public final class BossRespawnEntry {
                 + ", kind=" + kind
                 + ", status=" + status
                 + ", nextRespawnAt=" + nextRespawnAt
-                + ", metadata=" + metadata + "]";
+                + ", metadata=" + metadata
+                + ", schedule=" + schedule + "]";
     }
 
     public static final class Builder {
@@ -163,6 +179,7 @@ public final class BossRespawnEntry {
         private @Nullable String status;
         private @Nullable Instant nextRespawnAt;
         private @Nullable Map<String, String> metadata;
+        private @Nullable RecurringSchedule schedule;
 
         public Builder npcId(int npcId) {
             this.npcId = npcId;
@@ -194,8 +211,13 @@ public final class BossRespawnEntry {
             return this;
         }
 
+        public Builder schedule(@Nullable RecurringSchedule schedule) {
+            this.schedule = schedule;
+            return this;
+        }
+
         public BossRespawnEntry build() {
-            return new BossRespawnEntry(npcId, level, kind, status, nextRespawnAt, metadata);
+            return new BossRespawnEntry(npcId, level, kind, status, nextRespawnAt, metadata, schedule);
         }
     }
 }

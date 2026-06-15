@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.gameevents;
 
+import app.l2nx.gs.adapter.api.kafka.events.schedule.RecurringSchedule;
+
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
@@ -46,13 +48,15 @@ public final class GameEventEntry {
     private final boolean running;
     private final @Nullable Instant nextStartAt;
     private final @Nullable Map<String, String> metadata;
+    private final @Nullable RecurringSchedule schedule;
 
     public GameEventEntry(String code,
                           @Nullable String name,
                           boolean enabled,
                           boolean running,
                           @Nullable Instant nextStartAt,
-                          @Nullable Map<String, String> metadata) {
+                          @Nullable Map<String, String> metadata,
+                          @Nullable RecurringSchedule schedule) {
         this.code = code;
         this.name = name;
         this.enabled = enabled;
@@ -61,6 +65,7 @@ public final class GameEventEntry {
         this.metadata = metadata == null
                 ? null
                 : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.schedule = schedule;
     }
 
     /**
@@ -106,6 +111,15 @@ public final class GameEventEntry {
         return metadata;
     }
 
+    /**
+     * Recurring start rule ("every weekday(s) at HH:MM") derived from the event's
+     * cron schedule, or {@code null} for one-off / seasonal patterns that don't
+     * reduce to a weekly rule.
+     */
+    public @Nullable RecurringSchedule getSchedule() {
+        return schedule;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .code(code)
@@ -113,7 +127,8 @@ public final class GameEventEntry {
                 .enabled(enabled)
                 .running(running)
                 .nextStartAt(nextStartAt)
-                .metadata(metadata);
+                .metadata(metadata)
+                .schedule(schedule);
     }
 
     public static Builder builder() {
@@ -130,12 +145,13 @@ public final class GameEventEntry {
                 && Objects.equals(code, that.code)
                 && Objects.equals(name, that.name)
                 && Objects.equals(nextStartAt, that.nextStartAt)
-                && Objects.equals(metadata, that.metadata);
+                && Objects.equals(metadata, that.metadata)
+                && Objects.equals(schedule, that.schedule);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(code, name, enabled, running, nextStartAt, metadata);
+        return Objects.hash(code, name, enabled, running, nextStartAt, metadata, schedule);
     }
 
     @Override
@@ -145,7 +161,8 @@ public final class GameEventEntry {
                 + ", enabled=" + enabled
                 + ", running=" + running
                 + ", nextStartAt=" + nextStartAt
-                + ", metadata=" + metadata + "]";
+                + ", metadata=" + metadata
+                + ", schedule=" + schedule + "]";
     }
 
     public static final class Builder {
@@ -155,6 +172,7 @@ public final class GameEventEntry {
         private boolean running;
         private @Nullable Instant nextStartAt;
         private @Nullable Map<String, String> metadata;
+        private @Nullable RecurringSchedule schedule;
 
         public Builder code(String code) {
             this.code = code;
@@ -186,8 +204,13 @@ public final class GameEventEntry {
             return this;
         }
 
+        public Builder schedule(@Nullable RecurringSchedule schedule) {
+            this.schedule = schedule;
+            return this;
+        }
+
         public GameEventEntry build() {
-            return new GameEventEntry(code, name, enabled, running, nextStartAt, metadata);
+            return new GameEventEntry(code, name, enabled, running, nextStartAt, metadata, schedule);
         }
     }
 }

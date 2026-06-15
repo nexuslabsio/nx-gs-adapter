@@ -4,12 +4,16 @@ import com.google.gson.*;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Pre-configured {@link Gson} factory for nx-gs wire payloads. Registers
- * type adapters for {@link Instant} and {@link Duration} so Gson emits
- * ISO-8601 strings (e.g. {@code "2026-05-17T12:00:00Z"} /
- * {@code "PT60S"}) instead of its default struct form.
+ * type adapters for {@link Instant}, {@link Duration} and {@link OffsetTime}
+ * so Gson emits ISO-8601 strings (e.g. {@code "2026-05-17T12:00:00Z"} /
+ * {@code "PT60S"} / {@code "22:00:00+03:00"}) instead of its default struct
+ * form. {@link java.time.DayOfWeek} needs no adapter — Gson serializes enums by
+ * name ({@code "MONDAY"}).
  *
  * <p>Use this Gson instance for any Kafka publisher / consumer that serializes
  * nx-gs adapter wire DTOs — {@code DefaultKafkaFactory} wires it into
@@ -37,11 +41,18 @@ public final class NxGsonAdapters {
         JsonDeserializer<Instant> instantDe = (json, typeOfT, ctx) -> Instant.parse(json.getAsString());
         JsonSerializer<Duration> durationSer = (src, typeOfSrc, ctx) -> new JsonPrimitive(src.toString());
         JsonDeserializer<Duration> durationDe = (json, typeOfT, ctx) -> Duration.parse(json.getAsString());
+        // Fixed HH:mm:ss + offset (Z for UTC) — toString() would drop zero seconds,
+        // making the wire format vary; parsing stays lenient via ISO_OFFSET_TIME.
+        DateTimeFormatter offsetTimeFmt = DateTimeFormatter.ofPattern("HH:mm:ssXXX");
+        JsonSerializer<OffsetTime> offsetTimeSer = (src, typeOfSrc, ctx) -> new JsonPrimitive(src.format(offsetTimeFmt));
+        JsonDeserializer<OffsetTime> offsetTimeDe = (json, typeOfT, ctx) -> OffsetTime.parse(json.getAsString());
         return new GsonBuilder()
                 .disableHtmlEscaping()
                 .registerTypeAdapter(Instant.class, instantSer)
                 .registerTypeAdapter(Instant.class, instantDe)
                 .registerTypeAdapter(Duration.class, durationSer)
-                .registerTypeAdapter(Duration.class, durationDe);
+                .registerTypeAdapter(Duration.class, durationDe)
+                .registerTypeAdapter(OffsetTime.class, offsetTimeSer)
+                .registerTypeAdapter(OffsetTime.class, offsetTimeDe);
     }
 }

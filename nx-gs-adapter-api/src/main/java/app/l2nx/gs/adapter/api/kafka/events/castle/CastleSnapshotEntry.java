@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.castle;
 
+import app.l2nx.gs.adapter.api.kafka.events.schedule.RecurringSchedule;
+
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
@@ -39,12 +41,14 @@ public final class CastleSnapshotEntry {
     private final @Nullable Long ownerClanId;
     private final @Nullable Instant nextSiegeAt;
     private final @Nullable Map<String, String> metadata;
+    private final @Nullable RecurringSchedule schedule;
 
     public CastleSnapshotEntry(int castleId,
                                @Nullable String name,
                                @Nullable Long ownerClanId,
                                @Nullable Instant nextSiegeAt,
-                               @Nullable Map<String, String> metadata) {
+                               @Nullable Map<String, String> metadata,
+                               @Nullable RecurringSchedule schedule) {
         this.castleId = castleId;
         this.name = name;
         this.ownerClanId = ownerClanId;
@@ -52,6 +56,7 @@ public final class CastleSnapshotEntry {
         this.metadata = metadata == null
                 ? null
                 : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.schedule = schedule;
     }
 
     /**
@@ -89,13 +94,22 @@ public final class CastleSnapshotEntry {
         return metadata;
     }
 
+    /**
+     * Recurring siege rule ("every weekday(s) at HH:MM") derived from the
+     * castle's fixed weekly siege schedule, or {@code null} when unavailable.
+     */
+    public @Nullable RecurringSchedule getSchedule() {
+        return schedule;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .castleId(castleId)
                 .name(name)
                 .ownerClanId(ownerClanId)
                 .nextSiegeAt(nextSiegeAt)
-                .metadata(metadata);
+                .metadata(metadata)
+                .schedule(schedule);
     }
 
     public static Builder builder() {
@@ -111,12 +125,13 @@ public final class CastleSnapshotEntry {
                 && Objects.equals(name, that.name)
                 && Objects.equals(ownerClanId, that.ownerClanId)
                 && Objects.equals(nextSiegeAt, that.nextSiegeAt)
-                && Objects.equals(metadata, that.metadata);
+                && Objects.equals(metadata, that.metadata)
+                && Objects.equals(schedule, that.schedule);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(castleId, name, ownerClanId, nextSiegeAt, metadata);
+        return Objects.hash(castleId, name, ownerClanId, nextSiegeAt, metadata, schedule);
     }
 
     @Override
@@ -125,7 +140,8 @@ public final class CastleSnapshotEntry {
                 + ", name=" + name
                 + ", ownerClanId=" + ownerClanId
                 + ", nextSiegeAt=" + nextSiegeAt
-                + ", metadata=" + metadata + "]";
+                + ", metadata=" + metadata
+                + ", schedule=" + schedule + "]";
     }
 
     public static final class Builder {
@@ -134,6 +150,7 @@ public final class CastleSnapshotEntry {
         private @Nullable Long ownerClanId;
         private @Nullable Instant nextSiegeAt;
         private @Nullable Map<String, String> metadata;
+        private @Nullable RecurringSchedule schedule;
 
         public Builder castleId(int castleId) {
             this.castleId = castleId;
@@ -160,8 +177,13 @@ public final class CastleSnapshotEntry {
             return this;
         }
 
+        public Builder schedule(@Nullable RecurringSchedule schedule) {
+            this.schedule = schedule;
+            return this;
+        }
+
         public CastleSnapshotEntry build() {
-            return new CastleSnapshotEntry(castleId, name, ownerClanId, nextSiegeAt, metadata);
+            return new CastleSnapshotEntry(castleId, name, ownerClanId, nextSiegeAt, metadata, schedule);
         }
     }
 }
