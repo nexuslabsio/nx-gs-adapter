@@ -85,6 +85,14 @@ public interface NxProducer {
     void sendBytesKeyRecord(ProducerRecord<byte[], Object> record, Callback callback);
 
     /**
+     * Blocks until every buffered record has been sent to the broker
+     * (delegates to {@code KafkaProducer.flush()}). Used on the
+     * synchronous-flush path to guarantee a just-sent record reaches the
+     * broker before shutdown teardown.
+     */
+    void flush();
+
+    /**
      * Closes the underlying Kafka producer and releases resources.
      */
     void close();

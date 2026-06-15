@@ -28,7 +28,17 @@ class NxEventsConnectContextTest {
     @Test
     void events_shouldReturnProvidedImpl_whenBuilderSets() {
         AtomicReference<Object> seen = new AtomicReference<Object>();
-        NxEvents capturing = event -> seen.set(event);
+        NxEvents capturing = new NxEvents() {
+            @Override
+            public void publish(Object event) {
+                seen.set(event);
+            }
+
+            @Override
+            public boolean flush(long timeoutMs) {
+                return true;
+            }
+        };
 
         ConnectContext ctx = ConnectContext.builder()
                 .tenantId(UUID.randomUUID()).tenantSlug("acme")
@@ -54,7 +64,15 @@ class NxEventsConnectContextTest {
                 .serverName("Acme").adapterVersion("0.13.0")
                 .build();
         ConnectContext withCustom = withNoOp.toBuilder()
-                .events(event -> {
+                .events(new NxEvents() {
+                    @Override
+                    public void publish(Object event) {
+                    }
+
+                    @Override
+                    public boolean flush(long timeoutMs) {
+                        return true;
+                    }
                 })
                 .build();
 

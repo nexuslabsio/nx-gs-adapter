@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ResyncCoordinatorTest {
 
     private final List<Object> published = new ArrayList<Object>();
-    private final ResyncCoordinator coordinator = new ResyncCoordinator(published::add);
+    private final ResyncCoordinator coordinator = new ResyncCoordinator(RecordingNxEvents.into(published));
     private final SnapshotStore snapshot = new SnapshotStore();
 
     private static final UUID RESYNC_A = UUID.fromString("018f0000-0000-7000-8000-0000000000aa");

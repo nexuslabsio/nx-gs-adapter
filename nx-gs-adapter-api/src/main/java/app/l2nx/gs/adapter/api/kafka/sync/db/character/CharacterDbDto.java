@@ -74,6 +74,8 @@ public final class CharacterDbDto {
     private final @Nullable Boolean online;
     private final @Nullable Long onlineTimeSeconds;
     private final @Nullable Boolean hero;
+    private final @Nullable Boolean expBlocked;
+    private final @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns;
 
     public CharacterDbDto(long id,
                           String name,
@@ -94,7 +96,9 @@ public final class CharacterDbDto {
                           @Nullable Instant scheduledDeletionAt,
                           @Nullable Boolean online,
                           @Nullable Long onlineTimeSeconds,
-                          @Nullable Boolean hero) {
+                          @Nullable Boolean hero,
+                          @Nullable Boolean expBlocked,
+                          @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns) {
         this.id = id;
         this.name = Objects.requireNonNull(name, "CharacterDbDto.name is required");
         this.accountName = accountName;
@@ -115,6 +119,10 @@ public final class CharacterDbDto {
         this.online = online;
         this.onlineTimeSeconds = onlineTimeSeconds;
         this.hero = hero;
+        this.expBlocked = expBlocked;
+        this.instanceCooldowns = instanceCooldowns == null
+                ? null
+                : Collections.unmodifiableList(instanceCooldowns);
     }
 
     /**
@@ -303,6 +311,27 @@ public final class CharacterDbDto {
         return hero;
     }
 
+    /**
+     * Whether experience gain is blocked for this character — source
+     * legacy char-var {@code blockedEXP@} ({@code "1"} = blocked,
+     * {@code "0"}/absent = allowed). {@code null} when the tenant does not
+     * surface this flag.
+     */
+    public @Nullable Boolean getExpBlocked() {
+        return expBlocked;
+    }
+
+    /**
+     * Per-instance re-entry cooldowns — source {@code character_instance_time}
+     * (or its tenant equivalent), one entry per {@code (charId, instanceId)}.
+     * {@code null} when the tenant does not sync instance cooldowns (no
+     * {@code ChildSource} declared); empty list when the tenant syncs them but
+     * the character has none.
+     */
+    public @Nullable List<CharacterInstanceCooldownDbDto> getInstanceCooldowns() {
+        return instanceCooldowns;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .id(id)
@@ -324,7 +353,9 @@ public final class CharacterDbDto {
                 .scheduledDeletionAt(scheduledDeletionAt)
                 .online(online)
                 .onlineTimeSeconds(onlineTimeSeconds)
-                .hero(hero);
+                .hero(hero)
+                .expBlocked(expBlocked)
+                .instanceCooldowns(instanceCooldowns);
     }
 
     public static Builder builder() {
@@ -355,7 +386,9 @@ public final class CharacterDbDto {
                 && Objects.equals(scheduledDeletionAt, that.scheduledDeletionAt)
                 && Objects.equals(online, that.online)
                 && Objects.equals(onlineTimeSeconds, that.onlineTimeSeconds)
-                && Objects.equals(hero, that.hero);
+                && Objects.equals(hero, that.hero)
+                && Objects.equals(expBlocked, that.expBlocked)
+                && Objects.equals(instanceCooldowns, that.instanceCooldowns);
     }
 
     @Override
@@ -363,7 +396,7 @@ public final class CharacterDbDto {
         return Objects.hash(id, name, accountName, title, level, sex, race,
                 classId, baseClassId, subclasses, privateStore,
                 clanId, pvpCounter, pkCounter, karma, noblesse, scheduledDeletionAt, online,
-                onlineTimeSeconds, hero);
+                onlineTimeSeconds, hero, expBlocked, instanceCooldowns);
     }
 
     @Override
@@ -387,7 +420,9 @@ public final class CharacterDbDto {
                 + ", scheduledDeletionAt=" + scheduledDeletionAt
                 + ", online=" + online
                 + ", onlineTimeSeconds=" + onlineTimeSeconds
-                + ", hero=" + hero + "]";
+                + ", hero=" + hero
+                + ", expBlocked=" + expBlocked
+                + ", instanceCooldowns=" + instanceCooldowns + "]";
     }
 
     public static final class Builder {
@@ -411,6 +446,8 @@ public final class CharacterDbDto {
         private @Nullable Boolean online;
         private @Nullable Long onlineTimeSeconds;
         private @Nullable Boolean hero;
+        private @Nullable Boolean expBlocked;
+        private @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns;
 
         public Builder id(long id) {
             this.id = id;
@@ -512,11 +549,21 @@ public final class CharacterDbDto {
             return this;
         }
 
+        public Builder expBlocked(@Nullable Boolean expBlocked) {
+            this.expBlocked = expBlocked;
+            return this;
+        }
+
+        public Builder instanceCooldowns(@Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns) {
+            this.instanceCooldowns = instanceCooldowns;
+            return this;
+        }
+
         public CharacterDbDto build() {
             return new CharacterDbDto(id, name, accountName, title, level, sex, race,
                     classId, baseClassId, subclasses, privateStore,
                     clanId, pvpCounter, pkCounter, karma, noblesse, scheduledDeletionAt, online,
-                    onlineTimeSeconds, hero);
+                    onlineTimeSeconds, hero, expBlocked, instanceCooldowns);
         }
     }
 }

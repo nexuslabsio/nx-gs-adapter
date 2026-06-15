@@ -246,7 +246,7 @@ class CdcEngineE2ETest {
         // are whatever the shared schema currently holds (order-independent).
         String topic = "test.gs.sync.clans.resync";
         List<Object> adapterEvents = Collections.synchronizedList(new ArrayList<>());
-        engine = buildEngine(new EntityStatsTracker(), topic, adapterEvents::add);
+        engine = buildEngine(new EntityStatsTracker(), topic, RecordingNxEvents.into(adapterEvents));
         engine.start();
 
         int clanCount = countClans();
@@ -334,8 +334,7 @@ class CdcEngineE2ETest {
     }
 
     private CdcEngine buildEngine(EntityStatsTracker statsTracker) {
-        return buildEngine(statsTracker, TOPIC, evt -> {
-        });
+        return buildEngine(statsTracker, TOPIC, RecordingNxEvents.noop());
     }
 
     private CdcEngine buildEngine(EntityStatsTracker statsTracker, String topic, NxEvents events) {

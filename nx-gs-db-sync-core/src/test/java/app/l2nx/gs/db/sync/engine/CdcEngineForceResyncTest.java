@@ -216,7 +216,7 @@ class CdcEngineForceResyncTest {
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
                 k -> null,
-                published::add);
+                RecordingNxEvents.into(published));
     }
 
     private static LongOpenHashSet pks(long... values) {

@@ -1,16 +1,21 @@
 package app.l2nx.gs.gd.sync;
 
+import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
+import app.l2nx.gs.adapter.api.kafka.commands.gd.GdResyncCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.gd.GdResyncResult;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.armorsettemplate.ArmorSetTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.classtemplate.ClassTemplate;
+import app.l2nx.gs.adapter.api.kafka.sync.gd.instancetemplate.InstanceTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate.ItemTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate.NpcTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.recipetemplate.RecipeTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.skill.Skill;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.soulcrystaltemplate.SoulCrystalTemplate;
 import app.l2nx.gs.adapter.api.spi.*;
+import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
@@ -19,7 +24,8 @@ import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import java.util.*;
-import java.util.concurrent.Executor;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -29,7 +35,7 @@ import java.util.function.ToLongFunction;
  * Tier-1 module that publishes static game-data (datapack-derived) templates onto
  * the {@code gd} sync stream. Multi-entity and data-driven: a static registry of
  * {@link EntityDescriptor}s (itemtemplate, npctemplate, skill, recipetemplate,
- * armorsettemplate, soulcrystaltemplate, classtemplate) pairs each gd entity's
+ * armorsettemplate, soulcrystaltemplate, classtemplate, instance) pairs each gd entity's
  * Tier-2 SPI with its snapshot accessor and primary-key extractor, so adding an entity is
  * one registry line rather than another field / discovery block. Each present provider
  * becomes an independent {@link EntitySync} with its own snapshot burst, {@code syncId}
@@ -65,19 +71,30 @@ public final class GameDataSyncModule implements AdapterModule {
 
     private final List<EntityDescriptor<?, ?>> descriptors;
     private final GameDataSender sender;
+    private final GameDataSyncConfig config;
+
+    private final AtomicBoolean snapshotRunning = new AtomicBoolean(false);
+    private final AtomicBoolean rerunRequested = new AtomicBoolean(false);
 
     private volatile String state = STATE_INIT;
     private volatile ConnectContext context;
     private volatile GameDataSnapshotPublisher publisher;
     private volatile List<EntitySync<?>> entitySyncs = Collections.emptyList();
+    private volatile ScheduledExecutorService resyncScheduler;
 
     public GameDataSyncModule() {
-        this(defaultDescriptors(), GameDataSyncModule::sendViaNxKafka);
+        this(defaultDescriptors(), GameDataSyncModule::sendViaNxKafka, GameDataSyncConfig.fromProductionChain());
     }
 
     GameDataSyncModule(List<EntityDescriptor<?, ?>> descriptors, GameDataSender sender) {
+        this(descriptors, sender, GameDataSyncConfig.defaults());
+    }
+
+    GameDataSyncModule(List<EntityDescriptor<?, ?>> descriptors, GameDataSender sender,
+                       GameDataSyncConfig config) {
         this.descriptors = descriptors;
         this.sender = sender;
+        this.config = config;
     }
 
     /**
@@ -101,6 +118,8 @@ public final class GameDataSyncModule implements AdapterModule {
         list.add(new EntityDescriptor<ClassTemplateProvider, ClassTemplate>(ClassTemplateProvider.class,
                 ClassTemplateProvider::entityName, ClassTemplateProvider::snapshot,
                 t -> t.getClazz() == null ? -1L : t.getClazz().ordinal()));
+        list.add(new EntityDescriptor<InstanceTemplateProvider, InstanceTemplate>(InstanceTemplateProvider.class,
+                InstanceTemplateProvider::entityName, InstanceTemplateProvider::snapshot, t -> (long) t.getId()));
         return Collections.unmodifiableList(list);
     }
 
@@ -140,7 +159,7 @@ public final class GameDataSyncModule implements AdapterModule {
         if (resolved.isEmpty()) {
             log.warn("No gd template provider SPI registered — gd-sync DISABLED. Register an "
                     + "ItemTemplateProvider, NpcTemplateProvider, SkillProvider and/or one of the "
-                    + "recipe/armor-set/soul-crystal/class providers via META-INF/services to "
+                    + "recipe/armor-set/soul-crystal/class/instance providers via META-INF/services to "
                     + "enable game-data sync.");
             state = STATE_DISABLED;
             return;
@@ -148,7 +167,44 @@ public final class GameDataSyncModule implements AdapterModule {
 
         this.entitySyncs = Collections.unmodifiableList(resolved);
         this.publisher = new GameDataSnapshotPublisher(sender);
+        registerResyncHandler(ctx);
         state = STATE_ACTIVE;
+    }
+
+    private void registerResyncHandler(ConnectContext ctx) {
+        try {
+            ctx.commands().on(GdResyncCommand.class, this::handleGdResync);
+        } catch (Throwable t) {
+            // Registration failure must not take down the module — the snapshot
+            // burst still publishes on connect / host reload / schedule; only the
+            // manual remote-resync RPC surface is lost.
+            log.warn("Failed to register gd-sync resync command handler: {}", t.getClass().getName(), t);
+        }
+    }
+
+    CommandResult<GdResyncResult> handleGdResync(GdResyncCommand cmd, CommandContext cctx) {
+        final ConnectContext ctx = context;
+        final GameDataSnapshotPublisher pub = publisher;
+        List<EntitySync<?>> syncs = entitySyncs;
+        if (!STATE_ACTIVE.equals(state) || ctx == null || pub == null || syncs.isEmpty()) {
+            return CommandResult.unavailable("gd-sync module is not active");
+        }
+        List<String> entityNames = registeredEntityNames(syncs);
+        try {
+            ctx.io().execute(() -> runAllSnapshots(ctx, pub));
+        } catch (Throwable t) {
+            log.error("gd-sync resync dispatch threw {} — no snapshot scheduled", t.getClass().getName(), t);
+            return CommandResult.unavailable("gd-sync could not schedule the snapshot");
+        }
+        return CommandResult.ok(GdResyncResult.builder().acceptedEntities(entityNames).build());
+    }
+
+    private static List<String> registeredEntityNames(List<EntitySync<?>> syncs) {
+        List<String> names = new ArrayList<String>(syncs.size());
+        for (EntitySync<?> sync : syncs) {
+            names.add(sync.entityName());
+        }
+        return names;
     }
 
     @Override
@@ -180,14 +236,45 @@ public final class GameDataSyncModule implements AdapterModule {
             log.error("gd-sync initial snapshot dispatch threw {} — no snapshot published",
                     t.getClass().getName(), t);
         }
+
+        startResyncScheduler(ctx, pub);
+    }
+
+    private void startResyncScheduler(ConnectContext ctx, GameDataSnapshotPublisher pub) {
+        if (!config.scheduledResyncEnabled()) {
+            return;
+        }
+        final int hours = config.resyncIntervalHours();
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "nx-gd-sync-resync");
+                t.setDaemon(true);
+                return t;
+            }
+        });
+        Runnable tick = SafeRunnable.wrap(() -> runAllSnapshots(ctx, pub), log);
+        scheduler.scheduleWithFixedDelay(tick, hours, hours, TimeUnit.HOURS);
+        this.resyncScheduler = scheduler;
+        log.info("gd-sync scheduled resync enabled — every {}h", hours);
     }
 
     @Override
     public void stop() {
+        ScheduledExecutorService scheduler = resyncScheduler;
+        resyncScheduler = null;
+        if (scheduler != null) {
+            scheduler.shutdownNow();
+        }
     }
 
     @Override
     public void onDisconnect() {
+        ScheduledExecutorService scheduler = resyncScheduler;
+        resyncScheduler = null;
+        if (scheduler != null) {
+            scheduler.shutdownNow();
+        }
         entitySyncs = Collections.emptyList();
         context = null;
         publisher = null;
@@ -220,9 +307,33 @@ public final class GameDataSyncModule implements AdapterModule {
                 .build();
     }
 
+    /**
+     * Guarded full-snapshot pass. Coalesces concurrent triggers (connect,
+     * host datapack-reload, remote resync, scheduler) into a single in-flight
+     * runner. Every caller records its intent ({@code rerunRequested=true})
+     * <em>before</em> contending for the running flag, so no trigger is ever
+     * lost: a caller that cannot acquire the flag has already armed a rerun the
+     * active runner will observe; the runner clears the flag at the start of
+     * each pass and re-loops while it is set, including across the flag-release
+     * window (re-acquired by the outer loop), so a request landing in the tail
+     * of a pass still fires exactly one more pass.
+     */
     private void runAllSnapshots(ConnectContext ctx, GameDataSnapshotPublisher pub) {
-        for (EntitySync<?> sync : entitySyncs) {
-            sync.run(pub, ctx);
+        rerunRequested.set(true);
+        while (snapshotRunning.compareAndSet(false, true)) {
+            try {
+                do {
+                    rerunRequested.set(false);
+                    for (EntitySync<?> sync : entitySyncs) {
+                        sync.run(pub, ctx);
+                    }
+                } while (rerunRequested.get());
+            } finally {
+                snapshotRunning.set(false);
+            }
+            if (!rerunRequested.get()) {
+                return;
+            }
         }
     }
 

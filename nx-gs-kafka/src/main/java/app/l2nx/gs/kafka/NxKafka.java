@@ -381,6 +381,29 @@ public final class NxKafka {
         }
     }
 
+    /**
+     * Blocks until every buffered producer record has been sent to the broker
+     * (delegates to {@code KafkaProducer.flush()}). No-op when NxKafka is shut
+     * down. Takes the send read-lock so it cannot race a {@code close()}.
+     *
+     * <p>Used by the events publisher's synchronous-flush path to guarantee
+     * a just-published fact reaches the broker before JVM-exit teardown.</p>
+     */
+    public void flush() {
+        if (closed.get()) {
+            return;
+        }
+        sendLock.readLock().lock();
+        try {
+            if (closed.get()) {
+                return;
+            }
+            producer.flush();
+        } finally {
+            sendLock.readLock().unlock();
+        }
+    }
+
     public boolean isConnected() {
         return state == KafkaState.CONNECTED;
     }

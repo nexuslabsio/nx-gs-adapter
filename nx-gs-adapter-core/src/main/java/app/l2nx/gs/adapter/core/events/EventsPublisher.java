@@ -55,6 +55,9 @@ public final class EventsPublisher {
      */
     private static final long SHUTDOWN_GRACE_MS = 1000L;
 
+    private static final ProducerFlusher NO_OP_FLUSHER = () -> {
+    };
+
     public enum DropPolicy {OLDEST, NEWEST}
 
     /**
@@ -67,8 +70,19 @@ public final class EventsPublisher {
         void send(ProducerRecord<byte[], Object> record, Callback callback);
     }
 
+    /**
+     * Bridge to a synchronous producer flush. Production wires this to
+     * {@code NxKafka.instance()::flush}; a no-op is used where the producer is
+     * not reachable (tests). Blocks until in-flight sends reach the broker.
+     */
+    @FunctionalInterface
+    public interface ProducerFlusher {
+        void flush();
+    }
+
     private final Map<String, String> familyTopics;
     private final Sender sender;
+    private final ProducerFlusher producerFlusher;
     private final BlockingQueue<EventEnvelope> queue;
     private final int queueCapacity;
     private final DropPolicy dropPolicy;
@@ -85,11 +99,20 @@ public final class EventsPublisher {
                            Sender sender,
                            EventsConfig config,
                            EventTypeRegistry registry) {
+        this(familyTopics, sender, NO_OP_FLUSHER, config, registry);
+    }
+
+    public EventsPublisher(@Nullable Map<String, String> familyTopics,
+                           Sender sender,
+                           ProducerFlusher producerFlusher,
+                           EventsConfig config,
+                           EventTypeRegistry registry) {
         int capacity = Math.max(1, config.getQueueCapacity());
         this.familyTopics = familyTopics == null
                 ? Collections.emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, String>(familyTopics));
         this.sender = sender;
+        this.producerFlusher = producerFlusher != null ? producerFlusher : NO_OP_FLUSHER;
         this.queue = new ArrayBlockingQueue<EventEnvelope>(capacity);
         this.queueCapacity = capacity;
         this.dropPolicy = config.getDropPolicy() != null ? config.getDropPolicy() : DropPolicy.NEWEST;
@@ -164,6 +187,40 @@ public final class EventsPublisher {
         } else {
             droppedTotal.incrementAndGet();
         }
+    }
+
+    /**
+     * Synchronously drain the queue into the sender and block on a producer
+     * flush until in-flight records reach the broker, or {@code timeoutMs}
+     * elapses. Does NOT stop the daemon — this is a flush, not a shutdown; the
+     * daemon may drain concurrently (both feed the same thread-safe sender).
+     *
+     * <p>Never throws (game-exit safety) — a flusher failure is logged and
+     * reported as {@code false}.</p>
+     *
+     * @return {@code true} if the queue emptied and the producer flush returned
+     * within the budget; {@code false} on timeout (records may still be
+     * in flight)
+     */
+    public boolean flush(long timeoutMs) {
+        long deadline = System.currentTimeMillis() + Math.max(0L, timeoutMs);
+        EventEnvelope envelope;
+        while ((envelope = queue.poll()) != null) {
+            doSend(envelope);
+            if (timeoutMs > 0 && System.currentTimeMillis() >= deadline) {
+                log.warn("Events flush timed out draining queue after {}ms — {} envelope(s) still queued",
+                        timeoutMs, queue.size());
+                return false;
+            }
+        }
+        try {
+            producerFlusher.flush();
+        } catch (Throwable t) {
+            log.warn("Events flush: producer flush threw {} — {}",
+                    t.getClass().getName(), t.getMessage());
+            return false;
+        }
+        return timeoutMs <= 0 || System.currentTimeMillis() < deadline;
     }
 
     /**

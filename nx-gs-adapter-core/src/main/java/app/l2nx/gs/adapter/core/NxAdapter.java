@@ -508,14 +508,15 @@ public final class NxAdapter {
         EventsConfig cfg = eventsConfig != null ? eventsConfig : EventsConfig.defaults();
         EventsPublisher.Sender sender = (record, callback) ->
                 NxKafka.instance().sendBytesKeyRecord(record, callback);
+        EventsPublisher.ProducerFlusher flusher = () -> NxKafka.instance().flush();
         NxEvents facade = eventsFacade;
         if (facade == null) {
-            EventsBootstrap.Started started = EventsBootstrap.start(familyTopics, sender, cfg);
+            EventsBootstrap.Started started = EventsBootstrap.start(familyTopics, sender, flusher, cfg);
             eventsPublisher = started.publisher();
             eventsFacade = started.events();
             return eventsFacade;
         }
-        eventsPublisher = EventsBootstrap.swap(facade, familyTopics, sender, cfg);
+        eventsPublisher = EventsBootstrap.swap(facade, familyTopics, sender, flusher, cfg);
         return facade;
     }
 

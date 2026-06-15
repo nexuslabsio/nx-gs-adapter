@@ -59,6 +59,11 @@ class CommandsConsumerTest {
         @Override
         public void publish(Object event) {
         }
+
+        @Override
+        public boolean flush(long timeoutMs) {
+            return true;
+        }
     }
 
     private static final UUID OWN_SERVER_ID = UUID.fromString("019a0000-0000-7000-8000-000000000abc");

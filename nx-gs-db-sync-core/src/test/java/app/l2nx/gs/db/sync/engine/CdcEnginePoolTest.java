@@ -90,8 +90,7 @@ class CdcEnginePoolTest {
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
                 k -> null,
-                evt -> {
-                });
+                RecordingNxEvents.noop());
 
         engine.start();
 

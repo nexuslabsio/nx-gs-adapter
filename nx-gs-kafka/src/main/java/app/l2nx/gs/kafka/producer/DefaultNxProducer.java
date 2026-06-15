@@ -212,6 +212,15 @@ class DefaultNxProducer implements NxProducer {
     }
 
     @Override
+    public void flush() {
+        try {
+            producer.flush();
+        } catch (Exception e) {
+            log.warn("Error flushing producer", e);
+        }
+    }
+
+    @Override
     public void close() {
         try {
             producer.close(closeTimeout);

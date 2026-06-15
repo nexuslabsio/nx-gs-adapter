@@ -7,7 +7,8 @@ import java.util.Map;
 
 /**
  * Public factory for the events publish subsystem. {@code NxAdapter} calls
- * {@link #start(Map, EventsPublisher.Sender, EventsConfig)} once per connect
+ * {@link #start(Map, EventsPublisher.Sender, EventsPublisher.ProducerFlusher, EventsConfig)}
+ * once per connect
  * cycle to wire up the bounded queue + daemon thread + registry, returning a
  * {@link Started} bundle with the {@link EventsPublisher} (for shutdown +
  * heartbeat status) and the {@link NxEvents} façade (for
@@ -26,20 +27,24 @@ public final class EventsBootstrap {
      * Materializes the registry, instantiates the publisher, starts its daemon
      * thread, and wraps the publisher in an {@link NxEvents} façade.
      *
-     * @param familyTopics per-family Kafka topic map from
-     *                     {@code MessagingTopics.events}; {@code null} or
-     *                     empty disables every publish call (no-op +
-     *                     DEBUG log).
-     * @param sender       Kafka send bridge — production wires this to
-     *                     {@code NxKafka.instance()::sendBytesKeyRecord}.
-     * @param config       operator-tunable knobs (queue capacity, drop policy,
-     *                     shutdown drain).
+     * @param familyTopics    per-family Kafka topic map from
+     *                        {@code MessagingTopics.events}; {@code null} or
+     *                        empty disables every publish call (no-op +
+     *                        DEBUG log).
+     * @param sender          Kafka send bridge — production wires this to
+     *                        {@code NxKafka.instance()::sendBytesKeyRecord}.
+     * @param producerFlusher synchronous producer-flush bridge — production
+     *                        wires this to {@code NxKafka.instance()::flush};
+     *                        backs {@code NxEvents.flush(timeoutMs)}.
+     * @param config          operator-tunable knobs (queue capacity, drop policy,
+     *                        shutdown drain).
      */
     public static Started start(@Nullable Map<String, String> familyTopics,
                                 EventsPublisher.Sender sender,
+                                EventsPublisher.ProducerFlusher producerFlusher,
                                 EventsConfig config) {
         EventTypeRegistry registry = new EventTypeRegistry();
-        EventsPublisher publisher = new EventsPublisher(familyTopics, sender, config, registry);
+        EventsPublisher publisher = new EventsPublisher(familyTopics, sender, producerFlusher, config, registry);
         publisher.start();
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
         return new Started(publisher, events);
@@ -54,6 +59,7 @@ public final class EventsBootstrap {
     public static EventsPublisher swap(NxEvents facade,
                                        @Nullable Map<String, String> familyTopics,
                                        EventsPublisher.Sender sender,
+                                       EventsPublisher.ProducerFlusher producerFlusher,
                                        EventsConfig config) {
         if (!(facade instanceof NxEventsImpl)) {
             throw new IllegalArgumentException(
@@ -61,7 +67,7 @@ public final class EventsBootstrap {
                             + (facade == null ? "null" : facade.getClass().getName()));
         }
         EventTypeRegistry registry = new EventTypeRegistry();
-        EventsPublisher publisher = new EventsPublisher(familyTopics, sender, config, registry);
+        EventsPublisher publisher = new EventsPublisher(familyTopics, sender, producerFlusher, config, registry);
         publisher.start();
         ((NxEventsImpl) facade).swap(publisher, registry);
         return publisher;

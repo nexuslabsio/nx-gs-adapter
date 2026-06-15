@@ -7,10 +7,7 @@ import app.l2nx.gs.adapter.api.kafka.events.character.CharacterDeathEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.gameevents.GameEventSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.leveldata.LevelExpTableSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
-import app.l2nx.gs.adapter.api.kafka.events.mail.MailCancelledEvent;
-import app.l2nx.gs.adapter.api.kafka.events.mail.MailReturnedEvent;
-import app.l2nx.gs.adapter.api.kafka.events.mail.MailSentEvent;
+import app.l2nx.gs.adapter.api.kafka.events.mail.*;
 import app.l2nx.gs.adapter.api.kafka.events.olympiad.HeroGrantedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.olympiad.OlympiadMatchResultEvent;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
@@ -89,6 +86,10 @@ final class EventTypeRegistry {
                 evt -> LongBytes.bigEndian(((MailCancelledEvent) evt).getMailId()));
         register(map, families, MailReturnedEvent.class, "mail",
                 evt -> LongBytes.bigEndian(((MailReturnedEvent) evt).getMailId()));
+        register(map, families, MailReadEvent.class, "mail",
+                evt -> LongBytes.bigEndian(((MailReadEvent) evt).getMailId()));
+        register(map, families, MailDeletedEvent.class, "mail",
+                evt -> LongBytes.bigEndian(((MailDeletedEvent) evt).getMailId()));
         register(map, families, PrivateTradeFinishedEvent.class, "privatetrade",
                 evt -> null);
         register(map, families, RatingSnapshotEvent.class, "rating",

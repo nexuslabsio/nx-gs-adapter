@@ -68,4 +68,19 @@ final class NxEventsImpl implements NxEvents {
         }
         publisher.enqueue(new EventEnvelope(event, binding));
     }
+
+    @Override
+    public boolean flush(long timeoutMs) {
+        EventsPublisher publisher = publisherRef.get();
+        if (publisher == null) {
+            log.debug("flush called before publisher wired — nothing to flush");
+            return true;
+        }
+        try {
+            return publisher.flush(timeoutMs);
+        } catch (Throwable t) {
+            log.warn("flush threw {} — reporting incomplete", t.getClass().getName());
+            return false;
+        }
+    }
 }

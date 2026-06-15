@@ -51,8 +51,7 @@ class CdcEngineTest {
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
                 k -> null,
-                evt -> {
-                });
+                RecordingNxEvents.noop());
 
         // Replace the running scheduler tick path: stop immediately so the
         // periodic scheduler doesn't fire ticks under test.
@@ -86,8 +85,7 @@ class CdcEngineTest {
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
                 k -> null,
-                evt -> {
-                });
+                RecordingNxEvents.noop());
 
         engine.start();
         engine.stop();
@@ -112,8 +110,7 @@ class CdcEngineTest {
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
                 k -> null,
-                evt -> {
-                });
+                RecordingNxEvents.noop());
 
         engine.start();
         engine.start(); // second call must be a no-op
@@ -144,8 +141,7 @@ class CdcEngineTest {
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
                 k -> null,
-                evt -> {
-                });
+                RecordingNxEvents.noop());
 
         engine.start();
         assertEquals(1, recorder.loadCount, "load() must run exactly once on start");
@@ -196,8 +192,7 @@ class CdcEngineTest {
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
                 k -> null,
-                evt -> {
-                });
+                RecordingNxEvents.noop());
 
         engine.start();
         engine.stop();

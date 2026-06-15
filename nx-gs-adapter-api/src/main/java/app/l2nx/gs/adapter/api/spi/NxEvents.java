@@ -59,4 +59,32 @@ public interface NxEvents {
      *              {@code null} is treated as a no-op with a WARN log entry.
      */
     void publish(@Nullable Object event);
+
+    /**
+     * Synchronously drain the in-memory event queue into the Kafka producer and
+     * block until every buffered record has been sent to the broker, or until
+     * {@code timeoutMs} elapses — whichever comes first. The single sync method
+     * on this otherwise fire-and-forget contract.
+     *
+     * <p>Unlike {@link #publish}, this BLOCKS the caller. Use it on a JVM-exit
+     * path (e.g. just before {@code System.exit}) to guarantee a freshly
+     * published fact — typically the server-stopping event — reaches the broker
+     * before shutdown hooks tear the producer down. Callers MUST {@link #publish}
+     * the event first, then {@code flush}.</p>
+     *
+     * <p>Unlike {@code publish}'s game-loop-safety contract, this method MAY
+     * block for up to {@code timeoutMs}; never call it on the game thread.
+     * It never throws — failures and timeouts are swallowed (and surface only
+     * through the return value / heartbeat counters).</p>
+     *
+     * <p><b>Pre-connect.</b> Before {@code onConnect} wires the producer this is
+     * a no-op returning {@code true} (nothing to flush), mirroring {@code publish}.</p>
+     *
+     * @param timeoutMs maximum time to block, in milliseconds; {@code <= 0}
+     *                  attempts a best-effort drain + flush with no extra wait
+     * @return {@code true} if the queue drained and the producer flushed within
+     * the budget (or there was nothing to flush); {@code false} if the
+     * timeout elapsed with records still in flight
+     */
+    boolean flush(long timeoutMs);
 }

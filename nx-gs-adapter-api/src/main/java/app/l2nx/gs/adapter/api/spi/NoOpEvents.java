@@ -24,4 +24,9 @@ final class NoOpEvents implements NxEvents {
     @Override
     public void publish(@Nullable Object event) {
     }
+
+    @Override
+    public boolean flush(long timeoutMs) {
+        return true;
+    }
 }

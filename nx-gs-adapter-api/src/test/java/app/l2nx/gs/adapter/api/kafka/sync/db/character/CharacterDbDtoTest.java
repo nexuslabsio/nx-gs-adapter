@@ -137,7 +137,7 @@ class CharacterDbDtoTest {
     void builder_andConstructor_shouldProduceEqualObjects_whenAllOptionalNull() {
         CharacterDbDto fromBuilder = CharacterDbDto.builder().id(1L).name("X").build();
         CharacterDbDto fromCtor = new CharacterDbDto(1L, "X", null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -147,12 +147,15 @@ class CharacterDbDtoTest {
     void toBuilder_shouldRoundtrip() {
         List<CharacterSubclassDbDto> subs = Collections.singletonList(
                 CharacterSubclassDbDto.builder().classId(CharacterClass.SOULTAKER).level(76).build());
+        List<CharacterInstanceCooldownDbDto> cooldowns = Collections.singletonList(
+                CharacterInstanceCooldownDbDto.builder()
+                        .instanceId(42).reentryAt(Instant.parse("2026-07-02T00:00:00Z")).build());
         CharacterDbDto original = new CharacterDbDto(1L, "X", "acc", "", 10,
                 CharacterSex.MALE, CharacterRace.HUMAN,
                 CharacterClass.HUMAN_FIGHTER, CharacterClass.HUMAN_FIGHTER,
                 subs, CharacterPrivateStore.CRAFT,
                 null, 0, 0, 0, Boolean.FALSE, Instant.parse("2026-07-01T00:00:00Z"), Boolean.TRUE,
-                86_400L, Boolean.TRUE);
+                86_400L, Boolean.TRUE, Boolean.TRUE, cooldowns);
 
         assertEquals(original, original.toBuilder().build());
     }

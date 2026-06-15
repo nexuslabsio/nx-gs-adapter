@@ -217,6 +217,44 @@ class EventsPublisherTest {
         assertEquals(0, stats.getQueueDepth());
     }
 
+    @Test
+    void flush_shouldDrainQueueAndInvokeProducerFlush() {
+        ConcurrentLinkedQueue<Long> sent = new ConcurrentLinkedQueue<Long>();
+        EventsPublisher.Sender sender = (record, callback) -> {
+            sent.add(ByteBuffer.wrap(record.key()).getLong());
+            callback.onCompletion(null, null);
+        };
+        java.util.concurrent.atomic.AtomicInteger flushes = new java.util.concurrent.atomic.AtomicInteger();
+        EventsPublisher.ProducerFlusher flusher = flushes::incrementAndGet;
+
+        Map<String, String> topics = Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase");
+        EventTypeRegistry registry = new EventTypeRegistry();
+        // Non-started publisher — flush() drains synchronously on the calling thread.
+        publisher = new EventsPublisher(topics, sender, flusher,
+                cfg(10, EventsPublisher.DropPolicy.NEWEST, 0L), registry);
+        EventTypeBinding binding = registry.lookup(PremiumPurchaseEvent.class);
+        publisher.enqueue(envelope(1L, binding));
+        publisher.enqueue(envelope(2L, binding));
+
+        boolean completed = publisher.flush(1000L);
+
+        assertTrue(completed);
+        assertEquals(2, sent.size());
+        assertEquals(0, publisher.queueDepth());
+        assertEquals(1, flushes.get());
+    }
+
+    @Test
+    void flush_shouldReturnTrueAndFlush_whenQueueEmpty() {
+        java.util.concurrent.atomic.AtomicInteger flushes = new java.util.concurrent.atomic.AtomicInteger();
+        publisher = new EventsPublisher(Collections.emptyMap(), noopSender(),
+                flushes::incrementAndGet, cfg(10, EventsPublisher.DropPolicy.NEWEST, 0L),
+                new EventTypeRegistry());
+
+        assertTrue(publisher.flush(1000L));
+        assertEquals(1, flushes.get());
+    }
+
     private static EventsConfig cfg(int capacity, EventsPublisher.DropPolicy policy, long shutdownDrainMs) {
         return new EventsConfig(capacity, policy, shutdownDrainMs);
     }
