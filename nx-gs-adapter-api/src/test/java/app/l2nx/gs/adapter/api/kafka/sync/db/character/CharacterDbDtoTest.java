@@ -137,7 +137,7 @@ class CharacterDbDtoTest {
     void builder_andConstructor_shouldProduceEqualObjects_whenAllOptionalNull() {
         CharacterDbDto fromBuilder = CharacterDbDto.builder().id(1L).name("X").build();
         CharacterDbDto fromCtor = new CharacterDbDto(1L, "X", null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -155,7 +155,7 @@ class CharacterDbDtoTest {
                 CharacterClass.HUMAN_FIGHTER, CharacterClass.HUMAN_FIGHTER,
                 subs, CharacterPrivateStore.CRAFT,
                 null, 0, 0, 0, Boolean.FALSE, Instant.parse("2026-07-01T00:00:00Z"), Boolean.TRUE,
-                86_400L, Boolean.TRUE, Boolean.TRUE, cooldowns);
+                86_400L, Boolean.TRUE, Boolean.TRUE, 1500, cooldowns);
 
         assertEquals(original, original.toBuilder().build());
     }
