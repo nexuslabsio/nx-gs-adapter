@@ -5,6 +5,7 @@ import app.l2nx.gs.adapter.api.domain.item.ArmorType;
 import app.l2nx.gs.adapter.api.domain.item.EtcItemType;
 import app.l2nx.gs.adapter.api.domain.item.ItemClass;
 import app.l2nx.gs.adapter.api.domain.item.ItemEquipSlot;
+import app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore.WellKnownGearScoreEnchantProfiles;
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
 import org.jspecify.annotations.Nullable;
 
@@ -68,6 +69,8 @@ public final class ItemTemplate {
     private final @Nullable ItemStats stats;
     private final @Nullable ItemRestrictions restrictions;
     private final @Nullable ItemUpgrade upgrade;
+    private final @Nullable Integer gearScore;
+    private final @Nullable String gearScoreEnchantProfile;
 
     public ItemTemplate(int id,
                         ItemClass type,
@@ -91,7 +94,9 @@ public final class ItemTemplate {
                         @Nullable List<ItemSkillRef> skills,
                         @Nullable ItemStats stats,
                         @Nullable ItemRestrictions restrictions,
-                        @Nullable ItemUpgrade upgrade) {
+                        @Nullable ItemUpgrade upgrade,
+                        @Nullable Integer gearScore,
+                        @Nullable String gearScoreEnchantProfile) {
         this.id = id;
         this.type = Objects.requireNonNull(type, "type");
         this.icon = icon;
@@ -116,6 +121,8 @@ public final class ItemTemplate {
         this.stats = stats;
         this.restrictions = restrictions;
         this.upgrade = upgrade;
+        this.gearScore = gearScore;
+        this.gearScoreEnchantProfile = gearScoreEnchantProfile;
     }
 
     public int getId() {
@@ -231,6 +238,29 @@ public final class ItemTemplate {
         return upgrade;
     }
 
+    /**
+     * Base gear-score contribution of this item — the build-defined "power"
+     * weight the item adds before enchant / attribute scaling. {@code null} when
+     * the build does not compute gear score for the item (host sentinel
+     * {@code -1} maps to {@code null}).
+     */
+    public @Nullable Integer getGearScore() {
+        return gearScore;
+    }
+
+    /**
+     * Optional open-string profile key governing how this item's gear score grows
+     * with enchant level — a reference into the gear-score ruleset
+     * ({@code gearscore} entity) rather than an inline table: it matches the rule
+     * with the same {@code key} in the ruleset's {@code ENCHANT_PROFILE} group.
+     * Canonical {@code UPPER_SNAKE_CASE} values are in
+     * {@link WellKnownGearScoreEnchantProfiles}. {@code null} when the build has no
+     * gear score or no profile concept.
+     */
+    public @Nullable String getGearScoreEnchantProfile() {
+        return gearScoreEnchantProfile;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .id(id)
@@ -255,7 +285,9 @@ public final class ItemTemplate {
                 .skills(skills)
                 .stats(stats)
                 .restrictions(restrictions)
-                .upgrade(upgrade);
+                .upgrade(upgrade)
+                .gearScore(gearScore)
+                .gearScoreEnchantProfile(gearScoreEnchantProfile);
     }
 
     public static Builder builder() {
@@ -289,7 +321,9 @@ public final class ItemTemplate {
                 && Objects.equals(skills, that.skills)
                 && Objects.equals(stats, that.stats)
                 && Objects.equals(restrictions, that.restrictions)
-                && Objects.equals(upgrade, that.upgrade);
+                && Objects.equals(upgrade, that.upgrade)
+                && Objects.equals(gearScore, that.gearScore)
+                && Objects.equals(gearScoreEnchantProfile, that.gearScoreEnchantProfile);
     }
 
     @Override
@@ -297,7 +331,7 @@ public final class ItemTemplate {
         return Objects.hash(id, type, icon, name, weight, referencePrice, material,
                 grade, equipSlot, weaponType, armorType, etcItemType, stackable, questItem,
                 petUsable, defaultAction, useHandler, duration, reuseDelayMs, skills, stats,
-                restrictions, upgrade);
+                restrictions, upgrade, gearScore, gearScoreEnchantProfile);
     }
 
     @Override
@@ -329,6 +363,8 @@ public final class ItemTemplate {
         private @Nullable ItemStats stats;
         private @Nullable ItemRestrictions restrictions;
         private @Nullable ItemUpgrade upgrade;
+        private @Nullable Integer gearScore;
+        private @Nullable String gearScoreEnchantProfile;
 
         public Builder id(int id) {
             this.id = id;
@@ -445,11 +481,21 @@ public final class ItemTemplate {
             return this;
         }
 
+        public Builder gearScore(@Nullable Integer gearScore) {
+            this.gearScore = gearScore;
+            return this;
+        }
+
+        public Builder gearScoreEnchantProfile(@Nullable String gearScoreEnchantProfile) {
+            this.gearScoreEnchantProfile = gearScoreEnchantProfile;
+            return this;
+        }
+
         public ItemTemplate build() {
             return new ItemTemplate(id, type, icon, name, weight, referencePrice, material,
                     grade, equipSlot, weaponType, armorType, etcItemType, stackable, questItem,
                     petUsable, defaultAction, useHandler, duration, reuseDelayMs, skills, stats,
-                    restrictions, upgrade);
+                    restrictions, upgrade, gearScore, gearScoreEnchantProfile);
         }
     }
 }

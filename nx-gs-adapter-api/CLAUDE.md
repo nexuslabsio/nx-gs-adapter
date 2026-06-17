@@ -27,12 +27,19 @@ by the L2NX game-server adapter and its consumers. Published as
   `CharacterSubclassDbDto`; CharacterDbDto carries optional `accountName`,
   `nobless`, `scheduledDeletionAt` on top of the identity / progression set, all
   three from generic L2J columns — see
-  `docs/features/character-core-extension/`), `clan` (`ClanDbDto` +
+  `docs/features/character-core-extension/`; plus optional `gearScore: Integer`
+  — the active-class gear score, a snapshot at last character store, `null` when
+  the build computes no gear score), `clan` (`ClanDbDto` +
   `ClanSkillDbDto`; ClanDbDto carries optional `icon: byte[]` for the clan crest
   as decoded PNG bytes — schema providers do the source-format → PNG
   conversion in `mapEntity`), `alliance` (`AllianceDbDto{allyId, allyName,
   icon: byte[]}` — same icon convention as clan), `item` (`ItemDbDto`,
-  `ItemAttributeDbDto`). CharacterRuntimeDto (`kafka.sync.runtime.character`)
+  `ItemAttributeDbDto`), `rating`
+  (`kafka.sync.db.rating.RatingDbDto{ratingType, season?, charId, points,
+  metadata?}` + `WellKnownRatingTypes` — `lower_snake_case` open-string rating
+  types, first `fishing`; one unified topic carries every rating kind
+  discriminated by `ratingType`, rank is NOT on the wire — consumers window it at
+  read time). CharacterRuntimeDto (`kafka.sync.runtime.character`)
   carries an optional `online: Boolean` presence marker — wire convention:
   `null`/omitted = ONLINE (byte-budget default), explicit `false` = one-shot
   OFFLINE tombstone, explicit `true` allowed but redundant. Consumers MUST
@@ -42,6 +49,26 @@ by the L2NX game-server adapter and its consumers. Published as
   channel; `null` on cores that don't expose it and on offline tombstones.
   Consumers combine it with the per-server level→exp table (see
   `events.leveldata` below) to compute "% progress within the current level".
+- `app.l2nx.gs.adapter.api.kafka.sync.gd.<entity>` — per-entity wire DTOs for the
+  gd-sync (static game-data) stream, payload of `GameDataSyncEvent<T>`. Gear-score
+  additions (build-agnostic; `null` when the build computes no gear score):
+  `itemtemplate.ItemTemplate` carries optional `gearScore: Integer` (item base
+  contribution) + `gearScoreEnchantProfile: String` — an open `UPPER_SNAKE` profile
+  key (canonical constants in `WellKnownGearScoreEnchantProfiles`:
+  `WEAPON` / `NONWEAPON` / `SPECIAL`; build-defined, null when absent), a reference
+  into the ruleset's `ENCHANT_PROFILE` group (rule `key` == this value), not an
+  inline table; `skill.Skill` carries optional `gearScoreContributions:
+  List<GearScoreContribution>` where `GearScoreContribution{kind, value, classIds?}`
+  has `kind` in `UPPER_SNAKE` (`OWNED` / `PER_LEVEL` / `ENCHANT`) and `classIds`
+  null = all classes. New singleton entity `gearscore` —
+  `GearScoreRuleset{enabled, groups: List<GearScoreRuleGroup>}`,
+  `GearScoreRuleGroup{category (UPPER_SNAKE: LEVEL | ATTRIBUTE | AUGMENT |
+  ENCHANT_PROFILE | SET_BONUS | AURA | ACHIEVEMENT | SKILL), label: LocalizedText,
+  description?, rules: List<GearScoreRule>}`, `GearScoreRule{key, label?, value?,
+  unit? (UPPER_SNAKE: PER_POINT | PERCENT | FLAT | PER_LEVEL | PER_STEP), cap?,
+  scaling?: List<GearScoreScalingStep>}`, `GearScoreScalingStep{from, to?, value}`.
+  The wiki renders the ruleset groups as tables; per-entity values
+  (`ItemTemplate.gearScore`, `Skill.gearScoreContributions`) are the live numbers.
 - `app.l2nx.gs.adapter.api.kafka.events.<family>` — outbound discrete-fact event
   DTOs grouped by family. Single-event families take the concrete type on the
   publish method directly; multi-event families bind on an abstract base and
@@ -166,19 +193,6 @@ by the L2NX game-server adapter and its consumers. Published as
       `winnerClanId?` (post-siege holder; null on draw),
       `attackerClanIds` / `defenderClanIds` (registered clans), open `metadata`.
       Build-agnostic — outcome is an open string, not a contract assumption.
-    - `events.ratings` — `RatingSnapshotEvent` (final, UUIDv7 `eventId` +
-      `ratingType` open string + `List<RatingEntry> entries`) + `RatingEntry`
-      (`charId` + `score` + host-computed `rank`; no char name on the wire —
-      platform joins the character catalog) + `WellKnownRatingTypes` constants
-      (`fishing`). Single-event family; the wire family / topic is `rating`
-      (singular — `<tenant>.gs.events.rating`; the Java package stays
-      `events.ratings`). Periodic FULL snapshot of one ranked
-      leaderboard, host-pushed via `NxEvents.publish(...)` (bohpts: fishing
-      championship top-1000 every 1 min). One family carries every leaderboard
-      kind, discriminated by `ratingType`, so a new leaderboard needs only a
-      new `WellKnownRatingTypes` constant — no new family / topic. Partition
-      key: `null` (round-robin); platform scope-replaces per
-      `(server, ratingType)` gated by the `eventId` timestamp.
     - `events.leveldata` — `LevelExpTableSnapshotEvent` (final, UUIDv7 `eventId`
         + `List<LevelExpEntry> levels` + optional open `Map<String,String>
       metadata`) + `LevelExpEntry` (`int level` + `long requiredExp` — the
@@ -211,7 +225,11 @@ by the L2NX game-server adapter and its consumers. Published as
 - `app.l2nx.gs.adapter.api.spi` — SPIs: Tier-1 `AdapterModule`, Tier-2
   `DbSchemaProvider` / `RuntimeStateProvider` (`EntityMapping` carries the
   optional `parentRefs()` default — `ParentRef` cross-entity ownership
-  declarations consumed by the db-sync force-resync cascade), Tier-3
+  declarations consumed by the db-sync force-resync cascade) + the gd-sync catalog
+  providers (`ItemTemplateProvider` / `SkillProvider` / … `snapshot()` →
+  `Collection<T>`) including the singleton `GearScoreRulesetProvider`
+  (`entityName()` = `"gearscore"`, `snapshot()` → `Optional<GearScoreRuleset>`,
+  empty when the build has no gear-score system), Tier-3
   `JdbcConnectionSource`,
   context bundle `ConnectContext` (now includes `io()` returning an
   adapter-owned `java.util.concurrent.Executor` for module-level blocking IO),

@@ -75,6 +75,7 @@ public final class CharacterDbDto {
     private final @Nullable Long onlineTimeSeconds;
     private final @Nullable Boolean hero;
     private final @Nullable Boolean expBlocked;
+    private final @Nullable Integer gearScore;
     private final @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns;
 
     public CharacterDbDto(long id,
@@ -98,6 +99,7 @@ public final class CharacterDbDto {
                           @Nullable Long onlineTimeSeconds,
                           @Nullable Boolean hero,
                           @Nullable Boolean expBlocked,
+                          @Nullable Integer gearScore,
                           @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns) {
         this.id = id;
         this.name = Objects.requireNonNull(name, "CharacterDbDto.name is required");
@@ -120,6 +122,7 @@ public final class CharacterDbDto {
         this.onlineTimeSeconds = onlineTimeSeconds;
         this.hero = hero;
         this.expBlocked = expBlocked;
+        this.gearScore = gearScore;
         this.instanceCooldowns = instanceCooldowns == null
                 ? null
                 : Collections.unmodifiableList(instanceCooldowns);
@@ -322,6 +325,18 @@ public final class CharacterDbDto {
     }
 
     /**
+     * Gear score of the character's active class — a build-defined numeric
+     * "power" rating summed from item base / enchant / attribute / augment,
+     * character level, skills and set bonuses. Persisted by the game server only
+     * on character store (logout / autosave), so the value is a snapshot at the
+     * last save, not a live figure for an online character. {@code null} when the
+     * build does not compute gear score or does not surface the column.
+     */
+    public @Nullable Integer getGearScore() {
+        return gearScore;
+    }
+
+    /**
      * Per-instance re-entry cooldowns — source {@code character_instance_time}
      * (or its tenant equivalent), one entry per {@code (charId, instanceId)}.
      * {@code null} when the tenant does not sync instance cooldowns (no
@@ -355,6 +370,7 @@ public final class CharacterDbDto {
                 .onlineTimeSeconds(onlineTimeSeconds)
                 .hero(hero)
                 .expBlocked(expBlocked)
+                .gearScore(gearScore)
                 .instanceCooldowns(instanceCooldowns);
     }
 
@@ -388,6 +404,7 @@ public final class CharacterDbDto {
                 && Objects.equals(onlineTimeSeconds, that.onlineTimeSeconds)
                 && Objects.equals(hero, that.hero)
                 && Objects.equals(expBlocked, that.expBlocked)
+                && Objects.equals(gearScore, that.gearScore)
                 && Objects.equals(instanceCooldowns, that.instanceCooldowns);
     }
 
@@ -396,7 +413,7 @@ public final class CharacterDbDto {
         return Objects.hash(id, name, accountName, title, level, sex, race,
                 classId, baseClassId, subclasses, privateStore,
                 clanId, pvpCounter, pkCounter, karma, noblesse, scheduledDeletionAt, online,
-                onlineTimeSeconds, hero, expBlocked, instanceCooldowns);
+                onlineTimeSeconds, hero, expBlocked, gearScore, instanceCooldowns);
     }
 
     @Override
@@ -422,6 +439,7 @@ public final class CharacterDbDto {
                 + ", onlineTimeSeconds=" + onlineTimeSeconds
                 + ", hero=" + hero
                 + ", expBlocked=" + expBlocked
+                + ", gearScore=" + gearScore
                 + ", instanceCooldowns=" + instanceCooldowns + "]";
     }
 
@@ -447,6 +465,7 @@ public final class CharacterDbDto {
         private @Nullable Long onlineTimeSeconds;
         private @Nullable Boolean hero;
         private @Nullable Boolean expBlocked;
+        private @Nullable Integer gearScore;
         private @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns;
 
         public Builder id(long id) {
@@ -554,6 +573,11 @@ public final class CharacterDbDto {
             return this;
         }
 
+        public Builder gearScore(@Nullable Integer gearScore) {
+            this.gearScore = gearScore;
+            return this;
+        }
+
         public Builder instanceCooldowns(@Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns) {
             this.instanceCooldowns = instanceCooldowns;
             return this;
@@ -563,7 +587,7 @@ public final class CharacterDbDto {
             return new CharacterDbDto(id, name, accountName, title, level, sex, race,
                     classId, baseClassId, subclasses, privateStore,
                     clanId, pvpCounter, pkCounter, karma, noblesse, scheduledDeletionAt, online,
-                    onlineTimeSeconds, hero, expBlocked, instanceCooldowns);
+                    onlineTimeSeconds, hero, expBlocked, gearScore, instanceCooldowns);
         }
     }
 }

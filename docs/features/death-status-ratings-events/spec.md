@@ -223,6 +223,13 @@ bot), operators (server-status menu section), and platform-side consumers
 
 ### Milestone C — Fisher ratings sync
 
+> ⚠️ **SUPERSEDED (2026-06-17).** This events-based `ratings` family (`RatingSnapshotEvent` /
+> `RatingEntry` under `kafka.events.ratings`) has been **removed**. Ratings now sync per-character via
+> the db-sync CDC stream — `kafka.sync.db.rating.RatingDbDto` on `<tenant>.gs.sync.db.rating` — with
+> rank computed at read time. See the generic-ratings design spec in
+> `nx-gameservers/docs/superpowers/specs/2026-06-17-generic-ratings-sync-design.md`. The milestone
+> below is kept for history only; the DTOs it references no longer exist.
+
 **Must:**
 
 - [todo] R14. `nx-gs-adapter-api` MUST ship a **new `ratings` family** under

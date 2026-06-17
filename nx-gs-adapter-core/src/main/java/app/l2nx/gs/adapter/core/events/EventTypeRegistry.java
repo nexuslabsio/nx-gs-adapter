@@ -16,7 +16,6 @@ import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEve
 import app.l2nx.gs.adapter.api.kafka.events.privatetrade.PrivateTradeFinishedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.raid.kill.RaidKillEvent;
 import app.l2nx.gs.adapter.api.kafka.events.raid.respawn.BossRespawnSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.ratings.RatingSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerStartedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerStoppingEvent;
@@ -91,8 +90,6 @@ final class EventTypeRegistry {
         register(map, families, MailDeletedEvent.class, "mail",
                 evt -> LongBytes.bigEndian(((MailDeletedEvent) evt).getMailId()));
         register(map, families, PrivateTradeFinishedEvent.class, "privatetrade",
-                evt -> null);
-        register(map, families, RatingSnapshotEvent.class, "rating",
                 evt -> null);
         register(map, families, OlympiadMatchResultEvent.class, "olympiad",
                 evt -> LongBytes.bigEndian(((OlympiadMatchResultEvent) evt).getCharId()));

@@ -58,6 +58,7 @@ public final class Skill {
     private final @Nullable List<SkillLevel> levels;
     private final @Nullable List<SkillEnchantRoute> enchantRoutes;
     private final @Nullable List<SkillClassLearn> classes;
+    private final @Nullable List<GearScoreContribution> gearScoreContributions;
 
     public Skill(int id,
                  @Nullable String operateType,
@@ -79,7 +80,8 @@ public final class Skill {
                  @Nullable List<SkillCondition> conditions,
                  @Nullable List<SkillLevel> levels,
                  @Nullable List<SkillEnchantRoute> enchantRoutes,
-                 @Nullable List<SkillClassLearn> classes) {
+                 @Nullable List<SkillClassLearn> classes,
+                 @Nullable List<GearScoreContribution> gearScoreContributions) {
         this.id = id;
         this.operateType = operateType;
         this.skillType = skillType;
@@ -106,6 +108,8 @@ public final class Skill {
                 : Collections.unmodifiableList(new ArrayList<SkillEnchantRoute>(enchantRoutes));
         this.classes = classes == null ? null
                 : Collections.unmodifiableList(new ArrayList<SkillClassLearn>(classes));
+        this.gearScoreContributions = gearScoreContributions == null ? null
+                : Collections.unmodifiableList(new ArrayList<GearScoreContribution>(gearScoreContributions));
     }
 
     public int getId() {
@@ -261,6 +265,15 @@ public final class Skill {
         return classes;
     }
 
+    /**
+     * Gear-score contributions this skill grants (owning / per-level / per-enchant
+     * bonuses, optionally class-restricted); {@code null} when the build does not
+     * compute gear score or the skill contributes none.
+     */
+    public @Nullable List<GearScoreContribution> getGearScoreContributions() {
+        return gearScoreContributions;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .id(id)
@@ -283,7 +296,8 @@ public final class Skill {
                 .conditions(conditions)
                 .levels(levels)
                 .enchantRoutes(enchantRoutes)
-                .classes(classes);
+                .classes(classes)
+                .gearScoreContributions(gearScoreContributions);
     }
 
     public static Builder builder() {
@@ -315,7 +329,8 @@ public final class Skill {
                 && Objects.equals(conditions, that.conditions)
                 && Objects.equals(levels, that.levels)
                 && Objects.equals(enchantRoutes, that.enchantRoutes)
-                && Objects.equals(classes, that.classes);
+                && Objects.equals(classes, that.classes)
+                && Objects.equals(gearScoreContributions, that.gearScoreContributions);
     }
 
     @Override
@@ -324,7 +339,7 @@ public final class Skill {
                 abnormalType, abnormalVisualEffects, saveVs, sharedReuseGroup,
                 minPledgeClass, triggeredSkillId, triggeredSkillLevel, triggeredChanceType,
                 triggeredChancePercent, icon, maxLevel, flags, conditions, levels, enchantRoutes,
-                classes);
+                classes, gearScoreContributions);
     }
 
     @Override
@@ -354,6 +369,7 @@ public final class Skill {
         private @Nullable List<SkillLevel> levels;
         private @Nullable List<SkillEnchantRoute> enchantRoutes;
         private @Nullable List<SkillClassLearn> classes;
+        private @Nullable List<GearScoreContribution> gearScoreContributions;
 
         public Builder id(int id) {
             this.id = id;
@@ -460,12 +476,17 @@ public final class Skill {
             return this;
         }
 
+        public Builder gearScoreContributions(@Nullable List<GearScoreContribution> gearScoreContributions) {
+            this.gearScoreContributions = gearScoreContributions;
+            return this;
+        }
+
         public Skill build() {
             return new Skill(id, operateType, skillType, targetType, trait,
                     abnormalType, abnormalVisualEffects, saveVs, sharedReuseGroup,
                     minPledgeClass, triggeredSkillId, triggeredSkillLevel, triggeredChanceType,
                     triggeredChancePercent, icon, maxLevel, flags, conditions, levels,
-                    enchantRoutes, classes);
+                    enchantRoutes, classes, gearScoreContributions);
         }
     }
 }
