@@ -1,18 +1,16 @@
 package app.l2nx.gs.adapter.api.kafka.events.castle;
 
 import app.l2nx.gs.adapter.api.kafka.events.schedule.RecurringSchedule;
-
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One castle inside a {@link CastleSnapshotEvent}. Describes the castle's current
- * owning clan and the moment of its next scheduled siege.
+ * owning clan and the schedule of its next siege occurrence.
  *
  * <p>Fields:
  * <ul>
@@ -24,8 +22,16 @@ import java.util.Objects;
  *   <li>{@link #getOwnerClanId() ownerClanId} — optional owning clan id. The host
  *   translates its no-owner sentinel (typically {@code 0}) to {@code null}.</li>
  *   <li>{@link #getNextSiegeAt() nextSiegeAt} — optional. Absolute Instant of the
- *   next scheduled siege; {@code null} when unknown / unscheduled. The platform
- *   counts down locally, so the snapshot cadence can be slow.</li>
+ *   next scheduled siege start; {@code null} when unknown / unscheduled. The
+ *   platform counts down locally, so the snapshot cadence can be slow.</li>
+ *   <li>{@link #getRegistrationEndsAt() registrationEndsAt} — optional. Absolute
+ *   Instant when clan registration for the next siege locks (some hours before
+ *   {@code nextSiegeAt}); {@code null} when the host does not expose it.
+ *   Registration open-start is not modelled — it is effectively open from the
+ *   previous siege.</li>
+ *   <li>{@link #getSiegeEndsAt() siegeEndsAt} — optional. Absolute Instant when the
+ *   next siege ends ({@code nextSiegeAt} + the castle's siege duration);
+ *   {@code null} when the host does not expose it.</li>
  *   <li>{@link #getMetadata() metadata} — optional open string→string map of
  *   build-agnostic per-castle attributes. {@code null} when absent; hosts MAY add
  *   arbitrary keys without an API release and consumers ignore unknown keys.</li>
@@ -40,22 +46,28 @@ public final class CastleSnapshotEntry {
     private final @Nullable String name;
     private final @Nullable Long ownerClanId;
     private final @Nullable Instant nextSiegeAt;
+    private final @Nullable Instant registrationEndsAt;
+    private final @Nullable Instant siegeEndsAt;
     private final @Nullable Map<String, String> metadata;
     private final @Nullable RecurringSchedule schedule;
 
-    public CastleSnapshotEntry(int castleId,
-                               @Nullable String name,
-                               @Nullable Long ownerClanId,
-                               @Nullable Instant nextSiegeAt,
-                               @Nullable Map<String, String> metadata,
-                               @Nullable RecurringSchedule schedule) {
+    public CastleSnapshotEntry(
+            int castleId,
+            @Nullable String name,
+            @Nullable Long ownerClanId,
+            @Nullable Instant nextSiegeAt,
+            @Nullable Instant registrationEndsAt,
+            @Nullable Instant siegeEndsAt,
+            @Nullable Map<String, String> metadata,
+            @Nullable RecurringSchedule schedule) {
         this.castleId = castleId;
         this.name = name;
         this.ownerClanId = ownerClanId;
         this.nextSiegeAt = nextSiegeAt;
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.registrationEndsAt = registrationEndsAt;
+        this.siegeEndsAt = siegeEndsAt;
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
         this.schedule = schedule;
     }
 
@@ -79,11 +91,27 @@ public final class CastleSnapshotEntry {
     }
 
     /**
-     * Absolute Instant of the next scheduled siege, or {@code null} when unknown
-     * or unscheduled.
+     * Absolute Instant of the next scheduled siege start, or {@code null} when
+     * unknown or unscheduled.
      */
     public @Nullable Instant getNextSiegeAt() {
         return nextSiegeAt;
+    }
+
+    /**
+     * Absolute Instant when registration for the next siege locks, or
+     * {@code null} when the host does not expose it.
+     */
+    public @Nullable Instant getRegistrationEndsAt() {
+        return registrationEndsAt;
+    }
+
+    /**
+     * Absolute Instant when the next siege ends, or {@code null} when the host
+     * does not expose it.
+     */
+    public @Nullable Instant getSiegeEndsAt() {
+        return siegeEndsAt;
     }
 
     /**
@@ -108,6 +136,8 @@ public final class CastleSnapshotEntry {
                 .name(name)
                 .ownerClanId(ownerClanId)
                 .nextSiegeAt(nextSiegeAt)
+                .registrationEndsAt(registrationEndsAt)
+                .siegeEndsAt(siegeEndsAt)
                 .metadata(metadata)
                 .schedule(schedule);
     }
@@ -125,13 +155,16 @@ public final class CastleSnapshotEntry {
                 && Objects.equals(name, that.name)
                 && Objects.equals(ownerClanId, that.ownerClanId)
                 && Objects.equals(nextSiegeAt, that.nextSiegeAt)
+                && Objects.equals(registrationEndsAt, that.registrationEndsAt)
+                && Objects.equals(siegeEndsAt, that.siegeEndsAt)
                 && Objects.equals(metadata, that.metadata)
                 && Objects.equals(schedule, that.schedule);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(castleId, name, ownerClanId, nextSiegeAt, metadata, schedule);
+        return Objects.hash(
+                castleId, name, ownerClanId, nextSiegeAt, registrationEndsAt, siegeEndsAt, metadata, schedule);
     }
 
     @Override
@@ -140,6 +173,8 @@ public final class CastleSnapshotEntry {
                 + ", name=" + name
                 + ", ownerClanId=" + ownerClanId
                 + ", nextSiegeAt=" + nextSiegeAt
+                + ", registrationEndsAt=" + registrationEndsAt
+                + ", siegeEndsAt=" + siegeEndsAt
                 + ", metadata=" + metadata
                 + ", schedule=" + schedule + "]";
     }
@@ -149,6 +184,8 @@ public final class CastleSnapshotEntry {
         private @Nullable String name;
         private @Nullable Long ownerClanId;
         private @Nullable Instant nextSiegeAt;
+        private @Nullable Instant registrationEndsAt;
+        private @Nullable Instant siegeEndsAt;
         private @Nullable Map<String, String> metadata;
         private @Nullable RecurringSchedule schedule;
 
@@ -172,6 +209,16 @@ public final class CastleSnapshotEntry {
             return this;
         }
 
+        public Builder registrationEndsAt(@Nullable Instant registrationEndsAt) {
+            this.registrationEndsAt = registrationEndsAt;
+            return this;
+        }
+
+        public Builder siegeEndsAt(@Nullable Instant siegeEndsAt) {
+            this.siegeEndsAt = siegeEndsAt;
+            return this;
+        }
+
         public Builder metadata(@Nullable Map<String, String> metadata) {
             this.metadata = metadata;
             return this;
@@ -183,7 +230,8 @@ public final class CastleSnapshotEntry {
         }
 
         public CastleSnapshotEntry build() {
-            return new CastleSnapshotEntry(castleId, name, ownerClanId, nextSiegeAt, metadata, schedule);
+            return new CastleSnapshotEntry(
+                    castleId, name, ownerClanId, nextSiegeAt, registrationEndsAt, siegeEndsAt, metadata, schedule);
         }
     }
 }

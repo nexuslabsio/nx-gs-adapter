@@ -173,10 +173,13 @@ by the L2NX game-server adapter and its consumers. Published as
       constants. Single-event family; periodic FULL snapshot of every
       configured recurring event (TvT and others), host-pushed via
       `NxEvents.publish(...)`. Each `GameEventEntry` carries `code`
-      (REQUIRED, stable build-agnostic id), `name?`, `enabled` / `running`
-      (REQUIRED), `nextStartAt?` (`Instant`), and an open `metadata` map
-      whose one canonical key today is `event_kind=tvt`
-      (`WellKnownGameEventMetadata`). Partition key: `null` (round-robin).
+      (REQUIRED, stable build-agnostic id), `name?`, `enabled` (REQUIRED),
+      `status?` (open lifecycle phase — `WellKnownGameEventStatuses`:
+      `waiting` / `registration` / `in_progress` mapped from the engine state
+      machine; replaced the former boolean `running`), `nextStartAt?` (`Instant`),
+      and an open `metadata` map whose canonical keys today are `event_kind=tvt`
+      and `event_kind=solo_boss` (`WellKnownGameEventMetadata`). Partition key:
+      `null` (round-robin).
       Build-agnostic — TvT is one mapping, not a contract assumption.
     - `events.castle` — `CastleSnapshotEvent` (final, UUIDv7 `eventId` +
       `List<CastleSnapshotEntry> castles`) + `SiegeFinishedEvent` (final) +
@@ -185,7 +188,9 @@ by the L2NX game-server adapter and its consumers. Published as
       by `Nx-Message-Type`. `CastleSnapshotEvent` is a periodic FULL snapshot
       of every castle — each `CastleSnapshotEntry` carries `castleId`
       (REQUIRED), `name?`, `ownerClanId?` (host maps no-owner sentinel → null),
-      `nextSiegeAt?` (`Instant`), open `metadata`. Partition key: `null`
+      `nextSiegeAt?` (`Instant`), `registrationEndsAt?` / `siegeEndsAt?`
+      (`Instant`, next siege's registration-close and end, derived host-side from
+      the castle template), open `metadata`. Partition key: `null`
       (round-robin). `SiegeFinishedEvent` is one per ended siege: `eventId`
       (UUIDv7, REQUIRED), `castleId` (REQUIRED, partition key 8-byte BE),
       `castleName?`, `siegeStartedAt?`, `outcome` (REQUIRED, open string;

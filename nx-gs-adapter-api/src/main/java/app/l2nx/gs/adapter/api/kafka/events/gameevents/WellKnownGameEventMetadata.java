@@ -20,14 +20,16 @@ package app.l2nx.gs.adapter.api.kafka.events.gameevents;
  *     <li>{@link #EVENT_KIND} = {@link #EVENT_KIND_TVT} — set on a team-vs-team
  *         style mass-PvP event (e.g. the host's "TvT"). Hosts map their own
  *         event types onto this canonical value; consumers route category / icon
- *         on it. Events the host does not classify carry <b>no</b>
+ *         on it.</li>
+ *     <li>{@link #EVENT_KIND} = {@link #EVENT_KIND_SOLO_BOSS} — set on a solo /
+ *         free-for-all boss-hunt event (a scheduled world event, not a respawning
+ *         raid boss). Events the host does not classify carry <b>no</b>
  *         {@code event_kind} key.</li>
  * </ul>
  */
 public final class WellKnownGameEventMetadata {
 
-    private WellKnownGameEventMetadata() {
-    }
+    private WellKnownGameEventMetadata() {}
 
     /**
      * Canonical metadata key carrying the build-agnostic kind of a game event.
@@ -43,4 +45,12 @@ public final class WellKnownGameEventMetadata {
      * uses to group / badge PvP events on the schedule view.
      */
     public static final String EVENT_KIND_TVT = "tvt";
+
+    /**
+     * Canonical {@link #EVENT_KIND} value: a scheduled solo / free-for-all
+     * boss-hunt event (a recurring world event, distinct from a respawning raid
+     * boss). The platform groups / badges it apart from {@link #EVENT_KIND_TVT}
+     * on the schedule view.
+     */
+    public static final String EVENT_KIND_SOLO_BOSS = "solo_boss";
 }

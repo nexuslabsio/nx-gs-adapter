@@ -1,19 +1,17 @@
 package app.l2nx.gs.adapter.api.kafka.events.gameevents;
 
 import app.l2nx.gs.adapter.api.kafka.events.schedule.RecurringSchedule;
-
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One configured game event inside a {@link GameEventSnapshotEvent}. Describes a
- * recurring PvP / world event's schedule and current run state — build-agnostic
- * across event engines.
+ * recurring PvP / world event's schedule and current lifecycle phase —
+ * build-agnostic across event engines.
  *
  * <p>Fields:
  * <ul>
@@ -23,17 +21,20 @@ import java.util.Objects;
  *   <li>{@link #getName() name} — optional display name (host default locale).</li>
  *   <li>{@link #isEnabled() enabled} — REQUIRED. {@code true} = the host has this
  *   event auto-scheduled / turned on.</li>
- *   <li>{@link #isRunning() running} — REQUIRED. {@code true} = the event is
- *   currently in progress.</li>
+ *   <li>{@link #getStatus() status} — optional open string lifecycle phase. Canonical
+ *   values {@code waiting} / {@code registration} / {@code in_progress} in
+ *   {@link WellKnownGameEventStatuses}; {@code null} when the host engine exposes no
+ *   phase. It distinguishes a registration / preparation phase from the active run,
+ *   which a boolean cannot.</li>
  *   <li>{@link #getNextStartAt() nextStartAt} — optional. Instant of the next
  *   scheduled start; {@code null} when the event is not scheduled (disabled, or
  *   no upcoming occurrence).</li>
  *   <li>{@link #getMetadata() metadata} — optional open string→string map of
  *   build-agnostic per-event attributes. {@code null} when absent. Canonical
- *   keys/values are documented in {@link WellKnownGameEventMetadata}; the one
- *   defined today is {@code event_kind=tvt}. Hosts MAY publish arbitrary
- *   non-canonical keys without an API release; consumers ignore keys they do not
- *   understand.</li>
+ *   keys/values are documented in {@link WellKnownGameEventMetadata}; defined today
+ *   are {@code event_kind=tvt} and {@code event_kind=solo_boss}. Hosts MAY publish
+ *   arbitrary non-canonical keys without an API release; consumers ignore keys they
+ *   do not understand.</li>
  * </ul>
  *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
@@ -45,26 +46,26 @@ public final class GameEventEntry {
     private final String code;
     private final @Nullable String name;
     private final boolean enabled;
-    private final boolean running;
+    private final @Nullable String status;
     private final @Nullable Instant nextStartAt;
     private final @Nullable Map<String, String> metadata;
     private final @Nullable RecurringSchedule schedule;
 
-    public GameEventEntry(String code,
-                          @Nullable String name,
-                          boolean enabled,
-                          boolean running,
-                          @Nullable Instant nextStartAt,
-                          @Nullable Map<String, String> metadata,
-                          @Nullable RecurringSchedule schedule) {
+    public GameEventEntry(
+            String code,
+            @Nullable String name,
+            boolean enabled,
+            @Nullable String status,
+            @Nullable Instant nextStartAt,
+            @Nullable Map<String, String> metadata,
+            @Nullable RecurringSchedule schedule) {
         this.code = code;
         this.name = name;
         this.enabled = enabled;
-        this.running = running;
+        this.status = status;
         this.nextStartAt = nextStartAt;
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
         this.schedule = schedule;
     }
 
@@ -88,10 +89,11 @@ public final class GameEventEntry {
     }
 
     /**
-     * {@code true} = event is currently in progress.
+     * Open lifecycle phase of the event, or {@code null} when the host engine
+     * exposes none. Canonical values: see {@link WellKnownGameEventStatuses}.
      */
-    public boolean isRunning() {
-        return running;
+    public @Nullable String getStatus() {
+        return status;
     }
 
     /**
@@ -125,7 +127,7 @@ public final class GameEventEntry {
                 .code(code)
                 .name(name)
                 .enabled(enabled)
-                .running(running)
+                .status(status)
                 .nextStartAt(nextStartAt)
                 .metadata(metadata)
                 .schedule(schedule);
@@ -141,9 +143,9 @@ public final class GameEventEntry {
         if (!(o instanceof GameEventEntry)) return false;
         GameEventEntry that = (GameEventEntry) o;
         return enabled == that.enabled
-                && running == that.running
                 && Objects.equals(code, that.code)
                 && Objects.equals(name, that.name)
+                && Objects.equals(status, that.status)
                 && Objects.equals(nextStartAt, that.nextStartAt)
                 && Objects.equals(metadata, that.metadata)
                 && Objects.equals(schedule, that.schedule);
@@ -151,7 +153,7 @@ public final class GameEventEntry {
 
     @Override
     public int hashCode() {
-        return Objects.hash(code, name, enabled, running, nextStartAt, metadata, schedule);
+        return Objects.hash(code, name, enabled, status, nextStartAt, metadata, schedule);
     }
 
     @Override
@@ -159,7 +161,7 @@ public final class GameEventEntry {
         return "GameEventEntry[code=" + code
                 + ", name=" + name
                 + ", enabled=" + enabled
-                + ", running=" + running
+                + ", status=" + status
                 + ", nextStartAt=" + nextStartAt
                 + ", metadata=" + metadata
                 + ", schedule=" + schedule + "]";
@@ -169,7 +171,7 @@ public final class GameEventEntry {
         private String code;
         private @Nullable String name;
         private boolean enabled;
-        private boolean running;
+        private @Nullable String status;
         private @Nullable Instant nextStartAt;
         private @Nullable Map<String, String> metadata;
         private @Nullable RecurringSchedule schedule;
@@ -189,8 +191,8 @@ public final class GameEventEntry {
             return this;
         }
 
-        public Builder running(boolean running) {
-            this.running = running;
+        public Builder status(@Nullable String status) {
+            this.status = status;
             return this;
         }
 
@@ -210,7 +212,7 @@ public final class GameEventEntry {
         }
 
         public GameEventEntry build() {
-            return new GameEventEntry(code, name, enabled, running, nextStartAt, metadata, schedule);
+            return new GameEventEntry(code, name, enabled, status, nextStartAt, metadata, schedule);
         }
     }
 }

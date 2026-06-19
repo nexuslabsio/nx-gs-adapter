@@ -1,14 +1,13 @@
 package app.l2nx.gs.adapter.api.kafka.events.gameevents;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class GameEventSnapshotEventTest {
 
@@ -21,24 +20,24 @@ class GameEventSnapshotEventTest {
                 .code("1")
                 .name("Team vs Team")
                 .enabled(true)
-                .running(false)
+                .status(WellKnownGameEventStatuses.WAITING)
                 .nextStartAt(Instant.parse("2026-05-30T20:00:00Z"))
                 .metadata(Collections.singletonMap(
-                        WellKnownGameEventMetadata.EVENT_KIND,
-                        WellKnownGameEventMetadata.EVENT_KIND_TVT))
+                        WellKnownGameEventMetadata.EVENT_KIND, WellKnownGameEventMetadata.EVENT_KIND_TVT))
                 .build();
     }
 
     @Test
     void constructor_shouldRejectNullEventId() {
-        assertThrows(NullPointerException.class, () -> GameEventSnapshotEvent.builder().build());
+        assertThrows(
+                NullPointerException.class,
+                () -> GameEventSnapshotEvent.builder().build());
     }
 
     @Test
     void getEvents_shouldReturnEmptyList_whenBuilderOmits() {
-        GameEventSnapshotEvent event = GameEventSnapshotEvent.builder()
-                .eventId(id())
-                .build();
+        GameEventSnapshotEvent event =
+                GameEventSnapshotEvent.builder().eventId(id()).build();
 
         assertTrue(event.getEvents().isEmpty());
         assertNull(event.getMetadata());
@@ -51,8 +50,8 @@ class GameEventSnapshotEventTest {
                 .events(new ArrayList<>(Collections.singletonList(tvt())))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getEvents().add(tvt()));
+        assertThrows(
+                UnsupportedOperationException.class, () -> event.getEvents().add(tvt()));
     }
 
     @Test
@@ -60,10 +59,8 @@ class GameEventSnapshotEventTest {
         List<GameEventEntry> source = new ArrayList<>();
         source.add(tvt());
 
-        GameEventSnapshotEvent event = GameEventSnapshotEvent.builder()
-                .eventId(id())
-                .events(source)
-                .build();
+        GameEventSnapshotEvent event =
+                GameEventSnapshotEvent.builder().eventId(id()).events(source).build();
 
         source.add(tvt());
 
@@ -87,10 +84,11 @@ class GameEventSnapshotEventTest {
     void entry_tvt_shouldCarryCanonicalKind() {
         GameEventEntry entry = tvt();
 
-        assertEquals(WellKnownGameEventMetadata.EVENT_KIND_TVT,
+        assertEquals(
+                WellKnownGameEventMetadata.EVENT_KIND_TVT,
                 entry.getMetadata().get(WellKnownGameEventMetadata.EVENT_KIND));
         assertTrue(entry.isEnabled());
-        assertFalse(entry.isRunning());
+        assertEquals(WellKnownGameEventStatuses.WAITING, entry.getStatus());
         assertEquals("1", entry.getCode());
     }
 
@@ -100,7 +98,7 @@ class GameEventSnapshotEventTest {
                 .code("2")
                 .name("Capture the Flag")
                 .enabled(false)
-                .running(false)
+                .status(WellKnownGameEventStatuses.WAITING)
                 .build();
 
         assertNull(disabled.getNextStartAt());
@@ -120,7 +118,7 @@ class GameEventSnapshotEventTest {
     @Test
     void entry_metadata_shouldBeUnmodifiable() {
         GameEventEntry entry = tvt();
-        assertThrows(UnsupportedOperationException.class,
-                () -> entry.getMetadata().put("k", "v"));
+        assertThrows(
+                UnsupportedOperationException.class, () -> entry.getMetadata().put("k", "v"));
     }
 }
