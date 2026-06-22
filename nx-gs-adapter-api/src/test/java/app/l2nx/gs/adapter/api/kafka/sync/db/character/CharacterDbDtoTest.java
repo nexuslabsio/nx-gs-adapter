@@ -1,25 +1,30 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.character;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.domain.character.CharacterPrivateStore;
 import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
 import app.l2nx.gs.adapter.api.domain.character.CharacterSex;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
-import org.junit.jupiter.api.Test;
-
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class CharacterDbDtoTest {
 
     @Test
     void builder_shouldMapEachFieldToConstructorPosition() {
         List<CharacterSubclassDbDto> subs = Arrays.asList(
-                CharacterSubclassDbDto.builder().classId(CharacterClass.SOULTAKER).level(76).build(),
-                CharacterSubclassDbDto.builder().classId(CharacterClass.HIEROPHANT).level(80).build());
+                CharacterSubclassDbDto.builder()
+                        .classId(CharacterClass.SOULTAKER)
+                        .level(76)
+                        .build(),
+                CharacterSubclassDbDto.builder()
+                        .classId(CharacterClass.HIEROPHANT)
+                        .level(80)
+                        .build());
         Instant deleteAt = Instant.parse("2026-06-01T12:00:00Z");
 
         CharacterDbDto ch = CharacterDbDto.builder()
@@ -43,6 +48,7 @@ class CharacterDbDtoTest {
                 .online(Boolean.TRUE)
                 .onlineTimeSeconds(86_400L)
                 .hero(Boolean.TRUE)
+                .accessLevel("7")
                 .build();
 
         assertEquals(54321L, ch.getId());
@@ -65,6 +71,7 @@ class CharacterDbDtoTest {
         assertEquals(Boolean.TRUE, ch.getOnline());
         assertEquals(Long.valueOf(86_400L), ch.getOnlineTimeSeconds());
         assertEquals(Boolean.TRUE, ch.getHero());
+        assertEquals("7", ch.getAccessLevel());
     }
 
     @Test
@@ -91,6 +98,8 @@ class CharacterDbDtoTest {
         assertNull(ch.getOnline());
         assertNull(ch.getOnlineTimeSeconds());
         assertNull(ch.getHero());
+        assertNull(ch.getAccessLevel());
+        assertNull(ch.getLocks());
     }
 
     @Test
@@ -102,14 +111,19 @@ class CharacterDbDtoTest {
 
     @Test
     void clanId_shouldBeNullable_forSentinelZeroSourceValue() {
-        CharacterDbDto ch = CharacterDbDto.builder().id(1L).name("X").clanId(null).build();
+        CharacterDbDto ch =
+                CharacterDbDto.builder().id(1L).name("X").clanId(null).build();
 
         assertNull(ch.getClanId());
     }
 
     @Test
     void deleteTime_shouldBeNullable_forSentinelZeroSourceValue() {
-        CharacterDbDto ch = CharacterDbDto.builder().id(1L).name("X").scheduledDeletionAt(null).build();
+        CharacterDbDto ch = CharacterDbDto.builder()
+                .id(1L)
+                .name("X")
+                .scheduledDeletionAt(null)
+                .build();
 
         assertNull(ch.getScheduledDeletionAt());
     }
@@ -136,8 +150,9 @@ class CharacterDbDtoTest {
     @Test
     void builder_andConstructor_shouldProduceEqualObjects_whenAllOptionalNull() {
         CharacterDbDto fromBuilder = CharacterDbDto.builder().id(1L).name("X").build();
-        CharacterDbDto fromCtor = new CharacterDbDto(1L, "X", null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        CharacterDbDto fromCtor = new CharacterDbDto(
+                1L, "X", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -145,17 +160,45 @@ class CharacterDbDtoTest {
 
     @Test
     void toBuilder_shouldRoundtrip() {
-        List<CharacterSubclassDbDto> subs = Collections.singletonList(
-                CharacterSubclassDbDto.builder().classId(CharacterClass.SOULTAKER).level(76).build());
-        List<CharacterInstanceCooldownDbDto> cooldowns = Collections.singletonList(
-                CharacterInstanceCooldownDbDto.builder()
-                        .instanceId(42).reentryAt(Instant.parse("2026-07-02T00:00:00Z")).build());
-        CharacterDbDto original = new CharacterDbDto(1L, "X", "acc", "", 10,
-                CharacterSex.MALE, CharacterRace.HUMAN,
-                CharacterClass.HUMAN_FIGHTER, CharacterClass.HUMAN_FIGHTER,
-                subs, CharacterPrivateStore.CRAFT,
-                null, 0, 0, 0, Boolean.FALSE, Instant.parse("2026-07-01T00:00:00Z"), Boolean.TRUE,
-                86_400L, Boolean.TRUE, Boolean.TRUE, 1500, cooldowns);
+        List<CharacterSubclassDbDto> subs = Collections.singletonList(CharacterSubclassDbDto.builder()
+                .classId(CharacterClass.SOULTAKER)
+                .level(76)
+                .build());
+        List<CharacterInstanceCooldownDbDto> cooldowns =
+                Collections.singletonList(CharacterInstanceCooldownDbDto.builder()
+                        .instanceId(42)
+                        .reentryAt(Instant.parse("2026-07-02T00:00:00Z"))
+                        .build());
+        List<CharacterLockDbDto> locks = Collections.singletonList(CharacterLockDbDto.builder()
+                .lockType(WellKnownCharacterLockTypes.IP)
+                .lockValue("127.0.0.1")
+                .build());
+        CharacterDbDto original = new CharacterDbDto(
+                1L,
+                "X",
+                "acc",
+                "",
+                10,
+                CharacterSex.MALE,
+                CharacterRace.HUMAN,
+                CharacterClass.HUMAN_FIGHTER,
+                CharacterClass.HUMAN_FIGHTER,
+                subs,
+                CharacterPrivateStore.CRAFT,
+                null,
+                0,
+                0,
+                0,
+                Boolean.FALSE,
+                Instant.parse("2026-07-01T00:00:00Z"),
+                Boolean.TRUE,
+                86_400L,
+                Boolean.TRUE,
+                Boolean.TRUE,
+                1500,
+                "7",
+                cooldowns,
+                locks);
 
         assertEquals(original, original.toBuilder().build());
     }

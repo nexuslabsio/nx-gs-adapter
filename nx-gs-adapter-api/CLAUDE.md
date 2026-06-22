@@ -24,12 +24,19 @@ by the L2NX game-server adapter and its consumers. Published as
   (`HeartbeatEvent`, `NxHeaders`)
 - `app.l2nx.gs.adapter.api.kafka.sync.db.<entity>` — per-entity wire DTOs for
   the db-sync stream. Shipped entities: `character` (`CharacterDbDto`,
-  `CharacterSubclassDbDto`; CharacterDbDto carries optional `accountName`,
+  `CharacterSubclassDbDto`, `CharacterInstanceCooldownDbDto`,
+  `CharacterLockDbDto`; CharacterDbDto carries optional `accountName`,
   `nobless`, `scheduledDeletionAt` on top of the identity / progression set, all
   three from generic L2J columns — see
   `docs/features/character-core-extension/`; plus optional `gearScore: Integer`
   — the active-class gear score, a snapshot at last character store, `null` when
-  the build computes no gear score), `clan` (`ClanDbDto` +
+  the build computes no gear score; plus optional `accessLevel: String` — opaque
+  GM/access level, numeric text on int-based builds (`"7"`) or role name on
+  string-role builds, `null` when not surfaced; plus optional
+  `locks: List<CharacterLockDbDto>` — one entry per active character lock
+  (`lockType` ∈ `WellKnownCharacterLockTypes` = IP / HWID / ITEM, `lockValue?`),
+  derived from build-specific `character_variables`, `null` when not synced),
+  `clan` (`ClanDbDto` +
   `ClanSkillDbDto`; ClanDbDto carries optional `icon: byte[]` for the clan crest
   as decoded PNG bytes — schema providers do the source-format → PNG
   conversion in `mapEntity`), `alliance` (`AllianceDbDto{allyId, allyName,
@@ -135,7 +142,7 @@ by the L2NX game-server adapter and its consumers. Published as
           purchase → `null` (round-robin, no single natural per-entity key).
     - `events.raid` — `RaidKillEvent` (final) + `RaidActor` /
       `RaidDropItem` sub-DTOs + `RaidBossKind` enum (`RAID` /
-      `GRAND_BOSS` / `INSTANCE_BOSS`). Multi-event family (kill fact +
+      `EPIC` / `INSTANCE_BOSS`). Multi-event family (kill fact +
       boss-respawn snapshot, see below); one `RaidKillEvent` per
       `Attackable.isRaid() && !isRaidMinion()` death. Carries UUIDv7
       `eventId` (REQUIRED, derive `occurredAt`), `bossNpcId` (REQUIRED,
@@ -160,7 +167,7 @@ by the L2NX game-server adapter and its consumers. Published as
       `NxEvents.publish(...)` on the same `raid` topic (dispatched by
       `Nx-Message-Type`). Each `BossRespawnEntry` carries `npcId` (REQUIRED —
       platform resolves the boss name from this id; names are NOT on the wire),
-      `level?`, `kind` (reuses `RaidBossKind` — only `RAID` / `GRAND_BOSS`
+      `level?`, `kind` (reuses `RaidBossKind` — only `RAID` / `EPIC`
       emitted), `status` (REQUIRED, open string; canonical
       `alive` / `in_combat` / `dead` via `WellKnownBossStatuses`),
       `nextRespawnAt?` (`Instant`, set when dead + known), and an open

@@ -8,6 +8,7 @@ import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.armorsettemplate.ArmorSetTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.classtemplate.ClassTemplate;
+import app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore.GearScoreRuleset;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.instancetemplate.InstanceTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate.ItemTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate.NpcTemplate;
@@ -20,9 +21,6 @@ import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.clients.producer.ProducerRecord;
-
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,14 +28,18 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
 /**
  * Tier-1 module that publishes static game-data (datapack-derived) templates onto
  * the {@code gd} sync stream. Multi-entity and data-driven: a static registry of
  * {@link EntityDescriptor}s (itemtemplate, npctemplate, skill, recipetemplate,
- * armorsettemplate, soulcrystaltemplate, classtemplate, instance) pairs each gd entity's
- * Tier-2 SPI with its snapshot accessor and primary-key extractor, so adding an entity is
- * one registry line rather than another field / discovery block. Each present provider
+ * armorsettemplate, soulcrystaltemplate, classtemplate, instance, gearscore) pairs each gd
+ * entity's Tier-2 SPI with its snapshot accessor and primary-key extractor, so adding an entity
+ * is one registry line rather than another field / discovery block. The {@code gearscore} entity
+ * is a singleton — its SPI returns {@code Optional<GearScoreRuleset>}, adapted to a 0-or-1-element
+ * collection with a constant primary key so it shares the same engine. Each present provider
  * becomes an independent {@link EntitySync} with its own snapshot burst, {@code syncId}
  * and heartbeat {@link EntityStats}. Reads its inputs in order:
  *
@@ -90,8 +92,7 @@ public final class GameDataSyncModule implements AdapterModule {
         this(descriptors, sender, GameDataSyncConfig.defaults());
     }
 
-    GameDataSyncModule(List<EntityDescriptor<?, ?>> descriptors, GameDataSender sender,
-                       GameDataSyncConfig config) {
+    GameDataSyncModule(List<EntityDescriptor<?, ?>> descriptors, GameDataSender sender, GameDataSyncConfig config) {
         this.descriptors = descriptors;
         this.sender = sender;
         this.config = config;
@@ -103,23 +104,46 @@ public final class GameDataSyncModule implements AdapterModule {
      */
     static List<EntityDescriptor<?, ?>> defaultDescriptors() {
         List<EntityDescriptor<?, ?>> list = new ArrayList<EntityDescriptor<?, ?>>();
-        list.add(new EntityDescriptor<ItemTemplateProvider, ItemTemplate>(ItemTemplateProvider.class,
-                ItemTemplateProvider::entityName, ItemTemplateProvider::snapshot, t -> (long) t.getId()));
-        list.add(new EntityDescriptor<NpcTemplateProvider, NpcTemplate>(NpcTemplateProvider.class,
-                NpcTemplateProvider::entityName, NpcTemplateProvider::snapshot, t -> (long) t.getId()));
-        list.add(new EntityDescriptor<SkillProvider, Skill>(SkillProvider.class,
-                SkillProvider::entityName, SkillProvider::snapshot, t -> (long) t.getId()));
-        list.add(new EntityDescriptor<RecipeTemplateProvider, RecipeTemplate>(RecipeTemplateProvider.class,
-                RecipeTemplateProvider::entityName, RecipeTemplateProvider::snapshot, t -> (long) t.getId()));
-        list.add(new EntityDescriptor<ArmorSetTemplateProvider, ArmorSetTemplate>(ArmorSetTemplateProvider.class,
-                ArmorSetTemplateProvider::entityName, ArmorSetTemplateProvider::snapshot, t -> (long) t.getId()));
-        list.add(new EntityDescriptor<SoulCrystalTemplateProvider, SoulCrystalTemplate>(SoulCrystalTemplateProvider.class,
-                SoulCrystalTemplateProvider::entityName, SoulCrystalTemplateProvider::snapshot, t -> (long) t.getId()));
-        list.add(new EntityDescriptor<ClassTemplateProvider, ClassTemplate>(ClassTemplateProvider.class,
-                ClassTemplateProvider::entityName, ClassTemplateProvider::snapshot,
+        list.add(new EntityDescriptor<ItemTemplateProvider, ItemTemplate>(
+                ItemTemplateProvider.class, ItemTemplateProvider::entityName, ItemTemplateProvider::snapshot, t ->
+                        (long) t.getId()));
+        list.add(new EntityDescriptor<NpcTemplateProvider, NpcTemplate>(
+                NpcTemplateProvider.class, NpcTemplateProvider::entityName, NpcTemplateProvider::snapshot, t ->
+                        (long) t.getId()));
+        list.add(new EntityDescriptor<SkillProvider, Skill>(
+                SkillProvider.class, SkillProvider::entityName, SkillProvider::snapshot, t -> (long) t.getId()));
+        list.add(new EntityDescriptor<RecipeTemplateProvider, RecipeTemplate>(
+                RecipeTemplateProvider.class, RecipeTemplateProvider::entityName, RecipeTemplateProvider::snapshot, t ->
+                        (long) t.getId()));
+        list.add(new EntityDescriptor<ArmorSetTemplateProvider, ArmorSetTemplate>(
+                ArmorSetTemplateProvider.class,
+                ArmorSetTemplateProvider::entityName,
+                ArmorSetTemplateProvider::snapshot,
+                t -> (long) t.getId()));
+        list.add(new EntityDescriptor<SoulCrystalTemplateProvider, SoulCrystalTemplate>(
+                SoulCrystalTemplateProvider.class,
+                SoulCrystalTemplateProvider::entityName,
+                SoulCrystalTemplateProvider::snapshot,
+                t -> (long) t.getId()));
+        list.add(new EntityDescriptor<ClassTemplateProvider, ClassTemplate>(
+                ClassTemplateProvider.class,
+                ClassTemplateProvider::entityName,
+                ClassTemplateProvider::snapshot,
                 t -> t.getClazz() == null ? -1L : t.getClazz().ordinal()));
-        list.add(new EntityDescriptor<InstanceTemplateProvider, InstanceTemplate>(InstanceTemplateProvider.class,
-                InstanceTemplateProvider::entityName, InstanceTemplateProvider::snapshot, t -> (long) t.getId()));
+        list.add(new EntityDescriptor<InstanceTemplateProvider, InstanceTemplate>(
+                InstanceTemplateProvider.class,
+                InstanceTemplateProvider::entityName,
+                InstanceTemplateProvider::snapshot,
+                t -> (long) t.getId()));
+        // Singleton entity: the SPI returns Optional<GearScoreRuleset>, adapted to the collection
+        // engine as a 0-or-1-element list so it reuses the same burst / SNAPSHOT_COMPLETE flow.
+        // Empty (gear score disabled) → empty collection → legal count=0 snapshot whose stale-delete
+        // drops the singleton row. Constant pk — a singleton has no numeric primary key.
+        list.add(new EntityDescriptor<GearScoreRulesetProvider, GearScoreRuleset>(
+                GearScoreRulesetProvider.class,
+                GearScoreRulesetProvider::entityName,
+                p -> p.snapshot().map(Collections::singletonList).orElse(Collections.<GearScoreRuleset>emptyList()),
+                t -> 0L));
         return Collections.unmodifiableList(list);
     }
 
@@ -131,7 +155,8 @@ public final class GameDataSyncModule implements AdapterModule {
     @Override
     public void onConnect(ConnectContext ctx) {
         this.context = ctx;
-        if (ctx == null || ctx.getSyncTopics() == null
+        if (ctx == null
+                || ctx.getSyncTopics() == null
                 || ctx.getSyncTopics().getGd() == null
                 || ctx.getSyncTopics().getGd().isEmpty()) {
             log.warn("ConnectContext carries no gd sync topics — gd-sync DISABLED. "
@@ -178,7 +203,10 @@ public final class GameDataSyncModule implements AdapterModule {
             // Registration failure must not take down the module — the snapshot
             // burst still publishes on connect / host reload / schedule; only the
             // manual remote-resync RPC surface is lost.
-            log.warn("Failed to register gd-sync resync command handler: {}", t.getClass().getName(), t);
+            log.warn(
+                    "Failed to register gd-sync resync command handler: {}",
+                    t.getClass().getName(),
+                    t);
         }
     }
 
@@ -193,10 +221,14 @@ public final class GameDataSyncModule implements AdapterModule {
         try {
             ctx.io().execute(() -> runAllSnapshots(ctx, pub));
         } catch (Throwable t) {
-            log.error("gd-sync resync dispatch threw {} — no snapshot scheduled", t.getClass().getName(), t);
+            log.error(
+                    "gd-sync resync dispatch threw {} — no snapshot scheduled",
+                    t.getClass().getName(),
+                    t);
             return CommandResult.unavailable("gd-sync could not schedule the snapshot");
         }
-        return CommandResult.ok(GdResyncResult.builder().acceptedEntities(entityNames).build());
+        return CommandResult.ok(
+                GdResyncResult.builder().acceptedEntities(entityNames).build());
     }
 
     private static List<String> registeredEntityNames(List<EntitySync<?>> syncs) {
@@ -226,15 +258,20 @@ public final class GameDataSyncModule implements AdapterModule {
             // Trigger registration failures must not take down the module — the
             // initial snapshot below still publishes; only the on-demand re-publish
             // path is lost.
-            log.warn("Failed to register gd-sync snapshot trigger: {}", t.getClass().getName(), t);
+            log.warn(
+                    "Failed to register gd-sync snapshot trigger: {}",
+                    t.getClass().getName(),
+                    t);
         }
 
         try {
             Executor io = ctx.io();
             io.execute(() -> runAllSnapshots(ctx, pub));
         } catch (Throwable t) {
-            log.error("gd-sync initial snapshot dispatch threw {} — no snapshot published",
-                    t.getClass().getName(), t);
+            log.error(
+                    "gd-sync initial snapshot dispatch threw {} — no snapshot published",
+                    t.getClass().getName(),
+                    t);
         }
 
         startResyncScheduler(ctx, pub);
@@ -359,10 +396,13 @@ public final class GameDataSyncModule implements AdapterModule {
             log.warn("NxKafka not configured — gd-sync send dropped (topic={})", record.topic());
             invokeCallback(callback, notConfigured);
         } catch (Throwable senderFailure) {
-            log.warn("NxKafka.sendBytesKeyRecord threw {} — invoking callback exceptionally",
+            log.warn(
+                    "NxKafka.sendBytesKeyRecord threw {} — invoking callback exceptionally",
                     senderFailure.getClass().getName());
-            invokeCallback(callback,
-                    senderFailure instanceof Exception ? (Exception) senderFailure
+            invokeCallback(
+                    callback,
+                    senderFailure instanceof Exception
+                            ? (Exception) senderFailure
                             : new RuntimeException(senderFailure));
         }
     }
@@ -397,8 +437,11 @@ public final class GameDataSyncModule implements AdapterModule {
         private final Function<P, Collection<T>> snapshotFn;
         private final ToLongFunction<T> pkFn;
 
-        EntityDescriptor(Class<P> spi, Function<P, String> entityNameFn,
-                         Function<P, Collection<T>> snapshotFn, ToLongFunction<T> pkFn) {
+        EntityDescriptor(
+                Class<P> spi,
+                Function<P, String> entityNameFn,
+                Function<P, Collection<T>> snapshotFn,
+                ToLongFunction<T> pkFn) {
             this.spi = spi;
             this.entityNameFn = entityNameFn;
             this.snapshotFn = snapshotFn;
@@ -472,8 +515,11 @@ public final class GameDataSyncModule implements AdapterModule {
                 try {
                     items = snapshotSupplier.get();
                 } catch (Throwable t) {
-                    log.error("gd-sync provider for entity '{}' threw {} pulling snapshot — burst aborted",
-                            entityName, t.getClass().getName(), t);
+                    log.error(
+                            "gd-sync provider for entity '{}' threw {} pulling snapshot — burst aborted",
+                            entityName,
+                            t.getClass().getName(),
+                            t);
                     lastSnapshotComplete = false;
                     return;
                 }
@@ -490,7 +536,11 @@ public final class GameDataSyncModule implements AdapterModule {
                     lastSnapshotComplete = false;
                 }
             } catch (Throwable t) {
-                log.error("gd-sync snapshot run for entity '{}' threw {}", entityName, t.getClass().getName(), t);
+                log.error(
+                        "gd-sync snapshot run for entity '{}' threw {}",
+                        entityName,
+                        t.getClass().getName(),
+                        t);
             }
         }
 

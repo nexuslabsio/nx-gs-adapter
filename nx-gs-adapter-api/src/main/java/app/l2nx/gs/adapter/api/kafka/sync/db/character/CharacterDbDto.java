@@ -4,12 +4,11 @@ import app.l2nx.gs.adapter.api.domain.character.CharacterPrivateStore;
 import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
 import app.l2nx.gs.adapter.api.domain.character.CharacterSex;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO for one player character, payload of
@@ -76,31 +75,36 @@ public final class CharacterDbDto {
     private final @Nullable Boolean hero;
     private final @Nullable Boolean expBlocked;
     private final @Nullable Integer gearScore;
+    private final @Nullable String accessLevel;
     private final @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns;
+    private final @Nullable List<CharacterLockDbDto> locks;
 
-    public CharacterDbDto(long id,
-                          String name,
-                          @Nullable String accountName,
-                          @Nullable String title,
-                          @Nullable Integer level,
-                          @Nullable CharacterSex sex,
-                          @Nullable CharacterRace race,
-                          @Nullable CharacterClass classId,
-                          @Nullable CharacterClass baseClassId,
-                          @Nullable List<CharacterSubclassDbDto> subclasses,
-                          @Nullable CharacterPrivateStore privateStore,
-                          @Nullable Long clanId,
-                          @Nullable Integer pvpCounter,
-                          @Nullable Integer pkCounter,
-                          @Nullable Integer karma,
-                          @Nullable Boolean noblesse,
-                          @Nullable Instant scheduledDeletionAt,
-                          @Nullable Boolean online,
-                          @Nullable Long onlineTimeSeconds,
-                          @Nullable Boolean hero,
-                          @Nullable Boolean expBlocked,
-                          @Nullable Integer gearScore,
-                          @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns) {
+    public CharacterDbDto(
+            long id,
+            String name,
+            @Nullable String accountName,
+            @Nullable String title,
+            @Nullable Integer level,
+            @Nullable CharacterSex sex,
+            @Nullable CharacterRace race,
+            @Nullable CharacterClass classId,
+            @Nullable CharacterClass baseClassId,
+            @Nullable List<CharacterSubclassDbDto> subclasses,
+            @Nullable CharacterPrivateStore privateStore,
+            @Nullable Long clanId,
+            @Nullable Integer pvpCounter,
+            @Nullable Integer pkCounter,
+            @Nullable Integer karma,
+            @Nullable Boolean noblesse,
+            @Nullable Instant scheduledDeletionAt,
+            @Nullable Boolean online,
+            @Nullable Long onlineTimeSeconds,
+            @Nullable Boolean hero,
+            @Nullable Boolean expBlocked,
+            @Nullable Integer gearScore,
+            @Nullable String accessLevel,
+            @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns,
+            @Nullable List<CharacterLockDbDto> locks) {
         this.id = id;
         this.name = Objects.requireNonNull(name, "CharacterDbDto.name is required");
         this.accountName = accountName;
@@ -123,9 +127,9 @@ public final class CharacterDbDto {
         this.hero = hero;
         this.expBlocked = expBlocked;
         this.gearScore = gearScore;
-        this.instanceCooldowns = instanceCooldowns == null
-                ? null
-                : Collections.unmodifiableList(instanceCooldowns);
+        this.accessLevel = accessLevel;
+        this.instanceCooldowns = instanceCooldowns == null ? null : Collections.unmodifiableList(instanceCooldowns);
+        this.locks = locks == null ? null : Collections.unmodifiableList(locks);
     }
 
     /**
@@ -337,6 +341,14 @@ public final class CharacterDbDto {
     }
 
     /**
+     * Opaque GM/access level; numeric text on int-based builds (e.g. "7"), role
+     * name on string-role builds; null when not surfaced.
+     */
+    public @Nullable String getAccessLevel() {
+        return accessLevel;
+    }
+
+    /**
      * Per-instance re-entry cooldowns — source {@code character_instance_time}
      * (or its tenant equivalent), one entry per {@code (charId, instanceId)}.
      * {@code null} when the tenant does not sync instance cooldowns (no
@@ -345,6 +357,18 @@ public final class CharacterDbDto {
      */
     public @Nullable List<CharacterInstanceCooldownDbDto> getInstanceCooldowns() {
         return instanceCooldowns;
+    }
+
+    /**
+     * Active character locks — one entry per in-effect binding derived from
+     * build-specific {@code character_variables} rows (bohpts {@code lockIp} /
+     * {@code lockHwid} / {@code lockItem}). Each entry's {@code lockType} is a
+     * {@link WellKnownCharacterLockTypes} value. {@code null} when the tenant does
+     * not sync locks; empty list when the tenant syncs them but the character has
+     * no active lock.
+     */
+    public @Nullable List<CharacterLockDbDto> getLocks() {
+        return locks;
     }
 
     public Builder toBuilder() {
@@ -371,7 +395,9 @@ public final class CharacterDbDto {
                 .hero(hero)
                 .expBlocked(expBlocked)
                 .gearScore(gearScore)
-                .instanceCooldowns(instanceCooldowns);
+                .accessLevel(accessLevel)
+                .instanceCooldowns(instanceCooldowns)
+                .locks(locks);
     }
 
     public static Builder builder() {
@@ -405,15 +431,39 @@ public final class CharacterDbDto {
                 && Objects.equals(hero, that.hero)
                 && Objects.equals(expBlocked, that.expBlocked)
                 && Objects.equals(gearScore, that.gearScore)
-                && Objects.equals(instanceCooldowns, that.instanceCooldowns);
+                && Objects.equals(accessLevel, that.accessLevel)
+                && Objects.equals(instanceCooldowns, that.instanceCooldowns)
+                && Objects.equals(locks, that.locks);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, name, accountName, title, level, sex, race,
-                classId, baseClassId, subclasses, privateStore,
-                clanId, pvpCounter, pkCounter, karma, noblesse, scheduledDeletionAt, online,
-                onlineTimeSeconds, hero, expBlocked, gearScore, instanceCooldowns);
+        return Objects.hash(
+                id,
+                name,
+                accountName,
+                title,
+                level,
+                sex,
+                race,
+                classId,
+                baseClassId,
+                subclasses,
+                privateStore,
+                clanId,
+                pvpCounter,
+                pkCounter,
+                karma,
+                noblesse,
+                scheduledDeletionAt,
+                online,
+                onlineTimeSeconds,
+                hero,
+                expBlocked,
+                gearScore,
+                accessLevel,
+                instanceCooldowns,
+                locks);
     }
 
     @Override
@@ -440,7 +490,9 @@ public final class CharacterDbDto {
                 + ", hero=" + hero
                 + ", expBlocked=" + expBlocked
                 + ", gearScore=" + gearScore
-                + ", instanceCooldowns=" + instanceCooldowns + "]";
+                + ", accessLevel=" + accessLevel
+                + ", instanceCooldowns=" + instanceCooldowns
+                + ", locks=" + locks + "]";
     }
 
     public static final class Builder {
@@ -466,7 +518,9 @@ public final class CharacterDbDto {
         private @Nullable Boolean hero;
         private @Nullable Boolean expBlocked;
         private @Nullable Integer gearScore;
+        private @Nullable String accessLevel;
         private @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns;
+        private @Nullable List<CharacterLockDbDto> locks;
 
         public Builder id(long id) {
             this.id = id;
@@ -578,16 +632,48 @@ public final class CharacterDbDto {
             return this;
         }
 
+        public Builder accessLevel(@Nullable String accessLevel) {
+            this.accessLevel = accessLevel;
+            return this;
+        }
+
         public Builder instanceCooldowns(@Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns) {
             this.instanceCooldowns = instanceCooldowns;
             return this;
         }
 
+        public Builder locks(@Nullable List<CharacterLockDbDto> locks) {
+            this.locks = locks;
+            return this;
+        }
+
         public CharacterDbDto build() {
-            return new CharacterDbDto(id, name, accountName, title, level, sex, race,
-                    classId, baseClassId, subclasses, privateStore,
-                    clanId, pvpCounter, pkCounter, karma, noblesse, scheduledDeletionAt, online,
-                    onlineTimeSeconds, hero, expBlocked, gearScore, instanceCooldowns);
+            return new CharacterDbDto(
+                    id,
+                    name,
+                    accountName,
+                    title,
+                    level,
+                    sex,
+                    race,
+                    classId,
+                    baseClassId,
+                    subclasses,
+                    privateStore,
+                    clanId,
+                    pvpCounter,
+                    pkCounter,
+                    karma,
+                    noblesse,
+                    scheduledDeletionAt,
+                    online,
+                    onlineTimeSeconds,
+                    hero,
+                    expBlocked,
+                    gearScore,
+                    accessLevel,
+                    instanceCooldowns,
+                    locks);
         }
     }
 }
