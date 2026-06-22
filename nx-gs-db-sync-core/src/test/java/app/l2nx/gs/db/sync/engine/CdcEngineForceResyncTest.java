@@ -1,5 +1,9 @@
 package app.l2nx.gs.db.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.mock;
+
 import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
@@ -12,11 +16,6 @@ import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
 import app.l2nx.gs.db.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.common.TopicPartition;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-
 import java.sql.Connection;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -24,10 +23,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
-import static org.mockito.Mockito.mock;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Engine-level force-resync wiring: drain-before-cycle ordering, completion
@@ -40,8 +39,7 @@ class CdcEngineForceResyncTest {
 
     private static final long PK = 1L;
     private static final UUID RESYNC_ID = UUID.fromString("018f0000-0000-7000-8000-0000000000cc");
-    private static final RecordMetadata META =
-            new RecordMetadata(new TopicPartition("t", 0), 0L, 0, 0L, 0, 0);
+    private static final RecordMetadata META = new RecordMetadata(new TopicPartition("t", 0), 0L, 0, 0L, 0, 0);
 
     private final SnapshotStore snapshot = new SnapshotStore();
     private final CapturingSource source = new CapturingSource(snapshot);
@@ -124,6 +122,41 @@ class CdcEngineForceResyncTest {
     }
 
     @Test
+    void requestPkRepublishNoEvent_shouldForceRepublishPk_withoutEmittingCompletionEvent() {
+        snapshot.putCrc("clan", PK, 100);
+        engine = buildEngine();
+        engine.start();
+
+        engine.requestPkRepublishNoEvent("clan", pks(PK));
+
+        // Cycle observed the perturbed CRC (the no-event drain ran before borrow)
+        // and the empty host DB diffed the invalidated row to a DELETED publish
+        // whose ack removed it from the snapshot.
+        await(() -> !snapshot.containsCrc("clan", PK));
+        int crcSeenByCycle = source.crcAtBorrow.get(0);
+        assertNotEquals(100, crcSeenByCycle);
+        assertNotEquals(Phase1Hasher.MISSING_HASH, crcSeenByCycle);
+
+        // NO ResyncCompletedEvent — this is an internal per-command resync, not a
+        // tracked admin operation. Run another cycle to prove none ever lands.
+        engine.triggerEntityNow("clan");
+        await(() -> checkpoints.get() >= 2);
+        assertTrue(published.isEmpty(), "no-event republish must not emit any completion event");
+    }
+
+    @Test
+    void requestPkRepublishNoEvent_shouldBeNoOp_whenEntityUnknownOrPksEmpty() {
+        engine = buildEngine();
+        engine.start();
+
+        engine.requestPkRepublishNoEvent("nope", pks(PK));
+        engine.requestPkRepublishNoEvent("clan", pks());
+        engine.requestPkRepublishNoEvent("clan", null);
+
+        assertTrue(published.isEmpty());
+    }
+
+    @Test
     void runGuardedCycle_shouldResubmitImmediately_whenRequestLandsMidCycle() throws Exception {
         engine = buildEngine();
         engine.start();
@@ -186,8 +219,7 @@ class CdcEngineForceResyncTest {
         };
         SnapshotPersistence persistence = new SnapshotPersistence() {
             @Override
-            public void load(SnapshotStore target) {
-            }
+            public void load(SnapshotStore target) {}
 
             @Override
             public void checkpoint(String entityName, SnapshotStore src) {
@@ -195,12 +227,10 @@ class CdcEngineForceResyncTest {
             }
 
             @Override
-            public void flushAll(SnapshotStore src) {
-            }
+            public void flushAll(SnapshotStore src) {}
 
             @Override
-            public void close() {
-            }
+            public void close() {}
         };
         return new CdcEngine(
                 "test",

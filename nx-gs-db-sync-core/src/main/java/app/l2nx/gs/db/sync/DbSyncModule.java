@@ -23,8 +23,6 @@ import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import org.apache.kafka.clients.producer.Callback;
-
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
@@ -35,6 +33,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import org.apache.kafka.clients.producer.Callback;
 
 /**
  * Tier-1 module that runs the CRC32 CDC engine. Reads its inputs in order:
@@ -85,18 +84,20 @@ public final class DbSyncModule implements AdapterModule {
     private volatile CdcEngine engine;
 
     public DbSyncModule() {
-        this(DbSyncModule::loadJdbc,
+        this(
+                DbSyncModule::loadJdbc,
                 DbSyncModule::loadSchema,
                 DbSyncModule::performSmokeCheck,
                 EngineConfig.productionChain(),
                 DbSyncModule::sendViaNxKafka);
     }
 
-    DbSyncModule(Supplier<List<JdbcConnectionSource>> jdbcDiscoverer,
-                 Supplier<List<DbSchemaProvider>> schemaDiscoverer,
-                 Predicate<JdbcConnectionSource> smokeChecker,
-                 Function<String, String> configSource,
-                 KafkaSender kafkaSender) {
+    DbSyncModule(
+            Supplier<List<JdbcConnectionSource>> jdbcDiscoverer,
+            Supplier<List<DbSchemaProvider>> schemaDiscoverer,
+            Predicate<JdbcConnectionSource> smokeChecker,
+            Function<String, String> configSource,
+            KafkaSender kafkaSender) {
         this.jdbcDiscoverer = jdbcDiscoverer;
         this.schemaDiscoverer = schemaDiscoverer;
         this.smokeChecker = smokeChecker;
@@ -115,7 +116,8 @@ public final class DbSyncModule implements AdapterModule {
         if (ctx != null) {
             registerResyncHandlers(ctx);
         }
-        if (ctx == null || ctx.getSyncTopics() == null
+        if (ctx == null
+                || ctx.getSyncTopics() == null
                 || ctx.getSyncTopics().getDb() == null
                 || ctx.getSyncTopics().getDb().isEmpty()) {
             log.warn("ConnectContext carries no db sync topics — db-sync DISABLED. "
@@ -134,8 +136,8 @@ public final class DbSyncModule implements AdapterModule {
             return;
         }
         if (jdbcImpls.size() > 1) {
-            log.error("Multiple JdbcConnectionSource impls on classpath: [{}]. db-sync FAILED.",
-                    classNamesOf(jdbcImpls));
+            log.error(
+                    "Multiple JdbcConnectionSource impls on classpath: [{}]. db-sync FAILED.", classNamesOf(jdbcImpls));
             state = STATE_FAILED;
             return;
         }
@@ -153,15 +155,17 @@ public final class DbSyncModule implements AdapterModule {
             return;
         }
         if (schemaImpls.size() > 1) {
-            log.error("Multiple DbSchemaProvider impls on classpath: [{}]. db-sync FAILED.",
-                    classNamesOf(schemaImpls));
+            log.error("Multiple DbSchemaProvider impls on classpath: [{}]. db-sync FAILED.", classNamesOf(schemaImpls));
             state = STATE_FAILED;
             return;
         }
         DbSchemaProvider resolvedProvider = schemaImpls.get(0);
-        log.info("DbSchemaProvider resolved: schemaName={}, mappings={}",
+        log.info(
+                "DbSchemaProvider resolved: schemaName={}, mappings={}",
                 resolvedProvider.schemaName(),
-                resolvedProvider.mappings() == null ? 0 : resolvedProvider.mappings().size());
+                resolvedProvider.mappings() == null
+                        ? 0
+                        : resolvedProvider.mappings().size());
         this.provider = resolvedProvider;
         this.statsTracker = new EntityStatsTracker();
 
@@ -191,8 +195,10 @@ public final class DbSyncModule implements AdapterModule {
             SqlIdent.validate(p.schemaName(), "DbSchemaProvider.schemaName");
             validateIdentifiers(mappings);
         } catch (IllegalStateException invalidIdentifier) {
-            log.error("DbSchemaProvider {} returned an invalid identifier: {}",
-                    p.schemaName(), invalidIdentifier.getMessage());
+            log.error(
+                    "DbSchemaProvider {} returned an invalid identifier: {}",
+                    p.schemaName(),
+                    invalidIdentifier.getMessage());
             state = STATE_FAILED;
             return;
         }
@@ -211,8 +217,10 @@ public final class DbSyncModule implements AdapterModule {
         try {
             persistence = buildPersistence(config, p.schemaName());
         } catch (RuntimeException persistFailure) {
-            log.error("Snapshot persistence init failed ({}: {}) — db-sync FAILED",
-                    persistFailure.getClass().getName(), persistFailure.getMessage());
+            log.error(
+                    "Snapshot persistence init failed ({}: {}) — db-sync FAILED",
+                    persistFailure.getClass().getName(),
+                    persistFailure.getMessage());
             state = STATE_FAILED;
             return;
         }
@@ -236,8 +244,10 @@ public final class DbSyncModule implements AdapterModule {
         try {
             built.start();
         } catch (Throwable t) {
-            log.error("CdcEngine.start threw {}: {} — db-sync FAILED",
-                    t.getClass().getName(), t.getMessage());
+            log.error(
+                    "CdcEngine.start threw {}: {} — db-sync FAILED",
+                    t.getClass().getName(),
+                    t.getMessage());
             state = STATE_FAILED;
             this.engine = null;
             return;
@@ -247,17 +257,88 @@ public final class DbSyncModule implements AdapterModule {
         // mutates a character) without waiting for the next scheduled tick.
         try {
             CdcEngine running = engine;
+            JdbcConnectionSource resolvedSource = s;
+            Set<String> knownEntities = new LinkedHashSet<String>();
             NxSync sync = ctx.sync();
             for (EntityMapping<?> mapping : mappings) {
                 final String entityName = mapping.entityName();
+                knownEntities.add(entityName);
                 sync.registerTrigger(entityName, pks -> running.triggerEntityNow(entityName));
             }
+            sync.registerResyncHandler((entityName, pks, cascade) ->
+                    handleNxSyncResync(running, resolvedSource, knownEntities, ctx, entityName, pks, cascade));
         } catch (Throwable t) {
             // Trigger registration failures must not take down the module —
             // scheduled sync still works without the out-of-band path.
-            log.warn("Failed to register NxSync triggers for db-sync: {}",
-                    t.getClass().getName(), t);
+            log.warn(
+                    "Failed to register NxSync triggers for db-sync: {}",
+                    t.getClass().getName(),
+                    t);
         }
+    }
+
+    /**
+     * Routes {@code NxSync.requestResync} into the engine's no-event
+     * pk-republish. Runs on the caller's thread (game / consumer) — so the
+     * cascade-resolution JDBC and the engine submission are hopped onto the
+     * adapter IO pool, never the caller. No completion event is emitted (the
+     * no-event engine path carries no resyncId).
+     */
+    private static void handleNxSyncResync(
+            CdcEngine engine,
+            JdbcConnectionSource src,
+            Set<String> knownEntities,
+            ConnectContext ctx,
+            String entityName,
+            Collection<Long> pks,
+            boolean cascade) {
+        if (entityName == null || pks == null || pks.isEmpty()) {
+            return;
+        }
+        if (!knownEntities.contains(entityName)) {
+            log.debug("NxSync.requestResync({}) — entity not synced by db-sync, dropping", entityName);
+            return;
+        }
+        final LongOpenHashSet targetPks = new LongOpenHashSet(pks.size());
+        for (Long pk : pks) {
+            if (pk != null && pk.longValue() > 0L) {
+                targetPks.add(pk.longValue());
+            }
+        }
+        if (targetPks.isEmpty()) {
+            return;
+        }
+        // Trusted first-party in-process caller, so we don't reject (that would
+        // silently lose a sync); per-command counts are normally 1-2. A large
+        // count signals a caller bug — WARN so it surfaces, but proceed: the
+        // chunked IN-clause cascade resolution already bounds the SQL.
+        if (targetPks.size() > ResyncRowsCommand.MAX_PKS) {
+            log.warn(
+                    "NxSync.requestResync for entity {} carries {} pks (> {}) — unusually large for an in-process "
+                            + "republish; proceeding",
+                    entityName,
+                    targetPks.size(),
+                    ResyncRowsCommand.MAX_PKS);
+        }
+        ctx.io().execute(() -> {
+            Map<String, LongOpenHashSet> cascadeByEntity = Collections.emptyMap();
+            if (cascade) {
+                try {
+                    cascadeByEntity = resolveCascade(src, engine, entityName, targetPks);
+                } catch (SQLException resolutionFailure) {
+                    // Fan-out best-effort: the parent still re-publishes below.
+                    log.warn(
+                            "NxSync.requestResync cascade resolution failed for entity {}: {} — "
+                                    + "parent re-published without children",
+                            entityName,
+                            resolutionFailure.getMessage());
+                }
+            }
+            engine.requestPkRepublishNoEvent(entityName, targetPks);
+            for (Map.Entry<String, LongOpenHashSet> e : cascadeByEntity.entrySet()) {
+                engine.requestPkRepublishNoEvent(e.getKey(), e.getValue());
+            }
+        });
     }
 
     @Override
@@ -308,7 +389,9 @@ public final class DbSyncModule implements AdapterModule {
                     entityStats = entities;
                 }
             } catch (Throwable t) {
-                log.warn("EntityStatsTracker.currentStatuses threw {}", t.getClass().getName());
+                log.warn(
+                        "EntityStatsTracker.currentStatuses threw {}",
+                        t.getClass().getName());
             }
         }
 
@@ -316,13 +399,12 @@ public final class DbSyncModule implements AdapterModule {
         if (poolStats == null && entityStats == null) {
             stats = ModuleStatus.Stats.empty();
         } else {
-            stats = ModuleStatus.Stats.builder().pool(poolStats).entities(entityStats).build();
+            stats = ModuleStatus.Stats.builder()
+                    .pool(poolStats)
+                    .entities(entityStats)
+                    .build();
         }
-        return ModuleStatus.builder()
-                .name(NAME)
-                .state(state)
-                .stats(stats)
-                .build();
+        return ModuleStatus.builder().name(NAME).state(state).stats(stats).build();
     }
 
     /**
@@ -339,13 +421,14 @@ public final class DbSyncModule implements AdapterModule {
         } catch (Throwable t) {
             // Registration failure must not take down the module — sync itself
             // works without the resync RPC surface.
-            log.warn("Failed to register db-sync resync command handlers: {}",
-                    t.getClass().getName(), t);
+            log.warn(
+                    "Failed to register db-sync resync command handlers: {}",
+                    t.getClass().getName(),
+                    t);
         }
     }
 
-    CommandResult<ResyncEntitiesResult> handleResyncEntities(ResyncEntitiesCommand cmd,
-                                                             CommandContext cctx) {
+    CommandResult<ResyncEntitiesResult> handleResyncEntities(ResyncEntitiesCommand cmd, CommandContext cctx) {
         if (cmd.getResyncId() == null) {
             return CommandResult.validationFailed("resyncId is required", "resyncId");
         }
@@ -372,7 +455,8 @@ public final class DbSyncModule implements AdapterModule {
                 return CommandResult.unavailable("db-sync engine stopped while enqueuing resync");
             }
         }
-        return CommandResult.ok(ResyncEntitiesResult.builder().acceptedEntities(targets).build());
+        return CommandResult.ok(
+                ResyncEntitiesResult.builder().acceptedEntities(targets).build());
     }
 
     CommandResult<ResyncRowsResult> handleResyncRows(ResyncRowsCommand cmd, CommandContext cctx) {
@@ -394,8 +478,7 @@ public final class DbSyncModule implements AdapterModule {
         }
         if (pks.size() > ResyncRowsCommand.MAX_PKS) {
             return CommandResult.validationFailed(
-                    "pks must carry at most " + ResyncRowsCommand.MAX_PKS + " entries (got "
-                            + pks.size() + ")", "pks");
+                    "pks must carry at most " + ResyncRowsCommand.MAX_PKS + " entries (got " + pks.size() + ")", "pks");
         }
         LongOpenHashSet targetPks = new LongOpenHashSet(pks.size());
         for (Long pk : pks) {
@@ -405,44 +488,26 @@ public final class DbSyncModule implements AdapterModule {
             // L2J object ids are strictly positive; a garbage PK would enter the
             // snapshot as a sentinel and inflate the window-planning envelope.
             if (pk.longValue() <= 0L) {
-                return CommandResult.validationFailed(
-                        "pks must contain only positive values (got " + pk + ")", "pks");
+                return CommandResult.validationFailed("pks must contain only positive values (got " + pk + ")", "pks");
             }
             targetPks.add(pk.longValue());
         }
 
         // Cascade resolution runs synchronously BEFORE any enqueue so a SQL
         // failure replies INTERNAL_ERROR without a half-applied invalidation.
-        Map<String, LongOpenHashSet> cascadeByEntity = new LinkedHashMap<String, LongOpenHashSet>();
+        Map<String, LongOpenHashSet> cascadeByEntity;
         if (cmd.isCascade()) {
             try {
-                for (EntityMapping<?> mapping : running.mappings()) {
-                    List<ParentRef> refs = mapping.parentRefs();
-                    if (refs == null) {
-                        continue;
-                    }
-                    for (ParentRef ref : refs) {
-                        if (!entityName.equals(ref.parentEntityName())) {
-                            continue;
-                        }
-                        LongOpenHashSet resolved = resolveChildPks(src, mapping, ref, targetPks);
-                        if (resolved.isEmpty()) {
-                            continue;
-                        }
-                        LongOpenHashSet bucket = cascadeByEntity.get(mapping.entityName());
-                        if (bucket == null) {
-                            cascadeByEntity.put(mapping.entityName(), resolved);
-                        } else {
-                            bucket.addAll(resolved);
-                        }
-                    }
-                }
+                cascadeByEntity = resolveCascade(src, running, entityName, targetPks);
             } catch (SQLException resolutionFailure) {
-                log.error("Resync cascade resolution failed for entity {}: {}",
-                        entityName, resolutionFailure.getMessage());
-                return CommandResult.internalError(
-                        "Cascade resolution failed: " + resolutionFailure.getMessage());
+                log.error(
+                        "Resync cascade resolution failed for entity {}: {}",
+                        entityName,
+                        resolutionFailure.getMessage());
+                return CommandResult.internalError("Cascade resolution failed: " + resolutionFailure.getMessage());
             }
+        } else {
+            cascadeByEntity = new LinkedHashMap<String, LongOpenHashSet>();
         }
 
         if (!running.requestForceResync(cmd.getResyncId(), entityName, targetPks)) {
@@ -456,8 +521,9 @@ public final class DbSyncModule implements AdapterModule {
             }
             invalidatedByEntity.put(e.getKey(), e.getValue().size());
         }
-        return CommandResult.ok(
-                ResyncRowsResult.builder().invalidatedByEntity(invalidatedByEntity).build());
+        return CommandResult.ok(ResyncRowsResult.builder()
+                .invalidatedByEntity(invalidatedByEntity)
+                .build());
     }
 
     private static Set<String> mappedEntityNames(CdcEngine engine) {
@@ -469,13 +535,47 @@ public final class DbSyncModule implements AdapterModule {
     }
 
     /**
+     * Resolves, per dependent entity, the child PKs whose declared
+     * {@link ParentRef} points at {@code parentEntity} for the given
+     * {@code parentPks}. Shared by the tracked {@link ResyncRowsCommand} handler
+     * and the no-event {@code NxSync.requestResync} path. Empty buckets are
+     * dropped; entities are keyed in declaration order.
+     */
+    private static Map<String, LongOpenHashSet> resolveCascade(
+            JdbcConnectionSource src, CdcEngine engine, String parentEntity, LongOpenHashSet parentPks)
+            throws SQLException {
+        Map<String, LongOpenHashSet> cascadeByEntity = new LinkedHashMap<String, LongOpenHashSet>();
+        for (EntityMapping<?> mapping : engine.mappings()) {
+            List<ParentRef> refs = mapping.parentRefs();
+            if (refs == null) {
+                continue;
+            }
+            for (ParentRef ref : refs) {
+                if (!parentEntity.equals(ref.parentEntityName())) {
+                    continue;
+                }
+                LongOpenHashSet resolved = resolveChildPks(src, mapping, ref, parentPks);
+                if (resolved.isEmpty()) {
+                    continue;
+                }
+                LongOpenHashSet bucket = cascadeByEntity.get(mapping.entityName());
+                if (bucket == null) {
+                    cascadeByEntity.put(mapping.entityName(), resolved);
+                } else {
+                    bucket.addAll(resolved);
+                }
+            }
+        }
+        return cascadeByEntity;
+    }
+
+    /**
      * Identifiers are pre-validated by {@link #validateIdentifiers} at module
      * start, so the interpolation here is injection-safe.
      */
-    private static LongOpenHashSet resolveChildPks(JdbcConnectionSource src,
-                                                   EntityMapping<?> child,
-                                                   ParentRef ref,
-                                                   LongOpenHashSet parentPks) throws SQLException {
+    private static LongOpenHashSet resolveChildPks(
+            JdbcConnectionSource src, EntityMapping<?> child, ParentRef ref, LongOpenHashSet parentPks)
+            throws SQLException {
         LongOpenHashSet result = new LongOpenHashSet();
         long[] parents = parentPks.toLongArray();
         try (Connection conn = src.getConnection()) {
@@ -546,11 +646,10 @@ public final class DbSyncModule implements AdapterModule {
                 for (ParentRef ref : parentRefs) {
                     SqlIdent.validate(ref.fkColumn(), "entity '" + entity + "' parentRef.fkColumn");
                     if (!declaredEntities.contains(ref.parentEntityName())) {
-                        throw new IllegalStateException(
-                                "entity '" + entity + "' parentRef.parentEntityName '"
-                                        + ref.parentEntityName()
-                                        + "' does not reference a declared entity (declared: "
-                                        + declaredEntities + ")");
+                        throw new IllegalStateException("entity '" + entity + "' parentRef.parentEntityName '"
+                                + ref.parentEntityName()
+                                + "' does not reference a declared entity (declared: "
+                                + declaredEntities + ")");
                     }
                 }
             }
@@ -559,10 +658,12 @@ public final class DbSyncModule implements AdapterModule {
 
     private static SnapshotPersistence buildPersistence(EngineConfig config, String schemaName) {
         Path schemaDir = Paths.get(config.persistDir()).resolve(schemaName);
-        FileSnapshotPersistence fp = new FileSnapshotPersistence(
-                schemaDir, config.persistCheckpointMinIntervalSeconds());
-        log.info("Snapshot persistence: dir={}, checkpointMinIntervalSeconds={}",
-                schemaDir, config.persistCheckpointMinIntervalSeconds());
+        FileSnapshotPersistence fp =
+                new FileSnapshotPersistence(schemaDir, config.persistCheckpointMinIntervalSeconds());
+        log.info(
+                "Snapshot persistence: dir={}, checkpointMinIntervalSeconds={}",
+                schemaDir,
+                config.persistCheckpointMinIntervalSeconds());
         return fp;
     }
 
@@ -603,8 +704,7 @@ public final class DbSyncModule implements AdapterModule {
         }
     }
 
-    private static void sendViaNxKafka(String topic, byte[] key, Object value,
-                                       Callback callback) {
+    private static void sendViaNxKafka(String topic, byte[] key, Object value, Callback callback) {
         try {
             NxKafka.instance().send(topic, key, value, callback);
         } catch (KafkaException notConfigured) {
@@ -612,17 +712,24 @@ public final class DbSyncModule implements AdapterModule {
             try {
                 callback.onCompletion(null, notConfigured);
             } catch (Throwable t) {
-                log.warn("KafkaSender callback threw {} — publisher future will not complete",
+                log.warn(
+                        "KafkaSender callback threw {} — publisher future will not complete",
                         t.getClass().getName());
             }
         } catch (Throwable senderFailure) {
-            log.warn("NxKafka.send threw {} — invoking callback exceptionally", senderFailure.getClass().getName());
+            log.warn(
+                    "NxKafka.send threw {} — invoking callback exceptionally",
+                    senderFailure.getClass().getName());
             try {
-                callback.onCompletion(null,
-                        senderFailure instanceof Exception ? (Exception) senderFailure
+                callback.onCompletion(
+                        null,
+                        senderFailure instanceof Exception
+                                ? (Exception) senderFailure
                                 : new RuntimeException(senderFailure));
             } catch (Throwable t) {
-                log.warn("KafkaSender callback threw {} after upstream failure", t.getClass().getName());
+                log.warn(
+                        "KafkaSender callback threw {} after upstream failure",
+                        t.getClass().getName());
             }
         }
     }

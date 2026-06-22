@@ -14,7 +14,6 @@ import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import it.unimi.dsi.fastutil.longs.LongSet;
-
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,20 +52,21 @@ public final class CdcEngine {
 
     private volatile ScheduledThreadPoolExecutor scheduler;
 
-    public CdcEngine(String schemaName,
-                     List<? extends EntityMapping<?>> mappings,
-                     JdbcConnectionSource jdbcSource,
-                     SnapshotStore snapshot,
-                     SnapshotPersistence persistence,
-                     EngineConfig config,
-                     TopicResolver topicResolver,
-                     SyncEventPublisher publisher,
-                     EntityStatsTracker statsTracker,
-                     WindowPlanner windowPlanner,
-                     Phase1Hasher phase1Hasher,
-                     Phase2Fetcher phase2Fetcher,
-                     Function<String, String> configOverrideSource,
-                     NxEvents events) {
+    public CdcEngine(
+            String schemaName,
+            List<? extends EntityMapping<?>> mappings,
+            JdbcConnectionSource jdbcSource,
+            SnapshotStore snapshot,
+            SnapshotPersistence persistence,
+            EngineConfig config,
+            TopicResolver topicResolver,
+            SyncEventPublisher publisher,
+            EntityStatsTracker statsTracker,
+            WindowPlanner windowPlanner,
+            Phase1Hasher phase1Hasher,
+            Phase2Fetcher phase2Fetcher,
+            Function<String, String> configOverrideSource,
+            NxEvents events) {
         this.schemaName = schemaName;
         this.mappings = Collections.unmodifiableList(new ArrayList<EntityMapping<?>>(mappings));
         this.jdbcSource = jdbcSource;
@@ -93,8 +93,10 @@ public final class CdcEngine {
         try {
             persistence.load(snapshot);
         } catch (Throwable t) {
-            log.warn("SnapshotPersistence.load threw {}: {} — starting with empty snapshot",
-                    t.getClass().getName(), t.getMessage());
+            log.warn(
+                    "SnapshotPersistence.load threw {}: {} — starting with empty snapshot",
+                    t.getClass().getName(),
+                    t.getMessage());
         }
 
         int poolSize = resolvePoolSize(config.workers(), mappings.size());
@@ -110,25 +112,27 @@ public final class CdcEngine {
             }
 
             EntitySyncTask task = new EntitySyncTask(
-                    mapping, jdbcSource, snapshot,
-                    windowPlanner, phase1Hasher, phase2Fetcher,
-                    publisher, topicResolver, config);
+                    mapping,
+                    jdbcSource,
+                    snapshot,
+                    windowPlanner,
+                    phase1Hasher,
+                    phase2Fetcher,
+                    publisher,
+                    topicResolver,
+                    config);
             tasks.add(task);
 
-            final AtomicBoolean ticking = new AtomicBoolean(false);
             final String entity = mapping.entityName();
-            slotsByEntity.put(entity, new EntitySlot(task, ticking));
-            Runnable tick = SafeRunnable.wrap(() -> runGuardedCycle(entity, task, ticking), log);
+            final EntitySlot slot = new EntitySlot(task);
+            slotsByEntity.put(entity, slot);
+            Runnable tick = SafeRunnable.wrap(() -> runGuardedCycle(entity, slot), log);
 
             ScheduledFuture<?> handle = pool.scheduleWithFixedDelay(
-                    tick,
-                    config.tickIntervalSeconds(),
-                    config.tickIntervalSeconds(),
-                    TimeUnit.SECONDS);
+                    tick, config.tickIntervalSeconds(), config.tickIntervalSeconds(), TimeUnit.SECONDS);
             futures.add(handle);
         }
-        log.info("CdcEngine started: {} entities, schemaName={}, poolSize={}",
-                mappings.size(), schemaName, poolSize);
+        log.info("CdcEngine started: {} entities, schemaName={}, poolSize={}", mappings.size(), schemaName, poolSize);
     }
 
     /**
@@ -139,10 +143,16 @@ public final class CdcEngine {
      * instead of waiting for the next scheduled tick.
      *
      * <p>Honors the same per-entity {@code ticking} guard as scheduled
-     * runs — if a tick is already running for this entity the trigger
-     * is a no-op (the in-flight cycle picks up the change anyway, since
-     * Phase-1 re-reads the current row hashes). Unknown entity names log
-     * at WARN and drop.</p>
+     * runs. If a tick is already running for this entity the submitted
+     * cycle CASes the guard and returns as a no-op — but the trigger is
+     * NOT lost: it sets a per-entity pending-immediate flag BEFORE
+     * submitting, which the in-flight cycle's {@code finally} observes and
+     * re-submits, guaranteeing one full cycle starts strictly after this
+     * trigger. The flag is consumed at the start of a cycle (before the
+     * consistent-snapshot read opens), so a trigger landing after the read
+     * re-sets it and forces yet another cycle rather than racing the read.
+     * Multiple triggers during one cycle coalesce into a single re-run.
+     * Unknown entity names log at WARN and drop.</p>
      *
      * <p>Engine must be {@link #start()}ed and not {@link #stop()}ped;
      * pre-start and post-stop calls log at WARN and drop. Calling thread
@@ -153,8 +163,7 @@ public final class CdcEngine {
      */
     public void triggerEntityNow(String entityName) {
         if (!started.get() || stopped.get()) {
-            log.warn("CdcEngine.triggerEntityNow({}) called before start or after stop — dropping",
-                    entityName);
+            log.warn("CdcEngine.triggerEntityNow({}) called before start or after stop — dropping", entityName);
             return;
         }
         EntitySlot slot = slotsByEntity.get(entityName);
@@ -166,12 +175,18 @@ public final class CdcEngine {
         if (pool == null) {
             return;
         }
+        // Mark BEFORE submit so a trigger racing the ticking guard is recorded:
+        // if the submitted cycle loses the CAS, the running cycle's finally still
+        // sees this and re-submits — the request is never silently dropped.
+        slot.pendingImmediate.set(true);
         try {
-            pool.execute(SafeRunnable.wrap(
-                    () -> runGuardedCycle(entityName, slot.task, slot.ticking), log));
+            pool.execute(SafeRunnable.wrap(() -> runGuardedCycle(entityName, slot), log));
         } catch (Throwable t) {
-            log.warn("CdcEngine.triggerEntityNow({}) submit failed: {}",
-                    entityName, t.getClass().getName(), t);
+            log.warn(
+                    "CdcEngine.triggerEntityNow({}) submit failed: {}",
+                    entityName,
+                    t.getClass().getName(),
+                    t);
         }
     }
 
@@ -191,8 +206,11 @@ public final class CdcEngine {
             return false;
         }
         resyncCoordinator.enqueueAll(resyncId, entityName);
-        log.info("Force resync requested for WHOLE entity {} (resyncId={}) — "
-                + "full re-publication burst on the next cycle", entityName, resyncId);
+        log.info(
+                "Force resync requested for WHOLE entity {} (resyncId={}) — "
+                        + "full re-publication burst on the next cycle",
+                entityName,
+                resyncId);
         triggerEntityNow(entityName);
         return true;
     }
@@ -211,30 +229,77 @@ public final class CdcEngine {
         return true;
     }
 
+    /**
+     * INTERNAL per-command pk-republish — same snapshot-perturb + immediate
+     * cycle as {@link #requestForceResync(UUID, String, LongSet)} but carries
+     * NO {@code resyncId}, so it emits NO {@code ResyncCompletedEvent}. Used by
+     * {@code NxSync.requestResync} so command handlers can guarantee
+     * re-publication of specific rows right after a mutation without registering
+     * a tracked admin resync operation (which would make the platform consumer
+     * log spurious unknown-resyncId WARNs per command). Thread-safe,
+     * non-blocking; never mutates {@link SnapshotStore} on the calling thread —
+     * the perturbation runs on the entity's cycle thread, the calling thread
+     * only enqueues + submits.
+     *
+     * <p>Coalesced: concurrent requests union their PK sets, and a request
+     * landing mid-cycle re-submits at cycle end (the same pending-request
+     * machinery the tracked resync uses). No-op + WARN when the entity is
+     * unknown or the engine is not running; no-op on a {@code null}/empty PK
+     * set.</p>
+     */
+    public void requestPkRepublishNoEvent(String entityName, LongSet pks) {
+        if (pks == null || pks.isEmpty()) {
+            return;
+        }
+        if (!started.get() || stopped.get()) {
+            log.warn(
+                    "CdcEngine.requestPkRepublishNoEvent({}) called before start or after stop — dropping", entityName);
+            return;
+        }
+        if (!slotsByEntity.containsKey(entityName)) {
+            log.warn("CdcEngine.requestPkRepublishNoEvent({}) — unknown entity, dropping", entityName);
+            return;
+        }
+        resyncCoordinator.enqueueNoEventPks(entityName, pks);
+        triggerEntityNow(entityName);
+    }
+
     private boolean resyncRequestAccepted(UUID resyncId, String entityName) {
         if (!started.get() || stopped.get()) {
-            log.warn("CdcEngine.requestForceResync({}, {}) called before start or after stop — dropping",
-                    entityName, resyncId);
+            log.warn(
+                    "CdcEngine.requestForceResync({}, {}) called before start or after stop — dropping",
+                    entityName,
+                    resyncId);
             return false;
         }
         if (!slotsByEntity.containsKey(entityName)) {
-            log.warn("CdcEngine.requestForceResync({}, {}) — unknown entity, dropping",
-                    entityName, resyncId);
+            log.warn("CdcEngine.requestForceResync({}, {}) — unknown entity, dropping", entityName, resyncId);
             return false;
         }
         return true;
     }
 
-    private void runGuardedCycle(String entity, EntitySyncTask task, AtomicBoolean ticking) {
+    private void runGuardedCycle(String entity, EntitySlot slot) {
+        AtomicBoolean ticking = slot.ticking;
         if (!ticking.compareAndSet(false, true)) {
+            // Lost the CAS — a cycle is already running. Do NOT clear
+            // pendingImmediate here: the running cycle's finally must observe it
+            // and re-submit, otherwise an immediate trigger landing now is lost.
             log.debug("Entity {} cycle already running — out-of-band/scheduled tick skipped", entity);
             return;
         }
         try {
+            // Consume pendingImmediate BEFORE the snapshot read opens: any trigger
+            // arriving after this point (during or after the read) re-sets the
+            // flag and forces another full cycle, so a change committed before the
+            // trigger is guaranteed to be observed by some cycle. Consuming after
+            // the read would lose a trigger racing the read.
+            slot.pendingImmediate.set(false);
             // Drain BEFORE runCycle: the planner must see invalidation sentinels
             // in the snapshot's PK envelope, otherwise out-of-range sentinel
             // DELETEDs would slip to the next cycle.
             resyncCoordinator.drainAndInvalidate(entity, snapshot);
+            EntitySyncTask task = slot.task;
             long cycleStartedMs = System.currentTimeMillis();
             CycleResult result;
             try {
@@ -244,8 +309,11 @@ public final class CdcEngine {
                 // the snapshot envelope. Record a degraded result so the heartbeat
                 // does not keep showing the last pre-failure result forever and the
                 // resync completion gate stays deferred.
-                log.warn("Entity {} cycle threw {}: {} — recording DEGRADED result",
-                        entity, cycleFailure.getClass().getName(), cycleFailure.getMessage());
+                log.warn(
+                        "Entity {} cycle threw {}: {} — recording DEGRADED result",
+                        entity,
+                        cycleFailure.getClass().getName(),
+                        cycleFailure.getMessage());
                 result = CycleResult.degraded(System.currentTimeMillis() - cycleStartedMs);
                 statsTracker.recordCycleResult(entity, result);
                 resyncCoordinator.onCycleResult(entity, result);
@@ -258,15 +326,20 @@ public final class CdcEngine {
             try {
                 persistence.checkpoint(entity, snapshot);
             } catch (Throwable persistError) {
-                log.warn("SnapshotPersistence.checkpoint({}) threw {}: {}",
-                        entity, persistError.getClass().getName(), persistError.getMessage());
+                log.warn(
+                        "SnapshotPersistence.checkpoint({}) threw {}: {}",
+                        entity,
+                        persistError.getClass().getName(),
+                        persistError.getMessage());
             }
         } finally {
             ticking.set(false);
-            // A resync request that landed mid-cycle hit the ticking guard as a
-            // no-op — re-submit so its invalidations run in the immediately
-            // following cycle instead of waiting for the next scheduled tick.
-            if (resyncCoordinator.hasPending(entity) && !stopped.get()) {
+            // A resync request OR an immediate trigger (NxSync.requestNow) that
+            // landed mid-cycle hit the ticking guard as a no-op — re-submit so it
+            // runs in the immediately following cycle instead of waiting for the
+            // next scheduled tick. Order matters: release ticking first, then
+            // observe the flags, so the re-submitted cycle can win the CAS.
+            if ((slot.pendingImmediate.get() || resyncCoordinator.hasPending(entity)) && !stopped.get()) {
                 triggerEntityNow(entity);
             }
         }
@@ -274,11 +347,14 @@ public final class CdcEngine {
 
     private static final class EntitySlot {
         final EntitySyncTask task;
-        final AtomicBoolean ticking;
+        final AtomicBoolean ticking = new AtomicBoolean(false);
+        // Set by triggerEntityNow before submit; consumed at cycle start, observed
+        // again in the cycle's finally to re-submit a coalesced follow-up cycle so
+        // an immediate trigger racing the ticking guard is never dropped.
+        final AtomicBoolean pendingImmediate = new AtomicBoolean(false);
 
-        EntitySlot(EntitySyncTask task, AtomicBoolean ticking) {
+        EntitySlot(EntitySyncTask task) {
             this.task = task;
-            this.ticking = ticking;
         }
     }
 
@@ -325,8 +401,10 @@ public final class CdcEngine {
             try {
                 persistence.flushAll(snapshot);
             } catch (Throwable t) {
-                log.warn("SnapshotPersistence.flushAll threw {}: {} — shutdown continues",
-                        t.getClass().getName(), t.getMessage());
+                log.warn(
+                        "SnapshotPersistence.flushAll threw {}: {} — shutdown continues",
+                        t.getClass().getName(),
+                        t.getMessage());
             }
         } else {
             log.warn("CdcEngine skipping final snapshot flush — a cycle thread is still running; "
@@ -335,8 +413,7 @@ public final class CdcEngine {
         try {
             persistence.close();
         } catch (Throwable t) {
-            log.warn("SnapshotPersistence.close threw {}: {}",
-                    t.getClass().getName(), t.getMessage());
+            log.warn("SnapshotPersistence.close threw {}: {}", t.getClass().getName(), t.getMessage());
         }
         snapshot.clearAll();
         log.info("CdcEngine stopped");
@@ -383,5 +460,4 @@ public final class CdcEngine {
         }
         return Math.max(2, Math.min(entities, cores));
     }
-
 }

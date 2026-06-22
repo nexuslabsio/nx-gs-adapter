@@ -1,17 +1,16 @@
 package app.l2nx.gs.db.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import org.junit.jupiter.api.Test;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ResyncCoordinatorTest {
 
@@ -193,6 +192,57 @@ class ResyncCoordinatorTest {
         assertFalse(coordinator.hasPending("item"));
         coordinator.onCycleResult("clan", healthy());
         assertTrue(published.isEmpty());
+    }
+
+    @Test
+    void drainAndInvalidate_shouldInvalidateWithoutTracking_whenOnlyNoEventPks() {
+        snapshot.putCrc("clan", 1L, 100);
+
+        coordinator.enqueueNoEventPks("clan", pks(1L));
+        coordinator.drainAndInvalidate("clan", snapshot);
+
+        // PK is invalidated on the snapshot so the next cycle re-publishes it...
+        assertNotEquals(100, snapshot.getCrc("clan", 1L));
+        // ...but no resyncId was tracked, so a fully successful cycle emits nothing.
+        coordinator.onCycleResult("clan", healthy());
+        assertTrue(published.isEmpty(), "no-event channel must never emit a completion event");
+    }
+
+    @Test
+    void onCycleResult_shouldEmitOnlyForTrackedId_whenDrainMixesTrackedAndNoEventPks() {
+        snapshot.putCrc("clan", 1L, 100);
+        snapshot.putCrc("clan", 2L, 200);
+
+        coordinator.enqueuePks(RESYNC_A, "clan", pks(1L));
+        coordinator.enqueueNoEventPks("clan", pks(2L));
+        coordinator.drainAndInvalidate("clan", snapshot);
+
+        // Both the tracked and the no-event PK are invalidated for re-publication.
+        assertNotEquals(100, snapshot.getCrc("clan", 1L));
+        assertNotEquals(200, snapshot.getCrc("clan", 2L));
+
+        coordinator.onCycleResult("clan", healthy());
+
+        assertEquals(1, published.size(), "exactly one event for the tracked resyncId, none for the no-event PK");
+        assertEquals(RESYNC_A, ((ResyncCompletedEvent) published.get(0)).getResyncId());
+    }
+
+    @Test
+    void enqueueAll_shouldAbsorbQueuedNoEventPks() {
+        // A ghost PK the snapshot never had: if the no-event channel were drained
+        // separately it would insert a sentinel; whole-entity absorb must not.
+        coordinator.enqueueNoEventPks("clan", pks(999L));
+        coordinator.enqueueAll(RESYNC_A, "clan");
+        coordinator.drainAndInvalidate("clan", snapshot);
+
+        assertFalse(snapshot.containsCrc("clan", 999L), "absorbed no-event PK must not be separately processed");
+    }
+
+    @Test
+    void hasPending_shouldReturnTrue_whenOnlyNoEventPksQueued() {
+        coordinator.enqueueNoEventPks("clan", pks(1L));
+
+        assertTrue(coordinator.hasPending("clan"), "queued no-event PKs must drive the mid-cycle re-submit");
     }
 
     private static LongOpenHashSet pks(long... values) {

@@ -10,18 +10,20 @@ final class NoOpSync implements NxSync {
 
     static final NoOpSync INSTANCE = new NoOpSync();
 
-    private NoOpSync() {
-    }
+    private NoOpSync() {}
 
     @Override
-    public void requestNow(String entityName, long pk) {
-    }
+    public void requestNow(String entityName, long pk) {}
 
     @Override
-    public void requestNow(String entityName, Collection<Long> pks) {
-    }
+    public void requestNow(String entityName, Collection<Long> pks) {}
 
     @Override
-    public void registerTrigger(String entityName, NxSyncTrigger trigger) {
-    }
+    public void requestResync(String entityName, Collection<Long> pks, boolean cascade) {}
+
+    @Override
+    public void registerTrigger(String entityName, NxSyncTrigger trigger) {}
+
+    @Override
+    public void registerResyncHandler(NxSyncResyncHandler handler) {}
 }

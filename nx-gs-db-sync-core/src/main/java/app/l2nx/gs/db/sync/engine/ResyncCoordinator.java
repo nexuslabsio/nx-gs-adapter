@@ -9,7 +9,6 @@ import app.l2nx.gs.log.NxLogFactory;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
-
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,8 +37,7 @@ final class ResyncCoordinator {
     private final Map<String, Pending> pendingByEntity = new ConcurrentHashMap<String, Pending>();
     // Mutated only on the entity's cycle thread (under the engine's ticking guard);
     // ConcurrentHashMap only for the cross-entity map structure itself.
-    private final Map<String, List<InFlight>> inFlightByEntity =
-            new ConcurrentHashMap<String, List<InFlight>>();
+    private final Map<String, List<InFlight>> inFlightByEntity = new ConcurrentHashMap<String, List<InFlight>>();
 
     ResyncCoordinator(NxEvents events) {
         this.events = events;
@@ -54,6 +52,9 @@ final class ResyncCoordinator {
         synchronized (pending) {
             pending.all = true;
             pending.pks.clear();
+            // invalidate-all perturbs every stored entry, subsuming any queued
+            // no-event per-pk requests; drop them so the drain does not re-touch.
+            pending.noEventPks.clear();
             pending.resyncIds.add(resyncId);
         }
     }
@@ -72,13 +73,32 @@ final class ResyncCoordinator {
         }
     }
 
+    /**
+     * Enqueue an INTERNAL per-command pk-republish. Any thread; non-blocking;
+     * unions with previously queued no-event PKs. Carries NO {@code resyncId} —
+     * the drain invalidates these PKs alongside the tracked requests but never
+     * records an {@link InFlight}, so {@link #onCycleResult} emits no
+     * {@link ResyncCompletedEvent} for them. Used by
+     * {@code NxSync.requestResync} so a command handler can guarantee
+     * re-publication of specific rows without spawning a tracked admin resync
+     * operation.
+     */
+    void enqueueNoEventPks(String entityName, LongSet pks) {
+        Pending pending = pendingOf(entityName);
+        synchronized (pending) {
+            if (!pending.all) {
+                pending.noEventPks.addAll(pks);
+            }
+        }
+    }
+
     boolean hasPending(String entityName) {
         Pending pending = pendingByEntity.get(entityName);
         if (pending == null) {
             return false;
         }
         synchronized (pending) {
-            return !pending.resyncIds.isEmpty();
+            return !pending.resyncIds.isEmpty() || !pending.noEventPks.isEmpty();
         }
     }
 
@@ -95,29 +115,54 @@ final class ResyncCoordinator {
         }
         boolean all;
         LongOpenHashSet pks;
+        LongOpenHashSet noEventPks;
         List<UUID> drainedIds;
         synchronized (pending) {
-            if (pending.resyncIds.isEmpty()) {
+            if (pending.resyncIds.isEmpty() && pending.noEventPks.isEmpty()) {
                 return;
             }
             all = pending.all;
             pks = pending.pks.isEmpty() ? null : new LongOpenHashSet(pending.pks);
+            noEventPks = pending.noEventPks.isEmpty() ? null : new LongOpenHashSet(pending.noEventPks);
             drainedIds = new ArrayList<UUID>(pending.resyncIds);
             pending.all = false;
             pending.pks.clear();
+            pending.noEventPks.clear();
             pending.resyncIds.clear();
         }
         if (all) {
             snapshot.invalidateAll(entityName);
-            log.info("Force resync: invalidated all {} snapshot entries of entity {} (resyncIds={})",
-                    snapshot.sizeOf(entityName), entityName, drainedIds);
+            log.info(
+                    "Force resync: invalidated all {} snapshot entries of entity {} (resyncIds={})",
+                    snapshot.sizeOf(entityName),
+                    entityName,
+                    drainedIds);
         } else if (pks != null) {
             LongIterator it = pks.iterator();
             while (it.hasNext()) {
                 snapshot.invalidate(entityName, it.nextLong());
             }
-            log.info("Force resync: invalidated {} rows of entity {} (resyncIds={})",
-                    pks.size(), entityName, drainedIds);
+            log.info(
+                    "Force resync: invalidated {} rows of entity {} (resyncIds={})",
+                    pks.size(),
+                    entityName,
+                    drainedIds);
+        }
+        // No-event PKs invalidate the same way but record no InFlight resyncId,
+        // so the next cycle re-publishes them with NO ResyncCompletedEvent. When
+        // a whole-entity (all) request was absorbed they are already perturbed.
+        if (!all && noEventPks != null) {
+            LongIterator it = noEventPks.iterator();
+            while (it.hasNext()) {
+                snapshot.invalidate(entityName, it.nextLong());
+            }
+            log.debug(
+                    "No-event resync: invalidated {} rows of entity {} (per-command, no completion event)",
+                    noEventPks.size(),
+                    entityName);
+        }
+        if (drainedIds.isEmpty()) {
+            return;
         }
         Instant cycleStartedAt = Instant.now();
         List<InFlight> inFlight = inFlightOf(entityName);
@@ -144,9 +189,13 @@ final class ResyncCoordinator {
                 && result.failedPublishes() == 0L
                 && result.pendingPublishes() == 0L;
         if (!fullySuccessful) {
-            log.info("Force resync: entity {} cycle not fully successful (state={}, failed={}, pending={})"
+            log.info(
+                    "Force resync: entity {} cycle not fully successful (state={}, failed={}, pending={})"
                             + " — completion deferred for resyncIds={}",
-                    entityName, result.state(), result.failedPublishes(), result.pendingPublishes(),
+                    entityName,
+                    result.state(),
+                    result.failedPublishes(),
+                    result.pendingPublishes(),
                     idsOf(inFlight));
             return;
         }
@@ -159,8 +208,11 @@ final class ResyncCoordinator {
                     .cycleStartedAt(entry.cycleStartedAt)
                     .completedAt(completedAt)
                     .build());
-            log.info("Force resync completed: entity={}, resyncId={}, cycleStartedAt={}",
-                    entityName, entry.resyncId, entry.cycleStartedAt);
+            log.info(
+                    "Force resync completed: entity={}, resyncId={}, cycleStartedAt={}",
+                    entityName,
+                    entry.resyncId,
+                    entry.cycleStartedAt);
         }
         inFlight.clear();
     }
@@ -215,6 +267,9 @@ final class ResyncCoordinator {
     private static final class Pending {
         boolean all;
         final LongOpenHashSet pks = new LongOpenHashSet();
+        // Per-command pk-republish requests carrying no resyncId — invalidated
+        // on drain but never tracked for completion emission.
+        final LongOpenHashSet noEventPks = new LongOpenHashSet();
         final Set<UUID> resyncIds = new LinkedHashSet<UUID>();
     }
 
