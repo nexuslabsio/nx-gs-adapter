@@ -1,13 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.respawn;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
-
-import org.junit.jupiter.api.Test;
-
 import java.time.Instant;
 import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class BossRespawnSnapshotEventTest {
 
@@ -19,7 +17,7 @@ class BossRespawnSnapshotEventTest {
         return BossRespawnEntry.builder()
                 .npcId(29020)
                 .level(75)
-                .kind(RaidBossKind.GRAND_BOSS)
+                .kind(RaidBossKind.EPIC)
                 .status(WellKnownBossStatuses.DEAD)
                 .nextRespawnAt(Instant.parse("2026-06-01T12:00:00Z"))
                 .build();
@@ -27,14 +25,15 @@ class BossRespawnSnapshotEventTest {
 
     @Test
     void constructor_shouldRejectNullEventId() {
-        assertThrows(NullPointerException.class, () -> BossRespawnSnapshotEvent.builder().build());
+        assertThrows(
+                NullPointerException.class,
+                () -> BossRespawnSnapshotEvent.builder().build());
     }
 
     @Test
     void getBosses_shouldReturnEmptyList_whenBuilderOmits() {
-        BossRespawnSnapshotEvent event = BossRespawnSnapshotEvent.builder()
-                .eventId(id())
-                .build();
+        BossRespawnSnapshotEvent event =
+                BossRespawnSnapshotEvent.builder().eventId(id()).build();
 
         assertTrue(event.getBosses().isEmpty());
         assertNull(event.getMetadata());
@@ -47,8 +46,8 @@ class BossRespawnSnapshotEventTest {
                 .bosses(new ArrayList<>(Collections.singletonList(deadBoss())))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getBosses().add(deadBoss()));
+        assertThrows(
+                UnsupportedOperationException.class, () -> event.getBosses().add(deadBoss()));
     }
 
     @Test
@@ -56,10 +55,8 @@ class BossRespawnSnapshotEventTest {
         List<BossRespawnEntry> source = new ArrayList<>();
         source.add(deadBoss());
 
-        BossRespawnSnapshotEvent event = BossRespawnSnapshotEvent.builder()
-                .eventId(id())
-                .bosses(source)
-                .build();
+        BossRespawnSnapshotEvent event =
+                BossRespawnSnapshotEvent.builder().eventId(id()).bosses(source).build();
 
         source.add(deadBoss());
 
@@ -73,8 +70,8 @@ class BossRespawnSnapshotEventTest {
                 .metadata(Collections.singletonMap("source", "raidbossmanager"))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getMetadata().put("k", "v"));
+        assertThrows(
+                UnsupportedOperationException.class, () -> event.getMetadata().put("k", "v"));
     }
 
     @Test
@@ -92,7 +89,8 @@ class BossRespawnSnapshotEventTest {
 
     @Test
     void equals_shouldDistinguishBosses() {
-        BossRespawnSnapshotEvent empty = BossRespawnSnapshotEvent.builder().eventId(id()).build();
+        BossRespawnSnapshotEvent empty =
+                BossRespawnSnapshotEvent.builder().eventId(id()).build();
         BossRespawnSnapshotEvent withBoss = BossRespawnSnapshotEvent.builder()
                 .eventId(id())
                 .bosses(Collections.singletonList(deadBoss()))
@@ -123,7 +121,7 @@ class BossRespawnSnapshotEventTest {
 
         BossRespawnEntry entry = BossRespawnEntry.builder()
                 .npcId(29019)
-                .kind(RaidBossKind.GRAND_BOSS)
+                .kind(RaidBossKind.EPIC)
                 .status(WellKnownBossStatuses.DEAD)
                 .nextRespawnAt(Instant.parse("2026-06-02T00:00:00Z"))
                 .metadata(source)
@@ -132,8 +130,8 @@ class BossRespawnSnapshotEventTest {
         source.put("late", "value");
 
         assertEquals(1, entry.getMetadata().size());
-        assertThrows(UnsupportedOperationException.class,
-                () -> entry.getMetadata().put("k", "v"));
+        assertThrows(
+                UnsupportedOperationException.class, () -> entry.getMetadata().put("k", "v"));
     }
 
     @Test

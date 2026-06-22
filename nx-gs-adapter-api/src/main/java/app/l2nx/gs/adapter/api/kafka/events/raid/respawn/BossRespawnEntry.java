@@ -2,14 +2,12 @@ package app.l2nx.gs.adapter.api.kafka.events.raid.respawn;
 
 import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
 import app.l2nx.gs.adapter.api.kafka.events.schedule.RecurringSchedule;
-
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One tracked raid boss inside a {@link BossRespawnSnapshotEvent}. Describes the
@@ -25,8 +23,8 @@ import java.util.Objects;
  *   <li>{@link #getLevel() level} — optional boss level.</li>
  *   <li>{@link #getKind() kind} — REQUIRED. Reuses {@link RaidBossKind}; this
  *   snapshot only ever carries {@link RaidBossKind#RAID RAID} (open-world raid
- *   boss) or {@link RaidBossKind#GRAND_BOSS GRAND_BOSS} (epic). Instance bosses
- *   are excluded — they have no server-wide respawn timer.</li>
+ *   boss) or {@link RaidBossKind#EPIC EPIC} (boss in a tracked division).
+ *   Instance bosses are excluded — they have no server-wide respawn timer.</li>
  *   <li>{@link #getStatus() status} — REQUIRED. Open build-agnostic status
  *   string; canonical values in {@link WellKnownBossStatuses}
  *   ({@code alive} / {@code in_combat} / {@code dead}). Hosts MAY emit additional
@@ -56,21 +54,21 @@ public final class BossRespawnEntry {
     private final @Nullable Map<String, String> metadata;
     private final @Nullable RecurringSchedule schedule;
 
-    public BossRespawnEntry(int npcId,
-                            @Nullable Integer level,
-                            RaidBossKind kind,
-                            String status,
-                            @Nullable Instant nextRespawnAt,
-                            @Nullable Map<String, String> metadata,
-                            @Nullable RecurringSchedule schedule) {
+    public BossRespawnEntry(
+            int npcId,
+            @Nullable Integer level,
+            RaidBossKind kind,
+            String status,
+            @Nullable Instant nextRespawnAt,
+            @Nullable Map<String, String> metadata,
+            @Nullable RecurringSchedule schedule) {
         this.npcId = npcId;
         this.level = level;
         this.kind = kind;
         this.status = status;
         this.nextRespawnAt = nextRespawnAt;
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
         this.schedule = schedule;
     }
 
@@ -88,7 +86,7 @@ public final class BossRespawnEntry {
 
     /**
      * Coarse classification — {@link RaidBossKind#RAID} or
-     * {@link RaidBossKind#GRAND_BOSS} for this snapshot.
+     * {@link RaidBossKind#EPIC} for this snapshot.
      */
     public RaidBossKind getKind() {
         return kind;

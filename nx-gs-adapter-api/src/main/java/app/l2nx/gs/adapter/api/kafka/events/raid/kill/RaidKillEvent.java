@@ -1,10 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.kill;
 
 import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
-
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO published to the {@code raid} family topic
@@ -71,17 +69,18 @@ public final class RaidKillEvent {
     private final List<RaidDropItem> drops;
     private final @Nullable Map<String, String> metadata;
 
-    public RaidKillEvent(UUID eventId,
-                         int bossNpcId,
-                         @Nullable String bossName,
-                         @Nullable Integer bossLevel,
-                         RaidBossKind bossKind,
-                         @Nullable Long instanceId,
-                         @Nullable RaidActor lastHit,
-                         @Nullable RaidActor dropOwner,
-                         @Nullable List<RaidActor> participants,
-                         @Nullable List<RaidDropItem> drops,
-                         @Nullable Map<String, String> metadata) {
+    public RaidKillEvent(
+            UUID eventId,
+            int bossNpcId,
+            @Nullable String bossName,
+            @Nullable Integer bossLevel,
+            RaidBossKind bossKind,
+            @Nullable Long instanceId,
+            @Nullable RaidActor lastHit,
+            @Nullable RaidActor dropOwner,
+            @Nullable List<RaidActor> participants,
+            @Nullable List<RaidDropItem> drops,
+            @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "RaidKillEvent.eventId is required");
         this.bossNpcId = bossNpcId;
         this.bossName = bossName;
@@ -92,7 +91,8 @@ public final class RaidKillEvent {
         this.dropOwner = dropOwner;
         this.participants = freezeList(participants);
         this.drops = freezeList(drops);
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -231,8 +231,18 @@ public final class RaidKillEvent {
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, bossNpcId, bossName, bossLevel, bossKind,
-                instanceId, lastHit, dropOwner, participants, drops, metadata);
+        return Objects.hash(
+                eventId,
+                bossNpcId,
+                bossName,
+                bossLevel,
+                bossKind,
+                instanceId,
+                lastHit,
+                dropOwner,
+                participants,
+                drops,
+                metadata);
     }
 
     @Override
@@ -318,8 +328,18 @@ public final class RaidKillEvent {
         }
 
         public RaidKillEvent build() {
-            return new RaidKillEvent(eventId, bossNpcId, bossName, bossLevel, bossKind,
-                    instanceId, lastHit, dropOwner, participants, drops, metadata);
+            return new RaidKillEvent(
+                    eventId,
+                    bossNpcId,
+                    bossName,
+                    bossLevel,
+                    bossKind,
+                    instanceId,
+                    lastHit,
+                    dropOwner,
+                    participants,
+                    drops,
+                    metadata);
         }
     }
 }

@@ -22,7 +22,7 @@ rail — single-event per kill, multi-aggregate payload.
 
 Boss scope is intentionally broad: any `Attackable.isRaid() && !isRaidMinion()`
 death by a player. World grand bosses and instance bosses share the same wire
-shape; differentiation is the `bossKind` enum (`RAID` / `GRAND_BOSS` /
+shape; differentiation is the `bossKind` enum (`RAID` / `EPIC` /
 `INSTANCE_BOSS`), letting consumers split dashboards downstream.
 
 Audience: platform-side consumers (dashboards / leaderboards / clan analytics);
@@ -48,7 +48,7 @@ host-side authors hooking raid-death paths.
     - `@Nullable String bossName` — display name at kill time. Optional;
       platform resolves via its name catalog when null.
     - `@Nullable Integer bossLevel` — level at spawn.
-    - `RaidBossKind bossKind` — REQUIRED. `RAID` / `GRAND_BOSS` / `INSTANCE_BOSS`.
+    - `RaidBossKind bossKind` — REQUIRED. `RAID` / `EPIC` / `INSTANCE_BOSS`.
     - `@Nullable Long instanceId` — instance world id when killed inside a
       reflection / instance zone; `null` for open-world kills.
     - `@Nullable RaidActor lastHit` — final-blow character + affiliation
@@ -121,12 +121,14 @@ host-side authors hooking raid-death paths.
   `privatestore` family's purchase + snapshot pattern).
 
 - [todo] R4. `nx-gs-adapter-api.kafka.events.raid.RaidBossKind` enum MUST ship
-  with three values — `RAID`, `GRAND_BOSS`, `INSTANCE_BOSS` — and Javadoc
-  enumerating the host-side detection rule for each (open-world `isRaid()` →
-  `RAID`; `instanceof GrandBossInstance` → `GRAND_BOSS`;
-  `getReflection().isDefault() == false` → `INSTANCE_BOSS`). Order matters in
-  the host detection cascade: `INSTANCE_BOSS` first, then `GRAND_BOSS`, then
-  fall-through to `RAID`.
+  with three values — `RAID`, `EPIC`, `INSTANCE_BOSS` — and Javadoc
+  enumerating the host-side detection rule for each (`getReflection().isDefault()
+  == false` → `INSTANCE_BOSS`; boss in a tracked division (the host's configured
+  raid-boss divisions — pivowar / lowwar / midwar / bigwar) → `EPIC`; otherwise
+  open-world `isRaid()` → `RAID`). Order matters in the host detection cascade:
+  `INSTANCE_BOSS` first, then `EPIC`, then fall-through to `RAID`. The enum is
+  shared by the raid-kill facts and the boss-respawn snapshot — both pipelines
+  derive the kind from the same division-driven definition.
 
 - [todo] R5. `nx-gs-adapter-api.spi.NxEvents` MUST accept `RaidKillEvent`
   through the single generic `void publish(Object event)` method (the

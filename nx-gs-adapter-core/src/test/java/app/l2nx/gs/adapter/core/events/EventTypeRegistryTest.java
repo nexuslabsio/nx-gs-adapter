@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.core.events;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.events.account.AccountAuthAttemptEvent;
 import app.l2nx.gs.adapter.api.kafka.events.account.AuthOutcomes;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
@@ -20,13 +22,10 @@ import app.l2nx.gs.adapter.api.kafka.events.raid.kill.RaidKillEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
 import app.l2nx.gs.commons.UUIDv7;
-import org.junit.jupiter.api.Test;
-
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class EventTypeRegistryTest {
 
@@ -101,9 +100,8 @@ class EventTypeRegistryTest {
     @Test
     void partitionKeyExtractor_shouldReturnNull_forLevelExpTableSnapshotEvent() {
         EventTypeBinding binding = new EventTypeRegistry().lookup(LevelExpTableSnapshotEvent.class);
-        LevelExpTableSnapshotEvent event = LevelExpTableSnapshotEvent.builder()
-                .eventId(UUIDv7.generate())
-                .build();
+        LevelExpTableSnapshotEvent event =
+                LevelExpTableSnapshotEvent.builder().eventId(UUIDv7.generate()).build();
 
         assertNull(binding.partitionKeyExtractor().apply(event));
     }
@@ -130,7 +128,8 @@ class EventTypeRegistryTest {
         PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUIDv7.generate())
                 .storeType(PrivateStoreSide.ASK)
-                .sellerId(1L).buyerId(2L)
+                .sellerId(1L)
+                .buyerId(2L)
                 .build();
 
         assertNull(binding.partitionKeyExtractor().apply(event));
@@ -210,7 +209,7 @@ class EventTypeRegistryTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUIDv7.generate())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.GRAND_BOSS)
+                .bossKind(RaidBossKind.EPIC)
                 .build();
 
         byte[] key = binding.partitionKeyExtractor().apply(event);
@@ -239,8 +238,11 @@ class EventTypeRegistryTest {
         MailSentEvent event = MailSentEvent.builder()
                 .eventId(UUIDv7.generate())
                 .mailId(0xCAFEBABEL)
-                .senderCharId(0L).receiverCharId(2L)
-                .subject("s").expiresAt(Instant.EPOCH).build();
+                .senderCharId(0L)
+                .receiverCharId(2L)
+                .subject("s")
+                .expiresAt(Instant.EPOCH)
+                .build();
 
         byte[] key = binding.partitionKeyExtractor().apply(event);
 
@@ -261,7 +263,10 @@ class EventTypeRegistryTest {
     void partitionKey_shouldEncodeMailId_forMailAcceptedEvent() {
         EventTypeBinding binding = new EventTypeRegistry().lookup(MailAcceptedEvent.class);
         MailAcceptedEvent event = MailAcceptedEvent.builder()
-                .eventId(UUIDv7.generate()).mailId(0xBEEFL).claimedByCharId(1L).build();
+                .eventId(UUIDv7.generate())
+                .mailId(0xBEEFL)
+                .claimedByCharId(1L)
+                .build();
 
         byte[] key = binding.partitionKeyExtractor().apply(event);
 
@@ -281,7 +286,10 @@ class EventTypeRegistryTest {
     void partitionKey_shouldEncodeMailId_forMailCancelledEvent() {
         EventTypeBinding binding = new EventTypeRegistry().lookup(MailCancelledEvent.class);
         MailCancelledEvent event = MailCancelledEvent.builder()
-                .eventId(UUIDv7.generate()).mailId(0xBEEFL).cancelledByCharId(1L).build();
+                .eventId(UUIDv7.generate())
+                .mailId(0xBEEFL)
+                .cancelledByCharId(1L)
+                .build();
 
         byte[] key = binding.partitionKeyExtractor().apply(event);
 
@@ -301,7 +309,10 @@ class EventTypeRegistryTest {
     void partitionKey_shouldEncodeMailId_forMailReturnedEvent() {
         EventTypeBinding binding = new EventTypeRegistry().lookup(MailReturnedEvent.class);
         MailReturnedEvent event = MailReturnedEvent.builder()
-                .eventId(UUIDv7.generate()).mailId(0xBEEFL).returnedToSenderId(1L).build();
+                .eventId(UUIDv7.generate())
+                .mailId(0xBEEFL)
+                .returnedToSenderId(1L)
+                .build();
 
         byte[] key = binding.partitionKeyExtractor().apply(event);
 
@@ -327,8 +338,11 @@ class EventTypeRegistryTest {
         EventTypeBinding binding = new EventTypeRegistry().lookup(PrivateTradeFinishedEvent.class);
         TradeParty empty = TradeParty.builder().charId(1L).build();
         PrivateTradeFinishedEvent event = PrivateTradeFinishedEvent.builder()
-                .eventId(UUIDv7.generate()).tradeId(UUIDv7.generate())
-                .partyA(empty).partyB(empty).build();
+                .eventId(UUIDv7.generate())
+                .tradeId(UUIDv7.generate())
+                .partyA(empty)
+                .partyB(empty)
+                .build();
 
         assertNull(binding.partitionKeyExtractor().apply(event));
     }
@@ -355,11 +369,14 @@ class EventTypeRegistryTest {
                 .matchId(UUIDv7.generate())
                 .olympiadCycle(7)
                 .gameType(OlympiadGameType.CLASSED)
-                .charId(0xCAFEBABEL).classId(88)
-                .opponentCharId(1L).opponentClassId(92)
+                .charId(0xCAFEBABEL)
+                .classId(88)
+                .opponentCharId(1L)
+                .opponentClassId(92)
                 .result(OlympiadMatchResult.WIN)
                 .reason(OlympiadMatchReason.NORMAL)
-                .pointsBefore(40).pointsAfter(43)
+                .pointsBefore(40)
+                .pointsAfter(43)
                 .build();
 
         byte[] key = binding.partitionKeyExtractor().apply(event);
