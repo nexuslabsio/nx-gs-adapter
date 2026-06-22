@@ -224,6 +224,15 @@ Pool sizing keys: `l2nx.io.workers`, `l2nx.cdc-engine.workers`,
 
 ## Constraints
 
+- **Maximally tenant- and build-agnostic — model generic L2 game concepts, not one core's logic.** The
+  contracts (Kafka / REST DTOs, SPI types, enums) describe *what* a value means in generic Lineage 2
+  terms; they never encode *how* a specific host / core decides it. Classification, detection cascades,
+  and build-specific rules belong to the integration (host) code — the adapter ships only the shared
+  vocabulary + its generic semantics. Example: `RaidBossKind` defines `RAID` / `EPIC` / `INSTANCE_BOSS`
+  and what each means; the host decides which value a given boss gets — never bake division names,
+  `instanceof` / engine-API detection (`getReflection()`, `isRaid()`), or other core-specific logic into
+  adapter Javadoc / spec. Generalizes the proprietary-schema rule (Distribution & licensing) from
+  table/column names to *logic*: we focus on L2 game logic, not a specific core's implementation.
 - **Java 8 source + target** — host JVMs span Java 8 to 25+. No `var`, no `Stream.toList()`, no
   records, no `Map.of`, no text blocks, no switch expressions, no pattern matching. Stream API +
   lambda + Optional + `try-with-resources` are fine.
