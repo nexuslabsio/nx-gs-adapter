@@ -121,14 +121,11 @@ host-side authors hooking raid-death paths.
   `privatestore` family's purchase + snapshot pattern).
 
 - [todo] R4. `nx-gs-adapter-api.kafka.events.raid.RaidBossKind` enum MUST ship
-  with three values — `RAID`, `EPIC`, `INSTANCE_BOSS` — and Javadoc
-  enumerating the host-side detection rule for each (`getReflection().isDefault()
-  == false` → `INSTANCE_BOSS`; boss in a tracked division (the host's configured
-  raid-boss divisions — pivowar / lowwar / midwar / bigwar) → `EPIC`; otherwise
-  open-world `isRaid()` → `RAID`). Order matters in the host detection cascade:
-  `INSTANCE_BOSS` first, then `EPIC`, then fall-through to `RAID`. The enum is
-  shared by the raid-kill facts and the boss-respawn snapshot — both pipelines
-  derive the kind from the same division-driven definition.
+  with three values — `RAID`, `EPIC`, `INSTANCE_BOSS` — each carrying generic
+  Javadoc describing what the value means. The contract does NOT define HOW a
+  boss is classified: the host integration assigns the value per its own rules
+  (the adapter attaches no detection logic to it). The enum is shared by the
+  raid-kill facts and the boss-respawn snapshot.
 
 - [todo] R5. `nx-gs-adapter-api.spi.NxEvents` MUST accept `RaidKillEvent`
   through the single generic `void publish(Object event)` method (the

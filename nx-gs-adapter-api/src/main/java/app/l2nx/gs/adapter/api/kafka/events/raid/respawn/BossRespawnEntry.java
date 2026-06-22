@@ -22,9 +22,9 @@ import org.jspecify.annotations.Nullable;
  *   carried on the wire.</li>
  *   <li>{@link #getLevel() level} — optional boss level.</li>
  *   <li>{@link #getKind() kind} — REQUIRED. Reuses {@link RaidBossKind}; this
- *   snapshot only ever carries {@link RaidBossKind#RAID RAID} (open-world raid
- *   boss) or {@link RaidBossKind#EPIC EPIC} (boss in a tracked division).
- *   Instance bosses are excluded — they have no server-wide respawn timer.</li>
+ *   snapshot only ever carries {@link RaidBossKind#RAID RAID} or
+ *   {@link RaidBossKind#EPIC EPIC}. Instance bosses are excluded — they have no
+ *   server-wide respawn timer.</li>
  *   <li>{@link #getStatus() status} — REQUIRED. Open build-agnostic status
  *   string; canonical values in {@link WellKnownBossStatuses}
  *   ({@code alive} / {@code in_combat} / {@code dead}). Hosts MAY emit additional
