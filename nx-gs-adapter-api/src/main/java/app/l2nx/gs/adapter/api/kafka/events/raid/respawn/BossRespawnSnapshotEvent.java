@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.respawn;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO riding the {@code raid} family topic
@@ -45,14 +44,12 @@ public final class BossRespawnSnapshotEvent {
     private final List<BossRespawnEntry> bosses;
     private final @Nullable Map<String, String> metadata;
 
-    public BossRespawnSnapshotEvent(UUID eventId,
-                                    @Nullable List<BossRespawnEntry> bosses,
-                                    @Nullable Map<String, String> metadata) {
+    public BossRespawnSnapshotEvent(
+            UUID eventId, @Nullable List<BossRespawnEntry> bosses, @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "BossRespawnSnapshotEvent.eventId is required");
         this.bosses = freezeList(bosses);
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -82,10 +79,7 @@ public final class BossRespawnSnapshotEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .bosses(bosses)
-                .metadata(metadata);
+        return new Builder().eventId(eventId).bosses(bosses).metadata(metadata);
     }
 
     public static Builder builder() {
@@ -116,9 +110,7 @@ public final class BossRespawnSnapshotEvent {
 
     @Override
     public String toString() {
-        return "BossRespawnSnapshotEvent[eventId=" + eventId
-                + ", bosses=" + bosses
-                + ", metadata=" + metadata + "]";
+        return "BossRespawnSnapshotEvent[eventId=" + eventId + ", bosses=" + bosses + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {

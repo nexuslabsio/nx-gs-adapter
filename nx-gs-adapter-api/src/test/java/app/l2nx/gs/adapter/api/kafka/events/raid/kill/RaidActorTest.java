@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.kill;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class RaidActorTest {
 

@@ -18,8 +18,7 @@ final class NoOpCommands implements NxCommands {
 
     static final NoOpCommands INSTANCE = new NoOpCommands();
 
-    private NoOpCommands() {
-    }
+    private NoOpCommands() {}
 
     @Override
     public <R, C extends NxCommand<R>> void on(Class<C> type, CommandHandler<C, R> handler) {

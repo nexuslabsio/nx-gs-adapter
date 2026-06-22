@@ -5,7 +5,6 @@ import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanSkillDbDto;
 import app.l2nx.gs.adapter.api.spi.ChildSource;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.PrimarySource;
-
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
@@ -17,8 +16,7 @@ import java.util.*;
  */
 public final class TestMappings {
 
-    private TestMappings() {
-    }
+    private TestMappings() {}
 
     /**
      * Single-table {@code clan_data} mapping — no children, mirrors the
@@ -144,10 +142,8 @@ public final class TestMappings {
      * Phase-2 row mapping). Good enough for tests that only exercise the
      * planner / hasher SQL surface.
      */
-    public static EntityMapping<Object> stub(final String entity,
-                                             final String table,
-                                             final String pk,
-                                             final List<String> hashed) {
+    public static EntityMapping<Object> stub(
+            final String entity, final String table, final String pk, final List<String> hashed) {
         final PrimarySource<Object> primary = new PrimarySource<Object>() {
             @Override
             public String tableName() {

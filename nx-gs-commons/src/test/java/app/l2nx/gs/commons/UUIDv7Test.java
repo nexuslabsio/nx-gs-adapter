@@ -1,6 +1,6 @@
 package app.l2nx.gs.commons;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -10,8 +10,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class UUIDv7Test {
 
@@ -38,10 +37,8 @@ class UUIDv7Test {
         assertNotNull(extracted);
         long extractedMs = extracted.toEpochMilli();
 
-        assertTrue(extractedMs >= beforeMs,
-                "extractedMs (" + extractedMs + ") < beforeMs (" + beforeMs + ")");
-        assertTrue(extractedMs <= afterMs,
-                "extractedMs (" + extractedMs + ") > afterMs (" + afterMs + ")");
+        assertTrue(extractedMs >= beforeMs, "extractedMs (" + extractedMs + ") < beforeMs (" + beforeMs + ")");
+        assertTrue(extractedMs <= afterMs, "extractedMs (" + extractedMs + ") > afterMs (" + afterMs + ")");
     }
 
     @Test
@@ -50,8 +47,7 @@ class UUIDv7Test {
         UUID prev = UUIDv7.generate();
         for (int i = 1; i < n; i++) {
             UUID curr = UUIDv7.generate();
-            assertTrue(curr.compareTo(prev) > 0,
-                    "non-monotonic at i=" + i + ": prev=" + prev + " curr=" + curr);
+            assertTrue(curr.compareTo(prev) > 0, "non-monotonic at i=" + i + ": prev=" + prev + " curr=" + curr);
             prev = curr;
         }
     }
@@ -94,8 +90,7 @@ class UUIDv7Test {
     @Test
     void extractCreatedAt_shouldThrow_forNonVersion7() {
         UUID v4 = UUID.randomUUID();
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> UUIDv7.extractCreatedAt(v4));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> UUIDv7.extractCreatedAt(v4));
         assertTrue(ex.getMessage().contains("version"));
     }
 

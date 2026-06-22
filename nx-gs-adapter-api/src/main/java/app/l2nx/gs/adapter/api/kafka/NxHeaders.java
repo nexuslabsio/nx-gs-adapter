@@ -51,8 +51,7 @@ public final class NxHeaders {
      */
     public static final String NX_TARGET_SERVER_ID = "Nx-Target-Server-Id";
 
-    private NxHeaders() {
-    }
+    private NxHeaders() {}
 
     /**
      * Encodes a {@link UUID} as 16 raw bytes: {@code mostSigBits} big-endian
@@ -75,8 +74,7 @@ public final class NxHeaders {
             throw new IllegalArgumentException("UUID header value must not be null");
         }
         if (value.length != 16) {
-            throw new IllegalArgumentException(
-                    "UUID header value must be 16 bytes, got " + value.length);
+            throw new IllegalArgumentException("UUID header value must be 16 bytes, got " + value.length);
         }
         ByteBuffer buf = ByteBuffer.wrap(value);
         long msb = buf.getLong();

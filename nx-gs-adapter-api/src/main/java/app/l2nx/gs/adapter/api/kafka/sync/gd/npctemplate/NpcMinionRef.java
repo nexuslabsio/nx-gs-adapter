@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A leader→minion relationship of an NPC — the minion's template id and how many
@@ -71,8 +70,8 @@ public final class NpcMinionRef {
 
     @Override
     public String toString() {
-        return "NpcMinionRef[minionNpcTemplateId=" + minionNpcTemplateId
-                + ", count=" + count + ", groupIndex=" + groupIndex + "]";
+        return "NpcMinionRef[minionNpcTemplateId=" + minionNpcTemplateId + ", count=" + count + ", groupIndex="
+                + groupIndex + "]";
     }
 
     public static final class Builder {

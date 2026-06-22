@@ -1,12 +1,11 @@
 package app.l2nx.gs.kafka;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 class KafkaConfigTest {
 
@@ -20,8 +19,7 @@ class KafkaConfigTest {
 
     @Test
     void build_shouldThrow_whenBrokersNotSet() {
-        KafkaConfig.Builder builder = NxKafka.configure()
-                .clientId("test");
+        KafkaConfig.Builder builder = NxKafka.configure().clientId("test");
 
         KafkaException ex = assertThrows(KafkaException.class, builder::build);
         assertTrue(ex.getMessage().contains("Brokers"));
@@ -29,9 +27,7 @@ class KafkaConfigTest {
 
     @Test
     void build_shouldThrow_whenBrokersEmpty() {
-        KafkaConfig.Builder builder = NxKafka.configure()
-                .brokers("   ")
-                .clientId("test");
+        KafkaConfig.Builder builder = NxKafka.configure().brokers("   ").clientId("test");
 
         assertThrows(KafkaException.class, builder::build);
     }

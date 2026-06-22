@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One row of a gear-score scaling table on a {@link GearScoreRule} — a half-open
@@ -18,9 +17,7 @@ public final class GearScoreScalingStep {
     private final @Nullable Integer to;
     private final double value;
 
-    public GearScoreScalingStep(int from,
-                                @Nullable Integer to,
-                                double value) {
+    public GearScoreScalingStep(int from, @Nullable Integer to, double value) {
         this.from = from;
         this.to = to;
         this.value = value;
@@ -48,10 +45,7 @@ public final class GearScoreScalingStep {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .from(from)
-                .to(to)
-                .value(value);
+        return new Builder().from(from).to(to).value(value);
     }
 
     public static Builder builder() {
@@ -63,9 +57,7 @@ public final class GearScoreScalingStep {
         if (this == o) return true;
         if (!(o instanceof GearScoreScalingStep)) return false;
         GearScoreScalingStep that = (GearScoreScalingStep) o;
-        return from == that.from
-                && Double.compare(value, that.value) == 0
-                && Objects.equals(to, that.to);
+        return from == that.from && Double.compare(value, that.value) == 0 && Objects.equals(to, that.to);
     }
 
     @Override
@@ -75,9 +67,7 @@ public final class GearScoreScalingStep {
 
     @Override
     public String toString() {
-        return "GearScoreScalingStep[from=" + from
-                + ", to=" + to
-                + ", value=" + value + "]";
+        return "GearScoreScalingStep[from=" + from + ", to=" + to + ", value=" + value + "]";
     }
 
     public static final class Builder {

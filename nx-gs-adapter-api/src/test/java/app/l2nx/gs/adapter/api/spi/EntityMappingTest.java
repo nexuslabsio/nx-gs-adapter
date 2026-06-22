@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -8,8 +8,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 /**
  * Compile-smoke for the Tier-2 SPI contract: an anonymous-class implementation
@@ -127,8 +126,7 @@ class EntityMappingTest {
         assertEquals(1, mapping.children().size());
         assertSame(skills, mapping.children().get(0));
         // mapEntity round-trip with two child rows
-        Map<String, List<Object>> children = Collections.singletonMap(
-                "clan_skills", Arrays.asList("a", "b"));
+        Map<String, List<Object>> children = Collections.singletonMap("clan_skills", Arrays.asList("a", "b"));
         assertEquals("primary|2", mapping.mapEntity("primary", children));
         assertNotNull(mapping.children());
     }

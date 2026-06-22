@@ -1,10 +1,9 @@
 package app.l2nx.gs.commons;
 
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.jspecify.annotations.Nullable;
 
 /**
  * UUIDv7 generator per <a href="https://datatracker.ietf.org/doc/rfc9562/">RFC 9562</a>:
@@ -36,17 +35,16 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class UUIDv7 {
 
     private static final long TS_MASK = 0x0000_FFFF_FFFF_FFFFL; // low 48 bits
-    private static final long VERSION_BITS = 0x7L << 12;        // version = 7 in MSB bits 12..15
-    private static final int COUNTER_MAX = 0x0FFF;             // 12 bits
+    private static final long VERSION_BITS = 0x7L << 12; // version = 7 in MSB bits 12..15
+    private static final int COUNTER_MAX = 0x0FFF; // 12 bits
     private static final long VARIANT_CLEAR_MASK = 0x3FFF_FFFF_FFFF_FFFFL; // clears top 2 LSB bits
-    private static final long VARIANT_SET_BIT = 0x8000_0000_0000_0000L;    // sets top LSB bit -> variant 10
+    private static final long VARIANT_SET_BIT = 0x8000_0000_0000_0000L; // sets top LSB bit -> variant 10
 
     private static final Object LOCK = new Object();
     private static long lastTimestampMs = -1L;
     private static int subMsCounter = 0;
 
-    private UUIDv7() {
-    }
+    private UUIDv7() {}
 
     /**
      * Generate a fresh UUIDv7. Strictly monotonic within a JVM — repeated calls

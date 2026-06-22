@@ -11,16 +11,15 @@ import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Executor;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.jspecify.annotations.Nullable;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.Executor;
 
 /**
  * Public factory for the commands consume subsystem. {@code NxAdapter}
@@ -45,8 +44,7 @@ public final class CommandsBootstrap {
 
     private static final NxLog log = NxLogFactory.getLogger(CommandsBootstrap.class);
 
-    private CommandsBootstrap() {
-    }
+    private CommandsBootstrap() {}
 
     /**
      * Rebuild the consumer in-place behind an existing {@link NxCommands}
@@ -57,22 +55,22 @@ public final class CommandsBootstrap {
      * <p>Caller MUST stop the previous {@link CommandsConsumer} first — this
      * method only creates the new one.</p>
      */
-    public static @Nullable CommandsConsumer swap(NxCommands facade,
-                                                  @Nullable MessagingTopics messagingTopics,
-                                                  KafkaCredentials kafka,
-                                                  String clientIdBase,
-                                                  String groupId,
-                                                  UUID ownServerId,
-                                                  @Nullable Executor hostExecutor,
-                                                  Executor ioExecutor,
-                                                  NxEvents events,
-                                                  NxSync sync,
-                                                  CommandsConsumer.ReplySender replySender,
-                                                  @Nullable CommandsConfig config) {
+    public static @Nullable CommandsConsumer swap(
+            NxCommands facade,
+            @Nullable MessagingTopics messagingTopics,
+            KafkaCredentials kafka,
+            String clientIdBase,
+            String groupId,
+            UUID ownServerId,
+            @Nullable Executor hostExecutor,
+            Executor ioExecutor,
+            NxEvents events,
+            NxSync sync,
+            CommandsConsumer.ReplySender replySender,
+            @Nullable CommandsConfig config) {
         if (!(facade instanceof NxCommandsImpl)) {
-            throw new IllegalArgumentException(
-                    "swap() requires a facade produced by CommandsBootstrap.start(); got "
-                            + (facade == null ? "null" : facade.getClass().getName()));
+            throw new IllegalArgumentException("swap() requires a facade produced by CommandsBootstrap.start(); got "
+                    + (facade == null ? "null" : facade.getClass().getName()));
         }
         // Reuse the existing registry so previously registered handlers survive.
         CommandTypeRegistry registry = ((NxCommandsImpl) facade).peekRegistry();
@@ -80,8 +78,19 @@ public final class CommandsBootstrap {
             registry = new CommandTypeRegistry();
             ((NxCommandsImpl) facade).swap(registry);
         }
-        return buildConsumer(messagingTopics, kafka, clientIdBase, groupId, ownServerId,
-                hostExecutor, ioExecutor, events, sync, replySender, config, registry);
+        return buildConsumer(
+                messagingTopics,
+                kafka,
+                clientIdBase,
+                groupId,
+                ownServerId,
+                hostExecutor,
+                ioExecutor,
+                events,
+                sync,
+                replySender,
+                config,
+                registry);
     }
 
     /**
@@ -114,36 +123,49 @@ public final class CommandsBootstrap {
      * @param config          operator-tunable knobs; falls back to
      *                        {@link CommandsConfig#defaults()} when {@code null}.
      */
-    public static Started start(@Nullable MessagingTopics messagingTopics,
-                                KafkaCredentials kafka,
-                                String clientIdBase,
-                                String groupId,
-                                UUID ownServerId,
-                                @Nullable Executor hostExecutor,
-                                Executor ioExecutor,
-                                NxEvents events,
-                                NxSync sync,
-                                CommandsConsumer.ReplySender replySender,
-                                @Nullable CommandsConfig config) {
+    public static Started start(
+            @Nullable MessagingTopics messagingTopics,
+            KafkaCredentials kafka,
+            String clientIdBase,
+            String groupId,
+            UUID ownServerId,
+            @Nullable Executor hostExecutor,
+            Executor ioExecutor,
+            NxEvents events,
+            NxSync sync,
+            CommandsConsumer.ReplySender replySender,
+            @Nullable CommandsConfig config) {
         CommandTypeRegistry registry = new CommandTypeRegistry();
         NxCommandsImpl commands = new NxCommandsImpl(registry);
-        CommandsConsumer consumer = buildConsumer(messagingTopics, kafka, clientIdBase, groupId,
-                ownServerId, hostExecutor, ioExecutor, events, sync, replySender, config, registry);
+        CommandsConsumer consumer = buildConsumer(
+                messagingTopics,
+                kafka,
+                clientIdBase,
+                groupId,
+                ownServerId,
+                hostExecutor,
+                ioExecutor,
+                events,
+                sync,
+                replySender,
+                config,
+                registry);
         return new Started(commands, consumer);
     }
 
-    private static @Nullable CommandsConsumer buildConsumer(@Nullable MessagingTopics messagingTopics,
-                                                            KafkaCredentials kafka,
-                                                            String clientIdBase,
-                                                            String groupId,
-                                                            UUID ownServerId,
-                                                            @Nullable Executor hostExecutor,
-                                                            Executor ioExecutor,
-                                                            NxEvents events,
-                                                            NxSync sync,
-                                                            CommandsConsumer.ReplySender replySender,
-                                                            @Nullable CommandsConfig config,
-                                                            CommandTypeRegistry registry) {
+    private static @Nullable CommandsConsumer buildConsumer(
+            @Nullable MessagingTopics messagingTopics,
+            KafkaCredentials kafka,
+            String clientIdBase,
+            String groupId,
+            UUID ownServerId,
+            @Nullable Executor hostExecutor,
+            Executor ioExecutor,
+            NxEvents events,
+            NxSync sync,
+            CommandsConsumer.ReplySender replySender,
+            @Nullable CommandsConfig config,
+            CommandTypeRegistry registry) {
         String inboundTopic = (messagingTopics != null) ? messagingTopics.getCommandsTopic() : null;
         String repliesTopic = (messagingTopics != null) ? messagingTopics.getCommandsRepliesTopic() : null;
 
@@ -153,15 +175,18 @@ public final class CommandsBootstrap {
         }
 
         if (repliesTopic == null || repliesTopic.isEmpty()) {
-            log.warn("Commands inbound topic '{}' is configured but commandsRepliesTopic is not — "
+            log.warn(
+                    "Commands inbound topic '{}' is configured but commandsRepliesTopic is not — "
                             + "handlers will run but replies will be dropped (web side will see timeouts)",
                     inboundTopic);
         }
 
         if (hostExecutor == null) {
-            log.warn("commandsTopic '{}' is configured but no host executor registered — "
-                    + "handlers requiring ctx.host().sync(...) will throw IllegalStateException. "
-                    + "Call NxAdapter.hostExecutor(...) before NxAdapter.start()", inboundTopic);
+            log.warn(
+                    "commandsTopic '{}' is configured but no host executor registered — "
+                            + "handlers requiring ctx.host().sync(...) will throw IllegalStateException. "
+                            + "Call NxAdapter.hostExecutor(...) before NxAdapter.start()",
+                    inboundTopic);
         }
 
         CommandsConfig effectiveConfig = (config != null) ? config : CommandsConfig.defaults();
@@ -189,10 +214,8 @@ public final class CommandsBootstrap {
         return consumer;
     }
 
-    private static Map<String, Object> buildConsumerConfig(KafkaCredentials kafka,
-                                                           String clientIdBase,
-                                                           String groupId,
-                                                           CommandsConfig config) {
+    private static Map<String, Object> buildConsumerConfig(
+            KafkaCredentials kafka, String clientIdBase, String groupId, CommandsConfig config) {
         String clientId = clientIdBase + "-commands";
         Map<String, Object> props = new LinkedHashMap<String, Object>();
         // Internal defaults (overridable via l2nx.commands.kafka.*)
@@ -207,8 +230,7 @@ public final class CommandsBootstrap {
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put("security.protocol", kafka.getSecurityProtocol());
         props.put("sasl.mechanism", kafka.getSaslMechanism());
-        props.put("sasl.jaas.config",
-                KafkaInitializer.buildJaas(kafka.getSaslUsername(), kafka.getSaslPassword()));
+        props.put("sasl.jaas.config", KafkaInitializer.buildJaas(kafka.getSaslUsername(), kafka.getSaslPassword()));
         return props;
     }
 

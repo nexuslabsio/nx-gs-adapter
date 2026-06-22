@@ -7,10 +7,9 @@ import app.l2nx.gs.db.sync.engine.StatementRegistry;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import org.jspecify.annotations.Nullable;
-
 import java.sql.*;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Phase 1 of the CRC32 CDC protocol. {@link #hashPrimary} returns (PK → CRC32);
@@ -29,53 +28,63 @@ public final class Phase1Hasher {
      */
     public static final int MISSING_HASH = Integer.MIN_VALUE;
 
-    public Long2IntMap hashPrimary(Connection conn,
-                                   Window window,
-                                   PrimarySource<?> primary,
-                                   int queryTimeoutSeconds,
-                                   int fetchSize,
-                                   JdbcDialect dialect) throws SQLException {
+    public Long2IntMap hashPrimary(
+            Connection conn,
+            Window window,
+            PrimarySource<?> primary,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect)
+            throws SQLException {
         return hashPrimary(conn, window, primary, queryTimeoutSeconds, fetchSize, dialect, null);
     }
 
-    public Long2IntMap hashPrimary(Connection conn,
-                                   Window window,
-                                   PrimarySource<?> primary,
-                                   int queryTimeoutSeconds,
-                                   int fetchSize,
-                                   JdbcDialect dialect,
-                                   @Nullable StatementRegistry registry) throws SQLException {
+    public Long2IntMap hashPrimary(
+            Connection conn,
+            Window window,
+            PrimarySource<?> primary,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect,
+            @Nullable StatementRegistry registry)
+            throws SQLException {
         String sql = buildPrimarySql(primary);
         return runHashQuery(conn, window, sql, queryTimeoutSeconds, fetchSize, dialect, registry);
     }
 
-    public Long2IntMap hashChild(Connection conn,
-                                 Window window,
-                                 ChildSource<?> child,
-                                 int queryTimeoutSeconds,
-                                 int fetchSize,
-                                 JdbcDialect dialect) throws SQLException {
+    public Long2IntMap hashChild(
+            Connection conn,
+            Window window,
+            ChildSource<?> child,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect)
+            throws SQLException {
         return hashChild(conn, window, child, queryTimeoutSeconds, fetchSize, dialect, null);
     }
 
-    public Long2IntMap hashChild(Connection conn,
-                                 Window window,
-                                 ChildSource<?> child,
-                                 int queryTimeoutSeconds,
-                                 int fetchSize,
-                                 JdbcDialect dialect,
-                                 @Nullable StatementRegistry registry) throws SQLException {
+    public Long2IntMap hashChild(
+            Connection conn,
+            Window window,
+            ChildSource<?> child,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect,
+            @Nullable StatementRegistry registry)
+            throws SQLException {
         String sql = buildChildSql(child);
         return runHashQuery(conn, window, sql, queryTimeoutSeconds, fetchSize, dialect, registry);
     }
 
-    private static Long2IntMap runHashQuery(Connection conn,
-                                            Window window,
-                                            String sql,
-                                            int queryTimeoutSeconds,
-                                            int fetchSize,
-                                            JdbcDialect dialect,
-                                            @Nullable StatementRegistry registry) throws SQLException {
+    private static Long2IntMap runHashQuery(
+            Connection conn,
+            Window window,
+            String sql,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect,
+            @Nullable StatementRegistry registry)
+            throws SQLException {
         Long2IntOpenHashMap result = new Long2IntOpenHashMap();
         result.defaultReturnValue(MISSING_HASH);
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -122,8 +131,7 @@ public final class Phase1Hasher {
     static String buildPrimarySql(PrimarySource<?> primary) {
         List<String> hashed = primary.hashedColumns();
         if (hashed == null || hashed.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "PrimarySource " + primary.tableName() + " has no hashedColumns");
+            throw new IllegalArgumentException("PrimarySource " + primary.tableName() + " has no hashedColumns");
         }
         return "SELECT " + primary.pkColumn() + ", " + concatCrc32(hashed)
                 + " FROM " + primary.tableName()
@@ -133,8 +141,7 @@ public final class Phase1Hasher {
     static String buildChildSql(ChildSource<?> child) {
         List<String> hashed = child.hashedColumns();
         if (hashed == null || hashed.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "ChildSource " + child.tableName() + " has no hashedColumns");
+            throw new IllegalArgumentException("ChildSource " + child.tableName() + " has no hashedColumns");
         }
         return "SELECT " + child.fkColumn() + ", BIT_XOR(" + concatCrc32(hashed) + ") "
                 + "FROM " + child.tableName()

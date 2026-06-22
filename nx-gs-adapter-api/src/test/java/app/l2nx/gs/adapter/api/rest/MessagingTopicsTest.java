@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.rest;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class MessagingTopicsTest {
 
@@ -51,8 +50,8 @@ class MessagingTopicsTest {
                 .events(Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> topics.getEvents().put("character", "x"));
+        assertThrows(
+                UnsupportedOperationException.class, () -> topics.getEvents().put("character", "x"));
     }
 
     @Test

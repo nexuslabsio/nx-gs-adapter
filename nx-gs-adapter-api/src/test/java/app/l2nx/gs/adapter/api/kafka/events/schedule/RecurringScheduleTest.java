@@ -1,17 +1,16 @@
 package app.l2nx.gs.adapter.api.kafka.events.schedule;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.DayOfWeek;
 import java.time.OffsetTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 class RecurringScheduleTest {
 
@@ -43,7 +42,8 @@ class RecurringScheduleTest {
     void slots_shouldBeUnmodifiable() {
         RecurringSchedule schedule = new RecurringSchedule(Collections.singletonList(slot()));
 
-        assertThrows(UnsupportedOperationException.class, () -> schedule.getSlots().add(slot()));
+        assertThrows(
+                UnsupportedOperationException.class, () -> schedule.getSlots().add(slot()));
     }
 
     @Test

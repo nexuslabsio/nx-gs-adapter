@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One vertex of a territory-based spawn polygon — a horizontal {@code (x, y)} point
@@ -16,10 +15,7 @@ public final class NpcSpawnPoint {
     private final @Nullable Integer zmin;
     private final @Nullable Integer zmax;
 
-    public NpcSpawnPoint(@Nullable Integer x,
-                         @Nullable Integer y,
-                         @Nullable Integer zmin,
-                         @Nullable Integer zmax) {
+    public NpcSpawnPoint(@Nullable Integer x, @Nullable Integer y, @Nullable Integer zmin, @Nullable Integer zmax) {
         this.x = x;
         this.y = y;
         this.zmin = zmin;
@@ -43,11 +39,7 @@ public final class NpcSpawnPoint {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .x(x)
-                .y(y)
-                .zmin(zmin)
-                .zmax(zmax);
+        return new Builder().x(x).y(y).zmin(zmin).zmax(zmax);
     }
 
     public static Builder builder() {

@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate.NpcTemplate;
-
 import java.util.Collection;
 
 /**

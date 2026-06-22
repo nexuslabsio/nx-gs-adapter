@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.alliance;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Arrays;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO for one alliance, payload of {@code SyncEvent<AllianceDbDto>} on
@@ -45,10 +44,7 @@ public final class AllianceDbDto {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .id(id)
-                .name(name)
-                .icon(icon);
+        return new Builder().id(id).name(name).icon(icon);
     }
 
     public static Builder builder() {
@@ -60,9 +56,7 @@ public final class AllianceDbDto {
         if (this == o) return true;
         if (!(o instanceof AllianceDbDto)) return false;
         AllianceDbDto that = (AllianceDbDto) o;
-        return id == that.id
-                && name.equals(that.name)
-                && Arrays.equals(icon, that.icon);
+        return id == that.id && name.equals(that.name) && Arrays.equals(icon, that.icon);
     }
 
     @Override

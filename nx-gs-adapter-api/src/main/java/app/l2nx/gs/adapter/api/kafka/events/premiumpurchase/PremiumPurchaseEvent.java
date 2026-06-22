@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO published to the {@code premiumpurchase} family topic
@@ -38,20 +37,22 @@ public final class PremiumPurchaseEvent {
     private final List<PurchaseService> services;
     private final @Nullable Map<String, String> metadata;
 
-    public PremiumPurchaseEvent(UUID eventId,
-                                long characterId,
-                                @Nullable String characterName,
-                                @Nullable String accountName,
-                                @Nullable List<PurchaseItem> items,
-                                @Nullable List<PurchaseService> services,
-                                @Nullable Map<String, String> metadata) {
+    public PremiumPurchaseEvent(
+            UUID eventId,
+            long characterId,
+            @Nullable String characterName,
+            @Nullable String accountName,
+            @Nullable List<PurchaseItem> items,
+            @Nullable List<PurchaseService> services,
+            @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.characterId = characterId;
         this.characterName = characterName;
         this.accountName = accountName;
         this.items = freezeList(items);
         this.services = freezeList(services);
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -207,8 +208,8 @@ public final class PremiumPurchaseEvent {
         }
 
         public PremiumPurchaseEvent build() {
-            return new PremiumPurchaseEvent(eventId, characterId, characterName,
-                    accountName, items, services, metadata);
+            return new PremiumPurchaseEvent(
+                    eventId, characterId, characterName, accountName, items, services, metadata);
         }
     }
 }

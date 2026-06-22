@@ -5,7 +5,6 @@ import app.l2nx.gs.adapter.api.spi.CommandHandler;
 import app.l2nx.gs.adapter.api.spi.NxCommands;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -53,14 +52,12 @@ final class NxCommandsImpl implements NxCommands {
         }
         CommandTypeRegistry registry = registryRef.get();
         if (registry == null) {
-            log.warn("commands.on({}, ...) called before consumer wired — dropping",
-                    type.getSimpleName());
+            log.warn("commands.on({}, ...) called before consumer wired — dropping", type.getSimpleName());
             return;
         }
         boolean overwrote = registry.register(type, handler);
         if (overwrote) {
-            log.warn("Re-registered handler for command type {} — previous binding replaced",
-                    type.getSimpleName());
+            log.warn("Re-registered handler for command type {} — previous binding replaced", type.getSimpleName());
         } else {
             log.debug("Registered handler for command type {}", type.getSimpleName());
         }

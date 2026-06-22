@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
 import app.l2nx.gs.adapter.api.domain.npc.NpcDropType;
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One reward group of an NPC's drop list — a category, a group-selection chance, and the items
@@ -23,15 +22,15 @@ public final class NpcDropGroup {
     private final @Nullable Double groupChancePercent;
     private final @Nullable List<NpcDropItem> items;
 
-    public NpcDropGroup(@Nullable NpcDropType category,
-                        @Nullable Integer groupIndex,
-                        @Nullable Double groupChancePercent,
-                        @Nullable List<NpcDropItem> items) {
+    public NpcDropGroup(
+            @Nullable NpcDropType category,
+            @Nullable Integer groupIndex,
+            @Nullable Double groupChancePercent,
+            @Nullable List<NpcDropItem> items) {
         this.category = category;
         this.groupIndex = groupIndex;
         this.groupChancePercent = groupChancePercent;
-        this.items = items == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcDropItem>(items));
+        this.items = items == null ? null : Collections.unmodifiableList(new ArrayList<NpcDropItem>(items));
     }
 
     public @Nullable NpcDropType getCategory() {
@@ -80,8 +79,8 @@ public final class NpcDropGroup {
 
     @Override
     public String toString() {
-        return "NpcDropGroup[category=" + category + ", groupIndex=" + groupIndex
-                + ", groupChancePercent=" + groupChancePercent + "]";
+        return "NpcDropGroup[category=" + category + ", groupIndex=" + groupIndex + ", groupChancePercent="
+                + groupChancePercent + "]";
     }
 
     public static final class Builder {

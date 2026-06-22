@@ -1,22 +1,21 @@
 package app.l2nx.gs.runtime.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
 import app.l2nx.gs.adapter.api.spi.RuntimeRow;
 import app.l2nx.gs.runtime.sync.engine.publish.KafkaSender;
 import app.l2nx.gs.runtime.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.runtime.sync.engine.publish.TopicResolver;
-import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.record.RecordBatch;
-import org.junit.jupiter.api.Test;
-
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.record.RecordBatch;
+import org.junit.jupiter.api.Test;
 
 class RuntimeSyncEngineTest {
 
@@ -28,8 +27,7 @@ class RuntimeSyncEngineTest {
         RuntimeSyncEngine engine = new RuntimeSyncEngine(
                 Arrays.<RuntimeEntityMapping<?>>asList(a, b),
                 e -> "topic",
-                new SyncEventPublisher((t, k, v, cb) -> {
-                }),
+                new SyncEventPublisher((t, k, v, cb) -> {}),
                 new EntityStatsTracker(),
                 new EngineConfig(10, 5));
 
@@ -44,8 +42,7 @@ class RuntimeSyncEngineTest {
         RuntimeSyncEngine engine = new RuntimeSyncEngine(
                 Collections.<RuntimeEntityMapping<?>>singletonList(blank),
                 e -> "topic",
-                new SyncEventPublisher((t, k, v, cb) -> {
-                }),
+                new SyncEventPublisher((t, k, v, cb) -> {}),
                 new EntityStatsTracker(),
                 new EngineConfig(10, 5));
 
@@ -74,15 +71,18 @@ class RuntimeSyncEngineTest {
                 new EngineConfig(1, 1));
         try {
             engine.start();
-            assertTrue(a.snapshotLatch.await(5L, TimeUnit.SECONDS),
+            assertTrue(
+                    a.snapshotLatch.await(5L, TimeUnit.SECONDS),
                     "entity 'character' tick should have fired on the shared pool");
-            assertTrue(b.snapshotLatch.await(5L, TimeUnit.SECONDS),
+            assertTrue(
+                    b.snapshotLatch.await(5L, TimeUnit.SECONDS),
                     "entity 'party' tick should have fired on the shared pool");
             Set<String> threadNames = new HashSet<String>();
             threadNames.add(a.lastThreadName.get());
             threadNames.add(b.lastThreadName.get());
             for (String name : threadNames) {
-                assertTrue(name != null && name.startsWith("nx-runtime-sync-pool-"),
+                assertTrue(
+                        name != null && name.startsWith("nx-runtime-sync-pool-"),
                         "ticks must run on shared-pool threads, saw: " + name);
             }
         } finally {
@@ -120,8 +120,7 @@ class RuntimeSyncEngineTest {
             assertTrue(entered.await(5L, TimeUnit.SECONDS), "first tick must have entered snapshot()");
             // Let the scheduler attempt at least one more dispatch while we hold tick #1.
             Thread.sleep(1500L);
-            assertEquals(1, snapshotCalls.get(),
-                    "overlapping scheduled tick must be skipped by the tick guard");
+            assertEquals(1, snapshotCalls.get(), "overlapping scheduled tick must be skipped by the tick guard");
         } finally {
             holdInside.countDown();
             engine.stop();
@@ -136,7 +135,9 @@ class RuntimeSyncEngineTest {
         hashes.put(1L, 100L);
         StubMapping mapping = new StubMapping("character", hashes);
 
-        KafkaSender silent = (topic, key, value, callback) -> { /* never acks */ };
+        KafkaSender silent = (topic, key, value, callback) -> {
+            /* never acks */
+        };
         EntityStatsTracker tracker = new EntityStatsTracker();
         RuntimeSyncEngine engine = new RuntimeSyncEngine(
                 Collections.<RuntimeEntityMapping<?>>singletonList(mapping),
@@ -146,8 +147,7 @@ class RuntimeSyncEngineTest {
                 new EngineConfig(1, 30));
         mapping.snapshotLatch = new CountDownLatch(1);
         engine.start();
-        assertTrue(mapping.snapshotLatch.await(5L, TimeUnit.SECONDS),
-                "first tick must enter snapshot before stop()");
+        assertTrue(mapping.snapshotLatch.await(5L, TimeUnit.SECONDS), "first tick must enter snapshot before stop()");
         // Give the loop a moment to advance into the ack-walk.
         Thread.sleep(500L);
 
@@ -156,13 +156,13 @@ class RuntimeSyncEngineTest {
         long elapsedMs = (System.nanoTime() - t0) / 1_000_000L;
         // publish-flush-seconds=30 → awaitTermination budget is 31s; clean stop should
         // interrupt the futures and return immediately, not wait the full budget.
-        assertTrue(elapsedMs < 5_000L,
-                "stop() should not wait the full publish-flush budget (took " + elapsedMs + "ms)");
+        assertTrue(
+                elapsedMs < 5_000L, "stop() should not wait the full publish-flush budget (took " + elapsedMs + "ms)");
     }
 
     private static KafkaSender silentSender() {
-        return (topic, key, value, callback) -> callback.onCompletion(new RecordMetadata(
-                new TopicPartition(topic, 0), 0L, 0, RecordBatch.NO_TIMESTAMP, 0, 0), null);
+        return (topic, key, value, callback) -> callback.onCompletion(
+                new RecordMetadata(new TopicPartition(topic, 0), 0L, 0, RecordBatch.NO_TIMESTAMP, 0, 0), null);
     }
 
     private static final class StubMapping implements RuntimeEntityMapping<String> {

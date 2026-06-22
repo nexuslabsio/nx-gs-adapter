@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One effect a {@link SkillLevel} applies — the build-agnostic projection of a core
@@ -37,21 +36,22 @@ public final class SkillEffect {
     private final @Nullable Double effectPower;
     private final @Nullable List<SkillStatModifier> statModifiers;
 
-    public SkillEffect(String name,
-                       @Nullable String kind,
-                       @Nullable Map<String, String> params,
-                       @Nullable String abnormalType,
-                       @Nullable Integer abnormalLevel,
-                       @Nullable Double effectPower,
-                       @Nullable List<SkillStatModifier> statModifiers) {
+    public SkillEffect(
+            String name,
+            @Nullable String kind,
+            @Nullable Map<String, String> params,
+            @Nullable String abnormalType,
+            @Nullable Integer abnormalLevel,
+            @Nullable Double effectPower,
+            @Nullable List<SkillStatModifier> statModifiers) {
         this.name = Objects.requireNonNull(name, "name");
         this.kind = kind;
-        this.params = params == null ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(params));
+        this.params = params == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(params));
         this.abnormalType = abnormalType;
         this.abnormalLevel = abnormalLevel;
         this.effectPower = effectPower;
-        this.statModifiers = statModifiers == null ? null
+        this.statModifiers = statModifiers == null
+                ? null
                 : Collections.unmodifiableList(new ArrayList<SkillStatModifier>(statModifiers));
     }
 
@@ -136,8 +136,7 @@ public final class SkillEffect {
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, kind, params, abnormalType, abnormalLevel, effectPower,
-                statModifiers);
+        return Objects.hash(name, kind, params, abnormalType, abnormalLevel, effectPower, statModifiers);
     }
 
     @Override
@@ -190,8 +189,7 @@ public final class SkillEffect {
         }
 
         public SkillEffect build() {
-            return new SkillEffect(name, kind, params, abnormalType, abnormalLevel, effectPower,
-                    statModifiers);
+            return new SkillEffect(name, kind, params, abnormalType, abnormalLevel, effectPower, statModifiers);
         }
     }
 }

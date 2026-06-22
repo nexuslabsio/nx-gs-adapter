@@ -1,13 +1,12 @@
 package app.l2nx.gs.adapter.api.kafka.events.schedule;
 
-import org.jspecify.annotations.Nullable;
-
 import java.time.DayOfWeek;
 import java.time.OffsetTime;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One recurring occurrence rule inside a {@link RecurringSchedule}: a set of
@@ -42,9 +41,7 @@ public final class RecurringSlot {
     private final @Nullable OffsetTime time;
     private final int jitterMinutes;
 
-    public RecurringSlot(@Nullable Set<DayOfWeek> daysOfWeek,
-                         @Nullable OffsetTime time,
-                         int jitterMinutes) {
+    public RecurringSlot(@Nullable Set<DayOfWeek> daysOfWeek, @Nullable OffsetTime time, int jitterMinutes) {
         this.daysOfWeek = daysOfWeek == null || daysOfWeek.isEmpty()
                 ? Collections.<DayOfWeek>emptySet()
                 : Collections.unmodifiableSet(EnumSet.copyOf(daysOfWeek));
@@ -77,10 +74,7 @@ public final class RecurringSlot {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .daysOfWeek(daysOfWeek)
-                .time(time)
-                .jitterMinutes(jitterMinutes);
+        return new Builder().daysOfWeek(daysOfWeek).time(time).jitterMinutes(jitterMinutes);
     }
 
     public static Builder builder() {
@@ -104,9 +98,7 @@ public final class RecurringSlot {
 
     @Override
     public String toString() {
-        return "RecurringSlot[daysOfWeek=" + daysOfWeek
-                + ", time=" + time
-                + ", jitterMinutes=" + jitterMinutes + "]";
+        return "RecurringSlot[daysOfWeek=" + daysOfWeek + ", time=" + time + ", jitterMinutes=" + jitterMinutes + "]";
     }
 
     public static final class Builder {

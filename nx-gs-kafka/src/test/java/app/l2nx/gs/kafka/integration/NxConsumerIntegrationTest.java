@@ -1,7 +1,15 @@
 package app.l2nx.gs.kafka.integration;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -13,23 +21,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class NxConsumerIntegrationTest {
 
     @Container
-    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer(
-            "confluentinc/cp-kafka:7.7.0"
-    );
+    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer("confluentinc/cp-kafka:7.7.0");
 
     @AfterEach
     void tearDown() {
@@ -81,12 +78,9 @@ class NxConsumerIntegrationTest {
         String topic = "test.consumer.dup";
         NxKafka kafka = buildKafka("test-consumer-dup");
 
-        kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> {
-        });
+        kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> {});
 
-        assertThrows(KafkaException.class,
-                () -> kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> {
-                }));
+        assertThrows(KafkaException.class, () -> kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> {}));
     }
 
     @Test
@@ -133,8 +127,7 @@ class NxConsumerIntegrationTest {
 
         CountDownLatch latch = new CountDownLatch(1);
         kafka.subscribe("test.consumer.shut1", "g-shut", TestEvent.class, event -> latch.countDown());
-        kafka.subscribe("test.consumer.shut2", "g-shut", TestEvent.class, event -> {
-        });
+        kafka.subscribe("test.consumer.shut2", "g-shut", TestEvent.class, event -> {});
 
         publishJson("test.consumer.shut1", "{\"name\":\"p\",\"score\":1}");
         assertTrue(latch.await(10, TimeUnit.SECONDS));
@@ -155,9 +148,8 @@ class NxConsumerIntegrationTest {
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
 
-        try (KafkaProducer<String, byte[]> producer =
-                     new KafkaProducer<>(props, new StringSerializer(),
-                             new org.apache.kafka.common.serialization.ByteArraySerializer())) {
+        try (KafkaProducer<String, byte[]> producer = new KafkaProducer<>(
+                props, new StringSerializer(), new org.apache.kafka.common.serialization.ByteArraySerializer())) {
             producer.send(new ProducerRecord<>(topic, json.getBytes(StandardCharsets.UTF_8)));
             producer.flush();
         }

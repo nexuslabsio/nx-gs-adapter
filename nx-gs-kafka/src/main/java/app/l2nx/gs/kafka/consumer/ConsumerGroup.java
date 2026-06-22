@@ -4,18 +4,17 @@ import app.l2nx.gs.kafka.producer.NxProducer;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;
-import org.apache.kafka.clients.consumer.*;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 
 /**
  * Manages a single Kafka consumer with a dedicated daemon poll-loop thread
@@ -39,8 +38,13 @@ class ConsumerGroup<T> implements NxConsumer {
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final boolean autoCommitEnabled;
 
-    ConsumerGroup(String topic, Class<T> type, BiConsumer<T, ReplyContext> handler,
-                  NxProducer producer, Gson gson, Map<String, Object> consumerConfig) {
+    ConsumerGroup(
+            String topic,
+            Class<T> type,
+            BiConsumer<T, ReplyContext> handler,
+            NxProducer producer,
+            Gson gson,
+            Map<String, Object> consumerConfig) {
         this.topic = topic;
         this.type = type;
         this.handler = handler;
@@ -49,7 +53,8 @@ class ConsumerGroup<T> implements NxConsumer {
         this.log = NxLogFactory.getLogger(ConsumerGroup.class);
         this.autoCommitEnabled = resolveAutoCommit(consumerConfig);
         if (this.autoCommitEnabled) {
-            log.warn("auto.commit is enabled — at-least-once contract not enforced; failed handlers will silently drop records");
+            log.warn(
+                    "auto.commit is enabled — at-least-once contract not enforced; failed handlers will silently drop records");
         }
 
         this.consumer = new KafkaConsumer<>(consumerConfig, new StringDeserializer(), new ByteArrayDeserializer());
@@ -57,8 +62,8 @@ class ConsumerGroup<T> implements NxConsumer {
 
         this.pollThread = new Thread(this::pollLoop, "nx-gs-kafka-consumer-" + topic);
         pollThread.setDaemon(true);
-        pollThread.setUncaughtExceptionHandler((t, ex) ->
-                log.error("Uncaught exception on consumer thread {}", t.getName(), ex));
+        pollThread.setUncaughtExceptionHandler(
+                (t, ex) -> log.error("Uncaught exception on consumer thread {}", t.getName(), ex));
         pollThread.start();
 
         log.debug("Consumer started for topic {}", topic);
@@ -99,8 +104,7 @@ class ConsumerGroup<T> implements NxConsumer {
                             // it (and the rest of the batch). Without seek, Kafka's internal cursor
                             // advances past the failed record and subsequent successful commits in
                             // the same batch would skip it on restart.
-                            consumer.seek(new TopicPartition(record.topic(), record.partition()),
-                                    record.offset());
+                            consumer.seek(new TopicPartition(record.topic(), record.partition()), record.offset());
                             break;
                         }
                     }
@@ -142,8 +146,12 @@ class ConsumerGroup<T> implements NxConsumer {
             message = value == null ? null : gson.fromJson(new String(value, StandardCharsets.UTF_8), type);
         } catch (Throwable deserFailure) {
             // Permanent failure — payload won't parse on retry. Commit + skip.
-            log.warn("Deserialization failed for topic {} partition {} offset {} — committing and skipping",
-                    topic, record.partition(), record.offset(), deserFailure);
+            log.warn(
+                    "Deserialization failed for topic {} partition {} offset {} — committing and skipping",
+                    topic,
+                    record.partition(),
+                    record.offset(),
+                    deserFailure);
             if (!autoCommitEnabled) {
                 commitOffset(record);
             }
@@ -161,8 +169,12 @@ class ConsumerGroup<T> implements NxConsumer {
                 Thread.currentThread().interrupt();
                 return false;
             }
-            log.warn("Handler failed for topic {} partition {} offset {} — record will be redelivered",
-                    topic, record.partition(), record.offset(), t);
+            log.warn(
+                    "Handler failed for topic {} partition {} offset {} — record will be redelivered",
+                    topic,
+                    record.partition(),
+                    record.offset(),
+                    t);
             return false;
         }
     }
@@ -173,8 +185,12 @@ class ConsumerGroup<T> implements NxConsumer {
                     new TopicPartition(record.topic(), record.partition()),
                     new OffsetAndMetadata(record.offset() + 1)));
         } catch (Throwable t) {
-            log.warn("Failed to commit offset for topic {} partition {} offset {}",
-                    topic, record.partition(), record.offset(), t);
+            log.warn(
+                    "Failed to commit offset for topic {} partition {} offset {}",
+                    topic,
+                    record.partition(),
+                    record.offset(),
+                    t);
         }
     }
 }

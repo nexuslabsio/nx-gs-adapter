@@ -4,7 +4,6 @@ import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,10 +28,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class SnapshotStore {
 
-    private final Map<String, Long2IntOpenHashMap> byEntity =
-            new ConcurrentHashMap<String, Long2IntOpenHashMap>();
-    private final Map<String, ExtremeCache> extremeCache =
-            new ConcurrentHashMap<String, ExtremeCache>();
+    private final Map<String, Long2IntOpenHashMap> byEntity = new ConcurrentHashMap<String, Long2IntOpenHashMap>();
+    private final Map<String, ExtremeCache> extremeCache = new ConcurrentHashMap<String, ExtremeCache>();
 
     public int getCrc(String entityName, long pk) {
         Long2IntOpenHashMap map = byEntity.get(entityName);

@@ -5,12 +5,11 @@ import app.l2nx.gs.adapter.api.kafka.sync.gd.GameDataSyncEvent;
 import app.l2nx.gs.commons.UUIDv7;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-import org.apache.kafka.clients.producer.ProducerRecord;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.function.ToLongFunction;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
 /**
  * Builds one game-data snapshot burst for a single gd entity and forwards it to a
@@ -57,8 +56,8 @@ public final class GameDataSnapshotPublisher {
      * @return result carrying the generated {@code syncId} and template count, or
      * {@code null} when nothing was published (items null / topic absent).
      */
-    public <T> Result publishSnapshot(String entity, Collection<T> items, ToLongFunction<T> pkOf,
-                                      UUID serverId, String topic) {
+    public <T> Result publishSnapshot(
+            String entity, Collection<T> items, ToLongFunction<T> pkOf, UUID serverId, String topic) {
         if (topic == null || topic.isEmpty()) {
             log.warn("gd-sync snapshot for entity '{}' skipped — no topic configured", entity);
             return null;
@@ -67,8 +66,10 @@ public final class GameDataSnapshotPublisher {
             // null breaks the never-null contract; aborting (no marker) avoids a count=0
             // SNAPSHOT_COMPLETE that would reconcile-delete the whole catalog. Empty is legal and
             // still emits count=0 via the loop below.
-            log.error("gd-sync provider for entity '{}' returned null snapshot (contract violation) "
-                    + "— burst aborted, no SNAPSHOT_COMPLETE emitted", entity);
+            log.error(
+                    "gd-sync provider for entity '{}' returned null snapshot (contract violation) "
+                            + "— burst aborted, no SNAPSHOT_COMPLETE emitted",
+                    entity);
             return null;
         }
 
@@ -101,8 +102,12 @@ public final class GameDataSnapshotPublisher {
             send(topic, key, complete);
         } catch (Throwable t) {
             // marker may not have been sent → report incomplete so the module shows DEGRADED, not a fresh sync
-            log.error("gd-sync snapshot publish threw {} mid-burst (entity '{}', syncId {}) — partial burst sent",
-                    t.getClass().getName(), entity, syncId, t);
+            log.error(
+                    "gd-sync snapshot publish threw {} mid-burst (entity '{}', syncId {}) — partial burst sent",
+                    t.getClass().getName(),
+                    entity,
+                    syncId,
+                    t);
             return new Result(syncId, count, false);
         }
 

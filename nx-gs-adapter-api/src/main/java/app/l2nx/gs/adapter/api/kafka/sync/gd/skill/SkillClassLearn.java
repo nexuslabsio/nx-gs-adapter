@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One class→skill learn entry of a {@link Skill} — a playable class that learns this skill,
@@ -30,13 +29,14 @@ public final class SkillClassLearn {
     private final @Nullable Integer skillLevel;
     private final @Nullable List<SkillLearnItem> requiredItems;
 
-    public SkillClassLearn(@Nullable CharacterClass clazz,
-                           @Nullable Integer requiredLevel,
-                           @Nullable Long learnSp,
-                           @Nullable Boolean autoLearn,
-                           @Nullable Boolean learnedByNpc,
-                           @Nullable Integer skillLevel,
-                           @Nullable List<SkillLearnItem> requiredItems) {
+    public SkillClassLearn(
+            @Nullable CharacterClass clazz,
+            @Nullable Integer requiredLevel,
+            @Nullable Long learnSp,
+            @Nullable Boolean autoLearn,
+            @Nullable Boolean learnedByNpc,
+            @Nullable Integer skillLevel,
+            @Nullable List<SkillLearnItem> requiredItems) {
         this.clazz = clazz;
         this.requiredLevel = requiredLevel;
         this.learnSp = learnSp;
@@ -181,7 +181,8 @@ public final class SkillClassLearn {
         }
 
         public SkillClassLearn build() {
-            return new SkillClassLearn(clazz, requiredLevel, learnSp, autoLearn, learnedByNpc, skillLevel, requiredItems);
+            return new SkillClassLearn(
+                    clazz, requiredLevel, learnSp, autoLearn, learnedByNpc, skillLevel, requiredItems);
         }
     }
 }

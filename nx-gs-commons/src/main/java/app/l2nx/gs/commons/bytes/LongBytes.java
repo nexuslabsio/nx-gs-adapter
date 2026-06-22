@@ -11,8 +11,7 @@ package app.l2nx.gs.commons.bytes;
  */
 public final class LongBytes {
 
-    private LongBytes() {
-    }
+    private LongBytes() {}
 
     /**
      * Encode {@code value} as 8 big-endian bytes. Suitable for direct use as a

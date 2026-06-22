@@ -17,9 +17,7 @@ public final class DeleteItemResult {
     private final Long countDeleted;
     private final boolean fullyDeleted;
 
-    public DeleteItemResult(Long itemId,
-                            Long countDeleted,
-                            boolean fullyDeleted) {
+    public DeleteItemResult(Long itemId, Long countDeleted, boolean fullyDeleted) {
         if (itemId == null) {
             throw new IllegalArgumentException("itemId is required");
         }
@@ -60,10 +58,7 @@ public final class DeleteItemResult {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .itemId(itemId)
-                .countDeleted(countDeleted)
-                .fullyDeleted(fullyDeleted);
+        return new Builder().itemId(itemId).countDeleted(countDeleted).fullyDeleted(fullyDeleted);
     }
 
     public static Builder builder() {

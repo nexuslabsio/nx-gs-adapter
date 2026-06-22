@@ -1,10 +1,9 @@
 package app.l2nx.gs.kafka.serde;
 
 import com.google.gson.Gson;
-import org.apache.kafka.common.serialization.Deserializer;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.apache.kafka.common.serialization.Deserializer;
 
 /**
  * Kafka {@link Deserializer} that converts JSON bytes to a typed object via Gson.
@@ -32,8 +31,7 @@ public class GsonDeserializer<T> implements Deserializer<T> {
     }
 
     @Override
-    public void configure(Map<String, ?> configs, boolean isKey) {
-    }
+    public void configure(Map<String, ?> configs, boolean isKey) {}
 
     @Override
     public T deserialize(String topic, byte[] data) {
@@ -44,6 +42,5 @@ public class GsonDeserializer<T> implements Deserializer<T> {
     }
 
     @Override
-    public void close() {
-    }
+    public void close() {}
 }

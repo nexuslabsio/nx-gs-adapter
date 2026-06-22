@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.events.castle;
 
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO published to the {@code castle} family topic
@@ -47,15 +46,16 @@ public final class SiegeFinishedEvent {
     private final List<Long> defenderClanIds;
     private final @Nullable Map<String, String> metadata;
 
-    public SiegeFinishedEvent(UUID eventId,
-                              int castleId,
-                              @Nullable String castleName,
-                              @Nullable Instant siegeStartedAt,
-                              String outcome,
-                              @Nullable Long winnerClanId,
-                              @Nullable List<Long> attackerClanIds,
-                              @Nullable List<Long> defenderClanIds,
-                              @Nullable Map<String, String> metadata) {
+    public SiegeFinishedEvent(
+            UUID eventId,
+            int castleId,
+            @Nullable String castleName,
+            @Nullable Instant siegeStartedAt,
+            String outcome,
+            @Nullable Long winnerClanId,
+            @Nullable List<Long> attackerClanIds,
+            @Nullable List<Long> defenderClanIds,
+            @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "SiegeFinishedEvent.eventId is required");
         this.castleId = castleId;
         this.castleName = castleName;
@@ -64,9 +64,8 @@ public final class SiegeFinishedEvent {
         this.winnerClanId = winnerClanId;
         this.attackerClanIds = freezeList(attackerClanIds);
         this.defenderClanIds = freezeList(defenderClanIds);
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -182,8 +181,16 @@ public final class SiegeFinishedEvent {
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, castleId, castleName, siegeStartedAt, outcome,
-                winnerClanId, attackerClanIds, defenderClanIds, metadata);
+        return Objects.hash(
+                eventId,
+                castleId,
+                castleName,
+                siegeStartedAt,
+                outcome,
+                winnerClanId,
+                attackerClanIds,
+                defenderClanIds,
+                metadata);
     }
 
     @Override
@@ -256,8 +263,16 @@ public final class SiegeFinishedEvent {
         }
 
         public SiegeFinishedEvent build() {
-            return new SiegeFinishedEvent(eventId, castleId, castleName, siegeStartedAt,
-                    outcome, winnerClanId, attackerClanIds, defenderClanIds, metadata);
+            return new SiegeFinishedEvent(
+                    eventId,
+                    castleId,
+                    castleName,
+                    siegeStartedAt,
+                    outcome,
+                    winnerClanId,
+                    attackerClanIds,
+                    defenderClanIds,
+                    metadata);
         }
     }
 }

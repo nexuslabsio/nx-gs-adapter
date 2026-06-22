@@ -1,10 +1,9 @@
 package app.l2nx.gs.kafka.serde;
 
 import com.google.gson.Gson;
-import org.apache.kafka.common.serialization.Serializer;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.apache.kafka.common.serialization.Serializer;
 
 public class GsonSerializer implements Serializer<Object> {
 
@@ -19,8 +18,7 @@ public class GsonSerializer implements Serializer<Object> {
     }
 
     @Override
-    public void configure(Map<String, ?> configs, boolean isKey) {
-    }
+    public void configure(Map<String, ?> configs, boolean isKey) {}
 
     @Override
     public byte[] serialize(String topic, Object data) {
@@ -31,6 +29,5 @@ public class GsonSerializer implements Serializer<Object> {
     }
 
     @Override
-    public void close() {
-    }
+    public void close() {}
 }

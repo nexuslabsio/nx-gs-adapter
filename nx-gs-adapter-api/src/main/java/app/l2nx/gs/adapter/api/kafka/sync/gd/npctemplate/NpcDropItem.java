@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One item entry inside an NPC {@link NpcDropGroup} — the item that may drop plus its count
@@ -20,10 +19,7 @@ public final class NpcDropItem {
     private final @Nullable Long max;
     private final @Nullable Double chancePercent;
 
-    public NpcDropItem(int itemTemplateId,
-                       @Nullable Long min,
-                       @Nullable Long max,
-                       @Nullable Double chancePercent) {
+    public NpcDropItem(int itemTemplateId, @Nullable Long min, @Nullable Long max, @Nullable Double chancePercent) {
         this.itemTemplateId = itemTemplateId;
         this.min = min;
         this.max = max;
@@ -47,11 +43,7 @@ public final class NpcDropItem {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .itemTemplateId(itemTemplateId)
-                .min(min)
-                .max(max)
-                .chancePercent(chancePercent);
+        return new Builder().itemTemplateId(itemTemplateId).min(min).max(max).chancePercent(chancePercent);
     }
 
     public static Builder builder() {
@@ -76,8 +68,8 @@ public final class NpcDropItem {
 
     @Override
     public String toString() {
-        return "NpcDropItem[itemTemplateId=" + itemTemplateId + ", min=" + min + ", max=" + max
-                + ", chancePercent=" + chancePercent + "]";
+        return "NpcDropItem[itemTemplateId=" + itemTemplateId + ", min=" + min + ", max=" + max + ", chancePercent="
+                + chancePercent + "]";
     }
 
     public static final class Builder {

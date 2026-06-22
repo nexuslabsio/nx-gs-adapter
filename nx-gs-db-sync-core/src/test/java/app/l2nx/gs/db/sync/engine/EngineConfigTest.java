@@ -1,11 +1,10 @@
 package app.l2nx.gs.db.sync.engine;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class EngineConfigTest {
 
@@ -57,8 +56,7 @@ class EngineConfigTest {
         Map<String, String> source = new HashMap<String, String>();
         source.put(EngineConfig.KEY_TICK_INTERVAL_SECONDS, "abc");
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> EngineConfig.from(source::get));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> EngineConfig.from(source::get));
         assertTrue(ex.getMessage().contains(EngineConfig.KEY_TICK_INTERVAL_SECONDS));
     }
 

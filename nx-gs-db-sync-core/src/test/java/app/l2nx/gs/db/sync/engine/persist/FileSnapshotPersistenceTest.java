@@ -1,15 +1,14 @@
 package app.l2nx.gs.db.sync.engine.persist;
 
-import app.l2nx.gs.db.sync.engine.SnapshotStore;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.db.sync.engine.SnapshotStore;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class FileSnapshotPersistenceTest {
 
@@ -56,7 +55,7 @@ class FileSnapshotPersistenceTest {
         Path clanFile = dir.resolve("clan.snap");
         try (RandomAccessFile raf = new RandomAccessFile(clanFile.toFile(), "rw")) {
             raf.seek(0L);
-            raf.write(new byte[]{'X', 'X', 'X', 'X'});
+            raf.write(new byte[] {'X', 'X', 'X', 'X'});
         }
 
         SnapshotStore dst = new SnapshotStore();
@@ -111,8 +110,7 @@ class FileSnapshotPersistenceTest {
         try (FileSnapshotPersistence p = new FileSnapshotPersistence(dir, 0)) {
             p.load(dst);
         }
-        assertTrue(dst.entityNames().isEmpty(),
-                "absurd count header must be rejected before OOM-prone allocation");
+        assertTrue(dst.entityNames().isEmpty(), "absurd count header must be rejected before OOM-prone allocation");
     }
 
     @Test
@@ -145,19 +143,22 @@ class FileSnapshotPersistenceTest {
         // Throttle = 1 day — second checkpoint within the day must be a no-op.
         try (FileSnapshotPersistence p = new FileSnapshotPersistence(dir, 24 * 3600)) {
             p.checkpoint("clan", src);
-            long firstMtime = Files.getLastModifiedTime(dir.resolve("clan.snap")).toMillis();
+            long firstMtime =
+                    Files.getLastModifiedTime(dir.resolve("clan.snap")).toMillis();
 
             // Mutate, then call checkpoint again — file must NOT update.
             src.putCrc("clan", 2L, 200);
             Thread.sleep(50L); // ensure mtime tick would be observable if we wrote
             p.checkpoint("clan", src);
-            long secondMtime = Files.getLastModifiedTime(dir.resolve("clan.snap")).toMillis();
+            long secondMtime =
+                    Files.getLastModifiedTime(dir.resolve("clan.snap")).toMillis();
             assertEquals(firstMtime, secondMtime, "throttled checkpoint must not rewrite the file");
 
             // flushAll ignores the throttle.
             Thread.sleep(50L);
             p.flushAll(src);
-            long thirdMtime = Files.getLastModifiedTime(dir.resolve("clan.snap")).toMillis();
+            long thirdMtime =
+                    Files.getLastModifiedTime(dir.resolve("clan.snap")).toMillis();
             assertTrue(thirdMtime > secondMtime, "flushAll must write regardless of throttle");
         }
 
@@ -173,10 +174,9 @@ class FileSnapshotPersistenceTest {
     void constructor_shouldRefuseSecondInstanceOnSameDirectory(@TempDir Path dir) {
         FileSnapshotPersistence first = new FileSnapshotPersistence(dir, 0);
         try {
-            IllegalStateException ex = assertThrows(IllegalStateException.class,
-                    () -> new FileSnapshotPersistence(dir, 0));
-            assertTrue(ex.getMessage().contains("lock"),
-                    "expected lock-related error, got: " + ex.getMessage());
+            IllegalStateException ex =
+                    assertThrows(IllegalStateException.class, () -> new FileSnapshotPersistence(dir, 0));
+            assertTrue(ex.getMessage().contains("lock"), "expected lock-related error, got: " + ex.getMessage());
         } finally {
             first.close();
         }
@@ -215,8 +215,7 @@ class FileSnapshotPersistenceTest {
         }
 
         byte[] afterFailure = Files.readAllBytes(dir.resolve("clan.snap"));
-        assertArrayEquals(firstFile, afterFailure,
-                "failed write must NOT clobber the previous good snapshot");
+        assertArrayEquals(firstFile, afterFailure, "failed write must NOT clobber the previous good snapshot");
     }
 
     @Test
@@ -238,5 +237,4 @@ class FileSnapshotPersistenceTest {
         assertTrue(names.contains("clan"));
         assertTrue(names.contains("character"));
     }
-
 }

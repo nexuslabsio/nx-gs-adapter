@@ -1,5 +1,9 @@
 package app.l2nx.gs.db.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
@@ -9,16 +13,11 @@ import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
 import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
 import app.l2nx.gs.db.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
+import java.sql.Connection;
+import java.sql.SQLException;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Test;
-
-import java.sql.Connection;
-import java.sql.SQLException;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class EntitySyncTaskTest {
 

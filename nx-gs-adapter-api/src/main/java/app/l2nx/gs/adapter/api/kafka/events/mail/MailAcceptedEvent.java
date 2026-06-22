@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Receiver claimed mail attachments. COD adena movement (if any) is
@@ -23,18 +22,18 @@ public final class MailAcceptedEvent {
     private final List<MailItemMovement> attachments;
     private final @Nullable Map<String, String> metadata;
 
-    public MailAcceptedEvent(UUID eventId,
-                             long mailId,
-                             long claimedByCharId,
-                             @Nullable List<MailItemMovement> attachments,
-                             @Nullable Map<String, String> metadata) {
+    public MailAcceptedEvent(
+            UUID eventId,
+            long mailId,
+            long claimedByCharId,
+            @Nullable List<MailItemMovement> attachments,
+            @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.mailId = mailId;
         this.claimedByCharId = claimedByCharId;
         this.attachments = freezeList(attachments);
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {

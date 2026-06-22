@@ -1,10 +1,9 @@
 package app.l2nx.gs.kafka.serde;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.charset.StandardCharsets;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class GsonSerializerTest {
 
@@ -74,6 +73,5 @@ class GsonSerializerTest {
         }
     }
 
-    static class Empty {
-    }
+    static class Empty {}
 }

@@ -1,15 +1,14 @@
 package app.l2nx.gs.adapter.api.kafka.events.schedule;
 
-import org.junit.jupiter.api.Test;
-
-import java.time.DayOfWeek;
-import java.time.OffsetTime;
-import java.util.EnumSet;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.time.DayOfWeek;
+import java.time.OffsetTime;
+import java.util.EnumSet;
+import org.junit.jupiter.api.Test;
 
 class RecurringSlotTest {
 
@@ -21,8 +20,7 @@ class RecurringSlotTest {
                 .jitterMinutes(30)
                 .build();
 
-        RecurringSlot ctor = new RecurringSlot(
-                EnumSet.of(DayOfWeek.TUESDAY), OffsetTime.parse("19:00:00+03:00"), 30);
+        RecurringSlot ctor = new RecurringSlot(EnumSet.of(DayOfWeek.TUESDAY), OffsetTime.parse("19:00:00+03:00"), 30);
 
         assertEquals(ctor, built);
         assertEquals(ctor.hashCode(), built.hashCode());
@@ -38,11 +36,10 @@ class RecurringSlotTest {
 
     @Test
     void daysOfWeek_shouldBeUnmodifiable() {
-        RecurringSlot slot = new RecurringSlot(
-                EnumSet.of(DayOfWeek.MONDAY), OffsetTime.parse("12:00:00Z"), 0);
+        RecurringSlot slot = new RecurringSlot(EnumSet.of(DayOfWeek.MONDAY), OffsetTime.parse("12:00:00Z"), 0);
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> slot.getDaysOfWeek().add(DayOfWeek.SUNDAY));
+        assertThrows(
+                UnsupportedOperationException.class, () -> slot.getDaysOfWeek().add(DayOfWeek.SUNDAY));
     }
 
     @Test
@@ -58,8 +55,7 @@ class RecurringSlotTest {
     @Test
     void toBuilder_shouldRoundtrip() {
         RecurringSlot original = new RecurringSlot(
-                EnumSet.of(DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY),
-                OffsetTime.parse("21:45:00+03:00"), 30);
+                EnumSet.of(DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY), OffsetTime.parse("21:45:00+03:00"), 30);
 
         assertEquals(original, original.toBuilder().build());
     }

@@ -40,8 +40,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  */
 public final class WellKnownCustomActivityMetadata {
 
-    private WellKnownCustomActivityMetadata() {
-    }
+    private WellKnownCustomActivityMetadata() {}
 
     // ── Common ──────────────────────────────────────────────────────────────
 

@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.character;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Discrete death fact — one event per character death that the host chooses to
@@ -43,14 +42,11 @@ public final class CharacterDeathEvent {
     private final long charId;
     private final @Nullable Map<String, String> metadata;
 
-    public CharacterDeathEvent(UUID eventId,
-                               long charId,
-                               @Nullable Map<String, String> metadata) {
+    public CharacterDeathEvent(UUID eventId, long charId, @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "CharacterDeathEvent.eventId is required");
         this.charId = charId;
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {
@@ -66,10 +62,7 @@ public final class CharacterDeathEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .charId(charId)
-                .metadata(metadata);
+        return new Builder().eventId(eventId).charId(charId).metadata(metadata);
     }
 
     public static Builder builder() {
@@ -81,9 +74,7 @@ public final class CharacterDeathEvent {
         if (this == o) return true;
         if (!(o instanceof CharacterDeathEvent)) return false;
         CharacterDeathEvent that = (CharacterDeathEvent) o;
-        return charId == that.charId
-                && eventId.equals(that.eventId)
-                && Objects.equals(metadata, that.metadata);
+        return charId == that.charId && eventId.equals(that.eventId) && Objects.equals(metadata, that.metadata);
     }
 
     @Override
@@ -93,9 +84,7 @@ public final class CharacterDeathEvent {
 
     @Override
     public String toString() {
-        return "CharacterDeathEvent[eventId=" + eventId
-                + ", charId=" + charId
-                + ", metadata=" + metadata + "]";
+        return "CharacterDeathEvent[eventId=" + eventId + ", charId=" + charId + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {

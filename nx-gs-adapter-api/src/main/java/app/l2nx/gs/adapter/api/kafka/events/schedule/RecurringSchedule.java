@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.events.schedule;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A recurring (weekly) schedule for a tracked activity — raid/epic boss respawn,

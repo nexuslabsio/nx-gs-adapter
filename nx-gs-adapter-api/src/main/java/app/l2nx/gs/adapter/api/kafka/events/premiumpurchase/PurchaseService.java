@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One service-applied line of a {@link PremiumPurchaseEvent}. Carries the
@@ -34,10 +33,8 @@ public final class PurchaseService {
     private final @Nullable Map<String, String> params;
     private final List<Payment> payments;
 
-    public PurchaseService(String code,
-                           @Nullable Long qty,
-                           @Nullable Map<String, String> params,
-                           @Nullable List<Payment> payments) {
+    public PurchaseService(
+            String code, @Nullable Long qty, @Nullable Map<String, String> params, @Nullable List<Payment> payments) {
         this.code = code;
         this.qty = qty;
         this.params = freezeMap(params);
@@ -119,8 +116,8 @@ public final class PurchaseService {
 
     @Override
     public String toString() {
-        return "PurchaseService[code=" + code + ", qty=" + getQty()
-                + ", params=" + params + ", payments=" + payments + "]";
+        return "PurchaseService[code=" + code + ", qty=" + getQty() + ", params=" + params + ", payments=" + payments
+                + "]";
     }
 
     public static final class Builder {

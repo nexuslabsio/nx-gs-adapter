@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class ParentRefTest {
 
@@ -33,7 +33,8 @@ class ParentRefTest {
 
     @Test
     void hashCode_shouldMatchEquals() {
-        assertEquals(ParentRef.of("character", "owner_id").hashCode(),
+        assertEquals(
+                ParentRef.of("character", "owner_id").hashCode(),
                 ParentRef.of("character", "owner_id").hashCode());
     }
 

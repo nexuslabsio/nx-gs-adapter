@@ -1,19 +1,20 @@
 package app.l2nx.gs.adapter.api.rest;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Collections;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ConnectResponseTest {
 
     @Test
     void syncTopics_shouldDefaultToNull_whenBuilderOmitsIt() {
         ConnectResponse response = ConnectResponse.builder()
-                .tenantId(UUID.randomUUID()).tenantSlug("acme")
-                .serverId(UUID.randomUUID()).serverSlug("primary")
+                .tenantId(UUID.randomUUID())
+                .tenantSlug("acme")
+                .serverId(UUID.randomUUID())
+                .serverSlug("primary")
                 .serverName("Acme Primary")
                 .kafka(KafkaCredentials.builder().bootstrap("localhost:9092").build())
                 .build();
@@ -24,9 +25,8 @@ class ConnectResponseTest {
 
     @Test
     void heartbeatTopic_shouldRoundtrip() {
-        ConnectResponse response = ConnectResponse.builder()
-                .heartbeatTopic("acme.gs.heartbeat")
-                .build();
+        ConnectResponse response =
+                ConnectResponse.builder().heartbeatTopic("acme.gs.heartbeat").build();
 
         assertEquals("acme.gs.heartbeat", response.getHeartbeatTopic());
     }
@@ -38,13 +38,12 @@ class ConnectResponseTest {
                 .runtime(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"))
                 .build();
 
-        ConnectResponse response = ConnectResponse.builder()
-                .syncTopics(topics)
-                .build();
+        ConnectResponse response = ConnectResponse.builder().syncTopics(topics).build();
 
         assertEquals(topics, response.getSyncTopics());
         assertEquals("bohpts.gs.sync.db.clan", response.getSyncTopics().getDb().get("clan"));
-        assertEquals("bohpts.gs.sync.runtime.character",
+        assertEquals(
+                "bohpts.gs.sync.runtime.character",
                 response.getSyncTopics().getRuntime().get("character"));
     }
 
@@ -56,15 +55,18 @@ class ConnectResponseTest {
 
         ConnectResponse response = ConnectResponse.builder().syncTopics(topics).build();
 
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> response.getSyncTopics().getDb().put("character", "x"));
     }
 
     @Test
     void toBuilder_shouldRoundtrip() {
         ConnectResponse original = ConnectResponse.builder()
-                .tenantId(UUID.randomUUID()).tenantSlug("acme")
-                .serverId(UUID.randomUUID()).serverSlug("primary")
+                .tenantId(UUID.randomUUID())
+                .tenantSlug("acme")
+                .serverId(UUID.randomUUID())
+                .serverSlug("primary")
                 .serverName("Acme")
                 .kafka(KafkaCredentials.builder().bootstrap("localhost:9092").build())
                 .heartbeatTopic("acme.gs.heartbeat")
@@ -82,8 +84,10 @@ class ConnectResponseTest {
     @Test
     void messagingTopics_shouldDefaultToNull_whenBuilderOmitsIt() {
         ConnectResponse response = ConnectResponse.builder()
-                .tenantId(UUID.randomUUID()).tenantSlug("acme")
-                .serverId(UUID.randomUUID()).serverSlug("primary")
+                .tenantId(UUID.randomUUID())
+                .tenantSlug("acme")
+                .serverId(UUID.randomUUID())
+                .serverSlug("primary")
                 .serverName("Acme")
                 .kafka(KafkaCredentials.builder().bootstrap("localhost:9092").build())
                 .build();
@@ -99,7 +103,8 @@ class ConnectResponseTest {
                         .build())
                 .build();
 
-        assertEquals("acme.gs.events.premiumpurchase",
+        assertEquals(
+                "acme.gs.events.premiumpurchase",
                 response.getMessagingTopics().getEvents().get("premiumpurchase"));
     }
 }

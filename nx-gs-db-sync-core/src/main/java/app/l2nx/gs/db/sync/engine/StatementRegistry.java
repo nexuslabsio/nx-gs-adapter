@@ -1,8 +1,7 @@
 package app.l2nx.gs.db.sync.engine;
 
-import org.jspecify.annotations.Nullable;
-
 import java.sql.Statement;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Tracks the JDBC {@link Statement} currently executing for a sync task so

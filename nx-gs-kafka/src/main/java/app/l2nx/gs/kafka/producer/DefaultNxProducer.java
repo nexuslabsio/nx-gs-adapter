@@ -4,6 +4,12 @@ import app.l2nx.gs.kafka.serde.GsonSerializer;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -12,13 +18,6 @@ import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
-
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 class DefaultNxProducer implements NxProducer {
 
@@ -38,14 +37,14 @@ class DefaultNxProducer implements NxProducer {
         this(config, gson, staticHeaders, DEFAULT_CLOSE_TIMEOUT);
     }
 
-    DefaultNxProducer(Map<String, Object> config, Gson gson, Map<String, byte[]> staticHeaders,
-                      Duration closeTimeout) {
-        this(new KafkaProducer<>(config, new ByteArraySerializer(), new GsonSerializer(gson)),
-                staticHeaders, closeTimeout);
+    DefaultNxProducer(Map<String, Object> config, Gson gson, Map<String, byte[]> staticHeaders, Duration closeTimeout) {
+        this(
+                new KafkaProducer<>(config, new ByteArraySerializer(), new GsonSerializer(gson)),
+                staticHeaders,
+                closeTimeout);
     }
 
-    DefaultNxProducer(Producer<byte[], Object> producer, Map<String, byte[]> staticHeaders,
-                      Duration closeTimeout) {
+    DefaultNxProducer(Producer<byte[], Object> producer, Map<String, byte[]> staticHeaders, Duration closeTimeout) {
         this.log = NxLogFactory.getLogger(DefaultNxProducer.class);
         this.producer = producer;
         this.staticHeaders = buildStaticHeaders(staticHeaders);
@@ -177,8 +176,12 @@ class DefaultNxProducer implements NxProducer {
     public void sendRecord(ProducerRecord<String, Object> record) {
         try {
             ProducerRecord<byte[], Object> bytesRecord = new ProducerRecord<>(
-                    record.topic(), record.partition(), record.timestamp(),
-                    encodeKey(record.key()), record.value(), record.headers());
+                    record.topic(),
+                    record.partition(),
+                    record.timestamp(),
+                    encodeKey(record.key()),
+                    record.value(),
+                    record.headers());
             stamp(bytesRecord.headers());
             producer.send(bytesRecord, (metadata, exception) -> {
                 if (exception != null) {

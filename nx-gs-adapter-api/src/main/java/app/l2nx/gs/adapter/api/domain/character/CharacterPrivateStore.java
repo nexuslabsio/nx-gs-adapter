@@ -16,7 +16,6 @@ import org.jspecify.annotations.Nullable;
  * logged as warnings and surface as {@code null} on the wire.</p>
  */
 public enum CharacterPrivateStore {
-
     SELL(1),
     BUY(3),
     CRAFT(5),

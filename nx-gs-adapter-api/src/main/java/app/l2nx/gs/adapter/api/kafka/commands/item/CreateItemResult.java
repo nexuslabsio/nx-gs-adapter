@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.commands.item;
 
 import app.l2nx.gs.adapter.api.domain.item.ItemLocation;
-
 import java.util.Objects;
 
 /**
@@ -18,10 +17,7 @@ public final class CreateItemResult {
     private final Long enchantLevel;
     private final ItemLocation location;
 
-    public CreateItemResult(Long itemId,
-                            Long countCreated,
-                            Long enchantLevel,
-                            ItemLocation location) {
+    public CreateItemResult(Long itemId, Long countCreated, Long enchantLevel, ItemLocation location) {
         if (itemId == null) {
             throw new IllegalArgumentException("itemId is required");
         }

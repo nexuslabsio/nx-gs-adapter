@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.recipetemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One material a {@link RecipeTemplate} consumes — an item reference plus the quantity
@@ -28,9 +27,7 @@ public final class RecipeIngredient {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .itemTemplateId(itemTemplateId)
-                .count(count);
+        return new Builder().itemTemplateId(itemTemplateId).count(count);
     }
 
     public static Builder builder() {

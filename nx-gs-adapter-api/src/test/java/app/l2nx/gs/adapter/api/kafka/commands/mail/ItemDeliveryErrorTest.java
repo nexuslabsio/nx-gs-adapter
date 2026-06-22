@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class ItemDeliveryErrorTest {
 
@@ -61,7 +61,10 @@ class ItemDeliveryErrorTest {
     @Test
     void toBuilder_shouldRoundtrip() {
         ItemDeliveryError original = ItemDeliveryError.builder()
-                .itemTemplateId(57L).count(2L).reason("boom").build();
+                .itemTemplateId(57L)
+                .count(2L)
+                .reason("boom")
+                .build();
         ItemDeliveryError copy = original.toBuilder().build();
 
         assertEquals(original, copy);
@@ -70,9 +73,15 @@ class ItemDeliveryErrorTest {
     @Test
     void equals_shouldDistinguishOnReason() {
         ItemDeliveryError a = ItemDeliveryError.builder()
-                .itemTemplateId(57L).count(1L).reason("a").build();
+                .itemTemplateId(57L)
+                .count(1L)
+                .reason("a")
+                .build();
         ItemDeliveryError b = ItemDeliveryError.builder()
-                .itemTemplateId(57L).count(1L).reason("b").build();
+                .itemTemplateId(57L)
+                .count(1L)
+                .reason("b")
+                .build();
 
         assertNotEquals(a, b);
     }
@@ -80,9 +89,15 @@ class ItemDeliveryErrorTest {
     @Test
     void hashCode_shouldMatchEquals() {
         ItemDeliveryError a = ItemDeliveryError.builder()
-                .itemTemplateId(57L).count(1L).reason("x").build();
+                .itemTemplateId(57L)
+                .count(1L)
+                .reason("x")
+                .build();
         ItemDeliveryError b = ItemDeliveryError.builder()
-                .itemTemplateId(57L).count(1L).reason("x").build();
+                .itemTemplateId(57L)
+                .count(1L)
+                .reason("x")
+                .build();
 
         assertEquals(a.hashCode(), b.hashCode());
     }
@@ -90,7 +105,10 @@ class ItemDeliveryErrorTest {
     @Test
     void toString_shouldExposeAllFields() {
         ItemDeliveryError err = ItemDeliveryError.builder()
-                .itemTemplateId(57L).count(1L).reason("x").build();
+                .itemTemplateId(57L)
+                .count(1L)
+                .reason("x")
+                .build();
 
         String s = err.toString();
 

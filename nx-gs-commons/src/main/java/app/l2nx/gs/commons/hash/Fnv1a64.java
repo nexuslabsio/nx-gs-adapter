@@ -17,8 +17,7 @@ public final class Fnv1a64 {
     private static final long OFFSET_BASIS = 0xcbf29ce484222325L;
     private static final long PRIME = 0x100000001b3L;
 
-    private Fnv1a64() {
-    }
+    private Fnv1a64() {}
 
     public static long start() {
         return OFFSET_BASIS;

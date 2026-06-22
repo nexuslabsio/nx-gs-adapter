@@ -1,14 +1,13 @@
 package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import org.junit.jupiter.api.Test;
 
 class WellKnownServerOnlineBucketsTest {
 
@@ -31,7 +30,9 @@ class WellKnownServerOnlineBucketsTest {
     void constants_shouldHaveNoDuplicateValues() {
         List<String> values = allConstants();
         Set<String> deduped = new HashSet<String>(values);
-        assertEquals(values.size(), deduped.size(),
+        assertEquals(
+                values.size(),
+                deduped.size(),
                 "WellKnownServerOnlineBuckets must not have two constants with the same string value");
     }
 

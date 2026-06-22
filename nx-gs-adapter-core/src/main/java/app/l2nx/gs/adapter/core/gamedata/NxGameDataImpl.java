@@ -4,7 +4,6 @@ import app.l2nx.gs.adapter.api.spi.NxGameData;
 import app.l2nx.gs.adapter.api.spi.NxGameDataTrigger;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,8 +27,7 @@ public final class NxGameDataImpl implements NxGameData {
     private final CopyOnWriteArrayList<NxGameDataTrigger> triggers = new CopyOnWriteArrayList<NxGameDataTrigger>();
     private final AtomicReference<Executor> ioExecutor = new AtomicReference<Executor>();
 
-    public NxGameDataImpl() {
-    }
+    public NxGameDataImpl() {}
 
     /**
      * Swap the IO executor used to run triggers. Called by adapter-core on every
@@ -89,8 +87,10 @@ public final class NxGameDataImpl implements NxGameData {
         try {
             io.execute(safe);
         } catch (Throwable t) {
-            log.warn("NxGameData failed to dispatch snapshot trigger onto IO executor: {}",
-                    t.getClass().getName(), t);
+            log.warn(
+                    "NxGameData failed to dispatch snapshot trigger onto IO executor: {}",
+                    t.getClass().getName(),
+                    t);
         }
     }
 }

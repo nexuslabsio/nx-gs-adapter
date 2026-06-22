@@ -32,14 +32,15 @@ public final class HeartbeatEvent {
     private final Duration uptime;
     private final List<ModuleStatus> enabledModules;
 
-    public HeartbeatEvent(String tenantId,
-                          String tenantSlug,
-                          String serverId,
-                          String serverSlug,
-                          String serverName,
-                          String adapterVersion,
-                          Duration uptime,
-                          List<ModuleStatus> enabledModules) {
+    public HeartbeatEvent(
+            String tenantId,
+            String tenantSlug,
+            String serverId,
+            String serverSlug,
+            String serverName,
+            String adapterVersion,
+            Duration uptime,
+            List<ModuleStatus> enabledModules) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
@@ -117,8 +118,8 @@ public final class HeartbeatEvent {
 
     @Override
     public int hashCode() {
-        return Objects.hash(tenantId, tenantSlug, serverId, serverSlug, serverName,
-                adapterVersion, uptime, enabledModules);
+        return Objects.hash(
+                tenantId, tenantSlug, serverId, serverSlug, serverName, adapterVersion, uptime, enabledModules);
     }
 
     @Override
@@ -184,8 +185,8 @@ public final class HeartbeatEvent {
         }
 
         public HeartbeatEvent build() {
-            return new HeartbeatEvent(tenantId, tenantSlug, serverId, serverSlug, serverName,
-                    adapterVersion, uptime, enabledModules);
+            return new HeartbeatEvent(
+                    tenantId, tenantSlug, serverId, serverSlug, serverName, adapterVersion, uptime, enabledModules);
         }
     }
 }

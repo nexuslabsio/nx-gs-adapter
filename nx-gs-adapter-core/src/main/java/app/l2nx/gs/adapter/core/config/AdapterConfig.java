@@ -2,7 +2,6 @@ package app.l2nx.gs.adapter.core.config;
 
 import app.l2nx.gs.adapter.core.commands.CommandsConfig;
 import app.l2nx.gs.adapter.core.events.EventsConfig;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -35,18 +34,37 @@ public final class AdapterConfig {
     private final CommandsConfig commands;
     private final String hostType;
 
-    AdapterConfig(String serverKey, String platformUrl, String adapterVersion, boolean enabled,
-                  int ioWorkers,
-                  Map<String, Object> kafkaProducerOverrides, EventsConfig events,
-                  CommandsConfig commands) {
-        this(serverKey, platformUrl, adapterVersion, enabled, ioWorkers,
-                kafkaProducerOverrides, events, commands, DEFAULT_HOST_TYPE);
+    AdapterConfig(
+            String serverKey,
+            String platformUrl,
+            String adapterVersion,
+            boolean enabled,
+            int ioWorkers,
+            Map<String, Object> kafkaProducerOverrides,
+            EventsConfig events,
+            CommandsConfig commands) {
+        this(
+                serverKey,
+                platformUrl,
+                adapterVersion,
+                enabled,
+                ioWorkers,
+                kafkaProducerOverrides,
+                events,
+                commands,
+                DEFAULT_HOST_TYPE);
     }
 
-    AdapterConfig(String serverKey, String platformUrl, String adapterVersion, boolean enabled,
-                  int ioWorkers,
-                  Map<String, Object> kafkaProducerOverrides, EventsConfig events,
-                  CommandsConfig commands, String hostType) {
+    AdapterConfig(
+            String serverKey,
+            String platformUrl,
+            String adapterVersion,
+            boolean enabled,
+            int ioWorkers,
+            Map<String, Object> kafkaProducerOverrides,
+            EventsConfig events,
+            CommandsConfig commands,
+            String hostType) {
         this.serverKey = serverKey;
         this.platformUrl = platformUrl;
         this.adapterVersion = adapterVersion;

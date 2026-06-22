@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One gear-score contribution a skill grants — a sub-DTO of {@link Skill}. A skill
@@ -31,13 +30,10 @@ public final class GearScoreContribution {
     private final int value;
     private final @Nullable List<Integer> classIds;
 
-    public GearScoreContribution(String kind,
-                                 int value,
-                                 @Nullable List<Integer> classIds) {
+    public GearScoreContribution(String kind, int value, @Nullable List<Integer> classIds) {
         this.kind = Objects.requireNonNull(kind, "GearScoreContribution.kind is required");
         this.value = value;
-        this.classIds = classIds == null ? null
-                : Collections.unmodifiableList(new ArrayList<Integer>(classIds));
+        this.classIds = classIds == null ? null : Collections.unmodifiableList(new ArrayList<Integer>(classIds));
     }
 
     /**
@@ -65,10 +61,7 @@ public final class GearScoreContribution {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .kind(kind)
-                .value(value)
-                .classIds(classIds);
+        return new Builder().kind(kind).value(value).classIds(classIds);
     }
 
     public static Builder builder() {
@@ -80,9 +73,7 @@ public final class GearScoreContribution {
         if (this == o) return true;
         if (!(o instanceof GearScoreContribution)) return false;
         GearScoreContribution that = (GearScoreContribution) o;
-        return value == that.value
-                && kind.equals(that.kind)
-                && Objects.equals(classIds, that.classIds);
+        return value == that.value && kind.equals(that.kind) && Objects.equals(classIds, that.classIds);
     }
 
     @Override
@@ -92,9 +83,7 @@ public final class GearScoreContribution {
 
     @Override
     public String toString() {
-        return "GearScoreContribution[kind=" + kind
-                + ", value=" + value
-                + ", classIds=" + classIds + "]";
+        return "GearScoreContribution[kind=" + kind + ", value=" + value + ", classIds=" + classIds + "]";
     }
 
     public static final class Builder {

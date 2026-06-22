@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Discrete server-lifecycle fact — emitted once on the graceful-shutdown path,
@@ -36,12 +35,10 @@ public final class ServerStoppingEvent {
     private final UUID eventId;
     private final @Nullable Map<String, String> metadata;
 
-    public ServerStoppingEvent(UUID eventId,
-                               @Nullable Map<String, String> metadata) {
+    public ServerStoppingEvent(UUID eventId, @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "ServerStoppingEvent.eventId is required");
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {
@@ -53,9 +50,7 @@ public final class ServerStoppingEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .metadata(metadata);
+        return new Builder().eventId(eventId).metadata(metadata);
     }
 
     public static Builder builder() {
@@ -67,8 +62,7 @@ public final class ServerStoppingEvent {
         if (this == o) return true;
         if (!(o instanceof ServerStoppingEvent)) return false;
         ServerStoppingEvent that = (ServerStoppingEvent) o;
-        return eventId.equals(that.eventId)
-                && Objects.equals(metadata, that.metadata);
+        return eventId.equals(that.eventId) && Objects.equals(metadata, that.metadata);
     }
 
     @Override
@@ -78,8 +72,7 @@ public final class ServerStoppingEvent {
 
     @Override
     public String toString() {
-        return "ServerStoppingEvent[eventId=" + eventId
-                + ", metadata=" + metadata + "]";
+        return "ServerStoppingEvent[eventId=" + eventId + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {

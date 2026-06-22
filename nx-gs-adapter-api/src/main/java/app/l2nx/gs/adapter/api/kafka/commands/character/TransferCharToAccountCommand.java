@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.commands.character;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-
 import java.util.Objects;
 
 /**
@@ -101,8 +100,7 @@ public final class TransferCharToAccountCommand implements NxCommand<TransferCha
         if (this == o) return true;
         if (!(o instanceof TransferCharToAccountCommand)) return false;
         TransferCharToAccountCommand that = (TransferCharToAccountCommand) o;
-        return Objects.equals(charId, that.charId)
-                && Objects.equals(accountTo, that.accountTo);
+        return Objects.equals(charId, that.charId) && Objects.equals(accountTo, that.accountTo);
     }
 
     @Override

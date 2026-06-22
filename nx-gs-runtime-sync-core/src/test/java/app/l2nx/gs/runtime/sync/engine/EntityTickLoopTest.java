@@ -1,5 +1,7 @@
 package app.l2nx.gs.runtime.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
 import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
@@ -7,17 +9,14 @@ import app.l2nx.gs.adapter.api.spi.RuntimeRow;
 import app.l2nx.gs.runtime.sync.engine.publish.KafkaSender;
 import app.l2nx.gs.runtime.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.runtime.sync.engine.publish.TopicResolver;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.record.RecordBatch;
 import org.junit.jupiter.api.Test;
-
-import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class EntityTickLoopTest {
 
@@ -31,7 +30,8 @@ class EntityTickLoopTest {
         EntityStatsTracker tracker = new EntityStatsTracker();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            EntityTickLoop loop = new EntityTickLoop(mapping,
+            EntityTickLoop loop = new EntityTickLoop(
+                    mapping,
                     e -> "topic.character",
                     new SyncEventPublisher(sender),
                     tracker,
@@ -68,7 +68,8 @@ class EntityTickLoopTest {
         EntityStatsTracker tracker = new EntityStatsTracker();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            EntityTickLoop loop = new EntityTickLoop(mapping,
+            EntityTickLoop loop = new EntityTickLoop(
+                    mapping,
                     e -> "topic.character",
                     new SyncEventPublisher(sender),
                     tracker,
@@ -93,19 +94,14 @@ class EntityTickLoopTest {
         EntityStatsTracker tracker = new EntityStatsTracker();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            EntityTickLoop loop = new EntityTickLoop(mapping,
-                    e -> null,
-                    new SyncEventPublisher(sender),
-                    tracker,
-                    new EngineConfig(10, 5),
-                    scheduler);
+            EntityTickLoop loop = new EntityTickLoop(
+                    mapping, e -> null, new SyncEventPublisher(sender), tracker, new EngineConfig(10, 5), scheduler);
 
             loop.tick();
 
             assertEquals(0, sender.captured.size());
             assertEquals(1, tracker.currentStatuses().size());
-            assertEquals(EntityState.DEGRADED,
-                    tracker.currentStatuses().get(0).getState());
+            assertEquals(EntityState.DEGRADED, tracker.currentStatuses().get(0).getState());
         } finally {
             scheduler.shutdownNow();
         }
@@ -137,18 +133,17 @@ class EntityTickLoopTest {
         EntityStatsTracker tracker = new EntityStatsTracker();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            EntityTickLoop loop = new EntityTickLoop(throwing,
+            EntityTickLoop loop = new EntityTickLoop(
+                    throwing,
                     e -> "topic.character",
-                    new SyncEventPublisher((t, k, v, cb) -> {
-                    }),
+                    new SyncEventPublisher((t, k, v, cb) -> {}),
                     tracker,
                     new EngineConfig(10, 5),
                     scheduler);
 
             loop.tick();
 
-            assertEquals(EntityState.DEGRADED,
-                    tracker.currentStatuses().get(0).getState());
+            assertEquals(EntityState.DEGRADED, tracker.currentStatuses().get(0).getState());
         } finally {
             scheduler.shutdownNow();
         }
@@ -194,18 +189,17 @@ class EntityTickLoopTest {
         EntityStatsTracker tracker = new EntityStatsTracker();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            EntityTickLoop loop = new EntityTickLoop(cmeMapping,
+            EntityTickLoop loop = new EntityTickLoop(
+                    cmeMapping,
                     e -> "topic.character",
-                    new SyncEventPublisher((t, k, v, cb) -> {
-                    }),
+                    new SyncEventPublisher((t, k, v, cb) -> {}),
                     tracker,
                     new EngineConfig(10, 5),
                     scheduler);
 
             loop.tick();
 
-            assertEquals(EntityState.DEGRADED,
-                    tracker.currentStatuses().get(0).getState());
+            assertEquals(EntityState.DEGRADED, tracker.currentStatuses().get(0).getState());
         } finally {
             scheduler.shutdownNow();
         }
@@ -214,12 +208,13 @@ class EntityTickLoopTest {
     @Test
     void tick_shouldRecordDegraded_whenPublishFutureFails() {
         StubMapping mapping = new StubMapping(Collections.singletonMap(1L, 100L));
-        KafkaSender failing = (topic, key, value, callback) ->
-                callback.onCompletion(null, new RuntimeException("publish boom"));
+        KafkaSender failing =
+                (topic, key, value, callback) -> callback.onCompletion(null, new RuntimeException("publish boom"));
         EntityStatsTracker tracker = new EntityStatsTracker();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            EntityTickLoop loop = new EntityTickLoop(mapping,
+            EntityTickLoop loop = new EntityTickLoop(
+                    mapping,
                     e -> "topic.character",
                     new SyncEventPublisher(failing),
                     tracker,
@@ -228,12 +223,12 @@ class EntityTickLoopTest {
 
             loop.tick();
 
-            assertEquals(EntityState.DEGRADED,
-                    tracker.currentStatuses().get(0).getState());
+            assertEquals(EntityState.DEGRADED, tracker.currentStatuses().get(0).getState());
             assertEquals(1L, tracker.failedAcks(mapping.entityName()));
             assertEquals(0L, tracker.timedOutAcks(mapping.entityName()));
             // pk replayed next tick — snapshot must not have advanced for it.
-            assertTrue(loop.currentSnapshotKeysForTesting().isEmpty(),
+            assertTrue(
+                    loop.currentSnapshotKeysForTesting().isEmpty(),
                     "failed-publish PK must not advance into the next snapshot");
         } finally {
             scheduler.shutdownNow();
@@ -249,7 +244,8 @@ class EntityTickLoopTest {
         EntityStatsTracker tracker = new EntityStatsTracker();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            EntityTickLoop loop = new EntityTickLoop(mapping,
+            EntityTickLoop loop = new EntityTickLoop(
+                    mapping,
                     e -> "topic.character",
                     new SyncEventPublisher(sender),
                     tracker,
@@ -262,8 +258,7 @@ class EntityTickLoopTest {
 
             sender.captured.clear();
             loop.tick();
-            assertEquals(0, sender.captured.size(),
-                    "hash=0 must round-trip as unchanged — no spurious UPDATED");
+            assertEquals(0, sender.captured.size(), "hash=0 must round-trip as unchanged — no spurious UPDATED");
         } finally {
             scheduler.shutdownNow();
         }
@@ -280,7 +275,8 @@ class EntityTickLoopTest {
             // publish-flush-seconds = 0 would normally block forever for pending futures;
             // since the sender ack'd synchronously, the drain-done pass must classify
             // everything without ever touching the timeout path.
-            EntityTickLoop loop = new EntityTickLoop(mapping,
+            EntityTickLoop loop = new EntityTickLoop(
+                    mapping,
                     e -> "topic.character",
                     new SyncEventPublisher(sender),
                     tracker,
@@ -292,7 +288,8 @@ class EntityTickLoopTest {
             long elapsedMs = (System.nanoTime() - t0) / 1_000_000L;
 
             assertEquals(EntityState.HEALTHY, tracker.currentStatuses().get(0).getState());
-            assertTrue(elapsedMs < 500L,
+            assertTrue(
+                    elapsedMs < 500L,
                     "synchronous-ack tick should not block on the publish-flush deadline (took " + elapsedMs + "ms)");
         } finally {
             scheduler.shutdownNow();
@@ -301,8 +298,8 @@ class EntityTickLoopTest {
 
     @Test
     void resolveTopicFromContext_shouldReadRuntimeNamespace() {
-        TopicResolver runtimeOnly = TopicResolver.fromSnapshot(
-                Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"));
+        TopicResolver runtimeOnly =
+                TopicResolver.fromSnapshot(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"));
 
         assertEquals("bohpts.gs.sync.runtime.character", runtimeOnly.resolveTopic("character"));
         assertNull(runtimeOnly.resolveTopic("clan"));
@@ -369,10 +366,8 @@ class EntityTickLoopTest {
         public void send(String topic, byte[] key, Object value, Callback callback) {
             SyncEvent<?> event = (SyncEvent<?>) value;
             captured.add(new CapturedSend(topic, event.getPk(), event.getOp()));
-            callback.onCompletion(new RecordMetadata(
-                    new TopicPartition(topic, 0), 0L, 0,
-                    RecordBatch.NO_TIMESTAMP, 0, 0), null);
+            callback.onCompletion(
+                    new RecordMetadata(new TopicPartition(topic, 0), 0L, 0, RecordBatch.NO_TIMESTAMP, 0, 0), null);
         }
     }
-
 }

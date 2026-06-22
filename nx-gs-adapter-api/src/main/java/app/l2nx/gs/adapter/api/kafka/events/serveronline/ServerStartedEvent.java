@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Discrete server-lifecycle fact — emitted once when the game server has
@@ -41,12 +40,10 @@ public final class ServerStartedEvent {
     private final UUID eventId;
     private final @Nullable Map<String, String> metadata;
 
-    public ServerStartedEvent(UUID eventId,
-                              @Nullable Map<String, String> metadata) {
+    public ServerStartedEvent(UUID eventId, @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "ServerStartedEvent.eventId is required");
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {
@@ -58,9 +55,7 @@ public final class ServerStartedEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .metadata(metadata);
+        return new Builder().eventId(eventId).metadata(metadata);
     }
 
     public static Builder builder() {
@@ -72,8 +67,7 @@ public final class ServerStartedEvent {
         if (this == o) return true;
         if (!(o instanceof ServerStartedEvent)) return false;
         ServerStartedEvent that = (ServerStartedEvent) o;
-        return eventId.equals(that.eventId)
-                && Objects.equals(metadata, that.metadata);
+        return eventId.equals(that.eventId) && Objects.equals(metadata, that.metadata);
     }
 
     @Override
@@ -83,8 +77,7 @@ public final class ServerStartedEvent {
 
     @Override
     public String toString() {
-        return "ServerStartedEvent[eventId=" + eventId
-                + ", metadata=" + metadata + "]";
+        return "ServerStartedEvent[eventId=" + eventId + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {

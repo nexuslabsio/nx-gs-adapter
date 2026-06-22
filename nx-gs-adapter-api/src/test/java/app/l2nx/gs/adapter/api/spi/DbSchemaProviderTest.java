@@ -1,14 +1,13 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.sql.ResultSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import org.junit.jupiter.api.Test;
 
 /**
  * Compile-smoke for the Tier-2 SPI contract: an anonymous-class implementation

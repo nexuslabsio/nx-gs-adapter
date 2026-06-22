@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class PremiumPurchaseEventTest {
 
@@ -44,15 +43,15 @@ class PremiumPurchaseEventTest {
         PremiumPurchaseEvent event = PremiumPurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .characterId(42L)
-                .items(Collections.singletonList(
-                        PurchaseItem.builder().itemId(9627).qty(1)
-                                .payments(Collections.singletonList(
-                                        Payment.builder().currencyItemId(4037).qty(20).build()))
-                                .build()))
+                .items(Collections.singletonList(PurchaseItem.builder()
+                        .itemId(9627)
+                        .qty(1)
+                        .payments(Collections.singletonList(
+                                Payment.builder().currencyItemId(4037).qty(20).build()))
+                        .build()))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getItems().add(null));
+        assertThrows(UnsupportedOperationException.class, () -> event.getItems().add(null));
     }
 
     @Test
@@ -60,22 +59,25 @@ class PremiumPurchaseEventTest {
         PremiumPurchaseEvent event = PremiumPurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .characterId(42L)
-                .services(Collections.singletonList(
-                        PurchaseService.builder().code(WellKnownServices.NOBLESSE)
-                                .payments(Collections.singletonList(
-                                        Payment.builder().currencyItemId(4037).qty(50).build()))
-                                .build()))
+                .services(Collections.singletonList(PurchaseService.builder()
+                        .code(WellKnownServices.NOBLESSE)
+                        .payments(Collections.singletonList(
+                                Payment.builder().currencyItemId(4037).qty(50).build()))
+                        .build()))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getServices().add(null));
+        assertThrows(
+                UnsupportedOperationException.class, () -> event.getServices().add(null));
     }
 
     @Test
     void constructor_shouldDefensivelyCopyItemsList() {
         List<PurchaseItem> source = new ArrayList<PurchaseItem>();
-        source.add(PurchaseItem.builder().itemId(1).qty(1)
-                .payments(Collections.singletonList(Payment.builder().currencyItemId(57).qty(100).build()))
+        source.add(PurchaseItem.builder()
+                .itemId(1)
+                .qty(1)
+                .payments(Collections.singletonList(
+                        Payment.builder().currencyItemId(57).qty(100).build()))
                 .build());
 
         PremiumPurchaseEvent event = PremiumPurchaseEvent.builder()
@@ -84,8 +86,11 @@ class PremiumPurchaseEventTest {
                 .items(source)
                 .build();
 
-        source.add(PurchaseItem.builder().itemId(2).qty(2)
-                .payments(Collections.singletonList(Payment.builder().currencyItemId(57).qty(100).build()))
+        source.add(PurchaseItem.builder()
+                .itemId(2)
+                .qty(2)
+                .payments(Collections.singletonList(
+                        Payment.builder().currencyItemId(57).qty(100).build()))
                 .build());
 
         assertEquals(1, event.getItems().size());
@@ -101,18 +106,19 @@ class PremiumPurchaseEventTest {
                 .characterId(268437521L)
                 .characterName("Hisho")
                 .accountName("shanon")
-                .items(Collections.singletonList(
-                        PurchaseItem.builder().itemId(9627).qty(1)
-                                .params(Collections.singletonMap("enchant", "3"))
-                                .payments(Collections.singletonList(
-                                        Payment.builder().currencyItemId(4037).qty(20).build()))
-                                .build()))
-                .services(Collections.singletonList(
-                        PurchaseService.builder().code(WellKnownServices.NAME_COLOR_CHANGE)
-                                .params(serviceParams)
-                                .payments(Collections.singletonList(
-                                        Payment.builder().currencyItemId(4037).qty(50).build()))
-                                .build()))
+                .items(Collections.singletonList(PurchaseItem.builder()
+                        .itemId(9627)
+                        .qty(1)
+                        .params(Collections.singletonMap("enchant", "3"))
+                        .payments(Collections.singletonList(
+                                Payment.builder().currencyItemId(4037).qty(20).build()))
+                        .build()))
+                .services(Collections.singletonList(PurchaseService.builder()
+                        .code(WellKnownServices.NAME_COLOR_CHANGE)
+                        .params(serviceParams)
+                        .payments(Collections.singletonList(
+                                Payment.builder().currencyItemId(4037).qty(50).build()))
+                        .build()))
                 .build();
 
         assertEquals(original, original.toBuilder().build());
@@ -121,8 +127,10 @@ class PremiumPurchaseEventTest {
     @Test
     void purchaseItem_getParams_shouldBeEmpty_whenNull() {
         PurchaseItem item = PurchaseItem.builder()
-                .itemId(1).qty(1)
-                .payments(Collections.singletonList(Payment.builder().currencyItemId(57).qty(100).build()))
+                .itemId(1)
+                .qty(1)
+                .payments(Collections.singletonList(
+                        Payment.builder().currencyItemId(57).qty(100).build()))
                 .build();
 
         assertTrue(item.getParams().isEmpty());
@@ -132,7 +140,8 @@ class PremiumPurchaseEventTest {
     void purchaseService_getParams_shouldBeEmpty_whenNull() {
         PurchaseService service = PurchaseService.builder()
                 .code(WellKnownServices.NOBLESSE)
-                .payments(Collections.singletonList(Payment.builder().currencyItemId(4037).qty(50).build()))
+                .payments(Collections.singletonList(
+                        Payment.builder().currencyItemId(4037).qty(50).build()))
                 .build();
 
         assertTrue(service.getParams().isEmpty());

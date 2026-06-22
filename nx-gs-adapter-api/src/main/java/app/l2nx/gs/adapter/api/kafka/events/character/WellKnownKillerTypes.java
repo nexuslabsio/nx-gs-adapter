@@ -23,8 +23,7 @@ package app.l2nx.gs.adapter.api.kafka.events.character;
  */
 public final class WellKnownKillerTypes {
 
-    private WellKnownKillerTypes() {
-    }
+    private WellKnownKillerTypes() {}
 
     public static final String MONSTER = "monster";
 

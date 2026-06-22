@@ -2,7 +2,6 @@ package app.l2nx.gs.db.sync.engine.phase;
 
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -17,8 +16,7 @@ public final class ConsistentSnapshotTxn {
 
     private static final NxLog log = NxLogFactory.getLogger(ConsistentSnapshotTxn.class);
 
-    private ConsistentSnapshotTxn() {
-    }
+    private ConsistentSnapshotTxn() {}
 
     public static <T> T runReadOnly(Connection conn, SqlAction<T> action) throws SQLException {
         return runReadOnly(conn, ignored -> action.run());
@@ -55,8 +53,10 @@ public final class ConsistentSnapshotTxn {
             try {
                 conn.setAutoCommit(priorAutoCommit);
             } catch (Throwable restoreError) {
-                log.warn("Failed to restore autoCommit={} after consistent-snapshot txn: {}",
-                        priorAutoCommit, restoreError);
+                log.warn(
+                        "Failed to restore autoCommit={} after consistent-snapshot txn: {}",
+                        priorAutoCommit,
+                        restoreError);
             }
         }
     }

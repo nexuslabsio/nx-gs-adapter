@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.recipetemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic crafting-recipe wire DTO — the common L2 denominator for a single
@@ -40,20 +39,21 @@ public final class RecipeTemplate {
     private final @Nullable Integer hpConsume;
     private final @Nullable List<RecipeIngredient> ingredients;
 
-    public RecipeTemplate(int id,
-                          @Nullable Integer recipeItemTemplateId,
-                          @Nullable String recipeName,
-                          @Nullable Integer craftLevel,
-                          @Nullable Boolean dwarven,
-                          @Nullable Integer successRatePercent,
-                          @Nullable Integer productItemTemplateId,
-                          @Nullable Integer productCount,
-                          @Nullable Integer rareItemTemplateId,
-                          @Nullable Integer rareCount,
-                          @Nullable Integer rarityPercent,
-                          @Nullable Integer mpConsume,
-                          @Nullable Integer hpConsume,
-                          @Nullable List<RecipeIngredient> ingredients) {
+    public RecipeTemplate(
+            int id,
+            @Nullable Integer recipeItemTemplateId,
+            @Nullable String recipeName,
+            @Nullable Integer craftLevel,
+            @Nullable Boolean dwarven,
+            @Nullable Integer successRatePercent,
+            @Nullable Integer productItemTemplateId,
+            @Nullable Integer productCount,
+            @Nullable Integer rareItemTemplateId,
+            @Nullable Integer rareCount,
+            @Nullable Integer rarityPercent,
+            @Nullable Integer mpConsume,
+            @Nullable Integer hpConsume,
+            @Nullable List<RecipeIngredient> ingredients) {
         this.id = id;
         this.recipeItemTemplateId = recipeItemTemplateId;
         this.recipeName = recipeName;
@@ -67,8 +67,8 @@ public final class RecipeTemplate {
         this.rarityPercent = rarityPercent;
         this.mpConsume = mpConsume;
         this.hpConsume = hpConsume;
-        this.ingredients = ingredients == null ? null
-                : Collections.unmodifiableList(new ArrayList<RecipeIngredient>(ingredients));
+        this.ingredients =
+                ingredients == null ? null : Collections.unmodifiableList(new ArrayList<RecipeIngredient>(ingredients));
     }
 
     public int getId() {
@@ -200,15 +200,27 @@ public final class RecipeTemplate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, recipeItemTemplateId, recipeName, craftLevel, dwarven,
-                successRatePercent, productItemTemplateId, productCount, rareItemTemplateId,
-                rareCount, rarityPercent, mpConsume, hpConsume, ingredients);
+        return Objects.hash(
+                id,
+                recipeItemTemplateId,
+                recipeName,
+                craftLevel,
+                dwarven,
+                successRatePercent,
+                productItemTemplateId,
+                productCount,
+                rareItemTemplateId,
+                rareCount,
+                rarityPercent,
+                mpConsume,
+                hpConsume,
+                ingredients);
     }
 
     @Override
     public String toString() {
-        return "RecipeTemplate[id=" + id + ", productItemTemplateId=" + productItemTemplateId
-                + ", craftLevel=" + craftLevel + "]";
+        return "RecipeTemplate[id=" + id + ", productItemTemplateId=" + productItemTemplateId + ", craftLevel="
+                + craftLevel + "]";
     }
 
     public static final class Builder {
@@ -298,9 +310,21 @@ public final class RecipeTemplate {
         }
 
         public RecipeTemplate build() {
-            return new RecipeTemplate(id, recipeItemTemplateId, recipeName, craftLevel, dwarven,
-                    successRatePercent, productItemTemplateId, productCount, rareItemTemplateId,
-                    rareCount, rarityPercent, mpConsume, hpConsume, ingredients);
+            return new RecipeTemplate(
+                    id,
+                    recipeItemTemplateId,
+                    recipeName,
+                    craftLevel,
+                    dwarven,
+                    successRatePercent,
+                    productItemTemplateId,
+                    productCount,
+                    rareItemTemplateId,
+                    rareCount,
+                    rarityPercent,
+                    mpConsume,
+                    hpConsume,
+                    ingredients);
         }
     }
 }

@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Social-clan membership of an NPC — same-faction NPCs within {@code range} assist each
@@ -32,9 +31,7 @@ public final class NpcFaction {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .name(name)
-                .range(range);
+        return new Builder().name(name).range(range);
     }
 
     public static Builder builder() {
@@ -46,8 +43,7 @@ public final class NpcFaction {
         if (this == o) return true;
         if (!(o instanceof NpcFaction)) return false;
         NpcFaction that = (NpcFaction) o;
-        return Objects.equals(name, that.name)
-                && Objects.equals(range, that.range);
+        return Objects.equals(name, that.name) && Objects.equals(range, that.range);
     }
 
     @Override

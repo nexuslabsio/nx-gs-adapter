@@ -2,7 +2,6 @@ package app.l2nx.gs.kafka.consumer;
 
 import app.l2nx.gs.kafka.producer.NxProducer;
 import com.google.gson.Gson;
-
 import java.util.Map;
 import java.util.function.BiConsumer;
 
@@ -28,8 +27,13 @@ public interface NxConsumer {
      * @param <T>            message type
      * @return a new consumer instance
      */
-    static <T> NxConsumer create(String topic, Class<T> type, BiConsumer<T, ReplyContext> handler,
-                                 NxProducer producer, Gson gson, Map<String, Object> consumerConfig) {
+    static <T> NxConsumer create(
+            String topic,
+            Class<T> type,
+            BiConsumer<T, ReplyContext> handler,
+            NxProducer producer,
+            Gson gson,
+            Map<String, Object> consumerConfig) {
         return new ConsumerGroup<>(topic, type, handler, producer, gson, consumerConfig);
     }
 }

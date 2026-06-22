@@ -13,8 +13,7 @@ package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
  */
 public final class WellKnownServices {
 
-    private WellKnownServices() {
-    }
+    private WellKnownServices() {}
 
     /**
      * Grant noblesse status.

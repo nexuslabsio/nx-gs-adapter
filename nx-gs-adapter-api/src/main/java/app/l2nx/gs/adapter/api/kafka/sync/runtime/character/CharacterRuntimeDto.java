@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO for one player character's volatile runtime state — payload of
@@ -85,22 +84,23 @@ public final class CharacterRuntimeDto {
      * Canonical constructor. Prefer {@link #builder()} — positional construction
      * of 16 mostly-nullable fields is error-prone.
      */
-    public CharacterRuntimeDto(long id,
-                               @Nullable Integer curHp,
-                               @Nullable Integer maxHp,
-                               @Nullable Integer curMp,
-                               @Nullable Integer maxMp,
-                               @Nullable Integer curCp,
-                               @Nullable Integer maxCp,
-                               @Nullable Integer curVit,
-                               @Nullable Integer maxVit,
-                               @Nullable Integer x,
-                               @Nullable Integer y,
-                               @Nullable Integer z,
-                               @Nullable Boolean online,
-                               @Nullable String aiStatus,
-                               @Nullable Long exp,
-                               @Nullable List<CustomActivity> customActivities) {
+    public CharacterRuntimeDto(
+            long id,
+            @Nullable Integer curHp,
+            @Nullable Integer maxHp,
+            @Nullable Integer curMp,
+            @Nullable Integer maxMp,
+            @Nullable Integer curCp,
+            @Nullable Integer maxCp,
+            @Nullable Integer curVit,
+            @Nullable Integer maxVit,
+            @Nullable Integer x,
+            @Nullable Integer y,
+            @Nullable Integer z,
+            @Nullable Boolean online,
+            @Nullable String aiStatus,
+            @Nullable Long exp,
+            @Nullable List<CustomActivity> customActivities) {
         this.id = id;
         this.curHp = curHp;
         this.maxHp = maxHp;
@@ -296,8 +296,23 @@ public final class CharacterRuntimeDto {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, curHp, maxHp, curMp, maxMp, curCp, maxCp,
-                curVit, maxVit, x, y, z, online, aiStatus, exp, customActivities);
+        return Objects.hash(
+                id,
+                curHp,
+                maxHp,
+                curMp,
+                maxMp,
+                curCp,
+                maxCp,
+                curVit,
+                maxVit,
+                x,
+                y,
+                z,
+                online,
+                aiStatus,
+                exp,
+                customActivities);
     }
 
     @Override
@@ -427,9 +442,23 @@ public final class CharacterRuntimeDto {
         }
 
         public CharacterRuntimeDto build() {
-            return new CharacterRuntimeDto(id, curHp, maxHp, curMp, maxMp,
-                    curCp, maxCp, curVit, maxVit, x, y, z, online,
-                    aiStatus, exp, customActivities);
+            return new CharacterRuntimeDto(
+                    id,
+                    curHp,
+                    maxHp,
+                    curMp,
+                    maxMp,
+                    curCp,
+                    maxCp,
+                    curVit,
+                    maxVit,
+                    x,
+                    y,
+                    z,
+                    online,
+                    aiStatus,
+                    exp,
+                    customActivities);
         }
     }
 }

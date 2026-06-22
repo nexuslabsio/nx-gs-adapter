@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.kill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Snapshot of a single character's identity + affiliation + damage
@@ -54,14 +53,15 @@ public final class RaidActor {
     private final boolean commandChannelLeader;
     private final long damageDealt;
 
-    public RaidActor(long charId,
-                     @Nullable Long clanId,
-                     @Nullable Long allyId,
-                     @Nullable UUID partyId,
-                     @Nullable UUID commandChannelId,
-                     boolean partyLeader,
-                     boolean commandChannelLeader,
-                     long damageDealt) {
+    public RaidActor(
+            long charId,
+            @Nullable Long clanId,
+            @Nullable Long allyId,
+            @Nullable UUID partyId,
+            @Nullable UUID commandChannelId,
+            boolean partyLeader,
+            boolean commandChannelLeader,
+            long damageDealt) {
         this.charId = charId;
         this.clanId = clanId;
         this.allyId = allyId;
@@ -165,8 +165,8 @@ public final class RaidActor {
 
     @Override
     public int hashCode() {
-        return Objects.hash(charId, clanId, allyId, partyId, commandChannelId,
-                partyLeader, commandChannelLeader, damageDealt);
+        return Objects.hash(
+                charId, clanId, allyId, partyId, commandChannelId, partyLeader, commandChannelLeader, damageDealt);
     }
 
     @Override
@@ -232,8 +232,8 @@ public final class RaidActor {
         }
 
         public RaidActor build() {
-            return new RaidActor(charId, clanId, allyId, partyId, commandChannelId,
-                    partyLeader, commandChannelLeader, damageDealt);
+            return new RaidActor(
+                    charId, clanId, allyId, partyId, commandChannelId, partyLeader, commandChannelLeader, damageDealt);
         }
     }
 }

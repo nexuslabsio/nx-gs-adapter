@@ -1,10 +1,9 @@
 package app.l2nx.gs.kafka.serde;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.charset.StandardCharsets;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class GsonDeserializerTest {
 
@@ -29,8 +28,7 @@ class GsonDeserializerTest {
 
     @Test
     void deserialize_shouldHandleNestedObjects() {
-        byte[] json = "{\"label\":\"wrap\",\"nested\":{\"name\":\"p\",\"value\":1}}"
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] json = "{\"label\":\"wrap\",\"nested\":{\"name\":\"p\",\"value\":1}}".getBytes(StandardCharsets.UTF_8);
         GsonDeserializer<Wrapper> wrapperDeserializer = new GsonDeserializer<>(Wrapper.class);
 
         Wrapper result = wrapperDeserializer.deserialize("test-topic", json);
@@ -42,8 +40,7 @@ class GsonDeserializerTest {
 
     @Test
     void deserialize_shouldIgnoreUnknownFields() {
-        byte[] json = "{\"name\":\"p\",\"value\":1,\"extra\":\"ignored\"}"
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] json = "{\"name\":\"p\",\"value\":1,\"extra\":\"ignored\"}".getBytes(StandardCharsets.UTF_8);
 
         TestEvent result = deserializer.deserialize("test-topic", json);
 

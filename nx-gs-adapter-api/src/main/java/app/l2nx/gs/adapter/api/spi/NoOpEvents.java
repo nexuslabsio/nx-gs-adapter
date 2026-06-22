@@ -18,12 +18,10 @@ final class NoOpEvents implements NxEvents {
 
     static final NoOpEvents INSTANCE = new NoOpEvents();
 
-    private NoOpEvents() {
-    }
+    private NoOpEvents() {}
 
     @Override
-    public void publish(@Nullable Object event) {
-    }
+    public void publish(@Nullable Object event) {}
 
     @Override
     public boolean flush(long timeoutMs) {

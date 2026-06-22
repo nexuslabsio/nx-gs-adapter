@@ -1,9 +1,9 @@
 package app.l2nx.gs.commons.hash;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import org.junit.jupiter.api.Test;
 
 class Fnv1a64Test {
 

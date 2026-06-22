@@ -1,17 +1,16 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
 
 class PrivateStoreSideTest {
 
     @Test
     void values_shouldExposeAskAndBidOnly() {
         assertArrayEquals(
-                new PrivateStoreSide[]{PrivateStoreSide.ASK, PrivateStoreSide.BID},
-                PrivateStoreSide.values());
+                new PrivateStoreSide[] {PrivateStoreSide.ASK, PrivateStoreSide.BID}, PrivateStoreSide.values());
     }
 
     @Test

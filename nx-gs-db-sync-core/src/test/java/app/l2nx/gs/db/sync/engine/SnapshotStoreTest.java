@@ -1,11 +1,10 @@
 package app.l2nx.gs.db.sync.engine;
 
-import it.unimi.dsi.fastutil.longs.LongSet;
-import org.junit.jupiter.api.Test;
-
-import java.util.OptionalLong;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.OptionalLong;
+import org.junit.jupiter.api.Test;
 
 class SnapshotStoreTest {
 
@@ -13,8 +12,7 @@ class SnapshotStoreTest {
     void getCrc_shouldReturnMissingSentinel_whenEntityUnknown() {
         SnapshotStore store = new SnapshotStore();
 
-        assertEquals(app.l2nx.gs.db.sync.engine.phase.Phase1Hasher.MISSING_HASH,
-                store.getCrc("clan", 1L));
+        assertEquals(app.l2nx.gs.db.sync.engine.phase.Phase1Hasher.MISSING_HASH, store.getCrc("clan", 1L));
         assertFalse(store.containsCrc("clan", 1L));
     }
 

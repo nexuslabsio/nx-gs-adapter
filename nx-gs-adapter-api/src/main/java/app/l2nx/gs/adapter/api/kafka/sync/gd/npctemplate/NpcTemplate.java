@@ -4,9 +4,8 @@ import app.l2nx.gs.adapter.api.domain.WeaponType;
 import app.l2nx.gs.adapter.api.domain.npc.NpcRace;
 import app.l2nx.gs.adapter.api.domain.stat.Stat;
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic NPC-template wire DTO — the common L2 denominator for static NPC
@@ -80,43 +79,44 @@ public final class NpcTemplate {
     private final @Nullable List<NpcAbsorb> absorbs;
     private final @Nullable List<NpcSpawn> spawns;
 
-    public NpcTemplate(int id,
-                       String type,
-                       @Nullable Integer displayId,
-                       @Nullable Integer level,
-                       @Nullable NpcRace race,
-                       @Nullable String aiType,
-                       @Nullable String shots,
-                       @Nullable Boolean randomMinions,
-                       @Nullable Boolean lethalImmune,
-                       @Nullable Boolean championEligible,
-                       @Nullable Boolean noRandomWalk,
-                       @Nullable Boolean movementDisabled,
-                       @Nullable Integer maxPursueRange,
-                       @Nullable Boolean canSeeInSilentMove,
-                       @Nullable Boolean globalAggro,
-                       @Nullable String raceIcon,
-                       @Nullable Double collisionRadius,
-                       @Nullable Double collisionHeight,
-                       @Nullable String atkType,
-                       @Nullable Map<String, Double> stats,
-                       @Nullable Long rewardExp,
-                       @Nullable Long rewardSp,
-                       @Nullable Integer rewardRp,
-                       @Nullable NpcFaction faction,
-                       @Nullable Integer transformOnDeadNpcTemplateId,
-                       @Nullable Integer transformChancePercent,
-                       @Nullable Integer spawnOnDeathCount,
-                       @Nullable Integer spawnOnDeathChancePercent,
-                       @Nullable LocalizedText name,
-                       @Nullable LocalizedText title,
-                       @Nullable Integer rightHand,
-                       @Nullable Integer leftHand,
-                       @Nullable List<NpcSkillRef> skills,
-                       @Nullable List<NpcDropGroup> drops,
-                       @Nullable List<NpcMinionRef> minions,
-                       @Nullable List<NpcAbsorb> absorbs,
-                       @Nullable List<NpcSpawn> spawns) {
+    public NpcTemplate(
+            int id,
+            String type,
+            @Nullable Integer displayId,
+            @Nullable Integer level,
+            @Nullable NpcRace race,
+            @Nullable String aiType,
+            @Nullable String shots,
+            @Nullable Boolean randomMinions,
+            @Nullable Boolean lethalImmune,
+            @Nullable Boolean championEligible,
+            @Nullable Boolean noRandomWalk,
+            @Nullable Boolean movementDisabled,
+            @Nullable Integer maxPursueRange,
+            @Nullable Boolean canSeeInSilentMove,
+            @Nullable Boolean globalAggro,
+            @Nullable String raceIcon,
+            @Nullable Double collisionRadius,
+            @Nullable Double collisionHeight,
+            @Nullable String atkType,
+            @Nullable Map<String, Double> stats,
+            @Nullable Long rewardExp,
+            @Nullable Long rewardSp,
+            @Nullable Integer rewardRp,
+            @Nullable NpcFaction faction,
+            @Nullable Integer transformOnDeadNpcTemplateId,
+            @Nullable Integer transformChancePercent,
+            @Nullable Integer spawnOnDeathCount,
+            @Nullable Integer spawnOnDeathChancePercent,
+            @Nullable LocalizedText name,
+            @Nullable LocalizedText title,
+            @Nullable Integer rightHand,
+            @Nullable Integer leftHand,
+            @Nullable List<NpcSkillRef> skills,
+            @Nullable List<NpcDropGroup> drops,
+            @Nullable List<NpcMinionRef> minions,
+            @Nullable List<NpcAbsorb> absorbs,
+            @Nullable List<NpcSpawn> spawns) {
         this.id = id;
         this.type = Objects.requireNonNull(type, "type");
         this.displayId = displayId;
@@ -136,8 +136,7 @@ public final class NpcTemplate {
         this.collisionRadius = collisionRadius;
         this.collisionHeight = collisionHeight;
         this.atkType = atkType;
-        this.stats = stats == null ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, Double>(stats));
+        this.stats = stats == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, Double>(stats));
         this.rewardExp = rewardExp;
         this.rewardSp = rewardSp;
         this.rewardRp = rewardRp;
@@ -150,16 +149,11 @@ public final class NpcTemplate {
         this.title = title;
         this.rightHand = rightHand;
         this.leftHand = leftHand;
-        this.skills = skills == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcSkillRef>(skills));
-        this.drops = drops == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcDropGroup>(drops));
-        this.minions = minions == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcMinionRef>(minions));
-        this.absorbs = absorbs == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcAbsorb>(absorbs));
-        this.spawns = spawns == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcSpawn>(spawns));
+        this.skills = skills == null ? null : Collections.unmodifiableList(new ArrayList<NpcSkillRef>(skills));
+        this.drops = drops == null ? null : Collections.unmodifiableList(new ArrayList<NpcDropGroup>(drops));
+        this.minions = minions == null ? null : Collections.unmodifiableList(new ArrayList<NpcMinionRef>(minions));
+        this.absorbs = absorbs == null ? null : Collections.unmodifiableList(new ArrayList<NpcAbsorb>(absorbs));
+        this.spawns = spawns == null ? null : Collections.unmodifiableList(new ArrayList<NpcSpawn>(spawns));
     }
 
     public int getId() {
@@ -500,13 +494,44 @@ public final class NpcTemplate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, type, displayId, level, race, aiType, shots, randomMinions,
-                lethalImmune, championEligible, noRandomWalk, movementDisabled, maxPursueRange,
-                canSeeInSilentMove, globalAggro, raceIcon, collisionRadius, collisionHeight,
-                atkType, stats, rewardExp, rewardSp, rewardRp, faction,
-                transformOnDeadNpcTemplateId, transformChancePercent, spawnOnDeathCount,
-                spawnOnDeathChancePercent, name, title, rightHand, leftHand,
-                skills, drops, minions, absorbs, spawns);
+        return Objects.hash(
+                id,
+                type,
+                displayId,
+                level,
+                race,
+                aiType,
+                shots,
+                randomMinions,
+                lethalImmune,
+                championEligible,
+                noRandomWalk,
+                movementDisabled,
+                maxPursueRange,
+                canSeeInSilentMove,
+                globalAggro,
+                raceIcon,
+                collisionRadius,
+                collisionHeight,
+                atkType,
+                stats,
+                rewardExp,
+                rewardSp,
+                rewardRp,
+                faction,
+                transformOnDeadNpcTemplateId,
+                transformChancePercent,
+                spawnOnDeathCount,
+                spawnOnDeathChancePercent,
+                name,
+                title,
+                rightHand,
+                leftHand,
+                skills,
+                drops,
+                minions,
+                absorbs,
+                spawns);
     }
 
     @Override
@@ -739,13 +764,44 @@ public final class NpcTemplate {
         }
 
         public NpcTemplate build() {
-            return new NpcTemplate(id, type, displayId, level, race, aiType, shots, randomMinions,
-                    lethalImmune, championEligible, noRandomWalk, movementDisabled, maxPursueRange,
-                    canSeeInSilentMove, globalAggro, raceIcon, collisionRadius, collisionHeight,
-                    atkType, stats, rewardExp, rewardSp, rewardRp, faction,
-                    transformOnDeadNpcTemplateId, transformChancePercent, spawnOnDeathCount,
-                    spawnOnDeathChancePercent, name, title, rightHand, leftHand,
-                    skills, drops, minions, absorbs, spawns);
+            return new NpcTemplate(
+                    id,
+                    type,
+                    displayId,
+                    level,
+                    race,
+                    aiType,
+                    shots,
+                    randomMinions,
+                    lethalImmune,
+                    championEligible,
+                    noRandomWalk,
+                    movementDisabled,
+                    maxPursueRange,
+                    canSeeInSilentMove,
+                    globalAggro,
+                    raceIcon,
+                    collisionRadius,
+                    collisionHeight,
+                    atkType,
+                    stats,
+                    rewardExp,
+                    rewardSp,
+                    rewardRp,
+                    faction,
+                    transformOnDeadNpcTemplateId,
+                    transformChancePercent,
+                    spawnOnDeathCount,
+                    spawnOnDeathChancePercent,
+                    name,
+                    title,
+                    rightHand,
+                    leftHand,
+                    skills,
+                    drops,
+                    minions,
+                    absorbs,
+                    spawns);
         }
     }
 }

@@ -8,16 +8,15 @@ import app.l2nx.gs.log.NxLog;
  */
 public final class StartupBanner {
 
-    private static final String[] WORDMARK = new String[]{
-            " _     ____  _   ___  __",
-            "| |   |___ \\| \\ | \\ \\/ /",
-            "| |     __) |  \\| |\\  / ",
-            "| |___ / __/| |\\  |/  \\ ",
-            "|_____|_____|_| \\_/_/\\_\\"
+    private static final String[] WORDMARK = new String[] {
+        " _     ____  _   ___  __",
+        "| |   |___ \\| \\ | \\ \\/ /",
+        "| |     __) |  \\| |\\  / ",
+        "| |___ / __/| |\\  |/  \\ ",
+        "|_____|_____|_| \\_/_/\\_\\"
     };
 
-    private StartupBanner() {
-    }
+    private StartupBanner() {}
 
     public static void emit(NxLog log, String version) {
         log.info("");

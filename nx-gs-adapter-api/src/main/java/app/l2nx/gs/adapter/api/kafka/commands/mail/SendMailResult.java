@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Success payload of {@link SendMailCommand}: the set of created mail-message
@@ -43,8 +42,7 @@ public final class SendMailResult {
     private final List<Long> createdMailIds;
     private final List<ItemDeliveryError> itemErrors;
 
-    public SendMailResult(@Nullable List<Long> createdMailIds,
-                          @Nullable List<ItemDeliveryError> itemErrors) {
+    public SendMailResult(@Nullable List<Long> createdMailIds, @Nullable List<ItemDeliveryError> itemErrors) {
         this.createdMailIds = MailLists.freeze(createdMailIds);
         this.itemErrors = MailLists.freeze(itemErrors);
     }
@@ -81,8 +79,7 @@ public final class SendMailResult {
         if (this == o) return true;
         if (!(o instanceof SendMailResult)) return false;
         SendMailResult that = (SendMailResult) o;
-        return Objects.equals(createdMailIds, that.createdMailIds)
-                && Objects.equals(itemErrors, that.itemErrors);
+        return Objects.equals(createdMailIds, that.createdMailIds) && Objects.equals(itemErrors, that.itemErrors);
     }
 
     @Override
@@ -92,8 +89,7 @@ public final class SendMailResult {
 
     @Override
     public String toString() {
-        return "SendMailResult[createdMailIds=" + createdMailIds
-                + ", itemErrors=" + itemErrors + "]";
+        return "SendMailResult[createdMailIds=" + createdMailIds + ", itemErrors=" + itemErrors + "]";
     }
 
     public static final class Builder {

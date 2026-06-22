@@ -1,16 +1,15 @@
 package app.l2nx.gs.adapter.core.kafka;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.kafka.KafkaState;
-import org.junit.jupiter.api.Test;
-
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class KafkaInitializerTest {
 
@@ -30,15 +29,14 @@ class KafkaInitializerTest {
     void init_shouldComposePropertiesAndForwardListenerAndHeaders() {
         CapturingKafkaFactory factory = new CapturingKafkaFactory();
         KafkaInitializer init = new KafkaInitializer(factory);
-        Consumer<KafkaState> listener = state -> { /* test placeholder */ };
-        Map<String, byte[]> staticHeaders = Collections.singletonMap(
-                NxHeaders.NX_SERVER_ID, NxHeaders.encodeUuid(SERVER_ID));
+        Consumer<KafkaState> listener = state -> {
+            /* test placeholder */
+        };
+        Map<String, byte[]> staticHeaders =
+                Collections.singletonMap(NxHeaders.NX_SERVER_ID, NxHeaders.encodeUuid(SERVER_ID));
 
         KafkaState result = init.init(
-                kafkaCredentials("acme-x1-user", "p@ss"),
-                "nx-gs-adapter-acme-acme-x1",
-                staticHeaders,
-                listener);
+                kafkaCredentials("acme-x1-user", "p@ss"), "nx-gs-adapter-acme-acme-x1", staticHeaders, listener);
 
         assertEquals(KafkaState.CONNECTED, result);
         assertEquals(1, factory.callCount);
@@ -53,8 +51,7 @@ class KafkaInitializerTest {
                         + " required username=\"acme-x1-user\" password=\"p@ss\";",
                 factory.capturedProperties.get("sasl.jaas.config"));
         assertNotNull(factory.capturedStaticHeaders);
-        assertEquals(SERVER_ID,
-                NxHeaders.decodeUuid(factory.capturedStaticHeaders.get(NxHeaders.NX_SERVER_ID)));
+        assertEquals(SERVER_ID, NxHeaders.decodeUuid(factory.capturedStaticHeaders.get(NxHeaders.NX_SERVER_ID)));
     }
 
     @Test
@@ -62,8 +59,7 @@ class KafkaInitializerTest {
         CapturingKafkaFactory factory = new CapturingKafkaFactory();
         KafkaInitializer init = new KafkaInitializer(factory);
 
-        init.init(kafkaCredentials("u", "p"), "client-id", Collections.emptyMap(), s -> {
-        });
+        init.init(kafkaCredentials("u", "p"), "client-id", Collections.emptyMap(), s -> {});
 
         assertNotNull(factory.capturedStaticHeaders);
         assertTrue(factory.capturedStaticHeaders.isEmpty());
@@ -75,9 +71,8 @@ class KafkaInitializerTest {
         factory.postBuildState = KafkaState.DISCONNECTED;
         KafkaInitializer init = new KafkaInitializer(factory);
 
-        KafkaState result = init.init(kafkaCredentials("user", "pass"),
-                "nx-gs-adapter-acme-acme-x1", Collections.emptyMap(), state -> {
-                });
+        KafkaState result = init.init(
+                kafkaCredentials("user", "pass"), "nx-gs-adapter-acme-acme-x1", Collections.emptyMap(), state -> {});
 
         assertEquals(KafkaState.DISCONNECTED, result);
     }

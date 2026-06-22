@@ -23,13 +23,14 @@ public final class EntityStats {
     private final ChangesSummary lastCycleChanges;
     private final Integer consecutiveErrors;
 
-    public EntityStats(String name,
-                       EntityState state,
-                       Long rowCount,
-                       Long lastSyncEpochMs,
-                       Long lastCycleDurationMs,
-                       ChangesSummary lastCycleChanges,
-                       Integer consecutiveErrors) {
+    public EntityStats(
+            String name,
+            EntityState state,
+            Long rowCount,
+            Long lastSyncEpochMs,
+            Long lastCycleDurationMs,
+            ChangesSummary lastCycleChanges,
+            Integer consecutiveErrors) {
         this.name = name;
         this.state = state;
         this.rowCount = rowCount;
@@ -98,8 +99,8 @@ public final class EntityStats {
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, state, rowCount, lastSyncEpochMs, lastCycleDurationMs,
-                lastCycleChanges, consecutiveErrors);
+        return Objects.hash(
+                name, state, rowCount, lastSyncEpochMs, lastCycleDurationMs, lastCycleChanges, consecutiveErrors);
     }
 
     @Override
@@ -158,8 +159,8 @@ public final class EntityStats {
         }
 
         public EntityStats build() {
-            return new EntityStats(name, state, rowCount, lastSyncEpochMs,
-                    lastCycleDurationMs, lastCycleChanges, consecutiveErrors);
+            return new EntityStats(
+                    name, state, rowCount, lastSyncEpochMs, lastCycleDurationMs, lastCycleChanges, consecutiveErrors);
         }
     }
 }

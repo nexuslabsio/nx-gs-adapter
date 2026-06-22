@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One entry of {@link CharacterRuntimeDto#getCustomActivities()} — a
@@ -42,12 +41,10 @@ public final class CustomActivity {
     private final String type;
     private final @Nullable Map<String, String> metadata;
 
-    public CustomActivity(String type,
-                          @Nullable Map<String, String> metadata) {
+    public CustomActivity(String type, @Nullable Map<String, String> metadata) {
         this.type = type;
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -69,9 +66,7 @@ public final class CustomActivity {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .type(type)
-                .metadata(metadata);
+        return new Builder().type(type).metadata(metadata);
     }
 
     public static Builder builder() {
@@ -83,8 +78,7 @@ public final class CustomActivity {
         if (this == o) return true;
         if (!(o instanceof CustomActivity)) return false;
         CustomActivity that = (CustomActivity) o;
-        return Objects.equals(type, that.type)
-                && Objects.equals(metadata, that.metadata);
+        return Objects.equals(type, that.type) && Objects.equals(metadata, that.metadata);
     }
 
     @Override

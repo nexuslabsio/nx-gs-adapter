@@ -1,5 +1,11 @@
 package app.l2nx.gs.db.sync;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandStatus;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
@@ -14,12 +20,6 @@ import app.l2nx.gs.db.sync.engine.EngineConfig;
 import app.l2nx.gs.db.sync.engine.TestMappings;
 import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
 import com.google.gson.Gson;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -27,12 +27,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.function.Function;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class DbSyncModuleResyncCommandsTest {
 
@@ -83,8 +82,7 @@ class DbSyncModuleResyncCommandsTest {
         module = build(failingJdbc());
         module.onConnect(ctx());
 
-        CommandResult<ResyncRowsResult> result = module.handleResyncRows(
-                rowsCommand("character", 1L), cctx);
+        CommandResult<ResyncRowsResult> result = module.handleResyncRows(rowsCommand("character", 1L), cctx);
 
         assertEquals(CommandStatus.UNAVAILABLE, result.getStatus());
     }
@@ -132,8 +130,7 @@ class DbSyncModuleResyncCommandsTest {
     @Test
     void handleResyncEntities_shouldReturnValidationFailed_whenResyncIdMissingOnWire() {
         module = startedModule(failingJdbc());
-        ResyncEntitiesCommand wire = GSON.fromJson("{\"entities\":[\"character\"]}",
-                ResyncEntitiesCommand.class);
+        ResyncEntitiesCommand wire = GSON.fromJson("{\"entities\":[\"character\"]}", ResyncEntitiesCommand.class);
 
         CommandResult<ResyncEntitiesResult> result = module.handleResyncEntities(wire, cctx);
 
@@ -144,8 +141,7 @@ class DbSyncModuleResyncCommandsTest {
     void handleResyncRows_shouldReturnValidationFailed_whenEntityUnknown() {
         module = startedModule(failingJdbc());
 
-        CommandResult<ResyncRowsResult> result = module.handleResyncRows(
-                rowsCommand("nope", 1L), cctx);
+        CommandResult<ResyncRowsResult> result = module.handleResyncRows(rowsCommand("nope", 1L), cctx);
 
         assertEquals(CommandStatus.VALIDATION_FAILED, result.getStatus());
     }
@@ -171,8 +167,7 @@ class DbSyncModuleResyncCommandsTest {
             pks.append(i);
         }
         ResyncRowsCommand wire = GSON.fromJson(
-                "{\"resyncId\":\"" + RESYNC_ID + "\",\"entityName\":\"character\",\"pks\":["
-                        + pks + "]}",
+                "{\"resyncId\":\"" + RESYNC_ID + "\",\"entityName\":\"character\",\"pks\":[" + pks + "]}",
                 ResyncRowsCommand.class);
 
         CommandResult<ResyncRowsResult> result = module.handleResyncRows(wire, cctx);
@@ -185,8 +180,7 @@ class DbSyncModuleResyncCommandsTest {
     void handleResyncRows_shouldReturnValidationFailed_whenPkNonPositive(long pk) {
         module = startedModule(failingJdbc());
 
-        CommandResult<ResyncRowsResult> result = module.handleResyncRows(
-                rowsCommand("character", 1L, pk), cctx);
+        CommandResult<ResyncRowsResult> result = module.handleResyncRows(rowsCommand("character", 1L, pk), cctx);
 
         assertEquals(CommandStatus.VALIDATION_FAILED, result.getStatus());
     }
@@ -207,8 +201,7 @@ class DbSyncModuleResyncCommandsTest {
     void handleResyncRows_shouldReportTargetCountOnly_whenCascadeOff() {
         module = startedModule(failingJdbc());
 
-        CommandResult<ResyncRowsResult> result = module.handleResyncRows(
-                rowsCommand("character", 1L, 2L, 2L), cctx);
+        CommandResult<ResyncRowsResult> result = module.handleResyncRows(rowsCommand("character", 1L, 2L, 2L), cctx);
 
         assertTrue(result.isOk());
         Map<String, Integer> counts = result.getPayload().getInvalidatedByEntity();
@@ -269,7 +262,8 @@ class DbSyncModuleResyncCommandsTest {
                 cctx);
 
         assertTrue(result.isOk());
-        assertEquals(Collections.singleton("item"),
+        assertEquals(
+                Collections.singleton("item"),
                 result.getPayload().getInvalidatedByEntity().keySet());
     }
 
@@ -277,8 +271,7 @@ class DbSyncModuleResyncCommandsTest {
     void start_shouldFail_whenParentRefReferencesUnknownEntity() {
         DbSchemaProvider provider = provider(
                 stub("character"),
-                withParentRefs(stub("item"),
-                        Collections.singletonList(ParentRef.of("ghost", "owner_id"))));
+                withParentRefs(stub("item"), Collections.singletonList(ParentRef.of("ghost", "owner_id"))));
         module = build(failingJdbc(), provider);
         module.onConnect(ctx());
 
@@ -291,8 +284,8 @@ class DbSyncModuleResyncCommandsTest {
     void start_shouldFail_whenParentRefFkColumnInvalid() {
         DbSchemaProvider provider = provider(
                 stub("character"),
-                withParentRefs(stub("item"),
-                        Collections.singletonList(ParentRef.of("character", "owner_id; DROP TABLE x"))));
+                withParentRefs(
+                        stub("item"), Collections.singletonList(ParentRef.of("character", "owner_id; DROP TABLE x"))));
         module = build(failingJdbc(), provider);
         module.onConnect(ctx());
 
@@ -314,10 +307,12 @@ class DbSyncModuleResyncCommandsTest {
     }
 
     private DbSyncModule build(JdbcConnectionSource src) {
-        return build(src, provider(
-                stub("character"),
-                withParentRefs(stub("item"),
-                        Collections.singletonList(ParentRef.of("character", "owner_id")))));
+        return build(
+                src,
+                provider(
+                        stub("character"),
+                        withParentRefs(
+                                stub("item"), Collections.singletonList(ParentRef.of("character", "owner_id")))));
     }
 
     private DbSyncModule build(JdbcConnectionSource src, DbSchemaProvider provider) {
@@ -338,8 +333,11 @@ class DbSyncModuleResyncCommandsTest {
         dbTopics.put("character", "test.gs.sync.characters");
         dbTopics.put("item", "test.gs.sync.items");
         return ConnectContext.builder()
-                .tenantId(UUID.randomUUID()).tenantSlug("acme")
-                .serverId(UUID.randomUUID()).serverSlug("primary").serverName("Acme Primary")
+                .tenantId(UUID.randomUUID())
+                .tenantSlug("acme")
+                .serverId(UUID.randomUUID())
+                .serverSlug("primary")
+                .serverName("Acme Primary")
                 .adapterVersion("0.1.0")
                 .syncTopics(SyncTopics.builder().db(dbTopics).build())
                 .commands(commands)
@@ -370,12 +368,10 @@ class DbSyncModuleResyncCommandsTest {
     }
 
     private static EntityMapping<Object> stub(String entityName) {
-        return TestMappings.stub(entityName, entityName + "s", "obj_id",
-                Collections.singletonList("name"));
+        return TestMappings.stub(entityName, entityName + "s", "obj_id", Collections.singletonList("name"));
     }
 
-    private static EntityMapping<Object> withParentRefs(EntityMapping<Object> delegate,
-                                                        List<ParentRef> refs) {
+    private static EntityMapping<Object> withParentRefs(EntityMapping<Object> delegate, List<ParentRef> refs) {
         return new EntityMapping<Object>() {
             @Override
             public String entityName() {
@@ -460,8 +456,7 @@ class DbSyncModuleResyncCommandsTest {
     }
 
     private static final class RecordingCommands implements NxCommands {
-        final Map<Class<?>, CommandHandler<?, ?>> handlers =
-                new HashMap<Class<?>, CommandHandler<?, ?>>();
+        final Map<Class<?>, CommandHandler<?, ?>> handlers = new HashMap<Class<?>, CommandHandler<?, ?>>();
 
         @Override
         public <R, C extends NxCommand<R>> void on(Class<C> type, CommandHandler<C, R> handler) {

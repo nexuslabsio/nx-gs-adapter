@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Typed CDC event published by the adapter for one row of one synced entity.

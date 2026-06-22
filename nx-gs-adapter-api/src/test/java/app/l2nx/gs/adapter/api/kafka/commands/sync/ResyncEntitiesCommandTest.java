@@ -1,13 +1,12 @@
 package app.l2nx.gs.adapter.api.kafka.commands.sync;
 
-import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ResyncEntitiesCommandTest {
 
@@ -26,8 +25,8 @@ class ResyncEntitiesCommandTest {
 
     @Test
     void constructor_shouldRejectNullResyncId() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new ResyncEntitiesCommand(null, null));
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class, () -> new ResyncEntitiesCommand(null, null));
         assertTrue(ex.getMessage().contains("resyncId"));
     }
 

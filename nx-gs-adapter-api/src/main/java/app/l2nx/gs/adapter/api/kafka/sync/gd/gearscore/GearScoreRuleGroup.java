@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore;
 
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A category of gear-score rules inside a {@link GearScoreRuleset} — the wiki
@@ -24,10 +23,11 @@ public final class GearScoreRuleGroup {
     private final @Nullable LocalizedText description;
     private final List<GearScoreRule> rules;
 
-    public GearScoreRuleGroup(String category,
-                              LocalizedText label,
-                              @Nullable LocalizedText description,
-                              @Nullable List<GearScoreRule> rules) {
+    public GearScoreRuleGroup(
+            String category,
+            LocalizedText label,
+            @Nullable LocalizedText description,
+            @Nullable List<GearScoreRule> rules) {
         this.category = Objects.requireNonNull(category, "GearScoreRuleGroup.category is required");
         this.label = Objects.requireNonNull(label, "GearScoreRuleGroup.label is required");
         this.description = description;
@@ -94,8 +94,7 @@ public final class GearScoreRuleGroup {
 
     @Override
     public String toString() {
-        return "GearScoreRuleGroup[category=" + category
-                + ", rules=" + rules.size() + "]";
+        return "GearScoreRuleGroup[category=" + category + ", rules=" + rules.size() + "]";
     }
 
     public static final class Builder {

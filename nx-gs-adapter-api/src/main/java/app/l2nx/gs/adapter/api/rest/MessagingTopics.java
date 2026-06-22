@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.rest;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Top-level Kafka topic addressing for the bidirectional messaging surface
@@ -50,9 +49,10 @@ public final class MessagingTopics {
     private final @Nullable String commandsTopic;
     private final @Nullable String commandsRepliesTopic;
 
-    public MessagingTopics(@Nullable Map<String, String> events,
-                           @Nullable String commandsTopic,
-                           @Nullable String commandsRepliesTopic) {
+    public MessagingTopics(
+            @Nullable Map<String, String> events,
+            @Nullable String commandsTopic,
+            @Nullable String commandsRepliesTopic) {
         this.events = freeze(events);
         this.commandsTopic = isPresent(commandsTopic) ? commandsTopic : null;
         this.commandsRepliesTopic = isPresent(commandsRepliesTopic) ? commandsRepliesTopic : null;
@@ -90,10 +90,7 @@ public final class MessagingTopics {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .events(events)
-                .commandsTopic(commandsTopic)
-                .commandsRepliesTopic(commandsRepliesTopic);
+        return new Builder().events(events).commandsTopic(commandsTopic).commandsRepliesTopic(commandsRepliesTopic);
     }
 
     public static Builder builder() {

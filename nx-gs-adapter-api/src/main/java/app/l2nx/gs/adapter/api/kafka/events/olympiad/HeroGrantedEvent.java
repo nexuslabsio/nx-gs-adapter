@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO published to the {@code olympiad} family topic
@@ -47,20 +46,22 @@ public final class HeroGrantedEvent {
     private final int olympiadCycle;
     private final @Nullable Map<String, String> metadata;
 
-    public HeroGrantedEvent(UUID eventId,
-                            long charId,
-                            int classId,
-                            @Nullable CharacterClass clazz,
-                            @Nullable Long clanId,
-                            int olympiadCycle,
-                            @Nullable Map<String, String> metadata) {
+    public HeroGrantedEvent(
+            UUID eventId,
+            long charId,
+            int classId,
+            @Nullable CharacterClass clazz,
+            @Nullable Long clanId,
+            int olympiadCycle,
+            @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "HeroGrantedEvent.eventId is required");
         this.charId = charId;
         this.classId = classId;
         this.clazz = clazz;
         this.clanId = clanId;
         this.olympiadCycle = olympiadCycle;
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**

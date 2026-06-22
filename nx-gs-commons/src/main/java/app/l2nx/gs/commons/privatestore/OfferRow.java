@@ -1,9 +1,8 @@
 package app.l2nx.gs.commons.privatestore;
 
 import app.l2nx.gs.adapter.api.domain.Attribute;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Plain data holder for {@link PrivateStoreOfferHasher}. Mirrors the wire
@@ -19,12 +18,13 @@ public final class OfferRow {
     public final long unitPrice;
     public final long currencyItemId;
 
-    public OfferRow(long traderId,
-                    @Nullable Integer enchantLevel,
-                    @Nullable Map<Attribute, Integer> attributes,
-                    long count,
-                    long unitPrice,
-                    long currencyItemId) {
+    public OfferRow(
+            long traderId,
+            @Nullable Integer enchantLevel,
+            @Nullable Map<Attribute, Integer> attributes,
+            long count,
+            long unitPrice,
+            long currencyItemId) {
         this.traderId = traderId;
         this.enchantLevel = enchantLevel;
         this.attributes = attributes;

@@ -2,9 +2,8 @@ package app.l2nx.gs.adapter.core.connect;
 
 import app.l2nx.gs.adapter.api.rest.*;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
-import org.jspecify.annotations.Nullable;
-
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@link HostConnectFlow} for gameserver host-type. POSTs to
@@ -35,10 +34,8 @@ public final class GameServerConnectFlow implements HostConnectFlow<ConnectRespo
         ConnectRequest body = ConnectRequest.builder()
                 .adapterVersion(config.getAdapterVersion())
                 .build();
-        TypedConnectOutcome<ConnectResponse> outcome = http.exchange(
-                ConnectFlow.buildUrl(config.getPlatformUrl(), CONNECT_PATH),
-                config.getServerKey(),
-                body);
+        TypedConnectOutcome<ConnectResponse> outcome =
+                http.exchange(ConnectFlow.buildUrl(config.getPlatformUrl(), CONNECT_PATH), config.getServerKey(), body);
         outcome.getResponse().ifPresent(r -> captured = r);
         return outcome;
     }

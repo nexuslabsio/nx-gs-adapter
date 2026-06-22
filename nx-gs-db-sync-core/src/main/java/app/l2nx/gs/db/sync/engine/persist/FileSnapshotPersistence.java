@@ -3,7 +3,6 @@ package app.l2nx.gs.db.sync.engine.persist;
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -47,7 +46,7 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
 
     private static final NxLog log = NxLogFactory.getLogger(FileSnapshotPersistence.class);
 
-    static final byte[] MAGIC = new byte[]{'N', 'X', 'S', 'S'};
+    static final byte[] MAGIC = new byte[] {'N', 'X', 'S', 'S'};
     static final short FORMAT_VERSION = 1;
     static final String SNAPSHOT_SUFFIX = ".snap";
     static final String TMP_SUFFIX = SNAPSHOT_SUFFIX + ".tmp";
@@ -84,13 +83,11 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
         Path lockPath = schemaDir.resolve(LOCK_FILE);
         FileChannel channel = null;
         try {
-            channel = FileChannel.open(lockPath,
-                    StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             FileLock lock = channel.tryLock();
             if (lock == null) {
-                throw new IllegalStateException(
-                        "Another process already holds the snapshot lock '" + lockPath
-                                + "' — refusing to start a second writer");
+                throw new IllegalStateException("Another process already holds the snapshot lock '" + lockPath
+                        + "' — refusing to start a second writer");
             }
             this.lockChannel = channel;
             this.dirLock = lock;
@@ -98,7 +95,8 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
             closeQuietly(channel);
             throw new IllegalStateException(
                     "Another thread in this JVM already holds the snapshot lock '" + lockPath
-                            + "' — only one FileSnapshotPersistence per directory is allowed", e);
+                            + "' — only one FileSnapshotPersistence per directory is allowed",
+                    e);
         } catch (IOException e) {
             closeQuietly(channel);
             throw new IllegalStateException(
@@ -123,12 +121,18 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
                 }
             }
         } catch (IOException e) {
-            log.warn("FileSnapshotPersistence.load: directory scan of '{}' failed: {} — starting with empty snapshot",
-                    schemaDir, e.getMessage());
+            log.warn(
+                    "FileSnapshotPersistence.load: directory scan of '{}' failed: {} — starting with empty snapshot",
+                    schemaDir,
+                    e.getMessage());
             return;
         }
-        log.info("FileSnapshotPersistence loaded {} entit{} ({} entries) from '{}'",
-                loadedEntities, loadedEntities == 1 ? "y" : "ies", loadedEntries, schemaDir);
+        log.info(
+                "FileSnapshotPersistence loaded {} entit{} ({} entries) from '{}'",
+                loadedEntities,
+                loadedEntities == 1 ? "y" : "ies",
+                loadedEntries,
+                schemaDir);
     }
 
     private int loadOne(Path file, SnapshotStore target) {
@@ -136,8 +140,10 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
         try {
             fileSize = Files.size(file);
         } catch (IOException e) {
-            log.warn("FileSnapshotPersistence.load: '{}' size probe failed: {} — skipping",
-                    file.getFileName(), e.getMessage());
+            log.warn(
+                    "FileSnapshotPersistence.load: '{}' size probe failed: {} — skipping",
+                    file.getFileName(),
+                    e.getMessage());
             return -1;
         }
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file.toFile())))) {
@@ -149,14 +155,19 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
             }
             short version = in.readShort();
             if (version != FORMAT_VERSION) {
-                log.warn("FileSnapshotPersistence.load: '{}' unsupported version {} (expected {}) — skipping",
-                        file.getFileName(), version, FORMAT_VERSION);
+                log.warn(
+                        "FileSnapshotPersistence.load: '{}' unsupported version {} (expected {}) — skipping",
+                        file.getFileName(),
+                        version,
+                        FORMAT_VERSION);
                 return -1;
             }
             short nameLen = in.readShort();
             if (nameLen <= 0 || nameLen > MAX_ENTITY_NAME_BYTES) {
-                log.warn("FileSnapshotPersistence.load: '{}' bad entityName length {} — skipping",
-                        file.getFileName(), nameLen);
+                log.warn(
+                        "FileSnapshotPersistence.load: '{}' bad entityName length {} — skipping",
+                        file.getFileName(),
+                        nameLen);
                 return -1;
             }
             byte[] nameBytes = new byte[nameLen];
@@ -165,8 +176,7 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
 
             int count = in.readInt();
             if (count < 0) {
-                log.warn("FileSnapshotPersistence.load: '{}' negative count {} — skipping",
-                        file.getFileName(), count);
+                log.warn("FileSnapshotPersistence.load: '{}' negative count {} — skipping", file.getFileName(), count);
                 return -1;
             }
             // Cap count by what could fit in the file (entries plus trailing 4-byte
@@ -175,8 +185,11 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
             // to checksum-verify the truncated body.
             long maxFeasibleEntries = Math.max(0L, (fileSize - 4L) / ENTRY_BYTES);
             if ((long) count > maxFeasibleEntries) {
-                log.warn("FileSnapshotPersistence.load: '{}' count {} exceeds file capacity ({}) — skipping",
-                        file.getFileName(), count, maxFeasibleEntries);
+                log.warn(
+                        "FileSnapshotPersistence.load: '{}' count {} exceeds file capacity ({}) — skipping",
+                        file.getFileName(),
+                        count,
+                        maxFeasibleEntries);
                 return -1;
             }
             CRC32 bodyHash = new CRC32();
@@ -197,7 +210,8 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
             int expectedChecksum = in.readInt();
             int actualChecksum = (int) bodyHash.getValue();
             if (expectedChecksum != actualChecksum) {
-                log.warn("FileSnapshotPersistence.load: '{}' checksum mismatch (expected 0x{} got 0x{}) — skipping",
+                log.warn(
+                        "FileSnapshotPersistence.load: '{}' checksum mismatch (expected 0x{} got 0x{}) — skipping",
                         file.getFileName(),
                         Integer.toHexString(expectedChecksum),
                         Integer.toHexString(actualChecksum));
@@ -209,12 +223,16 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
             log.warn("FileSnapshotPersistence.load: '{}' truncated — skipping", file.getFileName());
             return -1;
         } catch (IOException ioe) {
-            log.warn("FileSnapshotPersistence.load: '{}' read error: {} — skipping",
-                    file.getFileName(), ioe.getMessage());
+            log.warn(
+                    "FileSnapshotPersistence.load: '{}' read error: {} — skipping",
+                    file.getFileName(),
+                    ioe.getMessage());
             return -1;
         } catch (RuntimeException re) {
-            log.warn("FileSnapshotPersistence.load: '{}' decode error: {} — skipping",
-                    file.getFileName(), re.getMessage());
+            log.warn(
+                    "FileSnapshotPersistence.load: '{}' decode error: {} — skipping",
+                    file.getFileName(),
+                    re.getMessage());
             return -1;
         }
     }
@@ -243,8 +261,11 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
                 flushed++;
             }
         }
-        log.info("FileSnapshotPersistence.flushAll: {} entit{} written to '{}'",
-                flushed, flushed == 1 ? "y" : "ies", schemaDir);
+        log.info(
+                "FileSnapshotPersistence.flushAll: {} entit{} written to '{}'",
+                flushed,
+                flushed == 1 ? "y" : "ies",
+                schemaDir);
     }
 
     private boolean writeOne(String entityName, SnapshotStore source) {
@@ -253,7 +274,7 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
         int sizeHint = source.sizeOf(entityName);
         try {
             try (FileOutputStream fos = new FileOutputStream(tmp.toFile());
-                 DataOutputStream out = new DataOutputStream(new BufferedOutputStream(fos))) {
+                    DataOutputStream out = new DataOutputStream(new BufferedOutputStream(fos))) {
                 out.write(MAGIC);
                 out.writeShort(FORMAT_VERSION);
                 byte[] nameBytes = entityName.getBytes(StandardCharsets.UTF_8);
@@ -271,7 +292,7 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
                 out.write(scratch, 0, 4);
                 bodyHash.update(scratch, 0, 4);
 
-                final int[] writtenCount = new int[]{0};
+                final int[] writtenCount = new int[] {0};
                 final IOException[] firstError = new IOException[1];
 
                 source.forEachEntry(entityName, (pk, crc) -> {
@@ -296,22 +317,26 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
                     // Single-writer-per-entity contract guarantees agreement; a drift
                     // here means a future refactor broke the contract — fail loud
                     // before we commit a body whose count header lies.
-                    throw new IOException("entry count drift during dump: expected "
-                            + sizeHint + " got " + writtenCount[0]);
+                    throw new IOException(
+                            "entry count drift during dump: expected " + sizeHint + " got " + writtenCount[0]);
                 }
                 out.writeInt((int) bodyHash.getValue());
                 out.flush();
                 fos.getFD().sync();
             }
-            Files.move(tmp, target,
-                    StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             return true;
         } catch (IOException ioe) {
-            log.warn("FileSnapshotPersistence.write({}): IO error: {} — leaving previous snapshot intact",
-                    entityName, ioe.getMessage());
+            log.warn(
+                    "FileSnapshotPersistence.write({}): IO error: {} — leaving previous snapshot intact",
+                    entityName,
+                    ioe.getMessage());
         } catch (RuntimeException re) {
-            log.warn("FileSnapshotPersistence.write({}): unexpected {} — leaving previous snapshot intact",
-                    entityName, re.getClass().getName(), re);
+            log.warn(
+                    "FileSnapshotPersistence.write({}): unexpected {} — leaving previous snapshot intact",
+                    entityName,
+                    re.getClass().getName(),
+                    re);
         }
         deleteIfExists(tmp);
         return false;

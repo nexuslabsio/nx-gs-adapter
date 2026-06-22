@@ -37,8 +37,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  */
 public final class WellKnownAiStatuses {
 
-    private WellKnownAiStatuses() {
-    }
+    private WellKnownAiStatuses() {}
 
     /**
      * Full stop, awaiting client input.

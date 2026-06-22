@@ -1,13 +1,13 @@
 package app.l2nx.gs.db.sync.engine.phase;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class ChangeSetTest {
 
@@ -101,8 +101,7 @@ class ChangeSetTest {
 
         ChangeSet diff = ChangeSet.diff(scan, prev, snapshot, ENTITY);
 
-        assertTrue(diff.isEmpty(),
-                "row whose CRC32 happens to equal MISSING_HASH must not be spuriously re-CREATED");
+        assertTrue(diff.isEmpty(), "row whose CRC32 happens to equal MISSING_HASH must not be spuriously re-CREATED");
     }
 
     @Test
@@ -128,9 +127,9 @@ class ChangeSetTest {
     @Test
     void diff_shouldHandleMixedChanges() {
         Long2IntMap scan = new Long2IntOpenHashMap();
-        scan.put(1L, 100);  // unchanged
-        scan.put(2L, 250);  // updated (was 200)
-        scan.put(4L, 400);  // created
+        scan.put(1L, 100); // unchanged
+        scan.put(2L, 250); // updated (was 200)
+        scan.put(4L, 400); // created
 
         SnapshotStore snapshot = new SnapshotStore();
         snapshot.putCrc(ENTITY, 1L, 100);
@@ -153,5 +152,4 @@ class ChangeSetTest {
         assertEquals(3, diff.totalChanges());
         assertFalse(diff.isEmpty());
     }
-
 }

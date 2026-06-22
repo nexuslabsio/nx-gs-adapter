@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.core;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
@@ -7,15 +9,12 @@ import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.core.kafka.CapturingKafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
 import app.l2nx.gs.adapter.core.modules.CapturingAdapterModule;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Verifies that {@code syncTopics} in a {@code ConnectResponse} survives the
@@ -36,7 +35,8 @@ class SyncTopicsWiringTest {
         // Sanity check: assert no leaked context from a prior test that exercised
         // ServiceLoader against the global META-INF registration. If this trips,
         // CapturingAdapterModule is being driven from a test that didn't reset() it.
-        assertNull(CapturingAdapterModule.lastContext(),
+        assertNull(
+                CapturingAdapterModule.lastContext(),
                 "CapturingAdapterModule leaked context from a prior test — reset() in @BeforeEach");
     }
 
@@ -53,31 +53,26 @@ class SyncTopicsWiringTest {
         dbTopics.put("character", "bohpts.gs.sync.db.character");
         Map<String, String> runtimeTopics = new HashMap<String, String>();
         runtimeTopics.put("character", "bohpts.gs.sync.runtime.character");
-        SyncTopics topics = SyncTopics.builder().db(dbTopics).runtime(runtimeTopics).build();
+        SyncTopics topics =
+                SyncTopics.builder().db(dbTopics).runtime(runtimeTopics).build();
 
-        NxAdapter.simulateInitKafkaForTesting(
-                new KafkaInitializer(new CapturingKafkaFactory()),
-                response(topics));
+        NxAdapter.simulateInitKafkaForTesting(new KafkaInitializer(new CapturingKafkaFactory()), response(topics));
 
         ConnectContext ctx = CapturingAdapterModule.lastContext();
         assertNotNull(ctx, "module.onConnect was not invoked");
         assertEquals(dbTopics, ctx.getSyncTopics().getDb());
         assertEquals(runtimeTopics, ctx.getSyncTopics().getRuntime());
         assertTrue(ctx.getSyncTopics().getGd().isEmpty());
-        assertTrue(CapturingAdapterModule.wasStarted(),
-                "module.start should fire after a successful onConnect");
+        assertTrue(CapturingAdapterModule.wasStarted(), "module.start should fire after a successful onConnect");
     }
 
     @Test
     void initKafka_shouldNormalizeNullSyncTopics_toEmptyNamespaces() {
-        NxAdapter.simulateInitKafkaForTesting(
-                new KafkaInitializer(new CapturingKafkaFactory()),
-                response(null));
+        NxAdapter.simulateInitKafkaForTesting(new KafkaInitializer(new CapturingKafkaFactory()), response(null));
 
         ConnectContext ctx = CapturingAdapterModule.lastContext();
         assertNotNull(ctx);
-        assertNotNull(ctx.getSyncTopics(),
-                "ConnectContext normalizes wire-null syncTopics to empty SyncTopics");
+        assertNotNull(ctx.getSyncTopics(), "ConnectContext normalizes wire-null syncTopics to empty SyncTopics");
         assertTrue(ctx.getSyncTopics().getDb().isEmpty());
         assertTrue(ctx.getSyncTopics().getRuntime().isEmpty());
         assertTrue(ctx.getSyncTopics().getGd().isEmpty());
@@ -94,14 +89,12 @@ class SyncTopicsWiringTest {
                 .db(java.util.Collections.singletonMap("character", "bohpts.gs.sync.db.character"))
                 .build();
 
-        NxAdapter.simulateInitKafkaForTesting(
-                new KafkaInitializer(new CapturingKafkaFactory()),
-                response(topics));
+        NxAdapter.simulateInitKafkaForTesting(new KafkaInitializer(new CapturingKafkaFactory()), response(topics));
 
         ConnectContext ctx = CapturingAdapterModule.lastContext();
         assertNotNull(ctx, "sync module.onConnect must still fire when events bootstrap fails");
-        assertTrue(CapturingAdapterModule.wasStarted(),
-                "sync module.start must fire even though events bootstrap threw");
+        assertTrue(
+                CapturingAdapterModule.wasStarted(), "sync module.start must fire even though events bootstrap threw");
         assertEquals("bohpts.gs.sync.db.character", ctx.getSyncTopics().getDb().get("character"));
     }
 
@@ -111,13 +104,12 @@ class SyncTopicsWiringTest {
                 .db(java.util.Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
                 .build();
 
-        NxAdapter.simulateInitKafkaForTesting(
-                new KafkaInitializer(new CapturingKafkaFactory()),
-                response(topics));
+        NxAdapter.simulateInitKafkaForTesting(new KafkaInitializer(new CapturingKafkaFactory()), response(topics));
 
         ConnectContext ctx = CapturingAdapterModule.lastContext();
         assertNotNull(ctx);
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> ctx.getSyncTopics().getDb().put("character", "x"));
     }
 

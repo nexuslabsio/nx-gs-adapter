@@ -2,7 +2,6 @@ package app.l2nx.gs.adapter.core.modules;
 
 import app.l2nx.gs.adapter.api.spi.AdapterModule;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
-
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class CapturingAdapterModule implements AdapterModule {
@@ -39,10 +38,8 @@ public final class CapturingAdapterModule implements AdapterModule {
     }
 
     @Override
-    public void stop() {
-    }
+    public void stop() {}
 
     @Override
-    public void onDisconnect() {
-    }
+    public void onDisconnect() {}
 }

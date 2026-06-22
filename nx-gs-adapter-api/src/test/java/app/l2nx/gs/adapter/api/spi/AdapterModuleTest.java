@@ -1,10 +1,10 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+
+import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
+import org.junit.jupiter.api.Test;
 
 class AdapterModuleTest {
 
@@ -27,20 +27,16 @@ class AdapterModuleTest {
             }
 
             @Override
-            public void onConnect(ConnectContext ctx) {
-            }
+            public void onConnect(ConnectContext ctx) {}
 
             @Override
-            public void start() {
-            }
+            public void start() {}
 
             @Override
-            public void stop() {
-            }
+            public void stop() {}
 
             @Override
-            public void onDisconnect() {
-            }
+            public void onDisconnect() {}
         };
     }
 }

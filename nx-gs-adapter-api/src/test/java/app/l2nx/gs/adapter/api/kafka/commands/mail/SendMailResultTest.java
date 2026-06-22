@@ -1,18 +1,20 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
 import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class SendMailResultTest {
 
     @Test
     void builder_shouldRoundtripFields() {
         ItemDeliveryError err = ItemDeliveryError.builder()
-                .itemTemplateId(57L).count(1L).reason("x").build();
+                .itemTemplateId(57L)
+                .count(1L)
+                .reason("x")
+                .build();
 
         SendMailResult result = SendMailResult.builder()
                 .createdMailIds(Arrays.asList(101L, 102L))
@@ -39,23 +41,24 @@ class SendMailResultTest {
 
     @Test
     void getCreatedMailIds_shouldBeUnmodifiable() {
-        SendMailResult result = SendMailResult.builder()
-                .createdMailIds(Arrays.asList(1L, 2L))
-                .build();
+        SendMailResult result =
+                SendMailResult.builder().createdMailIds(Arrays.asList(1L, 2L)).build();
 
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> result.getCreatedMailIds().add(3L));
     }
 
     @Test
     void getItemErrors_shouldBeUnmodifiable() {
-        ItemDeliveryError err = ItemDeliveryError.builder()
-                .itemTemplateId(57L).count(1L).build();
+        ItemDeliveryError err =
+                ItemDeliveryError.builder().itemTemplateId(57L).count(1L).build();
         SendMailResult result = SendMailResult.builder()
                 .itemErrors(Collections.singletonList(err))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> result.getItemErrors().add(err));
     }
 
@@ -71,9 +74,8 @@ class SendMailResultTest {
 
     @Test
     void toBuilder_shouldRoundtrip() {
-        SendMailResult original = SendMailResult.builder()
-                .createdMailIds(Arrays.asList(1L, 2L))
-                .build();
+        SendMailResult original =
+                SendMailResult.builder().createdMailIds(Arrays.asList(1L, 2L)).build();
         SendMailResult copy = original.toBuilder().build();
 
         assertEquals(original, copy);
@@ -82,19 +84,21 @@ class SendMailResultTest {
     @Test
     void equals_shouldDistinguishOnCreatedMailIds() {
         SendMailResult a = SendMailResult.builder()
-                .createdMailIds(Collections.singletonList(1L)).build();
+                .createdMailIds(Collections.singletonList(1L))
+                .build();
         SendMailResult b = SendMailResult.builder()
-                .createdMailIds(Collections.singletonList(2L)).build();
+                .createdMailIds(Collections.singletonList(2L))
+                .build();
 
         assertNotEquals(a, b);
     }
 
     @Test
     void hashCode_shouldMatchEquals() {
-        SendMailResult a = SendMailResult.builder()
-                .createdMailIds(Arrays.asList(1L, 2L)).build();
-        SendMailResult b = SendMailResult.builder()
-                .createdMailIds(Arrays.asList(1L, 2L)).build();
+        SendMailResult a =
+                SendMailResult.builder().createdMailIds(Arrays.asList(1L, 2L)).build();
+        SendMailResult b =
+                SendMailResult.builder().createdMailIds(Arrays.asList(1L, 2L)).build();
 
         assertEquals(a.hashCode(), b.hashCode());
     }

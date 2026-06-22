@@ -9,8 +9,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class Nulls {
 
-    private Nulls() {
-    }
+    private Nulls() {}
 
     public static @Nullable Integer zeroToNull(int raw) {
         return raw == 0 ? null : raw;

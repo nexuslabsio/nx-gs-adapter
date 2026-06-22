@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.commands.item;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-
 import java.util.Objects;
 
 /**
@@ -65,9 +64,7 @@ public final class DeleteItemCommand implements NxCommand<DeleteItemResult> {
     private final Long itemId;
     private final Long count;
 
-    public DeleteItemCommand(Long charId,
-                             Long itemId,
-                             Long count) {
+    public DeleteItemCommand(Long charId, Long itemId, Long count) {
         if (charId == null) {
             throw new IllegalArgumentException("charId is required");
         }
@@ -114,10 +111,7 @@ public final class DeleteItemCommand implements NxCommand<DeleteItemResult> {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .charId(charId)
-                .itemId(itemId)
-                .count(count);
+        return new Builder().charId(charId).itemId(itemId).count(count);
     }
 
     public static Builder builder() {
@@ -141,9 +135,7 @@ public final class DeleteItemCommand implements NxCommand<DeleteItemResult> {
 
     @Override
     public String toString() {
-        return "DeleteItemCommand[charId=" + charId
-                + ", itemId=" + itemId
-                + ", count=" + count + "]";
+        return "DeleteItemCommand[charId=" + charId + ", itemId=" + itemId + ", count=" + count + "]";
     }
 
     public static final class Builder {

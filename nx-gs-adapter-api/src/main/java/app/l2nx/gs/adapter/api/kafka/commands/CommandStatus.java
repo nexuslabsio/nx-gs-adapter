@@ -7,7 +7,6 @@ package app.l2nx.gs.adapter.api.kafka.commands;
  * {@link #UNSUPPORTED_COMMAND} is adapter-emitted only.
  */
 public enum CommandStatus {
-
     OK(Tier.OK),
 
     NOT_FOUND(Tier.CLIENT_ERROR),

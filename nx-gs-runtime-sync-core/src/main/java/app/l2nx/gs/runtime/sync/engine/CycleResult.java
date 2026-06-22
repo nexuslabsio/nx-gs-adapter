@@ -1,7 +1,6 @@
 package app.l2nx.gs.runtime.sync.engine;
 
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
-
 import java.util.Objects;
 
 /**
@@ -24,21 +23,18 @@ public final class CycleResult {
     private final long failedAcks;
     private final long timedOutAcks;
 
-    public CycleResult(EntityState state,
-                       long durationMs,
-                       long created,
-                       long updated,
-                       long rowCount) {
+    public CycleResult(EntityState state, long durationMs, long created, long updated, long rowCount) {
         this(state, durationMs, created, updated, rowCount, 0L, 0L);
     }
 
-    public CycleResult(EntityState state,
-                       long durationMs,
-                       long created,
-                       long updated,
-                       long rowCount,
-                       long failedAcks,
-                       long timedOutAcks) {
+    public CycleResult(
+            EntityState state,
+            long durationMs,
+            long created,
+            long updated,
+            long rowCount,
+            long failedAcks,
+            long timedOutAcks) {
         this.state = state;
         this.durationMs = durationMs;
         this.created = created;
@@ -80,20 +76,12 @@ public final class CycleResult {
         return new CycleResult(EntityState.DEGRADED, durationMs, 0L, 0L, 0L, 0L, 0L);
     }
 
-    public static CycleResult degraded(long durationMs,
-                                       long created,
-                                       long updated,
-                                       long rowCount,
-                                       long failedAcks,
-                                       long timedOutAcks) {
-        return new CycleResult(EntityState.DEGRADED, durationMs, created, updated, rowCount,
-                failedAcks, timedOutAcks);
+    public static CycleResult degraded(
+            long durationMs, long created, long updated, long rowCount, long failedAcks, long timedOutAcks) {
+        return new CycleResult(EntityState.DEGRADED, durationMs, created, updated, rowCount, failedAcks, timedOutAcks);
     }
 
-    public static CycleResult healthy(long durationMs,
-                                      long created,
-                                      long updated,
-                                      long rowCount) {
+    public static CycleResult healthy(long durationMs, long created, long updated, long rowCount) {
         return new CycleResult(EntityState.HEALTHY, durationMs, created, updated, rowCount, 0L, 0L);
     }
 

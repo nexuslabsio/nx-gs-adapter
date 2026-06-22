@@ -1,40 +1,40 @@
 package app.l2nx.gs.db.sync.engine.phase;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
 import app.l2nx.gs.adapter.api.spi.ChildSource;
 import app.l2nx.gs.adapter.api.spi.PrimarySource;
 import app.l2nx.gs.db.sync.engine.JdbcDialect;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-
 import java.sql.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class Phase1HasherTest {
 
     @Test
     void buildPrimarySql_shouldEmitCrc32ConcatWs_inDeclaredColumnOrder() {
-        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
-                Arrays.asList("clan_name", "clan_level", "leader_id"));
+        PrimarySource<?> primary =
+                stubPrimary("clan_data", "clan_id", Arrays.asList("clan_name", "clan_level", "leader_id"));
 
         String sql = Phase1Hasher.buildPrimarySql(primary);
 
-        assertEquals("SELECT clan_id, CRC32(CONCAT_WS(',', clan_name, clan_level, leader_id)) "
-                + "FROM clan_data WHERE clan_id BETWEEN ? AND ?", sql);
+        assertEquals(
+                "SELECT clan_id, CRC32(CONCAT_WS(',', clan_name, clan_level, leader_id)) "
+                        + "FROM clan_data WHERE clan_id BETWEEN ? AND ?",
+                sql);
     }
 
     @Test
     void buildPrimarySql_shouldHandleSingleHashedColumn() {
-        PrimarySource<?> primary = stubPrimary("foo_t", "id",
-                Collections.singletonList("name"));
+        PrimarySource<?> primary = stubPrimary("foo_t", "id", Collections.singletonList("name"));
 
         assertTrue(Phase1Hasher.buildPrimarySql(primary).contains("CRC32(CONCAT_WS(',', name))"));
     }
@@ -55,14 +55,15 @@ class Phase1HasherTest {
 
     @Test
     void buildChildSql_shouldEmitBitXorOverCrc32_groupedByFk() {
-        ChildSource<?> child = stubChild("clan_skills", "clan_id",
-                Arrays.asList("skill_id", "skill_level"));
+        ChildSource<?> child = stubChild("clan_skills", "clan_id", Arrays.asList("skill_id", "skill_level"));
 
         String sql = Phase1Hasher.buildChildSql(child);
 
-        assertEquals("SELECT clan_id, BIT_XOR(CRC32(CONCAT_WS(',', skill_id, skill_level))) "
-                + "FROM clan_skills WHERE clan_id BETWEEN ? AND ? "
-                + "GROUP BY clan_id", sql);
+        assertEquals(
+                "SELECT clan_id, BIT_XOR(CRC32(CONCAT_WS(',', skill_id, skill_level))) "
+                        + "FROM clan_skills WHERE clan_id BETWEEN ? AND ? "
+                        + "GROUP BY clan_id",
+                sql);
     }
 
     @Test
@@ -74,8 +75,7 @@ class Phase1HasherTest {
 
     @Test
     void hashPrimary_shouldExecuteWindowedCrcQuery() throws SQLException {
-        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
-                Arrays.asList("clan_name", "clan_level"));
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id", Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
         PreparedStatement ps = mock(PreparedStatement.class);
         ResultSet rs = mock(ResultSet.class);
@@ -86,8 +86,8 @@ class Phase1HasherTest {
         when(rs.getLong(1)).thenReturn(10L, 20L);
         when(rs.getLong(2)).thenReturn(111L, 222L);
 
-        Long2IntMap result = new Phase1Hasher().hashPrimary(
-                conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.OTHER);
+        Long2IntMap result =
+                new Phase1Hasher().hashPrimary(conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.OTHER);
 
         assertEquals(2, result.size());
         assertEquals(111, result.get(10L));
@@ -100,14 +100,13 @@ class Phase1HasherTest {
 
     @ParameterizedTest
     @CsvSource({
-            "MYSQL,    -2147483648",
-            "MARIADB,  10000",
-            "POSTGRES, 10000",
-            "OTHER,    10000",
+        "MYSQL,    -2147483648",
+        "MARIADB,  10000",
+        "POSTGRES, 10000",
+        "OTHER,    10000",
     })
     void hashPrimary_shouldApplyFetchSize_perDialect(JdbcDialect dialect, int expectedFetchSize) throws SQLException {
-        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
-                Arrays.asList("clan_name", "clan_level"));
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id", Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
         PreparedStatement ps = mock(PreparedStatement.class);
         ResultSet rs = mock(ResultSet.class);
@@ -123,8 +122,7 @@ class Phase1HasherTest {
 
     @Test
     void hashChild_shouldReturnXorAggregatePerFk() throws SQLException {
-        ChildSource<?> child = stubChild("clan_skills", "clan_id",
-                Arrays.asList("skill_id", "skill_level"));
+        ChildSource<?> child = stubChild("clan_skills", "clan_id", Arrays.asList("skill_id", "skill_level"));
         Connection conn = mock(Connection.class);
         PreparedStatement ps = mock(PreparedStatement.class);
         ResultSet rs = mock(ResultSet.class);
@@ -135,8 +133,8 @@ class Phase1HasherTest {
         when(rs.getLong(1)).thenReturn(1L, 2L);
         when(rs.getLong(2)).thenReturn(0xAAAAL, 0xBBBBL);
 
-        Long2IntMap result = new Phase1Hasher().hashChild(
-                conn, new Window(0L, 100L), child, 5, 10_000, JdbcDialect.OTHER);
+        Long2IntMap result =
+                new Phase1Hasher().hashChild(conn, new Window(0L, 100L), child, 5, 10_000, JdbcDialect.OTHER);
 
         assertEquals(2, result.size());
         assertEquals(0xAAAA, result.get(1L));
@@ -145,37 +143,38 @@ class Phase1HasherTest {
 
     @Test
     void hashPrimary_shouldPropagateSQLException_whenQueryThrows() throws SQLException {
-        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
-                Arrays.asList("clan_name", "clan_level"));
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id", Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
         PreparedStatement ps = mock(PreparedStatement.class);
 
         when(conn.prepareStatement(anyString())).thenReturn(ps);
         when(ps.executeQuery()).thenThrow(new SQLException("query failed"));
 
-        SQLException thrown = assertThrows(SQLException.class,
-                () -> new Phase1Hasher().hashPrimary(conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.OTHER));
+        SQLException thrown = assertThrows(
+                SQLException.class,
+                () -> new Phase1Hasher()
+                        .hashPrimary(conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.OTHER));
         assertEquals("query failed", thrown.getMessage());
     }
 
     @Test
     void hashPrimary_shouldPropagateSQLTimeoutException_distinctFromGenericSQLException() throws SQLException {
-        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
-                Arrays.asList("clan_name", "clan_level"));
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id", Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
         PreparedStatement ps = mock(PreparedStatement.class);
 
         when(conn.prepareStatement(anyString())).thenReturn(ps);
         when(ps.executeQuery()).thenThrow(new SQLTimeoutException("timeout"));
 
-        assertThrows(SQLTimeoutException.class,
-                () -> new Phase1Hasher().hashPrimary(conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.OTHER));
+        assertThrows(
+                SQLTimeoutException.class,
+                () -> new Phase1Hasher()
+                        .hashPrimary(conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.OTHER));
     }
 
     @Test
     void hashPrimary_shouldNarrowCrc_forValuesAboveIntegerMaxValue() throws SQLException {
-        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id",
-                Arrays.asList("clan_name", "clan_level"));
+        PrimarySource<?> primary = stubPrimary("clan_data", "clan_id", Arrays.asList("clan_name", "clan_level"));
         Connection conn = mock(Connection.class);
         PreparedStatement ps = mock(PreparedStatement.class);
         ResultSet rs = mock(ResultSet.class);
@@ -187,11 +186,10 @@ class Phase1HasherTest {
         long crc32Unsigned = 3_735_928_559L; // 0xDEADBEEF
         when(rs.getLong(2)).thenReturn(crc32Unsigned);
 
-        Long2IntMap result = new Phase1Hasher().hashPrimary(
-                conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.OTHER);
+        Long2IntMap result =
+                new Phase1Hasher().hashPrimary(conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.OTHER);
 
-        assertEquals((int) crc32Unsigned, result.get(42L),
-                "CRC32 narrowing must preserve all 32 bits");
+        assertEquals((int) crc32Unsigned, result.get(42L), "CRC32 narrowing must preserve all 32 bits");
     }
 
     private static PrimarySource<Object> stubPrimary(String table, String pk, List<String> hashed) {

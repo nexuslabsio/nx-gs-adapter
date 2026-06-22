@@ -14,8 +14,7 @@ public final class Window {
 
     public Window(long fromPk, long toPk) {
         if (toPk < fromPk) {
-            throw new IllegalArgumentException(
-                    "Window toPk=" + toPk + " < fromPk=" + fromPk);
+            throw new IllegalArgumentException("Window toPk=" + toPk + " < fromPk=" + fromPk);
         }
         this.fromPk = fromPk;
         this.toPk = toPk;

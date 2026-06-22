@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Closed Olympiad 1v1 match — one event per participant (self-perspective).
@@ -49,27 +48,28 @@ public final class OlympiadMatchResultEvent {
     private final long fightDurationSec;
     private final @Nullable Map<String, String> metadata;
 
-    public OlympiadMatchResultEvent(UUID eventId,
-                                    UUID matchId,
-                                    int olympiadCycle,
-                                    OlympiadGameType gameType,
-                                    long charId,
-                                    int classId,
-                                    @Nullable CharacterClass clazz,
-                                    @Nullable Long clanId,
-                                    long opponentCharId,
-                                    int opponentClassId,
-                                    @Nullable CharacterClass opponentClazz,
-                                    @Nullable Long opponentClanId,
-                                    OlympiadMatchResult result,
-                                    OlympiadMatchReason reason,
-                                    int pointsBefore,
-                                    int pointsAfter,
-                                    int damageDealt,
-                                    int opponentDamageDealt,
-                                    @Nullable Instant fightStartedAt,
-                                    long fightDurationSec,
-                                    @Nullable Map<String, String> metadata) {
+    public OlympiadMatchResultEvent(
+            UUID eventId,
+            UUID matchId,
+            int olympiadCycle,
+            OlympiadGameType gameType,
+            long charId,
+            int classId,
+            @Nullable CharacterClass clazz,
+            @Nullable Long clanId,
+            long opponentCharId,
+            int opponentClassId,
+            @Nullable CharacterClass opponentClazz,
+            @Nullable Long opponentClanId,
+            OlympiadMatchResult result,
+            OlympiadMatchReason reason,
+            int pointsBefore,
+            int pointsAfter,
+            int damageDealt,
+            int opponentDamageDealt,
+            @Nullable Instant fightStartedAt,
+            long fightDurationSec,
+            @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.matchId = matchId;
         this.olympiadCycle = olympiadCycle;
@@ -90,9 +90,8 @@ public final class OlympiadMatchResultEvent {
         this.opponentDamageDealt = opponentDamageDealt;
         this.fightStartedAt = fightStartedAt;
         this.fightDurationSec = fightDurationSec;
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {
@@ -268,13 +267,28 @@ public final class OlympiadMatchResultEvent {
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, matchId, olympiadCycle, gameType,
-                charId, classId, clazz, clanId,
-                opponentCharId, opponentClassId, opponentClazz, opponentClanId,
-                result, reason,
-                pointsBefore, pointsAfter,
-                damageDealt, opponentDamageDealt,
-                fightStartedAt, fightDurationSec, metadata);
+        return Objects.hash(
+                eventId,
+                matchId,
+                olympiadCycle,
+                gameType,
+                charId,
+                classId,
+                clazz,
+                clanId,
+                opponentCharId,
+                opponentClassId,
+                opponentClazz,
+                opponentClanId,
+                result,
+                reason,
+                pointsBefore,
+                pointsAfter,
+                damageDealt,
+                opponentDamageDealt,
+                fightStartedAt,
+                fightDurationSec,
+                metadata);
     }
 
     @Override
@@ -431,13 +445,28 @@ public final class OlympiadMatchResultEvent {
         }
 
         public OlympiadMatchResultEvent build() {
-            return new OlympiadMatchResultEvent(eventId, matchId, olympiadCycle, gameType,
-                    charId, classId, clazz, clanId,
-                    opponentCharId, opponentClassId, opponentClazz, opponentClanId,
-                    result, reason,
-                    pointsBefore, pointsAfter,
-                    damageDealt, opponentDamageDealt,
-                    fightStartedAt, fightDurationSec, metadata);
+            return new OlympiadMatchResultEvent(
+                    eventId,
+                    matchId,
+                    olympiadCycle,
+                    gameType,
+                    charId,
+                    classId,
+                    clazz,
+                    clanId,
+                    opponentCharId,
+                    opponentClassId,
+                    opponentClazz,
+                    opponentClanId,
+                    result,
+                    reason,
+                    pointsBefore,
+                    pointsAfter,
+                    damageDealt,
+                    opponentDamageDealt,
+                    fightStartedAt,
+                    fightDurationSec,
+                    metadata);
         }
     }
 }

@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.character;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Instant;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class CharacterInstanceCooldownDbDtoTest {
 
@@ -13,7 +12,9 @@ class CharacterInstanceCooldownDbDtoTest {
     @Test
     void builder_shouldMatchConstructor() {
         CharacterInstanceCooldownDbDto fromBuilder = CharacterInstanceCooldownDbDto.builder()
-                .instanceId(112).reentryAt(REENTRY).build();
+                .instanceId(112)
+                .reentryAt(REENTRY)
+                .build();
         CharacterInstanceCooldownDbDto fromCtor = new CharacterInstanceCooldownDbDto(112, REENTRY);
 
         assertEquals(fromCtor, fromBuilder);
@@ -22,14 +23,12 @@ class CharacterInstanceCooldownDbDtoTest {
 
     @Test
     void equals_shouldDistinguishInstanceId() {
-        assertNotEquals(new CharacterInstanceCooldownDbDto(1, REENTRY),
-                new CharacterInstanceCooldownDbDto(2, REENTRY));
+        assertNotEquals(new CharacterInstanceCooldownDbDto(1, REENTRY), new CharacterInstanceCooldownDbDto(2, REENTRY));
     }
 
     @Test
     void constructor_shouldRejectNullReentryAt() {
-        assertThrows(NullPointerException.class,
-                () -> new CharacterInstanceCooldownDbDto(1, null));
+        assertThrows(NullPointerException.class, () -> new CharacterInstanceCooldownDbDto(1, null));
     }
 
     @Test

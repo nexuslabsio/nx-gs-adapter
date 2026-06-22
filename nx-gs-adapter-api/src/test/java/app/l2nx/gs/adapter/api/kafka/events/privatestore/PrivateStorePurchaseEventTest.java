@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class PrivateStorePurchaseEventTest {
 
@@ -13,7 +12,8 @@ class PrivateStorePurchaseEventTest {
         PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
-                .sellerId(1L).buyerId(2L)
+                .sellerId(1L)
+                .buyerId(2L)
                 .build();
 
         assertTrue(event.getLines().isEmpty());
@@ -24,7 +24,8 @@ class PrivateStorePurchaseEventTest {
         PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
-                .sellerId(1L).buyerId(2L)
+                .sellerId(1L)
+                .buyerId(2L)
                 .lines(null)
                 .build();
 
@@ -36,7 +37,8 @@ class PrivateStorePurchaseEventTest {
         PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
-                .sellerId(1L).buyerId(2L)
+                .sellerId(1L)
+                .buyerId(2L)
                 .build();
 
         assertNull(event.getSellerName());
@@ -48,12 +50,12 @@ class PrivateStorePurchaseEventTest {
         PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
-                .sellerId(1L).buyerId(2L)
+                .sellerId(1L)
+                .buyerId(2L)
                 .lines(Collections.singletonList(stubLine(1234L, 100L)))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getLines().add(stubLine(5678L, 200L)));
+        assertThrows(UnsupportedOperationException.class, () -> event.getLines().add(stubLine(5678L, 200L)));
     }
 
     @Test
@@ -64,7 +66,8 @@ class PrivateStorePurchaseEventTest {
         PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.ASK)
-                .sellerId(1L).buyerId(2L)
+                .sellerId(1L)
+                .buyerId(2L)
                 .lines(source)
                 .build();
 
@@ -78,8 +81,10 @@ class PrivateStorePurchaseEventTest {
         PrivateStorePurchaseEvent original = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
                 .storeType(PrivateStoreSide.BID)
-                .sellerId(268437521L).sellerName("Hisho")
-                .buyerId(268437522L).buyerName("Shanon")
+                .sellerId(268437521L)
+                .sellerName("Hisho")
+                .buyerId(268437522L)
+                .buyerName("Shanon")
                 .lines(Arrays.asList(stubLine(1234L, 100L), stubLine(5678L, 200L)))
                 .build();
 
@@ -90,11 +95,15 @@ class PrivateStorePurchaseEventTest {
     void equals_shouldDistinguishEventId() {
         PrivateStorePurchaseEvent a = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
-                .storeType(PrivateStoreSide.ASK).sellerId(1L).buyerId(2L)
+                .storeType(PrivateStoreSide.ASK)
+                .sellerId(1L)
+                .buyerId(2L)
                 .build();
         PrivateStorePurchaseEvent b = PrivateStorePurchaseEvent.builder()
                 .eventId(UUID.randomUUID())
-                .storeType(PrivateStoreSide.ASK).sellerId(1L).buyerId(2L)
+                .storeType(PrivateStoreSide.ASK)
+                .sellerId(1L)
+                .buyerId(2L)
                 .build();
 
         assertNotEquals(a, b);
@@ -104,9 +113,17 @@ class PrivateStorePurchaseEventTest {
     void equals_shouldDistinguishStoreType() {
         UUID id = UUID.randomUUID();
         PrivateStorePurchaseEvent ask = PrivateStorePurchaseEvent.builder()
-                .eventId(id).storeType(PrivateStoreSide.ASK).sellerId(1L).buyerId(2L).build();
+                .eventId(id)
+                .storeType(PrivateStoreSide.ASK)
+                .sellerId(1L)
+                .buyerId(2L)
+                .build();
         PrivateStorePurchaseEvent bid = PrivateStorePurchaseEvent.builder()
-                .eventId(id).storeType(PrivateStoreSide.BID).sellerId(1L).buyerId(2L).build();
+                .eventId(id)
+                .storeType(PrivateStoreSide.BID)
+                .sellerId(1L)
+                .buyerId(2L)
+                .build();
 
         assertNotEquals(ask, bid);
     }
@@ -115,8 +132,10 @@ class PrivateStorePurchaseEventTest {
     void toString_shouldRenderEventIdAndPartyIds() {
         UUID id = UUID.fromString("018f5fa3-1e3d-7000-8000-000000000000");
         PrivateStorePurchaseEvent event = PrivateStorePurchaseEvent.builder()
-                .eventId(id).storeType(PrivateStoreSide.ASK)
-                .sellerId(11L).buyerId(22L)
+                .eventId(id)
+                .storeType(PrivateStoreSide.ASK)
+                .sellerId(11L)
+                .buyerId(22L)
                 .build();
 
         String s = event.toString();
@@ -128,7 +147,10 @@ class PrivateStorePurchaseEventTest {
 
     private static TradeLine stubLine(long itemId, long unitPrice) {
         return TradeLine.builder()
-                .itemId(itemId).count(1L).unitPrice(unitPrice).currencyItemId(57L)
+                .itemId(itemId)
+                .count(1L)
+                .unitPrice(unitPrice)
+                .currencyItemId(57L)
                 .build();
     }
 }

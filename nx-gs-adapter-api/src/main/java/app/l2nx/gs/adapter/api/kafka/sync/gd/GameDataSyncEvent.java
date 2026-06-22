@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Self-contained wire envelope for the {@code gd} (game-data) sync stream — the
@@ -45,13 +44,14 @@ public final class GameDataSyncEvent<T> {
     private final @Nullable Integer count;
     private final long timestampEpochMs;
 
-    public GameDataSyncEvent(String entityName,
-                             String op,
-                             UUID syncId,
-                             @Nullable Long pk,
-                             @Nullable T payload,
-                             @Nullable Integer count,
-                             long timestampEpochMs) {
+    public GameDataSyncEvent(
+            String entityName,
+            String op,
+            UUID syncId,
+            @Nullable Long pk,
+            @Nullable T payload,
+            @Nullable Integer count,
+            long timestampEpochMs) {
         this.entityName = Objects.requireNonNull(entityName, "entityName");
         this.op = Objects.requireNonNull(op, "op");
         this.syncId = Objects.requireNonNull(syncId, "syncId");
@@ -143,8 +143,8 @@ public final class GameDataSyncEvent<T> {
 
     @Override
     public String toString() {
-        return "GameDataSyncEvent[entityName=" + entityName + ", op=" + op + ", syncId=" + syncId
-                + ", pk=" + pk + ", count=" + count + "]";
+        return "GameDataSyncEvent[entityName=" + entityName + ", op=" + op + ", syncId=" + syncId + ", pk=" + pk
+                + ", count=" + count + "]";
     }
 
     public static final class Builder<T> {

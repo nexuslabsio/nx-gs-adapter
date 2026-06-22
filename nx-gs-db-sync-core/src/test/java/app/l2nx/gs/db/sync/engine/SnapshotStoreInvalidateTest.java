@@ -1,9 +1,9 @@
 package app.l2nx.gs.db.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class SnapshotStoreInvalidateTest {
 

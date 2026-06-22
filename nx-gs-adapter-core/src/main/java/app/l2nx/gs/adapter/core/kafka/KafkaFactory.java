@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.core.kafka;
 
 import app.l2nx.gs.kafka.KafkaState;
-
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -40,9 +39,10 @@ public interface KafkaFactory {
      * @return the post-build state — {@link KafkaState#CONNECTED} or
      * {@link KafkaState#DISCONNECTED}
      */
-    KafkaState build(String brokers,
-                     String clientId,
-                     Map<String, Object> properties,
-                     Map<String, byte[]> staticHeaders,
-                     Consumer<KafkaState> stateChangeListener);
+    KafkaState build(
+            String brokers,
+            String clientId,
+            Map<String, Object> properties,
+            Map<String, byte[]> staticHeaders,
+            Consumer<KafkaState> stateChangeListener);
 }

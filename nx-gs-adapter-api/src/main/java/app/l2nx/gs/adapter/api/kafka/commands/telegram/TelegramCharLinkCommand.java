@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.commands.telegram;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-
 import java.util.Objects;
 
 /**
@@ -57,10 +56,7 @@ public final class TelegramCharLinkCommand implements NxCommand<TelegramCharLink
     private final String confirmationCode;
     private final Long telegramUserId;
 
-    public TelegramCharLinkCommand(String accountName,
-                                   String charName,
-                                   String confirmationCode,
-                                   Long telegramUserId) {
+    public TelegramCharLinkCommand(String accountName, String charName, String confirmationCode, Long telegramUserId) {
         if (accountName == null) {
             throw new IllegalArgumentException("accountName is required");
         }

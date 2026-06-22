@@ -1,14 +1,13 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.item;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.domain.Attribute;
 import app.l2nx.gs.adapter.api.domain.item.ItemLocation;
-import org.junit.jupiter.api.Test;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ItemDbDtoTest {
 
@@ -66,10 +65,8 @@ class ItemDbDtoTest {
 
     @Test
     void attributes_shouldBeEmptyList_whenTenantSyncsThemButItemHasNone() {
-        ItemDbDto item = ItemDbDto.builder()
-                .id(1L)
-                .attributes(Collections.emptyList())
-                .build();
+        ItemDbDto item =
+                ItemDbDto.builder().id(1L).attributes(Collections.emptyList()).build();
 
         assertNotNull(item.getAttributes());
         assertTrue(item.getAttributes().isEmpty());

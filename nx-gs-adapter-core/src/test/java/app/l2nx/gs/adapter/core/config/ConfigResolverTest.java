@@ -1,9 +1,6 @@
 package app.l2nx.gs.adapter.core.config;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,8 +9,10 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ConfigResolverTest {
 
@@ -142,19 +141,21 @@ class ConfigResolverTest {
     }
 
     @ParameterizedTest(name = "rejects {0}")
-    @ValueSource(strings = {
-            "http://acme.api.l2nx.app",                // wrong scheme — bearer would travel plaintext
-            "ftp://acme.api.l2nx.app",                 // non-http(s) scheme
-            "https:///path",                           // missing host
-            "https://acme.api.l2nx.app?route=evil",    // query string
-            "https://acme.api.l2nx.app#frag",          // fragment
-            "https://acme api.l2nx.app"                // malformed URI (space in authority)
-    })
+    @ValueSource(
+            strings = {
+                "http://acme.api.l2nx.app", // wrong scheme — bearer would travel plaintext
+                "ftp://acme.api.l2nx.app", // non-http(s) scheme
+                "https:///path", // missing host
+                "https://acme.api.l2nx.app?route=evil", // query string
+                "https://acme.api.l2nx.app#frag", // fragment
+                "https://acme api.l2nx.app" // malformed URI (space in authority)
+            })
     void resolvePlatformUrl_shouldRejectInvalidValues(String value) {
         ConfigResolver resolver = withSysprop("l2nx.platform-url", value);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, resolver::resolvePlatformUrl);
-        assertTrue(ex.getMessage().contains("l2nx.platform-url"),
+        assertTrue(
+                ex.getMessage().contains("l2nx.platform-url"),
                 "rejection message must reference key, got: " + ex.getMessage());
     }
 
@@ -226,10 +227,11 @@ class ConfigResolverTest {
     @Test
     void loadFileProperties_shouldUseExplicitPath_whenConfigFileSyspropSet(@TempDir Path tempDir) throws IOException {
         Path configFile = tempDir.resolve("adapter.properties");
-        Files.write(configFile,
-                ("l2nx.gs-key=" + VALID_KEY + "\nl2nx.enabled=true\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(
+                configFile, ("l2nx.gs-key=" + VALID_KEY + "\nl2nx.enabled=true\n").getBytes(StandardCharsets.UTF_8));
 
-        Map<String, String> sys = singletonMap("l2nx.config-file", configFile.toAbsolutePath().toString());
+        Map<String, String> sys =
+                singletonMap("l2nx.config-file", configFile.toAbsolutePath().toString());
 
         Properties loaded = ConfigResolver.loadFileProperties(sys::get);
 
@@ -242,7 +244,8 @@ class ConfigResolverTest {
         Path configFile = tempDir.resolve("adapter.properties");
         Files.write(configFile, "label=кофе ☕\n".getBytes(StandardCharsets.UTF_8));
 
-        Map<String, String> sys = singletonMap("l2nx.config-file", configFile.toAbsolutePath().toString());
+        Map<String, String> sys =
+                singletonMap("l2nx.config-file", configFile.toAbsolutePath().toString());
 
         Properties loaded = ConfigResolver.loadFileProperties(sys::get);
 
@@ -254,8 +257,8 @@ class ConfigResolverTest {
         Path missing = tempDir.resolve("nonexistent-adapter.properties");
         Map<String, String> sys = singletonMap("l2nx.config-file", missing.toString());
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> ConfigResolver.loadFileProperties(sys::get));
+        IllegalStateException ex =
+                assertThrows(IllegalStateException.class, () -> ConfigResolver.loadFileProperties(sys::get));
         assertTrue(ex.getMessage().contains("l2nx.config-file"));
         assertTrue(ex.getMessage().contains(missing.toString()));
     }
@@ -274,8 +277,8 @@ class ConfigResolverTest {
     void loadFileProperties_shouldReadDefaultFile_whenConfigFileSyspropAbsentAndDefaultFileExists(@TempDir Path tempDir)
             throws IOException {
         Path defaultFile = tempDir.resolve("l2nx.properties");
-        Files.write(defaultFile,
-                ("l2nx.gs-key=" + VALID_KEY + "\nl2nx.enabled=true\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(
+                defaultFile, ("l2nx.gs-key=" + VALID_KEY + "\nl2nx.enabled=true\n").getBytes(StandardCharsets.UTF_8));
 
         Properties loaded = ConfigResolver.loadFileProperties(empty(), defaultFile);
 
@@ -289,11 +292,12 @@ class ConfigResolverTest {
         Path defaultPath = tempDir.resolve("l2nx.properties");
         Files.createDirectory(defaultPath);
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> ConfigResolver.loadFileProperties(empty(), defaultPath));
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class, () -> ConfigResolver.loadFileProperties(empty(), defaultPath));
         assertTrue(ex.getMessage().contains("l2nx.properties"));
         // Differentiated wording — must NOT claim the operator set -Dl2nx.config-file
-        assertTrue(ex.getMessage().contains("default config file"),
+        assertTrue(
+                ex.getMessage().contains("default config file"),
                 "expected default-file wording, got: " + ex.getMessage());
     }
 
@@ -334,16 +338,14 @@ class ConfigResolverTest {
         ConfigResolver resolver = new ConfigResolver(sys::get, names, file);
 
         Map<String, Object> overrides = resolver.resolveCommandsConfig().getKafkaOverrides();
-        assertEquals("75", overrides.get("max.poll.records"),
-                "file-supplied value must beat sysprop-supplied value");
+        assertEquals("75", overrides.get("max.poll.records"), "file-supplied value must beat sysprop-supplied value");
     }
 
     @Test
     void resolveIoWorkers_shouldDefaultWhenAbsent() {
         ConfigResolver resolver = new ConfigResolver(empty(), new Properties());
 
-        assertTrue(resolver.resolveIoWorkers() >= 2,
-                "default must respect the DEFAULT_IO_WORKERS_MIN floor");
+        assertTrue(resolver.resolveIoWorkers() >= 2, "default must respect the DEFAULT_IO_WORKERS_MIN floor");
     }
 
     @Test
@@ -404,8 +406,7 @@ class ConfigResolverTest {
         sys.put("l2nx.ls-key", VALID_LS_KEY);
         ConfigResolver resolver = new ConfigResolver(sys::get, new Properties());
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> resolver.resolveServerKey("ls"));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> resolver.resolveServerKey("ls"));
         assertTrue(ex.getMessage().contains("l2nx.gs-key"));
         assertTrue(ex.getMessage().contains("ls"));
     }
@@ -417,8 +418,7 @@ class ConfigResolverTest {
         sys.put("l2nx.ls-key", VALID_LS_KEY);
         ConfigResolver resolver = new ConfigResolver(sys::get, new Properties());
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> resolver.resolveServerKey("gs"));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> resolver.resolveServerKey("gs"));
         assertTrue(ex.getMessage().contains("l2nx.ls-key"));
         assertTrue(ex.getMessage().contains("gs"));
     }
@@ -427,8 +427,7 @@ class ConfigResolverTest {
     void resolveServerKey_shouldFailMissing_whenLsKeyAbsentAndHostTypeLs() {
         ConfigResolver resolver = new ConfigResolver(empty(), new Properties());
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> resolver.resolveServerKey("ls"));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> resolver.resolveServerKey("ls"));
         assertTrue(ex.getMessage().contains("l2nx.ls-key"));
         assertTrue(ex.getMessage().contains("Missing"));
     }
@@ -467,12 +466,12 @@ class ConfigResolverTest {
         // NUL char is illegal in paths on every platform — Paths.get throws InvalidPathException
         Map<String, String> sys = singletonMap("l2nx.config-file", "bad\u0000path");
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> ConfigResolver.loadFileProperties(sys::get));
-        assertTrue(ex.getMessage().contains("l2nx.config-file"),
+        IllegalStateException ex =
+                assertThrows(IllegalStateException.class, () -> ConfigResolver.loadFileProperties(sys::get));
+        assertTrue(
+                ex.getMessage().contains("l2nx.config-file"),
                 "expected config-file key in error, got: " + ex.getMessage());
-        assertTrue(ex.getMessage().contains("invalid path"),
-                "expected invalid-path wording, got: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("invalid path"), "expected invalid-path wording, got: " + ex.getMessage());
     }
 
     private static ConfigResolver withSysprop(String key, String value) {

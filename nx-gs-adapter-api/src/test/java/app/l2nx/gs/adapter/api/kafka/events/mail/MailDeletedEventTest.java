@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
-import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
 
 class MailDeletedEventTest {
 
@@ -14,7 +13,10 @@ class MailDeletedEventTest {
     @Test
     void builder_shouldMatchConstructor() {
         MailDeletedEvent fromBuilder = MailDeletedEvent.builder()
-                .eventId(EVENT_ID).mailId(42L).side(MailDeletionSide.SENDER).build();
+                .eventId(EVENT_ID)
+                .mailId(42L)
+                .side(MailDeletionSide.SENDER)
+                .build();
         MailDeletedEvent fromCtor = new MailDeletedEvent(EVENT_ID, 42L, MailDeletionSide.SENDER);
 
         assertEquals(fromCtor, fromBuilder);
@@ -38,7 +40,8 @@ class MailDeletedEventTest {
 
     @Test
     void readEvent_builder_shouldMatchConstructor() {
-        MailReadEvent fromBuilder = MailReadEvent.builder().eventId(EVENT_ID).mailId(9L).build();
+        MailReadEvent fromBuilder =
+                MailReadEvent.builder().eventId(EVENT_ID).mailId(9L).build();
         MailReadEvent fromCtor = new MailReadEvent(EVENT_ID, 9L);
 
         assertEquals(fromCtor, fromBuilder);

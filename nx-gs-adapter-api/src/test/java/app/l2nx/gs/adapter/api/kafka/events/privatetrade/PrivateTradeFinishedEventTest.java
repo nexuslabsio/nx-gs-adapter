@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatetrade;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Collections;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class PrivateTradeFinishedEventTest {
 
@@ -38,9 +37,17 @@ class PrivateTradeFinishedEventTest {
         TradeParty empty = TradeParty.builder().charId(1L).build();
 
         PrivateTradeFinishedEvent a = PrivateTradeFinishedEvent.builder()
-                .eventId(UUID.randomUUID()).tradeId(tradeId).partyA(empty).partyB(empty).build();
+                .eventId(UUID.randomUUID())
+                .tradeId(tradeId)
+                .partyA(empty)
+                .partyB(empty)
+                .build();
         PrivateTradeFinishedEvent b = PrivateTradeFinishedEvent.builder()
-                .eventId(UUID.randomUUID()).tradeId(tradeId).partyA(empty).partyB(empty).build();
+                .eventId(UUID.randomUUID())
+                .tradeId(tradeId)
+                .partyA(empty)
+                .partyB(empty)
+                .build();
 
         assertNotEquals(a, b);
     }
@@ -51,9 +58,17 @@ class PrivateTradeFinishedEventTest {
         TradeParty empty = TradeParty.builder().charId(1L).build();
 
         PrivateTradeFinishedEvent a = PrivateTradeFinishedEvent.builder()
-                .eventId(eventId).tradeId(UUID.randomUUID()).partyA(empty).partyB(empty).build();
+                .eventId(eventId)
+                .tradeId(UUID.randomUUID())
+                .partyA(empty)
+                .partyB(empty)
+                .build();
         PrivateTradeFinishedEvent b = PrivateTradeFinishedEvent.builder()
-                .eventId(eventId).tradeId(UUID.randomUUID()).partyA(empty).partyB(empty).build();
+                .eventId(eventId)
+                .tradeId(UUID.randomUUID())
+                .partyA(empty)
+                .partyB(empty)
+                .build();
 
         assertNotEquals(a, b);
     }
@@ -64,9 +79,7 @@ class PrivateTradeFinishedEventTest {
                 .charId(1L)
                 .items(Collections.singletonList(stub(6611L, 11L, 22L, 1L)))
                 .build();
-        TradeParty receiver = TradeParty.builder()
-                .charId(2L)
-                .build();
+        TradeParty receiver = TradeParty.builder().charId(2L).build();
 
         PrivateTradeFinishedEvent event = PrivateTradeFinishedEvent.builder()
                 .eventId(UUID.randomUUID())
@@ -86,7 +99,11 @@ class PrivateTradeFinishedEventTest {
         TradeParty empty = TradeParty.builder().charId(11L).build();
 
         PrivateTradeFinishedEvent event = PrivateTradeFinishedEvent.builder()
-                .eventId(eventId).tradeId(tradeId).partyA(empty).partyB(empty).build();
+                .eventId(eventId)
+                .tradeId(tradeId)
+                .partyA(empty)
+                .partyB(empty)
+                .build();
 
         String s = event.toString();
         assertTrue(s.contains("eventId=" + eventId));
@@ -95,7 +112,10 @@ class PrivateTradeFinishedEventTest {
 
     private static TradeItemMovement stub(long template, long itemId, long newItemId, long count) {
         return TradeItemMovement.builder()
-                .itemTemplateId(template).itemId(itemId).newItemId(newItemId).count(count)
+                .itemTemplateId(template)
+                .itemId(itemId)
+                .newItemId(newItemId)
+                .count(count)
                 .build();
     }
 }

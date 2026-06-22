@@ -38,8 +38,7 @@ package app.l2nx.gs.adapter.api.kafka.events.serveronline;
  */
 public final class WellKnownServerOnlineBuckets {
 
-    private WellKnownServerOnlineBuckets() {
-    }
+    private WellKnownServerOnlineBuckets() {}
 
     /**
      * Required. Total character presence on the server — every entity the

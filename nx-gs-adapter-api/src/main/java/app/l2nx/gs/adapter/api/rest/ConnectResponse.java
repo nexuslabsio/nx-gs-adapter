@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.rest;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Adapter handshake response — identity bundle plus the Kafka context the adapter
@@ -28,15 +27,16 @@ public final class ConnectResponse {
     private final @Nullable SyncTopics syncTopics;
     private final @Nullable MessagingTopics messagingTopics;
 
-    public ConnectResponse(UUID tenantId,
-                           String tenantSlug,
-                           UUID serverId,
-                           String serverSlug,
-                           String serverName,
-                           KafkaCredentials kafka,
-                           @Nullable String heartbeatTopic,
-                           @Nullable SyncTopics syncTopics,
-                           @Nullable MessagingTopics messagingTopics) {
+    public ConnectResponse(
+            UUID tenantId,
+            String tenantSlug,
+            UUID serverId,
+            String serverSlug,
+            String serverName,
+            KafkaCredentials kafka,
+            @Nullable String heartbeatTopic,
+            @Nullable SyncTopics syncTopics,
+            @Nullable MessagingTopics messagingTopics) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
@@ -142,8 +142,16 @@ public final class ConnectResponse {
 
     @Override
     public int hashCode() {
-        return Objects.hash(tenantId, tenantSlug, serverId, serverSlug, serverName,
-                kafka, heartbeatTopic, syncTopics, messagingTopics);
+        return Objects.hash(
+                tenantId,
+                tenantSlug,
+                serverId,
+                serverSlug,
+                serverName,
+                kafka,
+                heartbeatTopic,
+                syncTopics,
+                messagingTopics);
     }
 
     @Override
@@ -216,8 +224,16 @@ public final class ConnectResponse {
         }
 
         public ConnectResponse build() {
-            return new ConnectResponse(tenantId, tenantSlug, serverId, serverSlug,
-                    serverName, kafka, heartbeatTopic, syncTopics, messagingTopics);
+            return new ConnectResponse(
+                    tenantId,
+                    tenantSlug,
+                    serverId,
+                    serverSlug,
+                    serverName,
+                    kafka,
+                    heartbeatTopic,
+                    syncTopics,
+                    messagingTopics);
         }
     }
 }

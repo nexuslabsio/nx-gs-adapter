@@ -30,14 +30,15 @@ public final class LoginServerConnectResponse {
     private final String heartbeatTopic;
     private final MessagingTopics messagingTopics;
 
-    public LoginServerConnectResponse(UUID serverId,
-                                      String serverSlug,
-                                      UUID tenantId,
-                                      String tenantSlug,
-                                      String serverName,
-                                      KafkaCredentials kafka,
-                                      String heartbeatTopic,
-                                      MessagingTopics messagingTopics) {
+    public LoginServerConnectResponse(
+            UUID serverId,
+            String serverSlug,
+            UUID tenantId,
+            String tenantSlug,
+            String serverName,
+            KafkaCredentials kafka,
+            String heartbeatTopic,
+            MessagingTopics messagingTopics) {
         this.serverId = serverId;
         this.serverSlug = serverSlug;
         this.tenantId = tenantId;
@@ -113,8 +114,8 @@ public final class LoginServerConnectResponse {
 
     @Override
     public int hashCode() {
-        return Objects.hash(serverId, serverSlug, tenantId, tenantSlug, serverName,
-                kafka, heartbeatTopic, messagingTopics);
+        return Objects.hash(
+                serverId, serverSlug, tenantId, tenantSlug, serverName, kafka, heartbeatTopic, messagingTopics);
     }
 
     @Override
@@ -180,8 +181,8 @@ public final class LoginServerConnectResponse {
         }
 
         public LoginServerConnectResponse build() {
-            return new LoginServerConnectResponse(serverId, serverSlug, tenantId, tenantSlug,
-                    serverName, kafka, heartbeatTopic, messagingTopics);
+            return new LoginServerConnectResponse(
+                    serverId, serverSlug, tenantId, tenantSlug, serverName, kafka, heartbeatTopic, messagingTopics);
         }
     }
 }

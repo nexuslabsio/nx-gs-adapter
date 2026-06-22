@@ -23,8 +23,7 @@ package app.l2nx.gs.adapter.api.kafka.events.raid;
  */
 public final class WellKnownBossDivisions {
 
-    private WellKnownBossDivisions() {
-    }
+    private WellKnownBossDivisions() {}
 
     public static final String PIVOWAR = "pivowar";
 

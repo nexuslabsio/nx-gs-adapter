@@ -5,7 +5,6 @@ import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
-
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -58,7 +57,7 @@ final class TypedHttpConnect<R> {
             conn.setDoOutput(true);
 
             try (OutputStream os = conn.getOutputStream();
-                 Writer w = new BufferedWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8))) {
+                    Writer w = new BufferedWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8))) {
                 gson.toJson(body, w);
             }
 
@@ -73,7 +72,9 @@ final class TypedHttpConnect<R> {
                     }
                     return TypedConnectOutcome.ok(parsed);
                 } catch (JsonSyntaxException e) {
-                    log.warn("connect: 200 with malformed JSON ({})", e.getClass().getSimpleName());
+                    log.warn(
+                            "connect: 200 with malformed JSON ({})",
+                            e.getClass().getSimpleName());
                     return TypedConnectOutcome.ioFailure(new IOException("connect: malformed response body", e));
                 }
             }

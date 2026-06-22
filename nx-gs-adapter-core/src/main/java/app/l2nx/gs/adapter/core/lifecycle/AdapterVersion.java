@@ -20,8 +20,7 @@ public final class AdapterVersion {
     private static final String FALLBACK = "unknown";
     private static final String RESOURCE_PATH = "/META-INF/nx-gs-adapter-core.version";
 
-    private AdapterVersion() {
-    }
+    private AdapterVersion() {}
 
     public static String resolve() {
         String fromResource = readResource();
@@ -37,8 +36,7 @@ public final class AdapterVersion {
             if (is == null) {
                 return null;
             }
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
                 String line = reader.readLine();
                 if (line == null) {
                     return null;

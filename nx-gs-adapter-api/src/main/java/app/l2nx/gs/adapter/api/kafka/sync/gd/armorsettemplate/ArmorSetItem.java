@@ -31,9 +31,7 @@ public final class ArmorSetItem {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .slot(slot)
-                .itemTemplateId(itemTemplateId);
+        return new Builder().slot(slot).itemTemplateId(itemTemplateId);
     }
 
     public static Builder builder() {

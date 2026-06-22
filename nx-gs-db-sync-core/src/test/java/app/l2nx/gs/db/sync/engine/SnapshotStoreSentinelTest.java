@@ -1,21 +1,22 @@
 package app.l2nx.gs.db.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import org.junit.jupiter.api.Test;
-
 import java.util.Arrays;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 class SnapshotStoreSentinelTest {
 
     @Test
     void missingHashSentinel_shouldBeIntegerMinValue() {
-        assertEquals(Integer.MIN_VALUE, Phase1Hasher.MISSING_HASH,
+        assertEquals(
+                Integer.MIN_VALUE,
+                Phase1Hasher.MISSING_HASH,
                 "MISSING_HASH must be Integer.MIN_VALUE to disambiguate from legit CRC32=0");
     }
 
@@ -79,8 +80,8 @@ class SnapshotStoreSentinelTest {
         store.putCrc("clan", 15L, 150);
         store.putCrc("clan", 20L, 200);
 
-        Long2ObjectOpenHashMap<LongSet> buckets = store.bucketByWindows("clan",
-                Arrays.asList(new Window(0L, 5L), new Window(6L, 15L), new Window(16L, 25L)));
+        Long2ObjectOpenHashMap<LongSet> buckets = store.bucketByWindows(
+                "clan", Arrays.asList(new Window(0L, 5L), new Window(6L, 15L), new Window(16L, 25L)));
 
         assertEquals(3, buckets.size());
         assertEquals(2, buckets.get(0L).size()); // 1, 5

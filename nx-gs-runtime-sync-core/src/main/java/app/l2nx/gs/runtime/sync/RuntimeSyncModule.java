@@ -15,11 +15,10 @@ import app.l2nx.gs.runtime.sync.engine.RuntimeSyncEngine;
 import app.l2nx.gs.runtime.sync.engine.publish.KafkaSender;
 import app.l2nx.gs.runtime.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.runtime.sync.engine.publish.TopicResolver;
-import org.apache.kafka.clients.producer.Callback;
-
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.apache.kafka.clients.producer.Callback;
 
 /**
  * Tier-1 module that runs the runtime-sync engine. Reads its inputs in order:
@@ -56,14 +55,13 @@ public final class RuntimeSyncModule implements AdapterModule {
     private volatile List<RuntimeEntityMapping<?>> cachedMappings;
 
     public RuntimeSyncModule() {
-        this(RuntimeSyncModule::loadProviders,
-                EngineConfig.productionChain(),
-                RuntimeSyncModule::sendViaNxKafka);
+        this(RuntimeSyncModule::loadProviders, EngineConfig.productionChain(), RuntimeSyncModule::sendViaNxKafka);
     }
 
-    RuntimeSyncModule(Supplier<List<RuntimeStateProvider>> providerDiscoverer,
-                      Function<String, String> configSource,
-                      KafkaSender kafkaSender) {
+    RuntimeSyncModule(
+            Supplier<List<RuntimeStateProvider>> providerDiscoverer,
+            Function<String, String> configSource,
+            KafkaSender kafkaSender) {
         this.providerDiscoverer = providerDiscoverer;
         this.configSource = configSource;
         this.kafkaSender = kafkaSender;
@@ -77,7 +75,8 @@ public final class RuntimeSyncModule implements AdapterModule {
     @Override
     public void onConnect(ConnectContext ctx) {
         this.context = ctx;
-        if (ctx == null || ctx.getSyncTopics() == null
+        if (ctx == null
+                || ctx.getSyncTopics() == null
                 || ctx.getSyncTopics().getRuntime() == null
                 || ctx.getSyncTopics().getRuntime().isEmpty()) {
             log.warn("ConnectContext carries no runtime sync topics — runtime-sync DISABLED. "
@@ -96,15 +95,15 @@ public final class RuntimeSyncModule implements AdapterModule {
             return;
         }
         if (providers.size() > 1) {
-            log.error("Multiple RuntimeStateProvider impls on classpath: [{}]. runtime-sync FAILED.",
+            log.error(
+                    "Multiple RuntimeStateProvider impls on classpath: [{}]. runtime-sync FAILED.",
                     classNamesOf(providers));
             state = STATE_FAILED;
             return;
         }
         RuntimeStateProvider resolved = providers.get(0);
         List<RuntimeEntityMapping<?>> mappings = snapshotMappings(resolved);
-        log.info("RuntimeStateProvider resolved: schemaName={}, mappings={}",
-                resolved.schemaName(), mappings.size());
+        log.info("RuntimeStateProvider resolved: schemaName={}, mappings={}", resolved.schemaName(), mappings.size());
         this.cachedMappings = mappings;
         this.provider = resolved;
         this.statsTracker = new EntityStatsTracker();
@@ -121,8 +120,7 @@ public final class RuntimeSyncModule implements AdapterModule {
         EntityStatsTracker tracker = statsTracker;
         List<RuntimeEntityMapping<?>> mappings = cachedMappings;
         if (p == null || ctx == null || tracker == null || mappings == null) {
-            log.error("runtime-sync.start: missing dependency (provider/context/tracker/mappings) — staying {}",
-                    state);
+            log.error("runtime-sync.start: missing dependency (provider/context/tracker/mappings) — staying {}", state);
             return;
         }
         if (mappings.isEmpty()) {
@@ -134,14 +132,15 @@ public final class RuntimeSyncModule implements AdapterModule {
         TopicResolver resolver = TopicResolver.fromContext(ctx);
         SyncEventPublisher publisher = new SyncEventPublisher(kafkaSender);
 
-        RuntimeSyncEngine built = new RuntimeSyncEngine(
-                mappings, resolver, publisher, tracker, config);
+        RuntimeSyncEngine built = new RuntimeSyncEngine(mappings, resolver, publisher, tracker, config);
         this.engine = built;
         try {
             built.start();
         } catch (Throwable t) {
-            log.error("RuntimeSyncEngine.start threw {}: {} — runtime-sync FAILED",
-                    t.getClass().getName(), t.getMessage());
+            log.error(
+                    "RuntimeSyncEngine.start threw {}: {} — runtime-sync FAILED",
+                    t.getClass().getName(),
+                    t.getMessage());
             state = STATE_FAILED;
             this.engine = null;
         }
@@ -180,7 +179,9 @@ public final class RuntimeSyncModule implements AdapterModule {
                     entityStats = entities;
                 }
             } catch (Throwable t) {
-                log.warn("EntityStatsTracker.currentStatuses threw {}", t.getClass().getName());
+                log.warn(
+                        "EntityStatsTracker.currentStatuses threw {}",
+                        t.getClass().getName());
             }
         }
         ModuleStatus.Stats stats;
@@ -189,11 +190,7 @@ public final class RuntimeSyncModule implements AdapterModule {
         } else {
             stats = ModuleStatus.Stats.builder().entities(entityStats).build();
         }
-        return ModuleStatus.builder()
-                .name(NAME)
-                .state(state)
-                .stats(stats)
-                .build();
+        return ModuleStatus.builder().name(NAME).state(state).stats(stats).build();
     }
 
     private static List<RuntimeEntityMapping<?>> snapshotMappings(RuntimeStateProvider provider) {
@@ -227,10 +224,13 @@ public final class RuntimeSyncModule implements AdapterModule {
         try {
             NxKafka.instance().send(topic, key, value, callback);
         } catch (Throwable senderFailure) {
-            log.warn("NxKafka send threw {} — runtime-sync send dropped (topic={})",
-                    senderFailure.getClass().getName(), topic);
+            log.warn(
+                    "NxKafka send threw {} — runtime-sync send dropped (topic={})",
+                    senderFailure.getClass().getName(),
+                    topic);
             try {
-                callback.onCompletion(null,
+                callback.onCompletion(
+                        null,
                         senderFailure instanceof Exception
                                 ? (Exception) senderFailure
                                 : new RuntimeException(senderFailure));

@@ -3,9 +3,8 @@ package app.l2nx.gs.adapter.core.connect;
 import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.adapter.api.rest.MessagingTopics;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
-import org.jspecify.annotations.Nullable;
-
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Host-type-aware handshake strategy. Performs one POST against the
@@ -55,39 +54,49 @@ public interface HostConnectFlow<R> {
      * Captured response from the last successful {@link #connect()}.
      * Returns {@code null} before the first successful call.
      */
-    @Nullable R response();
+    @Nullable
+    R response();
 
     /**
      * Heartbeat Kafka topic from the captured response.
      */
-    @Nullable String heartbeatTopic();
+    @Nullable
+    String heartbeatTopic();
 
     /**
      * Messaging topic bundle (events + commands) from the captured
      * response.
      */
-    @Nullable MessagingTopics topics();
+    @Nullable
+    MessagingTopics topics();
 
     /**
      * Sync-stream topic bundle (db / runtime / datapack). Always {@code null}
      * for login-server host-type — LS deployments carry no sync streams.
      */
-    @Nullable SyncTopics syncTopics();
+    @Nullable
+    SyncTopics syncTopics();
 
-    @Nullable UUID serverId();
+    @Nullable
+    UUID serverId();
 
-    @Nullable UUID tenantId();
+    @Nullable
+    UUID tenantId();
 
-    @Nullable String tenantSlug();
+    @Nullable
+    String tenantSlug();
 
-    @Nullable String serverSlug();
+    @Nullable
+    String serverSlug();
 
-    @Nullable String serverName();
+    @Nullable
+    String serverName();
 
     /**
      * Kafka client bootstrap credentials from the captured response. Named
      * {@code kafka()} rather than {@code kafkaCredentials()} to match the
      * field accessor naming on the underlying response DTOs.
      */
-    @Nullable KafkaCredentials kafka();
+    @Nullable
+    KafkaCredentials kafka();
 }

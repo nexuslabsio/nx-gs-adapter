@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.rating;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic wire DTO for one character's standing in a ranked rating, payload of
@@ -35,18 +34,18 @@ public final class RatingDbDto {
     private final long points;
     private final @Nullable Map<String, String> metadata;
 
-    public RatingDbDto(String ratingType,
-                       @Nullable String season,
-                       long charId,
-                       long points,
-                       @Nullable Map<String, String> metadata) {
+    public RatingDbDto(
+            String ratingType,
+            @Nullable String season,
+            long charId,
+            long points,
+            @Nullable Map<String, String> metadata) {
         this.ratingType = Objects.requireNonNull(ratingType, "RatingDbDto.ratingType is required");
         this.season = season;
         this.charId = charId;
         this.points = points;
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**

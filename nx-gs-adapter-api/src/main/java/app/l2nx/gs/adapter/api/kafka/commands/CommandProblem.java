@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.commands;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Structured problem body for a non-OK {@link CommandResult}. Transport-neutral
@@ -20,9 +19,7 @@ public final class CommandProblem {
     private final @Nullable String detail;
     private final Map<String, Object> extensions;
 
-    public CommandProblem(String title,
-                          @Nullable String detail,
-                          @Nullable Map<String, Object> extensions) {
+    public CommandProblem(String title, @Nullable String detail, @Nullable Map<String, Object> extensions) {
         if (title == null) {
             throw new IllegalArgumentException("title is required");
         }
@@ -98,9 +95,7 @@ public final class CommandProblem {
 
     @Override
     public String toString() {
-        return "CommandProblem[title=" + title
-                + ", detail=" + detail
-                + ", extensions=" + extensions + "]";
+        return "CommandProblem[title=" + title + ", detail=" + detail + ", extensions=" + extensions + "]";
     }
 
     public static final class Builder {

@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.clan;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ClanDbDtoTest {
 
@@ -76,7 +75,9 @@ class ClanDbDtoTest {
     @Test
     void skills_shouldBeEmptyList_whenTenantSyncsThemButClanHasNone() {
         ClanDbDto clan = ClanDbDto.builder()
-                .id(1L).name("X").level(1)
+                .id(1L)
+                .name("X")
+                .level(1)
                 .skills(Collections.emptyList())
                 .build();
 
@@ -89,9 +90,12 @@ class ClanDbDtoTest {
         List<ClanSkillDbDto> skills = Collections.singletonList(
                 ClanSkillDbDto.builder().id(1).level(2).build());
         ClanDbDto original = ClanDbDto.builder()
-                .id(1L).name("X").level(5).leaderId(2L)
+                .id(1L)
+                .name("X")
+                .level(5)
+                .leaderId(2L)
                 .skills(skills)
-                .icon(new byte[]{1, 2, 3})
+                .icon(new byte[] {1, 2, 3})
                 .build();
 
         assertEquals(original, original.toBuilder().build());
@@ -105,9 +109,24 @@ class ClanDbDtoTest {
 
     @Test
     void equals_shouldCompareIconBytes() {
-        ClanDbDto a = ClanDbDto.builder().id(1L).name("X").level(1).icon(new byte[]{1, 2}).build();
-        ClanDbDto b = ClanDbDto.builder().id(1L).name("X").level(1).icon(new byte[]{1, 2}).build();
-        ClanDbDto c = ClanDbDto.builder().id(1L).name("X").level(1).icon(new byte[]{1, 3}).build();
+        ClanDbDto a = ClanDbDto.builder()
+                .id(1L)
+                .name("X")
+                .level(1)
+                .icon(new byte[] {1, 2})
+                .build();
+        ClanDbDto b = ClanDbDto.builder()
+                .id(1L)
+                .name("X")
+                .level(1)
+                .icon(new byte[] {1, 2})
+                .build();
+        ClanDbDto c = ClanDbDto.builder()
+                .id(1L)
+                .name("X")
+                .level(1)
+                .icon(new byte[] {1, 3})
+                .build();
         assertEquals(a, b);
         assertEquals(a.hashCode(), b.hashCode());
         assertNotEquals(a, c);

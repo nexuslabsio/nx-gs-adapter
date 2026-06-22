@@ -1,11 +1,10 @@
 package app.l2nx.gs.kafka;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 class NxKafkaTest {
 
@@ -41,13 +40,13 @@ class NxKafkaTest {
                 .reconnect(false)
                 .build();
 
-        KafkaException ex = assertThrows(KafkaException.class, () ->
-                NxKafka.configure()
+        KafkaException ex = assertThrows(
+                KafkaException.class,
+                () -> NxKafka.configure()
                         .brokers("localhost:19999")
                         .connectTimeout(1, TimeUnit.SECONDS)
                         .reconnect(false)
-                        .build()
-        );
+                        .build());
         assertTrue(ex.getMessage().contains("already configured"));
     }
 

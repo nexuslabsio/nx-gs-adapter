@@ -27,10 +27,8 @@ public final class ParentRef {
     private final String fkColumn;
 
     private ParentRef(String parentEntityName, String fkColumn) {
-        this.parentEntityName = Objects.requireNonNull(parentEntityName,
-                "ParentRef.parentEntityName is required");
-        this.fkColumn = Objects.requireNonNull(fkColumn,
-                "ParentRef.fkColumn is required");
+        this.parentEntityName = Objects.requireNonNull(parentEntityName, "ParentRef.parentEntityName is required");
+        this.fkColumn = Objects.requireNonNull(fkColumn, "ParentRef.fkColumn is required");
     }
 
     public static ParentRef of(String parentEntityName, String fkColumn) {
@@ -57,8 +55,7 @@ public final class ParentRef {
         if (this == o) return true;
         if (!(o instanceof ParentRef)) return false;
         ParentRef that = (ParentRef) o;
-        return parentEntityName.equals(that.parentEntityName)
-                && fkColumn.equals(that.fkColumn);
+        return parentEntityName.equals(that.parentEntityName) && fkColumn.equals(that.fkColumn);
     }
 
     @Override
@@ -68,7 +65,6 @@ public final class ParentRef {
 
     @Override
     public String toString() {
-        return "ParentRef[parentEntityName=" + parentEntityName
-                + ", fkColumn=" + fkColumn + "]";
+        return "ParentRef[parentEntityName=" + parentEntityName + ", fkColumn=" + fkColumn + "]";
     }
 }

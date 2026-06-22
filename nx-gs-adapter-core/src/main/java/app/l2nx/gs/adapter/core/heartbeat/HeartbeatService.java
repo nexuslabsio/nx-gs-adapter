@@ -5,7 +5,6 @@ import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -39,18 +38,20 @@ public final class HeartbeatService {
     private final Supplier<Instant> clock;
     private final AtomicReference<Session> session = new AtomicReference<Session>();
 
-    public HeartbeatService(KafkaPublisher publisher,
-                            ScheduledExecutorService scheduler,
-                            String adapterVersion,
-                            Supplier<List<ModuleStatus>> moduleStatuses) {
+    public HeartbeatService(
+            KafkaPublisher publisher,
+            ScheduledExecutorService scheduler,
+            String adapterVersion,
+            Supplier<List<ModuleStatus>> moduleStatuses) {
         this(publisher, scheduler, adapterVersion, moduleStatuses, () -> Instant.now());
     }
 
-    HeartbeatService(KafkaPublisher publisher,
-                     ScheduledExecutorService scheduler,
-                     String adapterVersion,
-                     Supplier<List<ModuleStatus>> moduleStatuses,
-                     Supplier<Instant> clock) {
+    HeartbeatService(
+            KafkaPublisher publisher,
+            ScheduledExecutorService scheduler,
+            String adapterVersion,
+            Supplier<List<ModuleStatus>> moduleStatuses,
+            Supplier<Instant> clock) {
         this.publisher = publisher;
         this.scheduler = scheduler;
         this.adapterVersion = adapterVersion;
@@ -58,12 +59,13 @@ public final class HeartbeatService {
         this.clock = clock;
     }
 
-    public synchronized void start(String tenantId,
-                                   String tenantSlug,
-                                   String serverId,
-                                   String serverSlug,
-                                   String serverName,
-                                   String heartbeatTopic) {
+    public synchronized void start(
+            String tenantId,
+            String tenantSlug,
+            String serverId,
+            String serverSlug,
+            String serverName,
+            String heartbeatTopic) {
         Session previous = session.getAndSet(null);
         if (previous != null) {
             previous.future.cancel(false);
@@ -76,8 +78,7 @@ public final class HeartbeatService {
                 log);
         // Initial delay 0 — fire the first heartbeat right after Kafka connect so the
         // platform sees the server "alive" without a 60s gap; subsequent ticks every PERIOD_SECONDS.
-        ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(
-                tick, 0L, PERIOD_SECONDS, TimeUnit.SECONDS);
+        ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(tick, 0L, PERIOD_SECONDS, TimeUnit.SECONDS);
         session.set(new Session(connectInstant, future));
     }
 
@@ -88,13 +89,14 @@ public final class HeartbeatService {
         }
     }
 
-    private void tick(String tenantId,
-                      String tenantSlug,
-                      String serverId,
-                      String serverSlug,
-                      String serverName,
-                      String heartbeatTopic,
-                      Instant connectInstant) {
+    private void tick(
+            String tenantId,
+            String tenantSlug,
+            String serverId,
+            String serverSlug,
+            String serverName,
+            String heartbeatTopic,
+            Instant connectInstant) {
         try {
             Duration uptime = Duration.between(connectInstant, clock.get());
             List<ModuleStatus> modules;
@@ -103,7 +105,8 @@ public final class HeartbeatService {
                 modules = reported != null ? reported : Collections.emptyList();
             } catch (Throwable t) {
                 // Registry shouldn't throw, but defending the heartbeat thread is cheap.
-                log.error("ModuleRegistry.currentStatuses threw {}", t.getClass().getName(), t);
+                log.error(
+                        "ModuleRegistry.currentStatuses threw {}", t.getClass().getName(), t);
                 modules = Collections.emptyList();
             }
             HeartbeatEvent event = HeartbeatEvent.builder()

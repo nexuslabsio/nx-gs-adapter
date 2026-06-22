@@ -1,17 +1,16 @@
 package app.l2nx.gs.kafka;
 
-import com.google.gson.Gson;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.Gson;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetTime;
 import java.util.EnumSet;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 class NxGsonAdaptersTest {
 
@@ -57,9 +56,7 @@ class NxGsonAdaptersTest {
     @Test
     void dtoWithInstantAndDuration_shouldRoundtrip_asNestedFields() {
         Gson gson = NxGsonAdapters.defaultGson();
-        Wrapper original = new Wrapper(
-                Instant.parse("2026-05-17T12:00:00Z"),
-                Duration.ofSeconds(45));
+        Wrapper original = new Wrapper(Instant.parse("2026-05-17T12:00:00Z"), Duration.ofSeconds(45));
 
         String json = gson.toJson(original);
         Wrapper decoded = gson.fromJson(json, Wrapper.class);
@@ -91,10 +88,8 @@ class NxGsonAdaptersTest {
     @Test
     void slotWithDaysAndOffsetTime_shouldRoundtrip() {
         Gson gson = NxGsonAdapters.defaultGson();
-        Slot original = new Slot(
-                EnumSet.of(DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY),
-                OffsetTime.parse("21:45:00+03:00"),
-                30);
+        Slot original =
+                new Slot(EnumSet.of(DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY), OffsetTime.parse("21:45:00+03:00"), 30);
 
         String json = gson.toJson(original);
         Slot decoded = gson.fromJson(json, Slot.class);

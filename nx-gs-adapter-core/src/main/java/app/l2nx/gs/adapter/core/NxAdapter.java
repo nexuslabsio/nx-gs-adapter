@@ -32,7 +32,6 @@ import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -63,6 +62,7 @@ public final class NxAdapter {
      * failure stays in {@code REGISTERING}; post-latch it drives {@code DEGRADED}.
      */
     private static final AtomicBoolean wasActive = new AtomicBoolean(false);
+
     private static final Object transitionLock = new Object();
     private static final Object shutdownLock = new Object();
     private static volatile Consumer<AdapterState> stateCallback;
@@ -86,8 +86,7 @@ public final class NxAdapter {
     private static volatile NxGameDataImpl gameDataFacade;
     private static final AtomicReference<Executor> hostExecutorRef = new AtomicReference<Executor>();
 
-    private NxAdapter() {
-    }
+    private NxAdapter() {}
 
     /**
      * Register a state-transition callback. May be called before or after {@link #start()}.
@@ -134,7 +133,8 @@ public final class NxAdapter {
      */
     public static NxAdapter start() {
         if (!started.compareAndSet(false, true)) {
-            log.warn("NxAdapter.start() called more than once — ignoring duplicate invocation (current state: {})",
+            log.warn(
+                    "NxAdapter.start() called more than once — ignoring duplicate invocation (current state: {})",
                     STATE.get());
             return INSTANCE;
         }
@@ -170,8 +170,7 @@ public final class NxAdapter {
         ModuleRegistry registry = new ModuleRegistry();
         moduleRegistry = registry;
         heartbeatService = new HeartbeatService(
-                defaultPublisher(), hbScheduler, config.getAdapterVersion(),
-                NxAdapter::collectModuleStatuses);
+                defaultPublisher(), hbScheduler, config.getAdapterVersion(), NxAdapter::collectModuleStatuses);
 
         // Single read of the volatile so a concurrent test-only swap can't split
         // the null-check from the dereference.
@@ -183,11 +182,7 @@ public final class NxAdapter {
                 : new GameServerConnectFlow(config);
         Consumer<HostConnectFlow<?>> onActive = active -> initKafka(kafkaInit, active);
         ConnectFlow flow = new ConnectFlow(
-                hostFlow,
-                new DefaultBackoffSchedule(),
-                scheduler,
-                NxAdapter::handleConnectOutcome,
-                onActive);
+                hostFlow, new DefaultBackoffSchedule(), scheduler, NxAdapter::handleConnectOutcome, onActive);
         scheduler.submit(SafeRunnable.wrap(flow, log));
 
         // Hook is registered last so FAILED / DISABLED paths never leave one attached.
@@ -310,18 +305,15 @@ public final class NxAdapter {
     }
 
     private static ScheduledExecutorService createConnectScheduler() {
-        return Executors.newSingleThreadScheduledExecutor(
-                DaemonThreadFactory.named("nx-adapter-connect", log));
+        return Executors.newSingleThreadScheduledExecutor(DaemonThreadFactory.named("nx-adapter-connect", log));
     }
 
     private static ScheduledExecutorService createHeartbeatScheduler() {
-        return Executors.newSingleThreadScheduledExecutor(
-                DaemonThreadFactory.named("nx-adapter-heartbeat", log));
+        return Executors.newSingleThreadScheduledExecutor(DaemonThreadFactory.named("nx-adapter-heartbeat", log));
     }
 
     private static ExecutorService createIoExecutor(int workers) {
-        return Executors.newFixedThreadPool(workers,
-                DaemonThreadFactory.counted("nx-io-", log));
+        return Executors.newFixedThreadPool(workers, DaemonThreadFactory.counted("nx-io-", log));
     }
 
     private static HeartbeatService.KafkaPublisher defaultPublisher() {
@@ -418,8 +410,10 @@ public final class NxAdapter {
         try {
             events = startEventsPublisher(active.topics());
         } catch (Throwable t) {
-            log.error("Events publisher bootstrap failed — events disabled, continuing with sync/commands: {}",
-                    t.getClass().getName(), t);
+            log.error(
+                    "Events publisher bootstrap failed — events disabled, continuing with sync/commands: {}",
+                    t.getClass().getName(),
+                    t);
         }
         // Group ID lives under the per-tenant prefix so the `User:<tenant>` SCRAM
         // principal's group ACL (prefixed on `<tenant>.`) covers it.
@@ -428,12 +422,13 @@ public final class NxAdapter {
         NxGameData gameData = startGameDataFacade();
         NxCommands commands = null;
         try {
-            commands = startCommandsConsumer(active.topics(),
-                    active.kafka(), clientId, commandsGroupId, active.serverId(),
-                    events, sync);
+            commands = startCommandsConsumer(
+                    active.topics(), active.kafka(), clientId, commandsGroupId, active.serverId(), events, sync);
         } catch (Throwable t) {
-            log.error("Commands consumer bootstrap failed — commands disabled, continuing with sync: {}",
-                    t.getClass().getName(), t);
+            log.error(
+                    "Commands consumer bootstrap failed — commands disabled, continuing with sync: {}",
+                    t.getClass().getName(),
+                    t);
         }
 
         ModuleRegistry registry = moduleRegistry;
@@ -499,15 +494,16 @@ public final class NxAdapter {
             try {
                 previous.stop();
             } catch (Throwable t) {
-                log.error("EventsPublisher.stop on reconnect threw {}", t.getClass().getName(), t);
+                log.error(
+                        "EventsPublisher.stop on reconnect threw {}",
+                        t.getClass().getName(),
+                        t);
             }
         }
-        Map<String, String> familyTopics = messagingTopics != null
-                ? messagingTopics.getEvents()
-                : Collections.emptyMap();
+        Map<String, String> familyTopics =
+                messagingTopics != null ? messagingTopics.getEvents() : Collections.emptyMap();
         EventsConfig cfg = eventsConfig != null ? eventsConfig : EventsConfig.defaults();
-        EventsPublisher.Sender sender = (record, callback) ->
-                NxKafka.instance().sendBytesKeyRecord(record, callback);
+        EventsPublisher.Sender sender = (record, callback) -> NxKafka.instance().sendBytesKeyRecord(record, callback);
         EventsPublisher.ProducerFlusher flusher = () -> NxKafka.instance().flush();
         NxEvents facade = eventsFacade;
         if (facade == null) {
@@ -527,35 +523,58 @@ public final class NxAdapter {
      * commands are disabled (registrations are accepted as no-ops). When
      * {@code commandsTopic} is unconfigured no consumer thread is spawned.
      */
-    private static NxCommands startCommandsConsumer(MessagingTopics messagingTopics,
-                                                    KafkaCredentials kafka,
-                                                    String clientId,
-                                                    String groupId,
-                                                    UUID ownServerId,
-                                                    NxEvents events,
-                                                    NxSync sync) {
+    private static NxCommands startCommandsConsumer(
+            MessagingTopics messagingTopics,
+            KafkaCredentials kafka,
+            String clientId,
+            String groupId,
+            UUID ownServerId,
+            NxEvents events,
+            NxSync sync) {
         CommandsConsumer previous = commandsConsumer;
         if (previous != null) {
             try {
                 previous.stop();
             } catch (Throwable t) {
-                log.error("CommandsConsumer.stop on reconnect threw {}", t.getClass().getName(), t);
+                log.error(
+                        "CommandsConsumer.stop on reconnect threw {}",
+                        t.getClass().getName(),
+                        t);
             }
         }
-        CommandsConsumer.ReplySender replySender = (record, callback) ->
-                NxKafka.instance().sendBytesKeyRecord(record, callback);
+        CommandsConsumer.ReplySender replySender =
+                (record, callback) -> NxKafka.instance().sendBytesKeyRecord(record, callback);
         NxCommands facade = commandsFacade;
         if (facade == null) {
             CommandsBootstrap.Started started = CommandsBootstrap.start(
-                    messagingTopics, kafka, clientId, groupId, ownServerId,
-                    hostExecutorRef.get(), ioExecutor, events, sync,
-                    replySender, commandsConfig);
+                    messagingTopics,
+                    kafka,
+                    clientId,
+                    groupId,
+                    ownServerId,
+                    hostExecutorRef.get(),
+                    ioExecutor,
+                    events,
+                    sync,
+                    replySender,
+                    commandsConfig);
             commandsConsumer = started.consumer();
             commandsFacade = started.commands();
             return commandsFacade;
         }
-        commandsConsumer = CommandsBootstrap.swap(facade, messagingTopics, kafka, clientId, groupId,
-                ownServerId, hostExecutorRef.get(), ioExecutor, events, sync, replySender, commandsConfig);
+        commandsConsumer = CommandsBootstrap.swap(
+                facade,
+                messagingTopics,
+                kafka,
+                clientId,
+                groupId,
+                ownServerId,
+                hostExecutorRef.get(),
+                ioExecutor,
+                events,
+                sync,
+                replySender,
+                commandsConfig);
         return facade;
     }
 
@@ -598,8 +617,8 @@ public final class NxAdapter {
         if (extra == 0) {
             return registryStatuses != null ? registryStatuses : Collections.emptyList();
         }
-        List<ModuleStatus> all = new ArrayList<ModuleStatus>(
-                (registryStatuses != null ? registryStatuses.size() : 0) + extra);
+        List<ModuleStatus> all =
+                new ArrayList<ModuleStatus>((registryStatuses != null ? registryStatuses.size() : 0) + extra);
         if (registryStatuses != null) {
             all.addAll(registryStatuses);
         }
@@ -614,7 +633,8 @@ public final class NxAdapter {
             try {
                 all.add(cmds.currentStatus());
             } catch (Throwable t) {
-                log.error("CommandsConsumer.currentStatus threw {}", t.getClass().getName(), t);
+                log.error(
+                        "CommandsConsumer.currentStatus threw {}", t.getClass().getName(), t);
             }
         }
         return all;
@@ -657,8 +677,10 @@ public final class NxAdapter {
             try {
                 cb.accept(target);
             } catch (Throwable t) {
-                log.error("onStateChange callback threw {} on transition to {}",
-                        t.getClass().getName(), target);
+                log.error(
+                        "onStateChange callback threw {} on transition to {}",
+                        t.getClass().getName(),
+                        target);
             }
         }
     }
@@ -716,7 +738,10 @@ public final class NxAdapter {
             try {
                 cmds.stop();
             } catch (Throwable t) {
-                log.error("CommandsConsumer.stop in resetForTesting threw {}", t.getClass().getName(), t);
+                log.error(
+                        "CommandsConsumer.stop in resetForTesting threw {}",
+                        t.getClass().getName(),
+                        t);
             }
             commandsConsumer = null;
         }
@@ -725,7 +750,10 @@ public final class NxAdapter {
             try {
                 pub.stop();
             } catch (Throwable t) {
-                log.error("EventsPublisher.stop in resetForTesting threw {}", t.getClass().getName(), t);
+                log.error(
+                        "EventsPublisher.stop in resetForTesting threw {}",
+                        t.getClass().getName(),
+                        t);
             }
             eventsPublisher = null;
         }

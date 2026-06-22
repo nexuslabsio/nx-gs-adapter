@@ -1,12 +1,11 @@
 package app.l2nx.gs.runtime.sync.engine;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
 
 class EngineConfigTest {
 
@@ -40,17 +39,15 @@ class EngineConfigTest {
 
     @Test
     void from_shouldThrow_whenValueNotInteger() {
-        assertThrows(IllegalStateException.class,
-                () -> EngineConfig.from(k -> "l2nx.runtime-sync.tick-interval-seconds".equals(k)
-                        ? "abc"
-                        : null));
+        assertThrows(
+                IllegalStateException.class,
+                () -> EngineConfig.from(k -> "l2nx.runtime-sync.tick-interval-seconds".equals(k) ? "abc" : null));
     }
 
     @Test
     void from_shouldThrow_whenValueNotPositive() {
-        assertThrows(IllegalStateException.class,
-                () -> EngineConfig.from(k -> "l2nx.runtime-sync.tick-interval-seconds".equals(k)
-                        ? "0"
-                        : null));
+        assertThrows(
+                IllegalStateException.class,
+                () -> EngineConfig.from(k -> "l2nx.runtime-sync.tick-interval-seconds".equals(k) ? "0" : null));
     }
 }

@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.gameevents;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO published to the {@code gameevents} family topic
@@ -43,14 +42,12 @@ public final class GameEventSnapshotEvent {
     private final List<GameEventEntry> events;
     private final @Nullable Map<String, String> metadata;
 
-    public GameEventSnapshotEvent(UUID eventId,
-                                  @Nullable List<GameEventEntry> events,
-                                  @Nullable Map<String, String> metadata) {
+    public GameEventSnapshotEvent(
+            UUID eventId, @Nullable List<GameEventEntry> events, @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "GameEventSnapshotEvent.eventId is required");
         this.events = freezeList(events);
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -80,10 +77,7 @@ public final class GameEventSnapshotEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .events(events)
-                .metadata(metadata);
+        return new Builder().eventId(eventId).events(events).metadata(metadata);
     }
 
     public static Builder builder() {
@@ -114,9 +108,7 @@ public final class GameEventSnapshotEvent {
 
     @Override
     public String toString() {
-        return "GameEventSnapshotEvent[eventId=" + eventId
-                + ", events=" + events
-                + ", metadata=" + metadata + "]";
+        return "GameEventSnapshotEvent[eventId=" + eventId + ", events=" + events + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {

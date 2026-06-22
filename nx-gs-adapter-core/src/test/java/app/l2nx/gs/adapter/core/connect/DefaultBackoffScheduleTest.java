@@ -1,29 +1,21 @@
 package app.l2nx.gs.adapter.core.connect;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class DefaultBackoffScheduleTest {
 
     private final DefaultBackoffSchedule schedule = new DefaultBackoffSchedule();
 
     @ParameterizedTest(name = "attempt {0} → base {1}ms ±25% jitter")
-    @CsvSource({
-            "1, 30000",
-            "2, 60000",
-            "3, 120000",
-            "4, 300000",
-            "5, 300000",
-            "100, 300000"
-    })
+    @CsvSource({"1, 30000", "2, 60000", "3, 120000", "4, 300000", "5, 300000", "100, 300000"})
     void next_shouldFollowCanonicalSchedule_withinJitterWindow(int attempt, long baseMs) {
         long quarter = baseMs / 4;
         long min = baseMs - quarter;
@@ -31,7 +23,8 @@ class DefaultBackoffScheduleTest {
         // Sample multiple times to catch jitter at both edges.
         for (int i = 0; i < 50; i++) {
             long ms = schedule.next(attempt).toMillis();
-            assertTrue(ms >= min && ms <= max,
+            assertTrue(
+                    ms >= min && ms <= max,
                     "attempt " + attempt + " emitted " + ms + "ms, out of [" + min + ", " + max + "]");
         }
     }
@@ -43,8 +36,7 @@ class DefaultBackoffScheduleTest {
         for (int i = 0; i < 25; i++) {
             distinct.add(schedule.next(1).toMillis());
         }
-        assertTrue(distinct.size() > 1,
-                "expected jitter to surface multiple distinct delays, got " + distinct);
+        assertTrue(distinct.size() > 1, "expected jitter to surface multiple distinct delays, got " + distinct);
     }
 
     @Test

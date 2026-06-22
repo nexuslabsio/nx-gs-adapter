@@ -1,5 +1,8 @@
 package app.l2nx.gs.db.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
@@ -13,14 +16,10 @@ import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
 import app.l2nx.gs.db.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.db.sync.engine.publish.TopicResolver;
 import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 class CdcEngineTest {
 
@@ -150,10 +149,11 @@ class CdcEngineTest {
         engine.stop();
         assertEquals(1, recorder.flushCount, "flushAll() must run on stop");
         assertEquals(1, recorder.closeCount, "close() must run on stop");
-        assertEquals(1L, recorder.flushSeenSizeBeforeClear,
+        assertEquals(
+                1L,
+                recorder.flushSeenSizeBeforeClear,
                 "flushAll must observe load()-seeded content (runs before snapshot.clearAll)");
-        assertEquals(0, snapshot.sizeOf("clan"),
-                "snapshot must be cleared on stop, AFTER flushAll");
+        assertEquals(0, snapshot.sizeOf("clan"), "snapshot must be cleared on stop, AFTER flushAll");
     }
 
     @Test
@@ -165,16 +165,13 @@ class CdcEngineTest {
             }
 
             @Override
-            public void checkpoint(String e, SnapshotStore s) {
-            }
+            public void checkpoint(String e, SnapshotStore s) {}
 
             @Override
-            public void flushAll(SnapshotStore s) {
-            }
+            public void flushAll(SnapshotStore s) {}
 
             @Override
-            public void close() {
-            }
+            public void close() {}
         };
 
         EntityStatsTracker tracker = new EntityStatsTracker();
@@ -218,8 +215,7 @@ class CdcEngineTest {
         }
 
         @Override
-        public void checkpoint(String entityName, SnapshotStore source) {
-        }
+        public void checkpoint(String entityName, SnapshotStore source) {}
 
         @Override
         public void flushAll(SnapshotStore source) {

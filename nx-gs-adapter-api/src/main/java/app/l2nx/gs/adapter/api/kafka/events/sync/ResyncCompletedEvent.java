@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.sync;
 
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Per-entity completion signal of a forced db-sync resync. The single message
@@ -51,18 +50,13 @@ public final class ResyncCompletedEvent {
     private final Instant cycleStartedAt;
     private final Instant completedAt;
 
-    public ResyncCompletedEvent(UUID eventId,
-                                UUID resyncId,
-                                String entityName,
-                                Instant cycleStartedAt,
-                                Instant completedAt) {
+    public ResyncCompletedEvent(
+            UUID eventId, UUID resyncId, String entityName, Instant cycleStartedAt, Instant completedAt) {
         this.eventId = Objects.requireNonNull(eventId, "ResyncCompletedEvent.eventId is required");
         this.resyncId = Objects.requireNonNull(resyncId, "ResyncCompletedEvent.resyncId is required");
         this.entityName = Objects.requireNonNull(entityName, "ResyncCompletedEvent.entityName is required");
-        this.cycleStartedAt = Objects.requireNonNull(cycleStartedAt,
-                "ResyncCompletedEvent.cycleStartedAt is required");
-        this.completedAt = Objects.requireNonNull(completedAt,
-                "ResyncCompletedEvent.completedAt is required");
+        this.cycleStartedAt = Objects.requireNonNull(cycleStartedAt, "ResyncCompletedEvent.cycleStartedAt is required");
+        this.completedAt = Objects.requireNonNull(completedAt, "ResyncCompletedEvent.completedAt is required");
     }
 
     public UUID getEventId() {

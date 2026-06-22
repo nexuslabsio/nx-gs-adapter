@@ -79,8 +79,7 @@ public final class MailItem {
         if (this == o) return true;
         if (!(o instanceof MailItem)) return false;
         MailItem that = (MailItem) o;
-        return Objects.equals(itemTemplateId, that.itemTemplateId)
-                && Objects.equals(count, that.count);
+        return Objects.equals(itemTemplateId, that.itemTemplateId) && Objects.equals(count, that.count);
     }
 
     @Override
@@ -90,8 +89,7 @@ public final class MailItem {
 
     @Override
     public String toString() {
-        return "MailItem[itemTemplateId=" + itemTemplateId
-                + ", count=" + count + "]";
+        return "MailItem[itemTemplateId=" + itemTemplateId + ", count=" + count + "]";
     }
 
     public static final class Builder {

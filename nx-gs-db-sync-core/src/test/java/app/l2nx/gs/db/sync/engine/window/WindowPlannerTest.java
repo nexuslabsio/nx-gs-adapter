@@ -1,21 +1,20 @@
 package app.l2nx.gs.db.sync.engine.window;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
 import app.l2nx.gs.db.sync.engine.TestMappings;
-import org.junit.jupiter.api.Test;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
 
 class WindowPlannerTest {
 
@@ -53,10 +52,7 @@ class WindowPlannerTest {
         List<Window> windows = WindowPlanner.divideRange(1, 12, 5);
 
         assertEquals(3, windows.size());
-        assertEquals(Arrays.asList(
-                new Window(1, 5),
-                new Window(6, 10),
-                new Window(11, 12)), windows);
+        assertEquals(Arrays.asList(new Window(1, 5), new Window(6, 10), new Window(11, 12)), windows);
     }
 
     @Test
@@ -73,7 +69,9 @@ class WindowPlannerTest {
         assertEquals(max, windows.get(windows.size() - 1).toPk());
         // Adjacency
         for (int i = 1; i < windows.size(); i++) {
-            assertEquals(windows.get(i - 1).toPk() + 1L, windows.get(i).fromPk(),
+            assertEquals(
+                    windows.get(i - 1).toPk() + 1L,
+                    windows.get(i).fromPk(),
                     "window " + i + " not adjacent to predecessor");
         }
     }
@@ -103,8 +101,7 @@ class WindowPlannerTest {
         } catch (IllegalStateException ex) {
             thrown = ex;
         }
-        assertNotNull(thrown,
-                "full-BIGINT range must hit the windows cap, never collapse to a single window");
+        assertNotNull(thrown, "full-BIGINT range must hit the windows cap, never collapse to a single window");
     }
 
     @Test
@@ -123,8 +120,7 @@ class WindowPlannerTest {
         when(rs.getLong(2)).thenReturn(0L);
         when(rs.wasNull()).thenReturn(true, true);
 
-        List<Window> windows = new WindowPlanner().plan(
-                clanMapping(), conn, new SnapshotStore(), 1000, 5);
+        List<Window> windows = new WindowPlanner().plan(clanMapping(), conn, new SnapshotStore(), 1000, 5);
 
         assertTrue(windows.isEmpty());
         verify(st).setQueryTimeout(5);
@@ -134,8 +130,7 @@ class WindowPlannerTest {
     void plan_shouldUseMinMaxFromConnection_andProduceContiguousWindows() throws SQLException {
         Connection conn = mockMinMax(1L, 12L);
 
-        List<Window> windows = new WindowPlanner().plan(
-                clanMapping(), conn, new SnapshotStore(), 5, 5);
+        List<Window> windows = new WindowPlanner().plan(clanMapping(), conn, new SnapshotStore(), 5, 5);
 
         assertEquals(3, windows.size());
         assertEquals(new Window(1, 5), windows.get(0));
@@ -197,8 +192,8 @@ class WindowPlannerTest {
     @Test
     void divideRange_shouldThrow_whenWindowCountExceedsCap() {
         // 1M windows × rowsPerWindow=1 across a normal range → cap hit.
-        Throwable t = assertThrowsOrNull(() ->
-                WindowPlanner.divideRange(0L, WindowPlanner.MAX_WINDOWS_PER_PLAN + 100L, 1));
+        Throwable t =
+                assertThrowsOrNull(() -> WindowPlanner.divideRange(0L, WindowPlanner.MAX_WINDOWS_PER_PLAN + 100L, 1));
         assertNotNull(t, "expected IllegalStateException at cap");
     }
 

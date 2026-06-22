@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One produced item of a {@link SkillProducedItemGroup} — an item-template reference
@@ -16,9 +15,7 @@ public final class SkillProducedItem {
     private final @Nullable Long minCount;
     private final @Nullable Long maxCount;
 
-    public SkillProducedItem(int itemTemplateId,
-                             @Nullable Long minCount,
-                             @Nullable Long maxCount) {
+    public SkillProducedItem(int itemTemplateId, @Nullable Long minCount, @Nullable Long maxCount) {
         this.itemTemplateId = itemTemplateId;
         this.minCount = minCount;
         this.maxCount = maxCount;
@@ -41,10 +38,7 @@ public final class SkillProducedItem {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .itemTemplateId(itemTemplateId)
-                .minCount(minCount)
-                .maxCount(maxCount);
+        return new Builder().itemTemplateId(itemTemplateId).minCount(minCount).maxCount(maxCount);
     }
 
     public static Builder builder() {
@@ -68,8 +62,8 @@ public final class SkillProducedItem {
 
     @Override
     public String toString() {
-        return "SkillProducedItem[itemTemplateId=" + itemTemplateId
-                + ", minCount=" + minCount + ", maxCount=" + maxCount + "]";
+        return "SkillProducedItem[itemTemplateId=" + itemTemplateId + ", minCount=" + minCount + ", maxCount="
+                + maxCount + "]";
     }
 
     public static final class Builder {

@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.api.domain.character;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class CharacterPrivateStoreTest {
 

@@ -67,48 +67,56 @@ public final class EngineConfig {
     private final String persistDir;
     private final int persistCheckpointMinIntervalSeconds;
 
-    public EngineConfig(int tickIntervalSeconds,
-                        int rowsPerWindow,
-                        int queryTimeoutSeconds,
-                        int publishFlushSeconds) {
-        this(tickIntervalSeconds, rowsPerWindow, queryTimeoutSeconds, publishFlushSeconds,
-                DEFAULT_FETCH_SIZE, DEFAULT_WORKERS,
-                DEFAULT_PERSIST_DIR, DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS);
+    public EngineConfig(int tickIntervalSeconds, int rowsPerWindow, int queryTimeoutSeconds, int publishFlushSeconds) {
+        this(
+                tickIntervalSeconds,
+                rowsPerWindow,
+                queryTimeoutSeconds,
+                publishFlushSeconds,
+                DEFAULT_FETCH_SIZE,
+                DEFAULT_WORKERS,
+                DEFAULT_PERSIST_DIR,
+                DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS);
     }
 
-    public EngineConfig(int tickIntervalSeconds,
-                        int rowsPerWindow,
-                        int queryTimeoutSeconds,
-                        int publishFlushSeconds,
-                        int fetchSize,
-                        int workers) {
-        this(tickIntervalSeconds, rowsPerWindow, queryTimeoutSeconds, publishFlushSeconds,
-                fetchSize, workers,
-                DEFAULT_PERSIST_DIR, DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS);
+    public EngineConfig(
+            int tickIntervalSeconds,
+            int rowsPerWindow,
+            int queryTimeoutSeconds,
+            int publishFlushSeconds,
+            int fetchSize,
+            int workers) {
+        this(
+                tickIntervalSeconds,
+                rowsPerWindow,
+                queryTimeoutSeconds,
+                publishFlushSeconds,
+                fetchSize,
+                workers,
+                DEFAULT_PERSIST_DIR,
+                DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS);
     }
 
-    public EngineConfig(int tickIntervalSeconds,
-                        int rowsPerWindow,
-                        int queryTimeoutSeconds,
-                        int publishFlushSeconds,
-                        int fetchSize,
-                        int workers,
-                        String persistDir,
-                        int persistCheckpointMinIntervalSeconds) {
+    public EngineConfig(
+            int tickIntervalSeconds,
+            int rowsPerWindow,
+            int queryTimeoutSeconds,
+            int publishFlushSeconds,
+            int fetchSize,
+            int workers,
+            String persistDir,
+            int persistCheckpointMinIntervalSeconds) {
         if (rowsPerWindow > MAX_ROWS_PER_WINDOW) {
-            throw new IllegalStateException(
-                    "Invalid '" + KEY_ROWS_PER_WINDOW + "' value " + rowsPerWindow
-                            + ": must be <= " + MAX_ROWS_PER_WINDOW
-                            + " (sanity cap — larger windows risk OOM on hash buffers)");
+            throw new IllegalStateException("Invalid '" + KEY_ROWS_PER_WINDOW + "' value " + rowsPerWindow
+                    + ": must be <= " + MAX_ROWS_PER_WINDOW
+                    + " (sanity cap — larger windows risk OOM on hash buffers)");
         }
         if (persistDir == null || persistDir.trim().isEmpty()) {
-            throw new IllegalStateException(
-                    "Invalid '" + KEY_PERSIST_DIR + "': must be non-empty");
+            throw new IllegalStateException("Invalid '" + KEY_PERSIST_DIR + "': must be non-empty");
         }
         if (persistCheckpointMinIntervalSeconds < 0) {
-            throw new IllegalStateException(
-                    "Invalid '" + KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS + "' value "
-                            + persistCheckpointMinIntervalSeconds + ": must be >= 0");
+            throw new IllegalStateException("Invalid '" + KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS + "' value "
+                    + persistCheckpointMinIntervalSeconds + ": must be >= 0");
         }
         this.tickIntervalSeconds = tickIntervalSeconds;
         this.rowsPerWindow = rowsPerWindow;
@@ -186,12 +194,13 @@ public final class EngineConfig {
                 positiveInt(source, KEY_FETCH_SIZE, DEFAULT_FETCH_SIZE),
                 nonNegativeInt(source, KEY_WORKERS, DEFAULT_WORKERS),
                 stringOrDefault(source, KEY_PERSIST_DIR, DEFAULT_PERSIST_DIR),
-                nonNegativeInt(source, KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS,
+                nonNegativeInt(
+                        source,
+                        KEY_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS,
                         DEFAULT_PERSIST_CHECKPOINT_MIN_INTERVAL_SECONDS));
     }
 
-    static Function<String, String> fileFirstChain(Properties fileProps,
-                                                   Function<String, String> sysprops) {
+    static Function<String, String> fileFirstChain(Properties fileProps, Function<String, String> sysprops) {
         return key -> {
             String fromFile = fileProps.getProperty(key);
             if (fromFile != null && !fromFile.trim().isEmpty()) {
@@ -221,8 +230,8 @@ public final class EngineConfig {
         } catch (NoSuchFileException missing) {
             if (required) {
                 throw new IllegalStateException(
-                        "cdc-engine config file '" + path + "' (from -D" + CONFIG_FILE_KEY
-                                + ") does not exist", missing);
+                        "cdc-engine config file '" + path + "' (from -D" + CONFIG_FILE_KEY + ") does not exist",
+                        missing);
             }
             return props;
         } catch (IOException ioe) {
@@ -243,23 +252,19 @@ public final class EngineConfig {
         try {
             parsed = Integer.parseInt(raw.trim());
         } catch (NumberFormatException e) {
-            throw new IllegalStateException(
-                    "Invalid '" + key + "' value '" + raw + "': not an integer", e);
+            throw new IllegalStateException("Invalid '" + key + "' value '" + raw + "': not an integer", e);
         }
         if (parsed <= 0) {
-            throw new IllegalStateException(
-                    "Invalid '" + key + "' value " + parsed + ": must be > 0");
+            throw new IllegalStateException("Invalid '" + key + "' value " + parsed + ": must be > 0");
         }
         return parsed;
     }
 
-    private static int positiveIntCapped(Function<String, String> source, String key,
-                                         int defaultValue, int maxValue) {
+    private static int positiveIntCapped(Function<String, String> source, String key, int defaultValue, int maxValue) {
         int parsed = positiveInt(source, key, defaultValue);
         if (parsed > maxValue) {
-            throw new IllegalStateException(
-                    "Invalid '" + key + "' value " + parsed + ": must be <= " + maxValue
-                            + " (sanity cap — larger windows risk OOM on hash buffers)");
+            throw new IllegalStateException("Invalid '" + key + "' value " + parsed + ": must be <= " + maxValue
+                    + " (sanity cap — larger windows risk OOM on hash buffers)");
         }
         return parsed;
     }
@@ -273,12 +278,10 @@ public final class EngineConfig {
         try {
             parsed = Integer.parseInt(raw.trim());
         } catch (NumberFormatException e) {
-            throw new IllegalStateException(
-                    "Invalid '" + key + "' value '" + raw + "': not an integer", e);
+            throw new IllegalStateException("Invalid '" + key + "' value '" + raw + "': not an integer", e);
         }
         if (parsed < 0) {
-            throw new IllegalStateException(
-                    "Invalid '" + key + "' value " + parsed + ": must be >= 0");
+            throw new IllegalStateException("Invalid '" + key + "' value " + parsed + ": must be >= 0");
         }
         return parsed;
     }
@@ -303,8 +306,7 @@ public final class EngineConfig {
         if ("false".equalsIgnoreCase(trimmed)) {
             return false;
         }
-        throw new IllegalStateException(
-                "Invalid '" + key + "' value '" + raw + "': must be 'true' or 'false'");
+        throw new IllegalStateException("Invalid '" + key + "' value '" + raw + "': must be 'true' or 'false'");
     }
 
     @Override
@@ -324,9 +326,15 @@ public final class EngineConfig {
 
     @Override
     public int hashCode() {
-        return Objects.hash(tickIntervalSeconds, rowsPerWindow, queryTimeoutSeconds,
-                publishFlushSeconds, fetchSize, workers,
-                persistDir, persistCheckpointMinIntervalSeconds);
+        return Objects.hash(
+                tickIntervalSeconds,
+                rowsPerWindow,
+                queryTimeoutSeconds,
+                publishFlushSeconds,
+                fetchSize,
+                workers,
+                persistDir,
+                persistCheckpointMinIntervalSeconds);
     }
 
     @Override

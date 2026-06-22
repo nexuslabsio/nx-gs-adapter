@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.castle;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO riding the {@code castle} family topic
@@ -36,14 +35,12 @@ public final class CastleSnapshotEvent {
     private final List<CastleSnapshotEntry> castles;
     private final @Nullable Map<String, String> metadata;
 
-    public CastleSnapshotEvent(UUID eventId,
-                               @Nullable List<CastleSnapshotEntry> castles,
-                               @Nullable Map<String, String> metadata) {
+    public CastleSnapshotEvent(
+            UUID eventId, @Nullable List<CastleSnapshotEntry> castles, @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "CastleSnapshotEvent.eventId is required");
         this.castles = freezeList(castles);
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -73,10 +70,7 @@ public final class CastleSnapshotEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .castles(castles)
-                .metadata(metadata);
+        return new Builder().eventId(eventId).castles(castles).metadata(metadata);
     }
 
     public static Builder builder() {
@@ -107,9 +101,7 @@ public final class CastleSnapshotEvent {
 
     @Override
     public String toString() {
-        return "CastleSnapshotEvent[eventId=" + eventId
-                + ", castles=" + castles
-                + ", metadata=" + metadata + "]";
+        return "CastleSnapshotEvent[eventId=" + eventId + ", castles=" + castles + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {

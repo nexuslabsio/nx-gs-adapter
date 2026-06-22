@@ -1,30 +1,27 @@
 package app.l2nx.gs.db.sync.engine.publish;
 
-import app.l2nx.gs.adapter.api.spi.ConnectContext;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
+import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import org.junit.jupiter.api.Test;
 
 class TopicResolverTest {
 
     @Test
     void fromSnapshot_shouldReturnTopic_forKnownEntity() {
-        TopicResolver resolver = TopicResolver.fromSnapshot(
-                Collections.singletonMap("clan", "bohpts.gs.sync.clans"));
+        TopicResolver resolver = TopicResolver.fromSnapshot(Collections.singletonMap("clan", "bohpts.gs.sync.clans"));
 
         assertEquals("bohpts.gs.sync.clans", resolver.resolveTopic("clan"));
     }
 
     @Test
     void fromSnapshot_shouldReturnNull_forMissingEntity() {
-        TopicResolver resolver = TopicResolver.fromSnapshot(
-                Collections.singletonMap("clan", "bohpts.gs.sync.clans"));
+        TopicResolver resolver = TopicResolver.fromSnapshot(Collections.singletonMap("clan", "bohpts.gs.sync.clans"));
 
         assertNull(resolver.resolveTopic("character"));
     }

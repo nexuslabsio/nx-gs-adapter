@@ -21,8 +21,7 @@ package app.l2nx.gs.adapter.api.kafka.events.character;
  */
 public final class WellKnownFarmModes {
 
-    private WellKnownFarmModes() {
-    }
+    private WellKnownFarmModes() {}
 
     public static final String AUTOFARM = "autofarm";
 

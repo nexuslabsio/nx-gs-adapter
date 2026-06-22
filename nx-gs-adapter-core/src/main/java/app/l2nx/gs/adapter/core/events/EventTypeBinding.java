@@ -19,9 +19,7 @@ final class EventTypeBinding {
     private final byte[] messageTypeBytes;
     private final Function<Object, byte[]> partitionKeyExtractor;
 
-    EventTypeBinding(String familyKey,
-                     String messageType,
-                     Function<Object, byte[]> partitionKeyExtractor) {
+    EventTypeBinding(String familyKey, String messageType, Function<Object, byte[]> partitionKeyExtractor) {
         this.familyKey = familyKey;
         this.messageType = messageType;
         this.messageTypeBytes = messageType.getBytes(StandardCharsets.UTF_8);

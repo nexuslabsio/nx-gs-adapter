@@ -1,15 +1,16 @@
 package app.l2nx.gs.adapter.api.kafka.ops;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+
+import org.junit.jupiter.api.Test;
 
 class PoolStatsTest {
 
     @Test
     void builder_shouldMapEachFieldToConstructorPosition() {
-        PoolStats stats = PoolStats.builder().active(2).idle(8).total(10).waiting(0).build();
+        PoolStats stats =
+                PoolStats.builder().active(2).idle(8).total(10).waiting(0).build();
 
         assertEquals(Integer.valueOf(2), stats.getActive());
         assertEquals(Integer.valueOf(8), stats.getIdle());

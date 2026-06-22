@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.ops;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Heartbeat slot reporting health of the built-in {@code commands} module —
@@ -62,16 +61,17 @@ public final class CommandsStats {
     private final long commitFailuresTotal;
     private final @Nullable List<String> registeredTypes;
 
-    public CommandsStats(long consumedTotal,
-                         long otherServerSkippedTotal,
-                         long handledTotal,
-                         long unsupportedTotal,
-                         long validationFailedTotal,
-                         long internalErrorsTotal,
-                         long repliesPublishedTotal,
-                         long repliesFailedTotal,
-                         long commitFailuresTotal,
-                         @Nullable List<String> registeredTypes) {
+    public CommandsStats(
+            long consumedTotal,
+            long otherServerSkippedTotal,
+            long handledTotal,
+            long unsupportedTotal,
+            long validationFailedTotal,
+            long internalErrorsTotal,
+            long repliesPublishedTotal,
+            long repliesFailedTotal,
+            long commitFailuresTotal,
+            @Nullable List<String> registeredTypes) {
         this.consumedTotal = consumedTotal;
         this.otherServerSkippedTotal = otherServerSkippedTotal;
         this.handledTotal = handledTotal;
@@ -172,9 +172,17 @@ public final class CommandsStats {
 
     @Override
     public int hashCode() {
-        return Objects.hash(consumedTotal, otherServerSkippedTotal, handledTotal, unsupportedTotal,
-                validationFailedTotal, internalErrorsTotal, repliesPublishedTotal,
-                repliesFailedTotal, commitFailuresTotal, registeredTypes);
+        return Objects.hash(
+                consumedTotal,
+                otherServerSkippedTotal,
+                handledTotal,
+                unsupportedTotal,
+                validationFailedTotal,
+                internalErrorsTotal,
+                repliesPublishedTotal,
+                repliesFailedTotal,
+                commitFailuresTotal,
+                registeredTypes);
     }
 
     @Override
@@ -254,9 +262,17 @@ public final class CommandsStats {
         }
 
         public CommandsStats build() {
-            return new CommandsStats(consumedTotal, otherServerSkippedTotal, handledTotal, unsupportedTotal,
-                    validationFailedTotal, internalErrorsTotal, repliesPublishedTotal,
-                    repliesFailedTotal, commitFailuresTotal, registeredTypes);
+            return new CommandsStats(
+                    consumedTotal,
+                    otherServerSkippedTotal,
+                    handledTotal,
+                    unsupportedTotal,
+                    validationFailedTotal,
+                    internalErrorsTotal,
+                    repliesPublishedTotal,
+                    repliesFailedTotal,
+                    commitFailuresTotal,
+                    registeredTypes);
         }
     }
 }

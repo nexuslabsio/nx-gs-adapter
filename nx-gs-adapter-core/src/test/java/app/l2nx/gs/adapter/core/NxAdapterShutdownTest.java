@@ -1,26 +1,20 @@
 package app.l2nx.gs.adapter.core;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class NxAdapterShutdownTest {
 
-    private static final String[] L2NX_PROPS = {
-            "l2nx.gs-key",
-            "l2nx.platform-url",
-            "l2nx.enabled",
-            "l2nx.config-file"
-    };
+    private static final String[] L2NX_PROPS = {"l2nx.gs-key", "l2nx.platform-url", "l2nx.enabled", "l2nx.config-file"};
 
     private final Map<String, String> savedProps = new HashMap<>();
 
@@ -56,8 +50,7 @@ class NxAdapterShutdownTest {
         adapter.shutdown();
         adapter.shutdown();
 
-        assertEquals(afterFirst, transitions.get(),
-                "duplicate shutdown() must not emit additional transitions");
+        assertEquals(afterFirst, transitions.get(), "duplicate shutdown() must not emit additional transitions");
         assertEquals(AdapterState.CLOSED, NxAdapter.state());
     }
 
@@ -70,7 +63,8 @@ class NxAdapterShutdownTest {
         adapter.shutdown();
 
         assertEquals(AdapterState.CLOSED, NxAdapter.state());
-        assertTrue(captured.contains(AdapterState.CLOSED),
+        assertTrue(
+                captured.contains(AdapterState.CLOSED),
                 "shutdown() must surface a CLOSED transition through onStateChange");
     }
 }

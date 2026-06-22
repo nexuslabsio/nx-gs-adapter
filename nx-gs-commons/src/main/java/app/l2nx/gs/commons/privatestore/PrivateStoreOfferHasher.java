@@ -2,9 +2,8 @@ package app.l2nx.gs.commons.privatestore;
 
 import app.l2nx.gs.adapter.api.domain.Attribute;
 import app.l2nx.gs.commons.hash.Fnv1a64;
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Order-independent FNV-1a64 hash over a private-store order book — used
@@ -33,8 +32,7 @@ public final class PrivateStoreOfferHasher {
         return Integer.compare(a.intValue(), b.intValue());
     }
 
-    private PrivateStoreOfferHasher() {
-    }
+    private PrivateStoreOfferHasher() {}
 
     /**
      * Empty input yields a stable sentinel distinct from any non-empty set.

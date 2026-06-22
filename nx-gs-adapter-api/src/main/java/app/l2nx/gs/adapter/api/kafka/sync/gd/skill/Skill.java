@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic skill wire DTO — the common L2 denominator for static skill data,
@@ -60,35 +59,37 @@ public final class Skill {
     private final @Nullable List<SkillClassLearn> classes;
     private final @Nullable List<GearScoreContribution> gearScoreContributions;
 
-    public Skill(int id,
-                 @Nullable String operateType,
-                 @Nullable String skillType,
-                 @Nullable String targetType,
-                 @Nullable String trait,
-                 @Nullable String abnormalType,
-                 @Nullable List<String> abnormalVisualEffects,
-                 @Nullable String saveVs,
-                 @Nullable Integer sharedReuseGroup,
-                 @Nullable Integer minPledgeClass,
-                 @Nullable Integer triggeredSkillId,
-                 @Nullable Integer triggeredSkillLevel,
-                 @Nullable String triggeredChanceType,
-                 @Nullable Integer triggeredChancePercent,
-                 @Nullable String icon,
-                 @Nullable Integer maxLevel,
-                 @Nullable SkillFlags flags,
-                 @Nullable List<SkillCondition> conditions,
-                 @Nullable List<SkillLevel> levels,
-                 @Nullable List<SkillEnchantRoute> enchantRoutes,
-                 @Nullable List<SkillClassLearn> classes,
-                 @Nullable List<GearScoreContribution> gearScoreContributions) {
+    public Skill(
+            int id,
+            @Nullable String operateType,
+            @Nullable String skillType,
+            @Nullable String targetType,
+            @Nullable String trait,
+            @Nullable String abnormalType,
+            @Nullable List<String> abnormalVisualEffects,
+            @Nullable String saveVs,
+            @Nullable Integer sharedReuseGroup,
+            @Nullable Integer minPledgeClass,
+            @Nullable Integer triggeredSkillId,
+            @Nullable Integer triggeredSkillLevel,
+            @Nullable String triggeredChanceType,
+            @Nullable Integer triggeredChancePercent,
+            @Nullable String icon,
+            @Nullable Integer maxLevel,
+            @Nullable SkillFlags flags,
+            @Nullable List<SkillCondition> conditions,
+            @Nullable List<SkillLevel> levels,
+            @Nullable List<SkillEnchantRoute> enchantRoutes,
+            @Nullable List<SkillClassLearn> classes,
+            @Nullable List<GearScoreContribution> gearScoreContributions) {
         this.id = id;
         this.operateType = operateType;
         this.skillType = skillType;
         this.targetType = targetType;
         this.trait = trait;
         this.abnormalType = abnormalType;
-        this.abnormalVisualEffects = abnormalVisualEffects == null ? null
+        this.abnormalVisualEffects = abnormalVisualEffects == null
+                ? null
                 : Collections.unmodifiableList(new ArrayList<String>(abnormalVisualEffects));
         this.saveVs = saveVs;
         this.sharedReuseGroup = sharedReuseGroup;
@@ -100,15 +101,15 @@ public final class Skill {
         this.icon = icon;
         this.maxLevel = maxLevel;
         this.flags = flags;
-        this.conditions = conditions == null ? null
-                : Collections.unmodifiableList(new ArrayList<SkillCondition>(conditions));
-        this.levels = levels == null ? null
-                : Collections.unmodifiableList(new ArrayList<SkillLevel>(levels));
-        this.enchantRoutes = enchantRoutes == null ? null
+        this.conditions =
+                conditions == null ? null : Collections.unmodifiableList(new ArrayList<SkillCondition>(conditions));
+        this.levels = levels == null ? null : Collections.unmodifiableList(new ArrayList<SkillLevel>(levels));
+        this.enchantRoutes = enchantRoutes == null
+                ? null
                 : Collections.unmodifiableList(new ArrayList<SkillEnchantRoute>(enchantRoutes));
-        this.classes = classes == null ? null
-                : Collections.unmodifiableList(new ArrayList<SkillClassLearn>(classes));
-        this.gearScoreContributions = gearScoreContributions == null ? null
+        this.classes = classes == null ? null : Collections.unmodifiableList(new ArrayList<SkillClassLearn>(classes));
+        this.gearScoreContributions = gearScoreContributions == null
+                ? null
                 : Collections.unmodifiableList(new ArrayList<GearScoreContribution>(gearScoreContributions));
     }
 
@@ -335,11 +336,29 @@ public final class Skill {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, operateType, skillType, targetType, trait,
-                abnormalType, abnormalVisualEffects, saveVs, sharedReuseGroup,
-                minPledgeClass, triggeredSkillId, triggeredSkillLevel, triggeredChanceType,
-                triggeredChancePercent, icon, maxLevel, flags, conditions, levels, enchantRoutes,
-                classes, gearScoreContributions);
+        return Objects.hash(
+                id,
+                operateType,
+                skillType,
+                targetType,
+                trait,
+                abnormalType,
+                abnormalVisualEffects,
+                saveVs,
+                sharedReuseGroup,
+                minPledgeClass,
+                triggeredSkillId,
+                triggeredSkillLevel,
+                triggeredChanceType,
+                triggeredChancePercent,
+                icon,
+                maxLevel,
+                flags,
+                conditions,
+                levels,
+                enchantRoutes,
+                classes,
+                gearScoreContributions);
     }
 
     @Override
@@ -482,11 +501,29 @@ public final class Skill {
         }
 
         public Skill build() {
-            return new Skill(id, operateType, skillType, targetType, trait,
-                    abnormalType, abnormalVisualEffects, saveVs, sharedReuseGroup,
-                    minPledgeClass, triggeredSkillId, triggeredSkillLevel, triggeredChanceType,
-                    triggeredChancePercent, icon, maxLevel, flags, conditions, levels,
-                    enchantRoutes, classes, gearScoreContributions);
+            return new Skill(
+                    id,
+                    operateType,
+                    skillType,
+                    targetType,
+                    trait,
+                    abnormalType,
+                    abnormalVisualEffects,
+                    saveVs,
+                    sharedReuseGroup,
+                    minPledgeClass,
+                    triggeredSkillId,
+                    triggeredSkillLevel,
+                    triggeredChanceType,
+                    triggeredChancePercent,
+                    icon,
+                    maxLevel,
+                    flags,
+                    conditions,
+                    levels,
+                    enchantRoutes,
+                    classes,
+                    gearScoreContributions);
         }
     }
 }

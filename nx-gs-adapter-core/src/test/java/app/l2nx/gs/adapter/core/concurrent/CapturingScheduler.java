@@ -65,8 +65,7 @@ public final class CapturingScheduler implements ScheduledExecutorService {
     }
 
     @Override
-    public void shutdown() {
-    }
+    public void shutdown() {}
 
     @Override
     public List<Runnable> shutdownNow() {

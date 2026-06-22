@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.commands.sync;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Inbound command instructing the db-sync engine to force a re-sync of
@@ -62,10 +61,7 @@ public final class ResyncRowsCommand implements NxCommand<ResyncRowsResult> {
     private final List<Long> pks;
     private final boolean cascade;
 
-    public ResyncRowsCommand(UUID resyncId,
-                             String entityName,
-                             List<Long> pks,
-                             boolean cascade) {
+    public ResyncRowsCommand(UUID resyncId, String entityName, List<Long> pks, boolean cascade) {
         if (resyncId == null) {
             throw new IllegalArgumentException("resyncId is required");
         }
@@ -122,11 +118,7 @@ public final class ResyncRowsCommand implements NxCommand<ResyncRowsResult> {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .resyncId(resyncId)
-                .entityName(entityName)
-                .pks(pks)
-                .cascade(cascade);
+        return new Builder().resyncId(resyncId).entityName(entityName).pks(pks).cascade(cascade);
     }
 
     public static Builder builder() {

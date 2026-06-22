@@ -5,7 +5,6 @@ import app.l2nx.gs.adapter.api.spi.AdapterModule;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-
 import java.util.*;
 
 /**
@@ -23,7 +22,10 @@ public final class ModuleRegistry {
 
     private static final NxLog log = NxLogFactory.getLogger(ModuleRegistry.class);
 
-    enum LifecycleState {HEALTHY, FAILED}
+    enum LifecycleState {
+        HEALTHY,
+        FAILED
+    }
 
     private final Object lock = new Object();
     private final List<AdapterModule> modules = new ArrayList<AdapterModule>();
@@ -158,7 +160,10 @@ public final class ModuleRegistry {
             try {
                 reported = m.currentStatus();
             } catch (Throwable t) {
-                log.error("Module {}.currentStatus threw {}", m.name(), t.getClass().getName());
+                log.error(
+                        "Module {}.currentStatus threw {}",
+                        m.name(),
+                        t.getClass().getName());
                 result.add(failedStatus(m.name()));
                 continue;
             }
@@ -194,8 +199,12 @@ public final class ModuleRegistry {
         try {
             r.run();
         } catch (Throwable t) {
-            log.error("Module {}.{} threw {}: {}", m.name(), hookName,
-                    t.getClass().getName(), t.getMessage());
+            log.error(
+                    "Module {}.{} threw {}: {}",
+                    m.name(),
+                    hookName,
+                    t.getClass().getName(),
+                    t.getMessage());
             synchronized (lock) {
                 states.put(m.name(), LifecycleState.FAILED);
             }
@@ -206,8 +215,12 @@ public final class ModuleRegistry {
         try {
             r.run();
         } catch (Throwable t) {
-            log.error("Module {}.{} threw {} during shutdown: {}", m.name(), hookName,
-                    t.getClass().getName(), t.getMessage());
+            log.error(
+                    "Module {}.{} threw {} during shutdown: {}",
+                    m.name(),
+                    hookName,
+                    t.getClass().getName(),
+                    t.getMessage());
         }
     }
 

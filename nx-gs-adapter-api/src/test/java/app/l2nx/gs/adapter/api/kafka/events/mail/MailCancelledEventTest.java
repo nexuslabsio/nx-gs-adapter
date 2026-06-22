@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class MailCancelledEventTest {
 
@@ -40,7 +39,8 @@ class MailCancelledEventTest {
                 .attachments(Collections.singletonList(stub(1L, 2L)))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> event.getAttachments().add(stub(3L, 4L)));
     }
 
@@ -77,16 +77,25 @@ class MailCancelledEventTest {
     void equals_shouldDistinguishCancelledByCharId() {
         UUID id = UUID.randomUUID();
         MailCancelledEvent a = MailCancelledEvent.builder()
-                .eventId(id).mailId(1L).cancelledByCharId(10L).build();
+                .eventId(id)
+                .mailId(1L)
+                .cancelledByCharId(10L)
+                .build();
         MailCancelledEvent b = MailCancelledEvent.builder()
-                .eventId(id).mailId(1L).cancelledByCharId(11L).build();
+                .eventId(id)
+                .mailId(1L)
+                .cancelledByCharId(11L)
+                .build();
 
         assertNotEquals(a, b);
     }
 
     private static MailItemMovement stub(long itemId, long newItemId) {
         return MailItemMovement.builder()
-                .itemTemplateId(57L).itemId(itemId).newItemId(newItemId).count(1L)
+                .itemTemplateId(57L)
+                .itemId(itemId)
+                .newItemId(newItemId)
+                .count(1L)
                 .build();
     }
 }

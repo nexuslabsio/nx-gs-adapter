@@ -1,15 +1,16 @@
 package app.l2nx.gs.adapter.api.kafka.ops;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+
+import org.junit.jupiter.api.Test;
 
 class EntityStatsTest {
 
     @Test
     void builder_shouldMapEachFieldToConstructorPosition() {
-        ChangesSummary changes = ChangesSummary.builder().created(2L).updated(1L).deleted(0L).build();
+        ChangesSummary changes =
+                ChangesSummary.builder().created(2L).updated(1L).deleted(0L).build();
 
         EntityStats stats = EntityStats.builder()
                 .name("clan")

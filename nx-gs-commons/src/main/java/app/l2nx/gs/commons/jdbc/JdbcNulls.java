@@ -1,10 +1,9 @@
 package app.l2nx.gs.commons.jdbc;
 
-import org.jspecify.annotations.Nullable;
-
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Null-aware {@link ResultSet} readers. Returns {@code null} when the source
@@ -26,8 +25,7 @@ import java.time.Instant;
  */
 public final class JdbcNulls {
 
-    private JdbcNulls() {
-    }
+    private JdbcNulls() {}
 
     public static @Nullable Integer nullableInt(ResultSet rs, String column) throws SQLException {
         int raw = rs.getInt(column);
@@ -58,7 +56,8 @@ public final class JdbcNulls {
      * {@code sentinel}. Use when the source schema encodes "not set" as a
      * specific in-band value (often {@code 0}) rather than SQL NULL.
      */
-    public static @Nullable Instant instantFromEpochMillisOrSentinel(ResultSet rs, String column, long sentinel) throws SQLException {
+    public static @Nullable Instant instantFromEpochMillisOrSentinel(ResultSet rs, String column, long sentinel)
+            throws SQLException {
         long raw = rs.getLong(column);
         if (rs.wasNull() || raw == sentinel) return null;
         return Instant.ofEpochMilli(raw);

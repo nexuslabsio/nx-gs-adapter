@@ -42,11 +42,12 @@ public final class CommandsConfig {
     private final long replyFlushTimeoutMs;
     private final Map<String, Object> kafkaOverrides;
 
-    public CommandsConfig(long pollTimeoutMs,
-                          long shutdownTimeoutMs,
-                          long hostSyncTimeoutMs,
-                          long replyFlushTimeoutMs,
-                          Map<String, Object> kafkaOverrides) {
+    public CommandsConfig(
+            long pollTimeoutMs,
+            long shutdownTimeoutMs,
+            long hostSyncTimeoutMs,
+            long replyFlushTimeoutMs,
+            Map<String, Object> kafkaOverrides) {
         this.pollTimeoutMs = pollTimeoutMs;
         this.shutdownTimeoutMs = shutdownTimeoutMs;
         this.hostSyncTimeoutMs = hostSyncTimeoutMs;
@@ -57,7 +58,8 @@ public final class CommandsConfig {
     }
 
     public static CommandsConfig defaults() {
-        return new CommandsConfig(DEFAULT_POLL_TIMEOUT_MS,
+        return new CommandsConfig(
+                DEFAULT_POLL_TIMEOUT_MS,
                 DEFAULT_SHUTDOWN_TIMEOUT_MS,
                 DEFAULT_HOST_SYNC_TIMEOUT_MS,
                 DEFAULT_REPLY_FLUSH_TIMEOUT_MS,

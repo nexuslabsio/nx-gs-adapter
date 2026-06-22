@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.instancetemplate;
 
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic instance-template wire DTO — the {@code id → name} catalog for

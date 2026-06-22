@@ -2,9 +2,8 @@ package app.l2nx.gs.adapter.api.kafka.commands.item;
 
 import app.l2nx.gs.adapter.api.domain.item.ItemLocation;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Inbound command instructing the game-server to grant a fresh item stack to
@@ -26,11 +25,12 @@ public final class CreateItemCommand implements NxCommand<CreateItemResult> {
     private final @Nullable Long enchantLevel;
     private final @Nullable ItemLocation location;
 
-    public CreateItemCommand(Long charId,
-                             Long itemTemplateId,
-                             Long count,
-                             @Nullable Long enchantLevel,
-                             @Nullable ItemLocation location) {
+    public CreateItemCommand(
+            Long charId,
+            Long itemTemplateId,
+            Long count,
+            @Nullable Long enchantLevel,
+            @Nullable ItemLocation location) {
         if (charId == null) {
             throw new IllegalArgumentException("charId is required");
         }

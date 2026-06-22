@@ -4,7 +4,6 @@ import app.l2nx.gs.adapter.api.spi.CommandContext;
 import app.l2nx.gs.adapter.api.spi.HostExecutor;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.adapter.api.spi.NxSync;
-
 import java.util.UUID;
 import java.util.concurrent.Executor;
 
@@ -27,11 +26,7 @@ final class CommandContextImpl implements CommandContext {
     private final Executor io;
     private final NxSync sync;
 
-    CommandContextImpl(UUID correlationId,
-                       HostExecutor host,
-                       NxEvents events,
-                       Executor io,
-                       NxSync sync) {
+    CommandContextImpl(UUID correlationId, HostExecutor host, NxEvents events, Executor io, NxSync sync) {
         this.correlationId = correlationId;
         this.host = host;
         this.events = events;

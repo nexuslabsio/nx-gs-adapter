@@ -99,8 +99,7 @@ public final class EngineConfig {
                 workers);
     }
 
-    static Function<String, String> fileFirstChain(Properties fileProps,
-                                                   Function<String, String> sysprops) {
+    static Function<String, String> fileFirstChain(Properties fileProps, Function<String, String> sysprops) {
         return key -> {
             String fromFile = fileProps.getProperty(key);
             if (fromFile != null && !fromFile.trim().isEmpty()) {
@@ -130,8 +129,8 @@ public final class EngineConfig {
         } catch (NoSuchFileException missing) {
             if (required) {
                 throw new IllegalStateException(
-                        "runtime-sync config file '" + path + "' (from -D" + CONFIG_FILE_KEY
-                                + ") does not exist", missing);
+                        "runtime-sync config file '" + path + "' (from -D" + CONFIG_FILE_KEY + ") does not exist",
+                        missing);
             }
             return props;
         } catch (IOException ioe) {
@@ -152,12 +151,10 @@ public final class EngineConfig {
         try {
             parsed = Integer.parseInt(raw.trim());
         } catch (NumberFormatException e) {
-            throw new IllegalStateException(
-                    "Invalid '" + key + "' value '" + raw + "': not an integer", e);
+            throw new IllegalStateException("Invalid '" + key + "' value '" + raw + "': not an integer", e);
         }
         if (parsed <= 0) {
-            throw new IllegalStateException(
-                    "Invalid '" + key + "' value " + parsed + ": must be > 0");
+            throw new IllegalStateException("Invalid '" + key + "' value " + parsed + ": must be > 0");
         }
         return parsed;
     }
@@ -171,12 +168,10 @@ public final class EngineConfig {
         try {
             parsed = Integer.parseInt(raw.trim());
         } catch (NumberFormatException e) {
-            throw new IllegalStateException(
-                    "Invalid '" + key + "' value '" + raw + "': not an integer", e);
+            throw new IllegalStateException("Invalid '" + key + "' value '" + raw + "': not an integer", e);
         }
         if (parsed <= 0) {
-            throw new IllegalStateException(
-                    "Invalid '" + key + "' value " + parsed + ": must be > 0");
+            throw new IllegalStateException("Invalid '" + key + "' value " + parsed + ": must be > 0");
         }
         return parsed;
     }

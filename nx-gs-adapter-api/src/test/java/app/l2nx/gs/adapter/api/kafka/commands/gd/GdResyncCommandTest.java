@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.commands.gd;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
 import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class GdResyncCommandTest {
 
@@ -22,7 +21,8 @@ class GdResyncCommandTest {
                 .build();
 
         assertEquals(Arrays.asList("itemtemplate", "instance"), result.getAcceptedEntities());
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> result.getAcceptedEntities().add("npctemplate"));
     }
 

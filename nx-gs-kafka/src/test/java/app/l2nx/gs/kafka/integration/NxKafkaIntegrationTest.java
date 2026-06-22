@@ -1,8 +1,11 @@
 package app.l2nx.gs.kafka.integration;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.gs.kafka.NxKafka;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -11,18 +14,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class NxKafkaIntegrationTest {
 
     @Container
-    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer(
-            "confluentinc/cp-kafka:7.7.0"
-    );
+    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer("confluentinc/cp-kafka:7.7.0");
 
     @AfterEach
     void tearDown() {
@@ -85,15 +82,19 @@ class NxKafkaIntegrationTest {
         assertTrue(kafka.isConnected());
 
         // Pause the container to simulate broker going down
-        DockerClientFactory.instance().client()
-                .pauseContainerCmd(KAFKA.getContainerId()).exec();
+        DockerClientFactory.instance()
+                .client()
+                .pauseContainerCmd(KAFKA.getContainerId())
+                .exec();
 
         try {
             awaitState(KafkaState.DISCONNECTED, 15000);
             assertFalse(kafka.isConnected());
         } finally {
-            DockerClientFactory.instance().client()
-                    .unpauseContainerCmd(KAFKA.getContainerId()).exec();
+            DockerClientFactory.instance()
+                    .client()
+                    .unpauseContainerCmd(KAFKA.getContainerId())
+                    .exec();
         }
 
         // Wait for reconnection
@@ -109,7 +110,6 @@ class NxKafkaIntegrationTest {
             }
             Thread.sleep(500);
         }
-        assertEquals(expected, NxKafka.instance().state(),
-                "Timed out waiting for state " + expected);
+        assertEquals(expected, NxKafka.instance().state(), "Timed out waiting for state " + expected);
     }
 }

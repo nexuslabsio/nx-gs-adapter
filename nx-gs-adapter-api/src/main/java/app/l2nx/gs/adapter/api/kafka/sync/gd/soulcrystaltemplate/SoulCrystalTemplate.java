@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.soulcrystaltemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic soul-crystal wire DTO — one node of the soul-crystal leveling chain,
@@ -21,10 +20,11 @@ public final class SoulCrystalTemplate {
     private final @Nullable Integer nextItemTemplateId;
     private final @Nullable Integer cursedNextItemTemplateId;
 
-    public SoulCrystalTemplate(int id,
-                               @Nullable Integer level,
-                               @Nullable Integer nextItemTemplateId,
-                               @Nullable Integer cursedNextItemTemplateId) {
+    public SoulCrystalTemplate(
+            int id,
+            @Nullable Integer level,
+            @Nullable Integer nextItemTemplateId,
+            @Nullable Integer cursedNextItemTemplateId) {
         this.id = id;
         this.level = level;
         this.nextItemTemplateId = nextItemTemplateId;

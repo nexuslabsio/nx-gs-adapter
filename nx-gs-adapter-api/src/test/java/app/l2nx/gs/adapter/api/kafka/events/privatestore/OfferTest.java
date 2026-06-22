@@ -1,21 +1,23 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
-import app.l2nx.gs.adapter.api.domain.Attribute;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class OfferTest {
 
     @Test
     void getAttributes_shouldReturnEmptyMap_whenBuilderOmits() {
         Offer offer = Offer.builder()
-                .traderId(42L).count(1L).unitPrice(100L).currencyItemId(57L)
+                .traderId(42L)
+                .count(1L)
+                .unitPrice(100L)
+                .currencyItemId(57L)
                 .build();
 
         assertTrue(offer.getAttributes().isEmpty());
@@ -24,8 +26,11 @@ class OfferTest {
     @Test
     void getAttributes_shouldReturnEmptyMap_whenBuilderPassesNull() {
         Offer offer = Offer.builder()
-                .traderId(42L).attributes(null)
-                .count(1L).unitPrice(100L).currencyItemId(57L)
+                .traderId(42L)
+                .attributes(null)
+                .count(1L)
+                .unitPrice(100L)
+                .currencyItemId(57L)
                 .build();
 
         assertTrue(offer.getAttributes().isEmpty());
@@ -37,12 +42,15 @@ class OfferTest {
         source.put(Attribute.FIRE, 300);
 
         Offer offer = Offer.builder()
-                .traderId(42L).attributes(source)
-                .count(1L).unitPrice(100L).currencyItemId(57L)
+                .traderId(42L)
+                .attributes(source)
+                .count(1L)
+                .unitPrice(100L)
+                .currencyItemId(57L)
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> offer.getAttributes().put(Attribute.WATER, 150));
+        assertThrows(
+                UnsupportedOperationException.class, () -> offer.getAttributes().put(Attribute.WATER, 150));
     }
 
     @Test
@@ -51,8 +59,11 @@ class OfferTest {
         source.put(Attribute.FIRE, 300);
 
         Offer offer = Offer.builder()
-                .traderId(42L).attributes(source)
-                .count(1L).unitPrice(100L).currencyItemId(57L)
+                .traderId(42L)
+                .attributes(source)
+                .count(1L)
+                .unitPrice(100L)
+                .currencyItemId(57L)
                 .build();
 
         source.put(Attribute.WATER, 150);
@@ -83,9 +94,17 @@ class OfferTest {
     @Test
     void equals_shouldDistinguishTraderId() {
         Offer a = Offer.builder()
-                .traderId(1L).count(1L).unitPrice(100L).currencyItemId(57L).build();
+                .traderId(1L)
+                .count(1L)
+                .unitPrice(100L)
+                .currencyItemId(57L)
+                .build();
         Offer b = Offer.builder()
-                .traderId(2L).count(1L).unitPrice(100L).currencyItemId(57L).build();
+                .traderId(2L)
+                .count(1L)
+                .unitPrice(100L)
+                .currencyItemId(57L)
+                .build();
 
         assertNotEquals(a, b);
     }
@@ -93,11 +112,17 @@ class OfferTest {
     @Test
     void equals_shouldDistinguishAttributes() {
         Offer a = Offer.builder()
-                .traderId(1L).count(1L).unitPrice(100L).currencyItemId(57L)
+                .traderId(1L)
+                .count(1L)
+                .unitPrice(100L)
+                .currencyItemId(57L)
                 .attributes(Collections.singletonMap(Attribute.FIRE, 300))
                 .build();
         Offer b = Offer.builder()
-                .traderId(1L).count(1L).unitPrice(100L).currencyItemId(57L)
+                .traderId(1L)
+                .count(1L)
+                .unitPrice(100L)
+                .currencyItemId(57L)
                 .attributes(Collections.singletonMap(Attribute.FIRE, 301))
                 .build();
 

@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.item;
 
 import app.l2nx.gs.adapter.api.domain.item.ItemLocation;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO for one item, payload of {@code SyncEvent<ItemDbDto>} on the
@@ -43,13 +42,14 @@ public final class ItemDbDto {
     private final @Nullable ItemLocation location;
     private final @Nullable List<ItemAttributeDbDto> attributes;
 
-    public ItemDbDto(long id,
-                     @Nullable Long itemTemplateId,
-                     @Nullable Long ownerId,
-                     @Nullable Long count,
-                     @Nullable Integer enchantLevel,
-                     @Nullable ItemLocation location,
-                     @Nullable List<ItemAttributeDbDto> attributes) {
+    public ItemDbDto(
+            long id,
+            @Nullable Long itemTemplateId,
+            @Nullable Long ownerId,
+            @Nullable Long count,
+            @Nullable Integer enchantLevel,
+            @Nullable ItemLocation location,
+            @Nullable List<ItemAttributeDbDto> attributes) {
         this.id = id;
         this.itemTemplateId = itemTemplateId;
         this.ownerId = ownerId;

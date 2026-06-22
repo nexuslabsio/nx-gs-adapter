@@ -29,8 +29,7 @@ package app.l2nx.gs.adapter.api.kafka.events.character;
  */
 public final class WellKnownPresenceMetadata {
 
-    private WellKnownPresenceMetadata() {
-    }
+    private WellKnownPresenceMetadata() {}
 
     /**
      * Canonical metadata key carrying the build-agnostic reason a character

@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatetrade;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One symmetric side of a closed personal trade. {@link #getItems() items}
@@ -16,8 +15,7 @@ public final class TradeParty {
     private final long charId;
     private final List<TradeItemMovement> items;
 
-    public TradeParty(long charId,
-                      @Nullable List<TradeItemMovement> items) {
+    public TradeParty(long charId, @Nullable List<TradeItemMovement> items) {
         this.charId = charId;
         this.items = freezeList(items);
     }
@@ -31,9 +29,7 @@ public final class TradeParty {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .charId(charId)
-                .items(items);
+        return new Builder().charId(charId).items(items);
     }
 
     public static Builder builder() {
@@ -52,8 +48,7 @@ public final class TradeParty {
         if (this == o) return true;
         if (!(o instanceof TradeParty)) return false;
         TradeParty that = (TradeParty) o;
-        return charId == that.charId
-                && Objects.equals(items, that.items);
+        return charId == that.charId && Objects.equals(items, that.items);
     }
 
     @Override
@@ -63,8 +58,7 @@ public final class TradeParty {
 
     @Override
     public String toString() {
-        return "TradeParty[charId=" + charId
-                + ", items=" + items + "]";
+        return "TradeParty[charId=" + charId + ", items=" + items + "]";
     }
 
     public static final class Builder {

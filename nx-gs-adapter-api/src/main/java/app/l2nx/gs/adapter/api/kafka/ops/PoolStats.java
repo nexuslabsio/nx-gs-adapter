@@ -82,8 +82,7 @@ public final class PoolStats {
 
     @Override
     public String toString() {
-        return "PoolStats[active=" + active + ", idle=" + idle
-                + ", total=" + total + ", waiting=" + waiting + "]";
+        return "PoolStats[active=" + active + ", idle=" + idle + ", total=" + total + ", waiting=" + waiting + "]";
     }
 
     public static final class Builder {

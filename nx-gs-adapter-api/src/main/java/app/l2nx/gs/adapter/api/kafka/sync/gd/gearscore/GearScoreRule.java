@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore;
 
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One rule inside a {@link GearScoreRuleGroup} — the atomic "this is worth N gear
@@ -28,19 +27,20 @@ public final class GearScoreRule {
     private final @Nullable Double cap;
     private final @Nullable List<GearScoreScalingStep> scaling;
 
-    public GearScoreRule(String key,
-                         @Nullable LocalizedText label,
-                         @Nullable Double value,
-                         @Nullable String unit,
-                         @Nullable Double cap,
-                         @Nullable List<GearScoreScalingStep> scaling) {
+    public GearScoreRule(
+            String key,
+            @Nullable LocalizedText label,
+            @Nullable Double value,
+            @Nullable String unit,
+            @Nullable Double cap,
+            @Nullable List<GearScoreScalingStep> scaling) {
         this.key = Objects.requireNonNull(key, "GearScoreRule.key is required");
         this.label = label;
         this.value = value;
         this.unit = unit;
         this.cap = cap;
-        this.scaling = scaling == null ? null
-                : Collections.unmodifiableList(new ArrayList<GearScoreScalingStep>(scaling));
+        this.scaling =
+                scaling == null ? null : Collections.unmodifiableList(new ArrayList<GearScoreScalingStep>(scaling));
     }
 
     /**
@@ -123,9 +123,7 @@ public final class GearScoreRule {
 
     @Override
     public String toString() {
-        return "GearScoreRule[key=" + key
-                + ", value=" + value
-                + ", unit=" + unit + "]";
+        return "GearScoreRule[key=" + key + ", value=" + value + ", unit=" + unit + "]";
     }
 
     public static final class Builder {

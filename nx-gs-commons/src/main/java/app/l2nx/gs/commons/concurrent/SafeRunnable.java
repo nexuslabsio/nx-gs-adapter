@@ -9,8 +9,7 @@ import app.l2nx.gs.log.NxLog;
  */
 public final class SafeRunnable {
 
-    private SafeRunnable() {
-    }
+    private SafeRunnable() {}
 
     public static Runnable wrap(Runnable delegate, NxLog log) {
         return () -> {

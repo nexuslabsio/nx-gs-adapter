@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Inbox mail rejected (or auto-bounced on expiry) — bounces back to sender
@@ -24,16 +23,18 @@ public final class MailReturnedEvent {
     private final List<MailItemMovement> attachments;
     private final @Nullable Map<String, String> metadata;
 
-    public MailReturnedEvent(UUID eventId,
-                             long mailId,
-                             long returnedToSenderId,
-                             @Nullable List<MailItemMovement> attachments,
-                             @Nullable Map<String, String> metadata) {
+    public MailReturnedEvent(
+            UUID eventId,
+            long mailId,
+            long returnedToSenderId,
+            @Nullable List<MailItemMovement> attachments,
+            @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.mailId = mailId;
         this.returnedToSenderId = returnedToSenderId;
         this.attachments = freezeList(attachments);
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {

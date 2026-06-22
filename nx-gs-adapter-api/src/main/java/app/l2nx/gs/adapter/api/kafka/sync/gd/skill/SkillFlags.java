@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Cohesive cluster of a {@link Skill}'s boolean classification flags — "what kind of
@@ -33,21 +32,22 @@ public final class SkillFlags {
     private final @Nullable Boolean reflectable;
     private final @Nullable Boolean stayAfterDeath;
 
-    public SkillFlags(@Nullable Boolean magic,
-                      @Nullable Boolean debuff,
-                      @Nullable Boolean offensive,
-                      @Nullable Boolean passive,
-                      @Nullable Boolean toggle,
-                      @Nullable Boolean staticSkill,
-                      @Nullable Boolean blockedInOlympiad,
-                      @Nullable Boolean overHit,
-                      @Nullable Boolean ignoreShield,
-                      @Nullable Boolean nextActionAttack,
-                      @Nullable Boolean heroSkill,
-                      @Nullable Boolean clanSkill,
-                      @Nullable Boolean dispellable,
-                      @Nullable Boolean reflectable,
-                      @Nullable Boolean stayAfterDeath) {
+    public SkillFlags(
+            @Nullable Boolean magic,
+            @Nullable Boolean debuff,
+            @Nullable Boolean offensive,
+            @Nullable Boolean passive,
+            @Nullable Boolean toggle,
+            @Nullable Boolean staticSkill,
+            @Nullable Boolean blockedInOlympiad,
+            @Nullable Boolean overHit,
+            @Nullable Boolean ignoreShield,
+            @Nullable Boolean nextActionAttack,
+            @Nullable Boolean heroSkill,
+            @Nullable Boolean clanSkill,
+            @Nullable Boolean dispellable,
+            @Nullable Boolean reflectable,
+            @Nullable Boolean stayAfterDeath) {
         this.magic = magic;
         this.debuff = debuff;
         this.offensive = offensive;
@@ -203,9 +203,22 @@ public final class SkillFlags {
 
     @Override
     public int hashCode() {
-        return Objects.hash(magic, debuff, offensive, passive, toggle, staticSkill,
-                blockedInOlympiad, overHit, ignoreShield, nextActionAttack, heroSkill, clanSkill,
-                dispellable, reflectable, stayAfterDeath);
+        return Objects.hash(
+                magic,
+                debuff,
+                offensive,
+                passive,
+                toggle,
+                staticSkill,
+                blockedInOlympiad,
+                overHit,
+                ignoreShield,
+                nextActionAttack,
+                heroSkill,
+                clanSkill,
+                dispellable,
+                reflectable,
+                stayAfterDeath);
     }
 
     @Override
@@ -306,9 +319,22 @@ public final class SkillFlags {
         }
 
         public SkillFlags build() {
-            return new SkillFlags(magic, debuff, offensive, passive, toggle, staticSkill,
-                    blockedInOlympiad, overHit, ignoreShield, nextActionAttack, heroSkill,
-                    clanSkill, dispellable, reflectable, stayAfterDeath);
+            return new SkillFlags(
+                    magic,
+                    debuff,
+                    offensive,
+                    passive,
+                    toggle,
+                    staticSkill,
+                    blockedInOlympiad,
+                    overHit,
+                    ignoreShield,
+                    nextActionAttack,
+                    heroSkill,
+                    clanSkill,
+                    dispellable,
+                    reflectable,
+                    stayAfterDeath);
         }
     }
 }

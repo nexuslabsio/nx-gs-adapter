@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Identity bundle handed to every {@link AdapterModule#onConnect(ConnectContext)} call
@@ -44,18 +43,19 @@ public final class ConnectContext {
     private final NxSync sync;
     private final NxGameData gameData;
 
-    public ConnectContext(UUID tenantId,
-                          String tenantSlug,
-                          UUID serverId,
-                          String serverSlug,
-                          String serverName,
-                          String adapterVersion,
-                          @Nullable SyncTopics syncTopics,
-                          @Nullable NxEvents events,
-                          @Nullable NxCommands commands,
-                          @Nullable Executor io,
-                          @Nullable NxSync sync,
-                          @Nullable NxGameData gameData) {
+    public ConnectContext(
+            UUID tenantId,
+            String tenantSlug,
+            UUID serverId,
+            String serverSlug,
+            String serverName,
+            String adapterVersion,
+            @Nullable SyncTopics syncTopics,
+            @Nullable NxEvents events,
+            @Nullable NxCommands commands,
+            @Nullable Executor io,
+            @Nullable NxSync sync,
+            @Nullable NxGameData gameData) {
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
         this.serverId = serverId;
@@ -207,8 +207,7 @@ public final class ConnectContext {
 
     @Override
     public int hashCode() {
-        return Objects.hash(tenantId, tenantSlug, serverId, serverSlug, serverName,
-                adapterVersion, syncTopics);
+        return Objects.hash(tenantId, tenantSlug, serverId, serverSlug, serverName, adapterVersion, syncTopics);
     }
 
     @Override
@@ -297,8 +296,19 @@ public final class ConnectContext {
         }
 
         public ConnectContext build() {
-            return new ConnectContext(tenantId, tenantSlug, serverId, serverSlug,
-                    serverName, adapterVersion, syncTopics, events, commands, io, sync, gameData);
+            return new ConnectContext(
+                    tenantId,
+                    tenantSlug,
+                    serverId,
+                    serverSlug,
+                    serverName,
+                    adapterVersion,
+                    syncTopics,
+                    events,
+                    commands,
+                    io,
+                    sync,
+                    gameData);
         }
     }
 }

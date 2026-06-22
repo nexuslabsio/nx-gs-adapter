@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.commands;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reply envelope for an inbound {@link NxCommand}. Travels on
@@ -46,24 +45,19 @@ public final class CommandResult<R> {
     private final @Nullable R payload;
     private final @Nullable CommandProblem problem;
 
-    public CommandResult(CommandStatus status,
-                         @Nullable R payload,
-                         @Nullable CommandProblem problem) {
+    public CommandResult(CommandStatus status, @Nullable R payload, @Nullable CommandProblem problem) {
         if (status == null) {
             throw new IllegalArgumentException("status is required");
         }
         if (status == CommandStatus.OK && problem != null) {
-            throw new IllegalArgumentException(
-                    "status=OK is mutually exclusive with problem (got " + problem + ")");
+            throw new IllegalArgumentException("status=OK is mutually exclusive with problem (got " + problem + ")");
         }
         if (status != CommandStatus.OK && problem == null) {
-            throw new IllegalArgumentException(
-                    "status=" + status + " requires a non-null problem");
+            throw new IllegalArgumentException("status=" + status + " requires a non-null problem");
         }
         if (status != CommandStatus.OK && payload != null) {
             throw new IllegalArgumentException(
-                    "status=" + status + " is mutually exclusive with payload (got "
-                            + payload + ")");
+                    "status=" + status + " is mutually exclusive with payload (got " + payload + ")");
         }
         this.status = status;
         this.payload = payload;
@@ -135,10 +129,7 @@ public final class CommandResult<R> {
     /**
      * Error reply with title + single-key extension context.
      */
-    public static <R> CommandResult<R> error(CommandStatus status,
-                                             String title,
-                                             String extKey,
-                                             Object extValue) {
+    public static <R> CommandResult<R> error(CommandStatus status, String title, String extKey, Object extValue) {
         return new CommandResult<R>(status, null, CommandProblem.of(title, extKey, extValue));
     }
 
@@ -191,9 +182,7 @@ public final class CommandResult<R> {
         if (this == o) return true;
         if (!(o instanceof CommandResult)) return false;
         CommandResult<?> that = (CommandResult<?>) o;
-        return status == that.status
-                && Objects.equals(payload, that.payload)
-                && Objects.equals(problem, that.problem);
+        return status == that.status && Objects.equals(payload, that.payload) && Objects.equals(problem, that.problem);
     }
 
     @Override
@@ -203,8 +192,6 @@ public final class CommandResult<R> {
 
     @Override
     public String toString() {
-        return "CommandResult[status=" + status
-                + ", payload=" + payload
-                + ", problem=" + problem + "]";
+        return "CommandResult[status=" + status + ", payload=" + payload + ", problem=" + problem + "]";
     }
 }

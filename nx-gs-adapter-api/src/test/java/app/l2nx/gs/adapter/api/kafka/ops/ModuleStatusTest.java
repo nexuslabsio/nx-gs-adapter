@@ -1,13 +1,12 @@
 package app.l2nx.gs.adapter.api.kafka.ops;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ModuleStatusTest {
 
@@ -33,9 +32,15 @@ class ModuleStatusTest {
     @Test
     void stats_shouldExposeEntities() {
         EntityStats clan = EntityStats.builder()
-                .name("clan").state(EntityState.HEALTHY).rowCount(1069L).build();
+                .name("clan")
+                .state(EntityState.HEALTHY)
+                .rowCount(1069L)
+                .build();
         EntityStats character = EntityStats.builder()
-                .name("character").state(EntityState.DEGRADED).rowCount(152_088L).build();
+                .name("character")
+                .state(EntityState.DEGRADED)
+                .rowCount(152_088L)
+                .build();
 
         ModuleStatus.Stats stats = ModuleStatus.Stats.builder()
                 .entities(Arrays.asList(clan, character))
@@ -47,7 +52,8 @@ class ModuleStatusTest {
 
     @Test
     void entities_shouldBeUnmodifiable() {
-        EntityStats clan = EntityStats.builder().name("clan").state(EntityState.HEALTHY).build();
+        EntityStats clan =
+                EntityStats.builder().name("clan").state(EntityState.HEALTHY).build();
         ModuleStatus.Stats stats = ModuleStatus.Stats.builder()
                 .entities(Collections.singletonList(clan))
                 .build();
@@ -58,8 +64,12 @@ class ModuleStatusTest {
 
     @Test
     void entities_shouldDefensivelyCopy_whenSourceMutates() {
-        EntityStats a = EntityStats.builder().name("clan").state(EntityState.HEALTHY).build();
-        EntityStats b = EntityStats.builder().name("character").state(EntityState.HEALTHY).build();
+        EntityStats a =
+                EntityStats.builder().name("clan").state(EntityState.HEALTHY).build();
+        EntityStats b = EntityStats.builder()
+                .name("character")
+                .state(EntityState.HEALTHY)
+                .build();
         java.util.ArrayList<EntityStats> source = new java.util.ArrayList<EntityStats>();
         source.add(a);
 
@@ -79,7 +89,8 @@ class ModuleStatusTest {
     @Test
     void builder_shouldMapEachFieldToConstructorPosition() {
         PoolStats pool = new PoolStats(1, 3, 4, null);
-        EntityStats clan = EntityStats.builder().name("clan").state(EntityState.HEALTHY).build();
+        EntityStats clan =
+                EntityStats.builder().name("clan").state(EntityState.HEALTHY).build();
         ModuleStatus status = ModuleStatus.builder()
                 .name("db-sync")
                 .state("ACTIVE")
@@ -92,13 +103,17 @@ class ModuleStatusTest {
         assertEquals("db-sync", status.getName());
         assertEquals("ACTIVE", status.getState());
         assertEquals(Optional.of(pool), status.getStats().getPool());
-        assertEquals(Optional.of(Collections.singletonList(clan)), status.getStats().getEntities());
+        assertEquals(
+                Optional.of(Collections.singletonList(clan)), status.getStats().getEntities());
     }
 
     @Test
     void toBuilder_shouldRoundtrip() {
         EntityStats clan = EntityStats.builder()
-                .name("clan").state(EntityState.HEALTHY).rowCount(3L).build();
+                .name("clan")
+                .state(EntityState.HEALTHY)
+                .rowCount(3L)
+                .build();
 
         ModuleStatus original = ModuleStatus.builder()
                 .name("db-sync")

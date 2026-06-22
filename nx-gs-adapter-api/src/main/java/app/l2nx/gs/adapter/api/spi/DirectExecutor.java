@@ -17,8 +17,7 @@ final class DirectExecutor implements Executor {
 
     static final DirectExecutor INSTANCE = new DirectExecutor();
 
-    private DirectExecutor() {
-    }
+    private DirectExecutor() {}
 
     @Override
     public void execute(Runnable command) {

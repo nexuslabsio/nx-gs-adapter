@@ -21,8 +21,7 @@ package app.l2nx.gs.adapter.api.kafka.events.serveronline;
  */
 public final class WellKnownServerStartMetadata {
 
-    private WellKnownServerStartMetadata() {
-    }
+    private WellKnownServerStartMetadata() {}
 
     public static final String GM_ONLY = "gm_only";
 

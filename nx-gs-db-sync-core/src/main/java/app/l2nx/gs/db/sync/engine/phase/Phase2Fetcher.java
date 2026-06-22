@@ -8,14 +8,13 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongList;
-import org.jspecify.annotations.Nullable;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Phase 2: fetches row data for PKs whose aggregate CRC32 changed. PK lists
@@ -30,22 +29,26 @@ public final class Phase2Fetcher {
 
     static final int CHUNK_SIZE = 1000;
 
-    public Long2ObjectMap<Object> fetchPrimary(Connection conn,
-                                               PrimarySource<?> primary,
-                                               LongList pks,
-                                               int queryTimeoutSeconds,
-                                               int fetchSize,
-                                               JdbcDialect dialect) throws SQLException {
+    public Long2ObjectMap<Object> fetchPrimary(
+            Connection conn,
+            PrimarySource<?> primary,
+            LongList pks,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect)
+            throws SQLException {
         return fetchPrimary(conn, primary, pks, queryTimeoutSeconds, fetchSize, dialect, null);
     }
 
-    public Long2ObjectMap<Object> fetchPrimary(Connection conn,
-                                               PrimarySource<?> primary,
-                                               LongList pks,
-                                               int queryTimeoutSeconds,
-                                               int fetchSize,
-                                               JdbcDialect dialect,
-                                               @Nullable StatementRegistry registry) throws SQLException {
+    public Long2ObjectMap<Object> fetchPrimary(
+            Connection conn,
+            PrimarySource<?> primary,
+            LongList pks,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect,
+            @Nullable StatementRegistry registry)
+            throws SQLException {
         Long2ObjectOpenHashMap<Object> result = new Long2ObjectOpenHashMap<Object>();
         if (pks == null || pks.isEmpty()) {
             return result;
@@ -62,22 +65,26 @@ public final class Phase2Fetcher {
         return result;
     }
 
-    public Long2ObjectMap<List<Object>> fetchChild(Connection conn,
-                                                   ChildSource<?> child,
-                                                   LongList fks,
-                                                   int queryTimeoutSeconds,
-                                                   int fetchSize,
-                                                   JdbcDialect dialect) throws SQLException {
+    public Long2ObjectMap<List<Object>> fetchChild(
+            Connection conn,
+            ChildSource<?> child,
+            LongList fks,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect)
+            throws SQLException {
         return fetchChild(conn, child, fks, queryTimeoutSeconds, fetchSize, dialect, null);
     }
 
-    public Long2ObjectMap<List<Object>> fetchChild(Connection conn,
-                                                   ChildSource<?> child,
-                                                   LongList fks,
-                                                   int queryTimeoutSeconds,
-                                                   int fetchSize,
-                                                   JdbcDialect dialect,
-                                                   @Nullable StatementRegistry registry) throws SQLException {
+    public Long2ObjectMap<List<Object>> fetchChild(
+            Connection conn,
+            ChildSource<?> child,
+            LongList fks,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect,
+            @Nullable StatementRegistry registry)
+            throws SQLException {
         Long2ObjectOpenHashMap<List<Object>> result = new Long2ObjectOpenHashMap<List<Object>>();
         if (fks == null || fks.isEmpty()) {
             return result;
@@ -100,14 +107,16 @@ public final class Phase2Fetcher {
         return result;
     }
 
-    private static void runChunkedFetch(Connection conn,
-                                        LongList pks,
-                                        int queryTimeoutSeconds,
-                                        int fetchSize,
-                                        JdbcDialect dialect,
-                                        String sql,
-                                        @Nullable StatementRegistry registry,
-                                        RowConsumer rowConsumer) throws SQLException {
+    private static void runChunkedFetch(
+            Connection conn,
+            LongList pks,
+            int queryTimeoutSeconds,
+            int fetchSize,
+            JdbcDialect dialect,
+            String sql,
+            @Nullable StatementRegistry registry,
+            RowConsumer rowConsumer)
+            throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             if (registry != null) {
                 registry.set(ps);
@@ -130,11 +139,8 @@ public final class Phase2Fetcher {
         }
     }
 
-    private static void fetchChunk(LongList pks,
-                                   int from,
-                                   int to,
-                                   PreparedStatement ps,
-                                   RowConsumer rowConsumer) throws SQLException {
+    private static void fetchChunk(LongList pks, int from, int to, PreparedStatement ps, RowConsumer rowConsumer)
+            throws SQLException {
         int count = to - from;
         long padPk = pks.getLong(to - 1);
         for (int i = 0; i < count; i++) {
@@ -152,12 +158,14 @@ public final class Phase2Fetcher {
 
     static String buildSql(String tableName, String keyColumn, int placeholderCount) {
         if (placeholderCount <= 0) {
-            throw new IllegalArgumentException(
-                    "placeholderCount must be > 0, was " + placeholderCount);
+            throw new IllegalArgumentException("placeholderCount must be > 0, was " + placeholderCount);
         }
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT * FROM ").append(tableName)
-                .append(" WHERE ").append(keyColumn).append(" IN (");
+        sql.append("SELECT * FROM ")
+                .append(tableName)
+                .append(" WHERE ")
+                .append(keyColumn)
+                .append(" IN (");
         for (int i = 0; i < placeholderCount; i++) {
             if (i > 0) sql.append(", ");
             sql.append('?');

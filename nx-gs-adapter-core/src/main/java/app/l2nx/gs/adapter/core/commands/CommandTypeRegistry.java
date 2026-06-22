@@ -2,13 +2,12 @@ package app.l2nx.gs.adapter.core.commands;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import app.l2nx.gs.adapter.api.spi.CommandHandler;
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Host-populated {@code Nx-Message-Type} → handler binding table. Populated

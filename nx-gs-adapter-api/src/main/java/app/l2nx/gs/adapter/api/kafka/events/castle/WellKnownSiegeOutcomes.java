@@ -25,8 +25,7 @@ package app.l2nx.gs.adapter.api.kafka.events.castle;
  */
 public final class WellKnownSiegeOutcomes {
 
-    private WellKnownSiegeOutcomes() {
-    }
+    private WellKnownSiegeOutcomes() {}
 
     /**
      * A different clan captured the castle; {@code winnerClanId} is the captor.

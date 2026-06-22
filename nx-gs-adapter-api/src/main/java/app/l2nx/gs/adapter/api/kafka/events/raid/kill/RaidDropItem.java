@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.kill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One drop entry inside a {@link RaidKillEvent} — the host's record of what
@@ -57,10 +56,7 @@ public final class RaidDropItem {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .itemId(itemId)
-                .count(count)
-                .enchantLevel(enchantLevel);
+        return new Builder().itemId(itemId).count(count).enchantLevel(enchantLevel);
     }
 
     public static Builder builder() {
@@ -72,9 +68,7 @@ public final class RaidDropItem {
         if (this == o) return true;
         if (!(o instanceof RaidDropItem)) return false;
         RaidDropItem that = (RaidDropItem) o;
-        return itemId == that.itemId
-                && count == that.count
-                && Objects.equals(enchantLevel, that.enchantLevel);
+        return itemId == that.itemId && count == that.count && Objects.equals(enchantLevel, that.enchantLevel);
     }
 
     @Override
@@ -84,9 +78,7 @@ public final class RaidDropItem {
 
     @Override
     public String toString() {
-        return "RaidDropItem[itemId=" + itemId
-                + ", count=" + count
-                + ", enchantLevel=" + enchantLevel + "]";
+        return "RaidDropItem[itemId=" + itemId + ", count=" + count + ", enchantLevel=" + enchantLevel + "]";
     }
 
     public static final class Builder {

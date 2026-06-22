@@ -4,7 +4,6 @@ import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -24,8 +23,7 @@ public final class KafkaInitializer {
 
     private static final NxLog log = NxLogFactory.getLogger(KafkaInitializer.class);
 
-    private static final String SCRAM_LOGIN_MODULE =
-            "org.apache.kafka.common.security.scram.ScramLoginModule";
+    private static final String SCRAM_LOGIN_MODULE = "org.apache.kafka.common.security.scram.ScramLoginModule";
 
     private final KafkaFactory factory;
     private final Map<String, Object> producerOverrides;
@@ -52,24 +50,29 @@ public final class KafkaInitializer {
      *                            (e.g. {@code Nx-Server-Id}); may be empty
      * @param stateChangeListener forwarded to {@code NxKafka.onStateChange}
      */
-    public KafkaState init(KafkaCredentials kafka,
-                           String clientId,
-                           Map<String, byte[]> staticHeaders,
-                           Consumer<KafkaState> stateChangeListener) {
+    public KafkaState init(
+            KafkaCredentials kafka,
+            String clientId,
+            Map<String, byte[]> staticHeaders,
+            Consumer<KafkaState> stateChangeListener) {
         Map<String, Object> properties = new LinkedHashMap<>(producerOverrides);
         // Security properties always win — must come after producer overrides.
         properties.put("security.protocol", kafka.getSecurityProtocol());
         properties.put("sasl.mechanism", kafka.getSaslMechanism());
         properties.put("sasl.jaas.config", buildJaas(kafka.getSaslUsername(), kafka.getSaslPassword()));
 
-        log.info("Initializing Kafka client — bootstrap={}, clientId={}, sasl.mechanism={}, staticHeaders={}",
-                kafka.getBootstrap(), clientId, kafka.getSaslMechanism(), staticHeaders.keySet());
+        log.info(
+                "Initializing Kafka client — bootstrap={}, clientId={}, sasl.mechanism={}, staticHeaders={}",
+                kafka.getBootstrap(),
+                clientId,
+                kafka.getSaslMechanism(),
+                staticHeaders.keySet());
         return factory.build(kafka.getBootstrap(), clientId, properties, staticHeaders, stateChangeListener);
     }
 
     public static String buildJaas(String username, String password) {
-        return SCRAM_LOGIN_MODULE + " required username=\"" + jaasEscape(username)
-                + "\" password=\"" + jaasEscape(password) + "\";";
+        return SCRAM_LOGIN_MODULE + " required username=\"" + jaasEscape(username) + "\" password=\""
+                + jaasEscape(password) + "\";";
     }
 
     private static String jaasEscape(String s) {

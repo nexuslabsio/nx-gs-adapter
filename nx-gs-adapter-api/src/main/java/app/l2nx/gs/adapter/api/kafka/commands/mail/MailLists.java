@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Package-private list-freezing helper shared by the mail-command DTOs.
@@ -13,8 +12,7 @@ import java.util.List;
  */
 final class MailLists {
 
-    private MailLists() {
-    }
+    private MailLists() {}
 
     static <T> List<T> freeze(@Nullable List<T> src) {
         if (src == null || src.isEmpty()) {

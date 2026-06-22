@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One cast precondition of a {@link Skill} — the build-agnostic projection of a
@@ -28,11 +27,9 @@ public final class SkillCondition {
     private final String type;
     private final @Nullable Map<String, String> params;
 
-    public SkillCondition(String type,
-                          @Nullable Map<String, String> params) {
+    public SkillCondition(String type, @Nullable Map<String, String> params) {
         this.type = Objects.requireNonNull(type, "type");
-        this.params = params == null ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(params));
+        this.params = params == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(params));
     }
 
     public String getType() {
@@ -48,9 +45,7 @@ public final class SkillCondition {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .type(type)
-                .params(params);
+        return new Builder().type(type).params(params);
     }
 
     public static Builder builder() {

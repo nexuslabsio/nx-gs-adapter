@@ -1,11 +1,10 @@
 package app.l2nx.gs.kafka.producer;
 
 import com.google.gson.Gson;
-import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.clients.producer.ProducerRecord;
-
 import java.time.Duration;
 import java.util.Map;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
 /**
  * Internal producer interface. Users should call
@@ -122,8 +121,7 @@ public interface NxProducer {
      *                      send; may be empty but not {@code null}
      * @return a new producer instance
      */
-    static NxProducer create(Map<String, Object> config, Gson gson,
-                             Map<String, byte[]> staticHeaders) {
+    static NxProducer create(Map<String, Object> config, Gson gson, Map<String, byte[]> staticHeaders) {
         return new DefaultNxProducer(config, gson, staticHeaders);
     }
 
@@ -138,8 +136,8 @@ public interface NxProducer {
      * @param closeTimeout  bounded wait for in-flight flush on close
      * @return a new producer instance
      */
-    static NxProducer create(Map<String, Object> config, Gson gson,
-                             Map<String, byte[]> staticHeaders, Duration closeTimeout) {
+    static NxProducer create(
+            Map<String, Object> config, Gson gson, Map<String, byte[]> staticHeaders, Duration closeTimeout) {
         return new DefaultNxProducer(config, gson, staticHeaders, closeTimeout);
     }
 }

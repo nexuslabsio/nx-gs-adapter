@@ -1,18 +1,17 @@
 package app.l2nx.gs.adapter.core.connect;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.AdapterConfigFixtures;
 import com.github.tomakehurst.wiremock.WireMockServer;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
-
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
-import static org.junit.jupiter.api.Assertions.*;
 
 class GameServerConnectFlowTest {
 
@@ -50,7 +49,8 @@ class GameServerConnectFlowTest {
     @Test
     void connect_shouldHitGameServersPath() {
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(200)
+                .willReturn(aResponse()
+                        .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_GS_RESPONSE)));
 
@@ -61,14 +61,14 @@ class GameServerConnectFlowTest {
         assertEquals(200, outcome.getStatusCode());
         assertTrue(outcome.getResponse().isPresent());
         wireMock.verify(postRequestedFor(urlEqualTo(CONNECT_PATH))
-                .withHeader("Authorization",
-                        equalTo("Bearer " + AdapterConfigFixtures.VALID_SERVER_KEY)));
+                .withHeader("Authorization", equalTo("Bearer " + AdapterConfigFixtures.VALID_SERVER_KEY)));
     }
 
     @Test
     void connect_shouldDeserializeConnectResponse() {
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(200)
+                .willReturn(aResponse()
+                        .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_GS_RESPONSE)));
 
@@ -97,7 +97,8 @@ class GameServerConnectFlowTest {
         // legacy /servers/connect path that the platform keeps as a dual-mode alias
         // for OLDER adapter deployments during rollout).
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(200)
+                .willReturn(aResponse()
+                        .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_GS_RESPONSE)));
 
@@ -111,7 +112,8 @@ class GameServerConnectFlowTest {
     @Test
     void accessors_shouldProjectCapturedResponse() {
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(200)
+                .willReturn(aResponse()
+                        .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_GS_RESPONSE)));
 

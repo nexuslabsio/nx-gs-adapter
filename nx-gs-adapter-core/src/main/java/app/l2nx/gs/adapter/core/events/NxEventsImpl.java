@@ -3,9 +3,8 @@ package app.l2nx.gs.adapter.core.events;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-import org.jspecify.annotations.Nullable;
-
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Adapter-core implementation of {@link NxEvents}. Stateless façade —
@@ -56,7 +55,9 @@ final class NxEventsImpl implements NxEvents {
         }
         EventTypeBinding binding = registry.lookup(event.getClass());
         if (binding == null) {
-            log.warn("No registered binding for event type {} — dropping", event.getClass().getName());
+            log.warn(
+                    "No registered binding for event type {} — dropping",
+                    event.getClass().getName());
             return;
         }
         // Short-circuit: a family with no topic is "disabled" — never enqueue.

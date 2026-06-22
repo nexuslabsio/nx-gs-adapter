@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Upgrade / modification mechanics of an {@link ItemTemplate} — "how this item can
@@ -21,11 +20,12 @@ public final class ItemUpgrade {
     private final @Nullable Boolean crystallizable;
     private final @Nullable Integer crystalCount;
 
-    public ItemUpgrade(@Nullable Boolean enchantable,
-                       @Nullable Integer defaultEnchantLevel,
-                       @Nullable Boolean attributable,
-                       @Nullable Boolean crystallizable,
-                       @Nullable Integer crystalCount) {
+    public ItemUpgrade(
+            @Nullable Boolean enchantable,
+            @Nullable Integer defaultEnchantLevel,
+            @Nullable Boolean attributable,
+            @Nullable Boolean crystallizable,
+            @Nullable Integer crystalCount) {
         this.enchantable = enchantable;
         this.defaultEnchantLevel = defaultEnchantLevel;
         this.attributable = attributable;
@@ -102,8 +102,8 @@ public final class ItemUpgrade {
 
     @Override
     public String toString() {
-        return "ItemUpgrade[enchantable=" + enchantable + ", attributable=" + attributable
-                + ", crystalCount=" + crystalCount + "]";
+        return "ItemUpgrade[enchantable=" + enchantable + ", attributable=" + attributable + ", crystalCount="
+                + crystalCount + "]";
     }
 
     public static final class Builder {

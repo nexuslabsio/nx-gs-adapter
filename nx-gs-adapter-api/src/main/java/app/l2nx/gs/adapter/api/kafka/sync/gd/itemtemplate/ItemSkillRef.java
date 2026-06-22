@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A reference to a skill granted by an item — the intrinsic {@code (id, level)} the
@@ -23,10 +22,7 @@ public final class ItemSkillRef {
     private final @Nullable String type;
     private final @Nullable Integer chancePercent;
 
-    public ItemSkillRef(int id,
-                        int level,
-                        @Nullable String type,
-                        @Nullable Integer chancePercent) {
+    public ItemSkillRef(int id, int level, @Nullable String type, @Nullable Integer chancePercent) {
         this.id = id;
         this.level = level;
         this.type = type;
@@ -50,11 +46,7 @@ public final class ItemSkillRef {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .id(id)
-                .level(level)
-                .type(type)
-                .chancePercent(chancePercent);
+        return new Builder().id(id).level(level).type(type).chancePercent(chancePercent);
     }
 
     public static Builder builder() {
@@ -79,8 +71,8 @@ public final class ItemSkillRef {
 
     @Override
     public String toString() {
-        return "ItemSkillRef[id=" + id + ", level=" + level + ", type=" + type
-                + ", chancePercent=" + chancePercent + "]";
+        return "ItemSkillRef[id=" + id + ", level=" + level + ", type=" + type + ", chancePercent=" + chancePercent
+                + "]";
     }
 
     public static final class Builder {

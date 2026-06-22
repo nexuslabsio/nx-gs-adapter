@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Inbound command instructing the game-server to compose and deliver a system
@@ -68,11 +67,8 @@ public final class SendMailCommand implements NxCommand<SendMailResult> {
     private final @Nullable String body;
     private final List<MailItem> items;
 
-    public SendMailCommand(Long charId,
-                           @Nullable String author,
-                           String title,
-                           @Nullable String body,
-                           @Nullable List<MailItem> items) {
+    public SendMailCommand(
+            Long charId, @Nullable String author, String title, @Nullable String body, @Nullable List<MailItem> items) {
         if (charId == null) {
             throw new IllegalArgumentException("charId is required");
         }

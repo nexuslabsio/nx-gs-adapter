@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
 import app.l2nx.gs.adapter.api.domain.Attribute;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One item-movement line carried by a mail-lifecycle event. Mirrors
@@ -27,12 +26,13 @@ public final class MailItemMovement {
     private final @Nullable Integer enchantLevel;
     private final @Nullable Map<Attribute, Integer> attributes;
 
-    public MailItemMovement(long itemTemplateId,
-                            long itemId,
-                            long newItemId,
-                            long count,
-                            @Nullable Integer enchantLevel,
-                            @Nullable Map<Attribute, Integer> attributes) {
+    public MailItemMovement(
+            long itemTemplateId,
+            long itemId,
+            long newItemId,
+            long count,
+            @Nullable Integer enchantLevel,
+            @Nullable Map<Attribute, Integer> attributes) {
         this.itemTemplateId = itemTemplateId;
         this.itemId = itemId;
         this.newItemId = newItemId;

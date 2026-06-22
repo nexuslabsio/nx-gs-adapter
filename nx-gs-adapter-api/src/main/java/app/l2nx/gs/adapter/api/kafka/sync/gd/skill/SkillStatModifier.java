@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One stat modification a skill (or one of its effects) applies — the build-agnostic
@@ -30,10 +29,7 @@ public final class SkillStatModifier {
     private final @Nullable Double value;
     private final @Nullable Integer order;
 
-    public SkillStatModifier(String stat,
-                             String op,
-                             @Nullable Double value,
-                             @Nullable Integer order) {
+    public SkillStatModifier(String stat, String op, @Nullable Double value, @Nullable Integer order) {
         this.stat = Objects.requireNonNull(stat, "stat");
         this.op = Objects.requireNonNull(op, "op");
         this.value = value;
@@ -70,11 +66,7 @@ public final class SkillStatModifier {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .stat(stat)
-                .op(op)
-                .value(value)
-                .order(order);
+        return new Builder().stat(stat).op(op).value(value).order(order);
     }
 
     public static Builder builder() {

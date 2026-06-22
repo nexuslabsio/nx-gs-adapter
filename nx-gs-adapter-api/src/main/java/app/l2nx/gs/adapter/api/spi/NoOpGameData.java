@@ -8,14 +8,11 @@ final class NoOpGameData implements NxGameData {
 
     static final NoOpGameData INSTANCE = new NoOpGameData();
 
-    private NoOpGameData() {
-    }
+    private NoOpGameData() {}
 
     @Override
-    public void publishSnapshot() {
-    }
+    public void publishSnapshot() {}
 
     @Override
-    public void registerSnapshotTrigger(NxGameDataTrigger trigger) {
-    }
+    public void registerSnapshotTrigger(NxGameDataTrigger trigger) {}
 }

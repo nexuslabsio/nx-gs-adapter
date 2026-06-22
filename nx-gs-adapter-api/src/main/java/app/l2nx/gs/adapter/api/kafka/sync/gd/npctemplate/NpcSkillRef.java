@@ -30,9 +30,7 @@ public final class NpcSkillRef {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .id(id)
-                .level(level);
+        return new Builder().id(id).level(level);
     }
 
     public static Builder builder() {

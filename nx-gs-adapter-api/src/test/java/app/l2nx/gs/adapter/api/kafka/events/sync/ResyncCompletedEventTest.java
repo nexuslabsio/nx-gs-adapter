@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.events.sync;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Instant;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ResyncCompletedEventTest {
 
@@ -33,32 +32,35 @@ class ResyncCompletedEventTest {
 
     @Test
     void constructor_shouldRejectNullEventId() {
-        assertThrows(NullPointerException.class,
+        assertThrows(
+                NullPointerException.class,
                 () -> new ResyncCompletedEvent(null, RESYNC_ID, "item", STARTED, COMPLETED));
     }
 
     @Test
     void constructor_shouldRejectNullResyncId() {
-        assertThrows(NullPointerException.class,
-                () -> new ResyncCompletedEvent(EVENT_ID, null, "item", STARTED, COMPLETED));
+        assertThrows(
+                NullPointerException.class, () -> new ResyncCompletedEvent(EVENT_ID, null, "item", STARTED, COMPLETED));
     }
 
     @Test
     void constructor_shouldRejectNullEntityName() {
-        assertThrows(NullPointerException.class,
+        assertThrows(
+                NullPointerException.class,
                 () -> new ResyncCompletedEvent(EVENT_ID, RESYNC_ID, null, STARTED, COMPLETED));
     }
 
     @Test
     void constructor_shouldRejectNullCycleStartedAt() {
-        assertThrows(NullPointerException.class,
+        assertThrows(
+                NullPointerException.class,
                 () -> new ResyncCompletedEvent(EVENT_ID, RESYNC_ID, "item", null, COMPLETED));
     }
 
     @Test
     void constructor_shouldRejectNullCompletedAt() {
-        assertThrows(NullPointerException.class,
-                () -> new ResyncCompletedEvent(EVENT_ID, RESYNC_ID, "item", STARTED, null));
+        assertThrows(
+                NullPointerException.class, () -> new ResyncCompletedEvent(EVENT_ID, RESYNC_ID, "item", STARTED, null));
     }
 
     @Test

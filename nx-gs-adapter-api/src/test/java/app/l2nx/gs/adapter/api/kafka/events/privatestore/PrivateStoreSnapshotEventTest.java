@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class PrivateStoreSnapshotEventTest {
 
@@ -41,8 +40,8 @@ class PrivateStoreSnapshotEventTest {
                 .offers(Collections.singletonList(stubOffer(1L, 100L)))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getOffers().add(stubOffer(2L, 200L)));
+        assertThrows(
+                UnsupportedOperationException.class, () -> event.getOffers().add(stubOffer(2L, 200L)));
     }
 
     @Test
@@ -52,7 +51,8 @@ class PrivateStoreSnapshotEventTest {
 
         PrivateStoreSnapshotEvent event = PrivateStoreSnapshotEvent.builder()
                 .eventId(UUID.randomUUID())
-                .itemId(1234L).side(PrivateStoreSide.ASK)
+                .itemId(1234L)
+                .side(PrivateStoreSide.ASK)
                 .offers(source)
                 .build();
 
@@ -67,9 +67,7 @@ class PrivateStoreSnapshotEventTest {
                 .eventId(UUID.randomUUID())
                 .itemId(6364L)
                 .side(PrivateStoreSide.BID)
-                .offers(Arrays.asList(
-                        stubOffer(1L, 100L),
-                        stubOffer(2L, 200L)))
+                .offers(Arrays.asList(stubOffer(1L, 100L), stubOffer(2L, 200L)))
                 .build();
 
         PrivateStoreSnapshotEvent copy = original.toBuilder().build();
@@ -80,9 +78,15 @@ class PrivateStoreSnapshotEventTest {
     @Test
     void equals_shouldDistinguishEventId() {
         PrivateStoreSnapshotEvent a = PrivateStoreSnapshotEvent.builder()
-                .eventId(UUID.randomUUID()).itemId(1L).side(PrivateStoreSide.ASK).build();
+                .eventId(UUID.randomUUID())
+                .itemId(1L)
+                .side(PrivateStoreSide.ASK)
+                .build();
         PrivateStoreSnapshotEvent b = PrivateStoreSnapshotEvent.builder()
-                .eventId(UUID.randomUUID()).itemId(1L).side(PrivateStoreSide.ASK).build();
+                .eventId(UUID.randomUUID())
+                .itemId(1L)
+                .side(PrivateStoreSide.ASK)
+                .build();
 
         assertNotEquals(a, b);
     }
@@ -91,9 +95,15 @@ class PrivateStoreSnapshotEventTest {
     void equals_shouldDistinguishItemId() {
         UUID id = UUID.randomUUID();
         PrivateStoreSnapshotEvent a = PrivateStoreSnapshotEvent.builder()
-                .eventId(id).itemId(1L).side(PrivateStoreSide.ASK).build();
+                .eventId(id)
+                .itemId(1L)
+                .side(PrivateStoreSide.ASK)
+                .build();
         PrivateStoreSnapshotEvent b = PrivateStoreSnapshotEvent.builder()
-                .eventId(id).itemId(2L).side(PrivateStoreSide.ASK).build();
+                .eventId(id)
+                .itemId(2L)
+                .side(PrivateStoreSide.ASK)
+                .build();
 
         assertNotEquals(a, b);
     }
@@ -102,9 +112,15 @@ class PrivateStoreSnapshotEventTest {
     void equals_shouldDistinguishSide() {
         UUID id = UUID.randomUUID();
         PrivateStoreSnapshotEvent ask = PrivateStoreSnapshotEvent.builder()
-                .eventId(id).itemId(1L).side(PrivateStoreSide.ASK).build();
+                .eventId(id)
+                .itemId(1L)
+                .side(PrivateStoreSide.ASK)
+                .build();
         PrivateStoreSnapshotEvent bid = PrivateStoreSnapshotEvent.builder()
-                .eventId(id).itemId(1L).side(PrivateStoreSide.BID).build();
+                .eventId(id)
+                .itemId(1L)
+                .side(PrivateStoreSide.BID)
+                .build();
 
         assertNotEquals(ask, bid);
     }
@@ -115,7 +131,8 @@ class PrivateStoreSnapshotEventTest {
         // tracked (itemId, side) pair empties. The DTO must permit it.
         PrivateStoreSnapshotEvent tombstone = PrivateStoreSnapshotEvent.builder()
                 .eventId(UUID.randomUUID())
-                .itemId(1234L).side(PrivateStoreSide.ASK)
+                .itemId(1234L)
+                .side(PrivateStoreSide.ASK)
                 .offers(Collections.emptyList())
                 .build();
 
@@ -126,7 +143,9 @@ class PrivateStoreSnapshotEventTest {
     void toString_shouldRenderEventIdItemIdAndSide() {
         UUID id = UUID.fromString("018f5fa3-1e3d-7000-8000-000000000000");
         PrivateStoreSnapshotEvent event = PrivateStoreSnapshotEvent.builder()
-                .eventId(id).itemId(6364L).side(PrivateStoreSide.BID)
+                .eventId(id)
+                .itemId(6364L)
+                .side(PrivateStoreSide.BID)
                 .build();
 
         String s = event.toString();
@@ -137,7 +156,10 @@ class PrivateStoreSnapshotEventTest {
 
     private static Offer stubOffer(long traderId, long unitPrice) {
         return Offer.builder()
-                .traderId(traderId).count(1L).unitPrice(unitPrice).currencyItemId(57L)
+                .traderId(traderId)
+                .count(1L)
+                .unitPrice(unitPrice)
+                .currencyItemId(57L)
                 .build();
     }
 }

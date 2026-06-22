@@ -1,13 +1,12 @@
 package app.l2nx.gs.adapter.core.lifecycle;
 
-import app.l2nx.gs.log.NxLog;
-import org.junit.jupiter.api.Test;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import app.l2nx.gs.log.NxLog;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 class StartupBannerTest {
 
@@ -37,8 +36,7 @@ class StartupBannerTest {
         final List<String> infoMessages = new ArrayList<>();
 
         @Override
-        public void debug(String message, Object... args) {
-        }
+        public void debug(String message, Object... args) {}
 
         @Override
         public void info(String message, Object... args) {
@@ -46,19 +44,15 @@ class StartupBannerTest {
             for (Object arg : args) {
                 int idx = resolved.indexOf("{}");
                 if (idx < 0) break;
-                resolved = resolved.substring(0, idx)
-                        + arg
-                        + resolved.substring(idx + 2);
+                resolved = resolved.substring(0, idx) + arg + resolved.substring(idx + 2);
             }
             infoMessages.add(resolved);
         }
 
         @Override
-        public void warn(String message, Object... args) {
-        }
+        public void warn(String message, Object... args) {}
 
         @Override
-        public void error(String message, Object... args) {
-        }
+        public void error(String message, Object... args) {}
     }
 }

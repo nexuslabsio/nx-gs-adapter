@@ -21,11 +21,10 @@ import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerStartedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerStoppingEvent;
 import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
 import app.l2nx.gs.commons.bytes.LongBytes;
-import org.jspecify.annotations.Nullable;
-
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Hardcoded type-to-wire-metadata registry for outbound events. One entry
@@ -49,56 +48,107 @@ final class EventTypeRegistry {
         Map<Class<?>, EventTypeBinding> map = new HashMap<>();
         Set<String> families = new LinkedHashSet<>();
 
-        register(map, families, PremiumPurchaseEvent.class, "premiumpurchase",
+        register(
+                map,
+                families,
+                PremiumPurchaseEvent.class,
+                "premiumpurchase",
                 evt -> LongBytes.bigEndian(((PremiumPurchaseEvent) evt).getCharacterId()));
-        register(map, families, ServerOnlineSnapshotEvent.class, "serveronline",
-                evt -> null);
-        register(map, families, ServerStartedEvent.class, "serveronline",
-                evt -> null);
-        register(map, families, ServerStoppingEvent.class, "serveronline",
-                evt -> null);
-        register(map, families, GameEventSnapshotEvent.class, "gameevents",
-                evt -> null);
-        register(map, families, PrivateStorePurchaseEvent.class, "privatestore",
-                evt -> null);
-        register(map, families, PrivateStoreSnapshotEvent.class, "privatestore",
+        register(map, families, ServerOnlineSnapshotEvent.class, "serveronline", evt -> null);
+        register(map, families, ServerStartedEvent.class, "serveronline", evt -> null);
+        register(map, families, ServerStoppingEvent.class, "serveronline", evt -> null);
+        register(map, families, GameEventSnapshotEvent.class, "gameevents", evt -> null);
+        register(map, families, PrivateStorePurchaseEvent.class, "privatestore", evt -> null);
+        register(
+                map,
+                families,
+                PrivateStoreSnapshotEvent.class,
+                "privatestore",
                 evt -> LongBytes.bigEndian(((PrivateStoreSnapshotEvent) evt).getItemId()));
-        register(map, families, CharacterPresenceEvent.class, "character",
+        register(
+                map,
+                families,
+                CharacterPresenceEvent.class,
+                "character",
                 evt -> LongBytes.bigEndian(((CharacterPresenceEvent) evt).getCharId()));
-        register(map, families, CharacterDeathEvent.class, "character",
+        register(
+                map,
+                families,
+                CharacterDeathEvent.class,
+                "character",
                 evt -> LongBytes.bigEndian(((CharacterDeathEvent) evt).getCharId()));
-        register(map, families, LevelExpTableSnapshotEvent.class, "character",
-                evt -> null);
-        register(map, families, RaidKillEvent.class, "raid",
+        register(map, families, LevelExpTableSnapshotEvent.class, "character", evt -> null);
+        register(
+                map,
+                families,
+                RaidKillEvent.class,
+                "raid",
                 evt -> LongBytes.bigEndian(((RaidKillEvent) evt).getBossNpcId()));
-        register(map, families, BossRespawnSnapshotEvent.class, "raid",
-                evt -> null);
-        register(map, families, CastleSnapshotEvent.class, "castle",
-                evt -> null);
-        register(map, families, SiegeFinishedEvent.class, "castle",
+        register(map, families, BossRespawnSnapshotEvent.class, "raid", evt -> null);
+        register(map, families, CastleSnapshotEvent.class, "castle", evt -> null);
+        register(
+                map,
+                families,
+                SiegeFinishedEvent.class,
+                "castle",
                 evt -> LongBytes.bigEndian(((SiegeFinishedEvent) evt).getCastleId()));
-        register(map, families, MailSentEvent.class, "mail",
+        register(
+                map,
+                families,
+                MailSentEvent.class,
+                "mail",
                 evt -> LongBytes.bigEndian(((MailSentEvent) evt).getMailId()));
-        register(map, families, MailAcceptedEvent.class, "mail",
+        register(
+                map,
+                families,
+                MailAcceptedEvent.class,
+                "mail",
                 evt -> LongBytes.bigEndian(((MailAcceptedEvent) evt).getMailId()));
-        register(map, families, MailCancelledEvent.class, "mail",
+        register(
+                map,
+                families,
+                MailCancelledEvent.class,
+                "mail",
                 evt -> LongBytes.bigEndian(((MailCancelledEvent) evt).getMailId()));
-        register(map, families, MailReturnedEvent.class, "mail",
+        register(
+                map,
+                families,
+                MailReturnedEvent.class,
+                "mail",
                 evt -> LongBytes.bigEndian(((MailReturnedEvent) evt).getMailId()));
-        register(map, families, MailReadEvent.class, "mail",
+        register(
+                map,
+                families,
+                MailReadEvent.class,
+                "mail",
                 evt -> LongBytes.bigEndian(((MailReadEvent) evt).getMailId()));
-        register(map, families, MailDeletedEvent.class, "mail",
+        register(
+                map,
+                families,
+                MailDeletedEvent.class,
+                "mail",
                 evt -> LongBytes.bigEndian(((MailDeletedEvent) evt).getMailId()));
-        register(map, families, PrivateTradeFinishedEvent.class, "privatetrade",
-                evt -> null);
-        register(map, families, OlympiadMatchResultEvent.class, "olympiad",
+        register(map, families, PrivateTradeFinishedEvent.class, "privatetrade", evt -> null);
+        register(
+                map,
+                families,
+                OlympiadMatchResultEvent.class,
+                "olympiad",
                 evt -> LongBytes.bigEndian(((OlympiadMatchResultEvent) evt).getCharId()));
-        register(map, families, HeroGrantedEvent.class, "olympiad",
+        register(
+                map,
+                families,
+                HeroGrantedEvent.class,
+                "olympiad",
                 evt -> LongBytes.bigEndian(((HeroGrantedEvent) evt).getCharId()));
-        register(map, families, ResyncCompletedEvent.class, "sync",
-                evt -> null);
-        register(map, families, AccountAuthAttemptEvent.class, "account",
-                evt -> ((AccountAuthAttemptEvent) evt).getAccountName()
+        register(map, families, ResyncCompletedEvent.class, "sync", evt -> null);
+        register(
+                map,
+                families,
+                AccountAuthAttemptEvent.class,
+                "account",
+                evt -> ((AccountAuthAttemptEvent) evt)
+                        .getAccountName()
                         .toLowerCase(Locale.ROOT)
                         .getBytes(StandardCharsets.UTF_8));
 
@@ -124,9 +174,12 @@ final class EventTypeRegistry {
         return familyKeys;
     }
 
-    private static void register(Map<Class<?>, EventTypeBinding> map, Set<String> families,
-                                 Class<?> type, String familyKey,
-                                 Function<Object, byte[]> partitionKeyExtractor) {
+    private static void register(
+            Map<Class<?>, EventTypeBinding> map,
+            Set<String> families,
+            Class<?> type,
+            String familyKey,
+            Function<Object, byte[]> partitionKeyExtractor) {
         map.put(type, new EventTypeBinding(familyKey, type.getSimpleName(), partitionKeyExtractor));
         families.add(familyKey);
     }

@@ -3,7 +3,6 @@ package app.l2nx.gs.db.sync.engine;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.db.sync.engine.publish.TopicResolver;
 import app.l2nx.gs.log.NxLog;
-
 import java.util.List;
 import java.util.function.Function;
 
@@ -24,15 +23,16 @@ import java.util.function.Function;
  */
 public final class ConfigResolutionLogger {
 
-    private ConfigResolutionLogger() {
-    }
+    private ConfigResolutionLogger() {}
 
-    public static void log(NxLog log,
-                           EngineConfig effective,
-                           List<? extends EntityMapping<?>> mappings,
-                           TopicResolver resolver,
-                           Function<String, String> overrideSource) {
-        log.info("cdc-engine config: tickInterval={}s {}, rowsPerWindow={} {}, "
+    public static void log(
+            NxLog log,
+            EngineConfig effective,
+            List<? extends EntityMapping<?>> mappings,
+            TopicResolver resolver,
+            Function<String, String> overrideSource) {
+        log.info(
+                "cdc-engine config: tickInterval={}s {}, rowsPerWindow={} {}, "
                         + "queryTimeout={}s {}, publishFlush={}s {}",
                 effective.tickIntervalSeconds(),
                 tag(overrideSource, EngineConfig.KEY_TICK_INTERVAL_SECONDS),
@@ -42,7 +42,8 @@ public final class ConfigResolutionLogger {
                 tag(overrideSource, EngineConfig.KEY_QUERY_TIMEOUT_SECONDS),
                 effective.publishFlushSeconds(),
                 tag(overrideSource, EngineConfig.KEY_PUBLISH_FLUSH_SECONDS));
-        log.info("cdc-engine persist: dir={} {}, checkpointMinInterval={}s {}",
+        log.info(
+                "cdc-engine persist: dir={} {}, checkpointMinInterval={}s {}",
                 effective.persistDir(),
                 tag(overrideSource, EngineConfig.KEY_PERSIST_DIR),
                 effective.persistCheckpointMinIntervalSeconds(),

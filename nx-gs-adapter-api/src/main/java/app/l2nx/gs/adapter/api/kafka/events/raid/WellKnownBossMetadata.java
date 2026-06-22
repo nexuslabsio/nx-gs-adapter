@@ -21,8 +21,7 @@ package app.l2nx.gs.adapter.api.kafka.events.raid;
  */
 public final class WellKnownBossMetadata {
 
-    private WellKnownBossMetadata() {
-    }
+    private WellKnownBossMetadata() {}
 
     /** Metadata key tagging a boss's division grouping; value is a {@link WellKnownBossDivisions} string. */
     public static final String DIVISION = "division";

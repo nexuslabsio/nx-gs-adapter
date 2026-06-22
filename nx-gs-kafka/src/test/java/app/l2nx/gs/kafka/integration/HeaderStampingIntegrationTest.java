@@ -1,7 +1,17 @@
 package app.l2nx.gs.kafka.integration;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.kafka.producer.NxProducer;
 import com.google.gson.Gson;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -19,17 +29,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
  * Verifies that {@link NxProducer#create(Map, Gson, Map)} stamps the configured
  * static headers on every outbound record across every {@code send(...)} overload
@@ -44,14 +43,26 @@ import static org.junit.jupiter.api.Assertions.*;
 class HeaderStampingIntegrationTest {
 
     @Container
-    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer(
-            "confluentinc/cp-kafka:7.7.0"
-    );
+    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer("confluentinc/cp-kafka:7.7.0");
 
     private static final String HEADER_NAME = "X-Test-Static-Header";
-    private static final byte[] HEADER_VALUE = new byte[]{
-            0x01, 0x23, 0x45, 0x67, (byte) 0x89, (byte) 0xab, (byte) 0xcd, (byte) 0xef,
-            (byte) 0xfe, (byte) 0xdc, (byte) 0xba, (byte) 0x98, 0x76, 0x54, 0x32, 0x10
+    private static final byte[] HEADER_VALUE = new byte[] {
+        0x01,
+        0x23,
+        0x45,
+        0x67,
+        (byte) 0x89,
+        (byte) 0xab,
+        (byte) 0xcd,
+        (byte) 0xef,
+        (byte) 0xfe,
+        (byte) 0xdc,
+        (byte) 0xba,
+        (byte) 0x98,
+        0x76,
+        0x54,
+        0x32,
+        0x10
     };
 
     private NxProducer producer;
@@ -118,7 +129,7 @@ class HeaderStampingIntegrationTest {
         producer = createStampingProducer();
         CountDownLatch latch = new CountDownLatch(1);
 
-        producer.send(topic, new byte[]{1, 2, 3, 4}, new TestEvent("p5", 5), (m, e) -> latch.countDown());
+        producer.send(topic, new byte[] {1, 2, 3, 4}, new TestEvent("p5", 5), (m, e) -> latch.countDown());
         assertTrue(latch.await(10, TimeUnit.SECONDS));
 
         assertHeaderPresent(consumeOne(topic, "g5"));
@@ -183,7 +194,7 @@ class HeaderStampingIntegrationTest {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
         try (KafkaConsumer<String, byte[]> consumer =
-                     new KafkaConsumer<>(props, new StringDeserializer(), new ByteArrayDeserializer())) {
+                new KafkaConsumer<>(props, new StringDeserializer(), new ByteArrayDeserializer())) {
             consumer.subscribe(Collections.singletonList(topic));
             ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofSeconds(10));
             if (records.isEmpty()) {

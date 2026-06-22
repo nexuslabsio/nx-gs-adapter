@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Trade / storage / permission flags of an {@link ItemTemplate} — "what you may do
@@ -26,14 +25,15 @@ public final class ItemRestrictions {
     private final @Nullable Boolean olympiadRestricted;
     private final @Nullable Boolean eventRestricted;
 
-    public ItemRestrictions(@Nullable Boolean tradable,
-                            @Nullable Boolean dropable,
-                            @Nullable Boolean sellable,
-                            @Nullable Boolean destroyable,
-                            @Nullable Boolean warehouseDepositable,
-                            @Nullable Boolean freightable,
-                            @Nullable Boolean olympiadRestricted,
-                            @Nullable Boolean eventRestricted) {
+    public ItemRestrictions(
+            @Nullable Boolean tradable,
+            @Nullable Boolean dropable,
+            @Nullable Boolean sellable,
+            @Nullable Boolean destroyable,
+            @Nullable Boolean warehouseDepositable,
+            @Nullable Boolean freightable,
+            @Nullable Boolean olympiadRestricted,
+            @Nullable Boolean eventRestricted) {
         this.tradable = tradable;
         this.dropable = dropable;
         this.sellable = sellable;
@@ -121,14 +121,20 @@ public final class ItemRestrictions {
 
     @Override
     public int hashCode() {
-        return Objects.hash(tradable, dropable, sellable, destroyable, warehouseDepositable,
-                freightable, olympiadRestricted, eventRestricted);
+        return Objects.hash(
+                tradable,
+                dropable,
+                sellable,
+                destroyable,
+                warehouseDepositable,
+                freightable,
+                olympiadRestricted,
+                eventRestricted);
     }
 
     @Override
     public String toString() {
-        return "ItemRestrictions[tradable=" + tradable + ", dropable=" + dropable
-                + ", sellable=" + sellable + "]";
+        return "ItemRestrictions[tradable=" + tradable + ", dropable=" + dropable + ", sellable=" + sellable + "]";
     }
 
     public static final class Builder {
@@ -182,8 +188,15 @@ public final class ItemRestrictions {
         }
 
         public ItemRestrictions build() {
-            return new ItemRestrictions(tradable, dropable, sellable, destroyable, warehouseDepositable,
-                    freightable, olympiadRestricted, eventRestricted);
+            return new ItemRestrictions(
+                    tradable,
+                    dropable,
+                    sellable,
+                    destroyable,
+                    warehouseDepositable,
+                    freightable,
+                    olympiadRestricted,
+                    eventRestricted);
         }
     }
 }

@@ -44,8 +44,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  */
 public final class WellKnownCustomActivities {
 
-    private WellKnownCustomActivities() {
-    }
+    private WellKnownCustomActivities() {}
 
     /**
      * The character is fishing.

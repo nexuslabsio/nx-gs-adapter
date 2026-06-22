@@ -1,13 +1,12 @@
 package app.l2nx.gs.adapter.api.kafka.ops;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class HeartbeatEventTest {
 
@@ -16,7 +15,9 @@ class HeartbeatEventTest {
         ModuleStatus dbSync = ModuleStatus.builder()
                 .name("db-sync")
                 .state("ACTIVE")
-                .stats(ModuleStatus.Stats.builder().pool(new PoolStats(1, 3, 4, null)).build())
+                .stats(ModuleStatus.Stats.builder()
+                        .pool(new PoolStats(1, 3, 4, null))
+                        .build())
                 .build();
 
         HeartbeatEvent original = HeartbeatEvent.builder()
@@ -64,9 +65,13 @@ class HeartbeatEventTest {
     @Test
     void enabledModules_shouldDefaultToEmptyList_whenBuilderOmitsIt() {
         HeartbeatEvent event = HeartbeatEvent.builder()
-                .tenantId("t").tenantSlug("ts")
-                .serverId("s").serverSlug("ss").serverName("sn")
-                .adapterVersion("v").uptime(Duration.ZERO)
+                .tenantId("t")
+                .tenantSlug("ts")
+                .serverId("s")
+                .serverSlug("ss")
+                .serverName("sn")
+                .adapterVersion("v")
+                .uptime(Duration.ZERO)
                 .build();
 
         assertEquals(Collections.emptyList(), event.getEnabledModules());
@@ -79,7 +84,8 @@ class HeartbeatEventTest {
                 .enabledModules(Collections.singletonList(a))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> event.getEnabledModules().add(a));
     }
 

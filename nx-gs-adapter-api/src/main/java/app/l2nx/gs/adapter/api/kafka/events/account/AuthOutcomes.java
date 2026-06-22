@@ -17,6 +17,5 @@ public final class AuthOutcomes {
     public static final String PASSWORD_EXPIRED = "PASSWORD_EXPIRED";
     public static final String RATE_LIMITED_BY_IP = "RATE_LIMITED_BY_IP";
 
-    private AuthOutcomes() {
-    }
+    private AuthOutcomes() {}
 }

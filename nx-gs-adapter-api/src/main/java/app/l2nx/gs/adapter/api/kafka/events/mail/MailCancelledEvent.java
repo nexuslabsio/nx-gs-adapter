@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Sender cancelled an outbox mail before the receiver claimed it —
@@ -22,16 +21,18 @@ public final class MailCancelledEvent {
     private final List<MailItemMovement> attachments;
     private final @Nullable Map<String, String> metadata;
 
-    public MailCancelledEvent(UUID eventId,
-                              long mailId,
-                              long cancelledByCharId,
-                              @Nullable List<MailItemMovement> attachments,
-                              @Nullable Map<String, String> metadata) {
+    public MailCancelledEvent(
+            UUID eventId,
+            long mailId,
+            long cancelledByCharId,
+            @Nullable List<MailItemMovement> attachments,
+            @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.mailId = mailId;
         this.cancelledByCharId = cancelledByCharId;
         this.attachments = freezeList(attachments);
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {

@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.armorsettemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Cohesive cluster of an {@link ArmorSetTemplate}'s flat base-stat bonuses — the STR / DEX /
@@ -23,12 +22,13 @@ public final class ArmorSetStatBonus {
     private final @Nullable Integer wit;
     private final @Nullable Integer men;
 
-    public ArmorSetStatBonus(@Nullable Integer str,
-                             @Nullable Integer dex,
-                             @Nullable Integer con,
-                             @Nullable Integer intBonus,
-                             @Nullable Integer wit,
-                             @Nullable Integer men) {
+    public ArmorSetStatBonus(
+            @Nullable Integer str,
+            @Nullable Integer dex,
+            @Nullable Integer con,
+            @Nullable Integer intBonus,
+            @Nullable Integer wit,
+            @Nullable Integer men) {
         this.str = str;
         this.dex = dex;
         this.con = con;
@@ -99,8 +99,8 @@ public final class ArmorSetStatBonus {
 
     @Override
     public String toString() {
-        return "ArmorSetStatBonus[str=" + str + ", dex=" + dex + ", con=" + con
-                + ", intBonus=" + intBonus + ", wit=" + wit + ", men=" + men + "]";
+        return "ArmorSetStatBonus[str=" + str + ", dex=" + dex + ", con=" + con + ", intBonus=" + intBonus + ", wit="
+                + wit + ", men=" + men + "]";
     }
 
     public static final class Builder {

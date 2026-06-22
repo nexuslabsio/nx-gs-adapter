@@ -25,8 +25,7 @@ package app.l2nx.gs.adapter.api.kafka.events.character;
  */
 public final class WellKnownDeathMetadata {
 
-    private WellKnownDeathMetadata() {
-    }
+    private WellKnownDeathMetadata() {}
 
     public static final String KILLER_TYPE = "killer_type";
 

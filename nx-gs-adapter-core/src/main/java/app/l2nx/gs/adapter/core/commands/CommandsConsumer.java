@@ -15,6 +15,13 @@ import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -23,14 +30,6 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.jspecify.annotations.Nullable;
-
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.Collections;
-import java.util.UUID;
-import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Inbound commands consumer + dispatcher. Single Kafka consumer on the
@@ -56,8 +55,7 @@ public final class CommandsConsumer {
     private static final NxLog log = NxLogFactory.getLogger(CommandsConsumer.class);
 
     private static final long SHUTDOWN_GRACE_MS = 1_000L;
-    private static final byte[] FALLBACK_REPLY_TYPE_BYTES =
-            "CommandResult".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] FALLBACK_REPLY_TYPE_BYTES = "CommandResult".getBytes(StandardCharsets.UTF_8);
 
     /**
      * Bridge to the actual Kafka send. Production wires this to
@@ -100,18 +98,19 @@ public final class CommandsConsumer {
 
     private volatile boolean running = false;
 
-    CommandsConsumer(String inboundTopic,
-                     @Nullable String repliesTopic,
-                     UUID ownServerId,
-                     HostExecutor hostExecutor,
-                     NxEvents events,
-                     Executor ioExecutor,
-                     NxSync sync,
-                     CommandTypeRegistry registry,
-                     Consumer<byte[], byte[]> kafkaConsumer,
-                     ReplySender replySender,
-                     Gson gson,
-                     CommandsConfig config) {
+    CommandsConsumer(
+            String inboundTopic,
+            @Nullable String repliesTopic,
+            UUID ownServerId,
+            HostExecutor hostExecutor,
+            NxEvents events,
+            Executor ioExecutor,
+            NxSync sync,
+            CommandTypeRegistry registry,
+            Consumer<byte[], byte[]> kafkaConsumer,
+            ReplySender replySender,
+            Gson gson,
+            CommandsConfig config) {
         this.inboundTopic = inboundTopic;
         this.repliesTopic = repliesTopic;
         this.ownServerId = ownServerId;
@@ -158,8 +157,7 @@ public final class CommandsConsumer {
         try {
             kafkaConsumer.wakeup();
         } catch (Throwable t) {
-            log.warn("Commands consumer wakeup threw {}: {}",
-                    t.getClass().getName(), t.getMessage(), t);
+            log.warn("Commands consumer wakeup threw {}: {}", t.getClass().getName(), t.getMessage(), t);
         }
         try {
             daemon.join(shutdownTimeoutMs + SHUTDOWN_GRACE_MS);
@@ -169,8 +167,7 @@ public final class CommandsConsumer {
         try {
             kafkaConsumer.close(Duration.ofMillis(SHUTDOWN_GRACE_MS));
         } catch (Throwable t) {
-            log.warn("Commands consumer close threw {}: {}",
-                    t.getClass().getName(), t.getMessage(), t);
+            log.warn("Commands consumer close threw {}: {}", t.getClass().getName(), t.getMessage(), t);
         }
         log.info("Commands consumer stopped");
     }
@@ -217,7 +214,10 @@ public final class CommandsConsumer {
                 if (!running) {
                     return;
                 }
-                log.error("Commands consumer poll error: {} — backing off 1s", t.getClass().getName(), t);
+                log.error(
+                        "Commands consumer poll error: {} — backing off 1s",
+                        t.getClass().getName(),
+                        t);
                 sleepQuiet(1_000L);
                 continue;
             }
@@ -230,8 +230,11 @@ public final class CommandsConsumer {
                 kafkaConsumer.commitSync();
             } catch (Throwable t) {
                 commitFailuresTotal.incrementAndGet();
-                log.warn("Commands consumer commit failed: {} ({}) — dropping batch (at-most-once)",
-                        t.getClass().getName(), t.getMessage(), t);
+                log.warn(
+                        "Commands consumer commit failed: {} ({}) — dropping batch (at-most-once)",
+                        t.getClass().getName(),
+                        t.getMessage(),
+                        t);
                 continue;
             }
 
@@ -270,9 +273,12 @@ public final class CommandsConsumer {
                     int leftover = pendingReplies.get();
                     if (leftover > 0) {
                         replyFlushTimeoutsTotal.incrementAndGet();
-                        log.warn("Reply flush timed out with {} send(s) still in flight after {}ms — "
-                                + "committing offset anyway; pending sends will continue and may still "
-                                + "succeed asynchronously", leftover, replyFlushTimeoutMs);
+                        log.warn(
+                                "Reply flush timed out with {} send(s) still in flight after {}ms — "
+                                        + "committing offset anyway; pending sends will continue and may still "
+                                        + "succeed asynchronously",
+                                leftover,
+                                replyFlushTimeoutMs);
                     }
                     return false;
                 }
@@ -283,8 +289,10 @@ public final class CommandsConsumer {
                     running = false;
                     Thread.currentThread().interrupt();
                     if (leftover > 0) {
-                        log.warn("Interrupted during reply drain; skipping offset commit so {} "
-                                + "pending record(s) will redeliver", leftover);
+                        log.warn(
+                                "Interrupted during reply drain; skipping offset commit so {} "
+                                        + "pending record(s) will redeliver",
+                                leftover);
                         return true;
                     }
                     return false;
@@ -309,29 +317,36 @@ public final class CommandsConsumer {
         byte[] value = record.value();
         String rawJson = (value == null) ? "{}" : new String(value, StandardCharsets.UTF_8);
 
-        log.info("Inbound command received — type={}, corr={}, payload={}",
-                messageType, correlationId, rawJson);
+        log.info("Inbound command received — type={}, corr={}, payload={}", messageType, correlationId, rawJson);
 
         // 1. Resolve binding
         if (messageType == null || messageType.isEmpty()) {
             unsupportedTotal.incrementAndGet();
-            log.warn("Inbound command record missing {} header — replying UNSUPPORTED_COMMAND",
+            log.warn(
+                    "Inbound command record missing {} header — replying UNSUPPORTED_COMMAND",
                     NxHeaders.NX_MESSAGE_TYPE);
-            sendReply(correlationId, FALLBACK_REPLY_TYPE_BYTES,
-                    CommandResult.error(CommandStatus.UNSUPPORTED_COMMAND,
+            sendReply(
+                    correlationId,
+                    FALLBACK_REPLY_TYPE_BYTES,
+                    CommandResult.error(
+                            CommandStatus.UNSUPPORTED_COMMAND,
                             "Inbound command missing Nx-Message-Type header",
-                            "error.cause", "missing-message-type-header"));
+                            "error.cause",
+                            "missing-message-type-header"));
             return;
         }
         CommandTypeBinding binding = registry.lookup(messageType);
         if (binding == null) {
             unsupportedTotal.incrementAndGet();
-            log.warn("No registered handler for command type {} — replying UNSUPPORTED_COMMAND",
-                    messageType);
-            sendReply(correlationId, computeReplyTypeBytes(messageType),
-                    CommandResult.error(CommandStatus.UNSUPPORTED_COMMAND,
+            log.warn("No registered handler for command type {} — replying UNSUPPORTED_COMMAND", messageType);
+            sendReply(
+                    correlationId,
+                    computeReplyTypeBytes(messageType),
+                    CommandResult.error(
+                            CommandStatus.UNSUPPORTED_COMMAND,
                             "No registered handler for command type",
-                            "messageType", messageType));
+                            "messageType",
+                            messageType));
             return;
         }
 
@@ -346,10 +361,16 @@ public final class CommandsConsumer {
             }
         } catch (JsonSyntaxException jse) {
             validationFailedTotal.incrementAndGet();
-            log.error("Failed to deserialize command type {} (corr={}): {}",
-                    messageType, correlationId, jse.getMessage());
-            sendReply(correlationId, replyTypeBytes,
-                    CommandResult.error(CommandStatus.VALIDATION_FAILED,
+            log.error(
+                    "Failed to deserialize command type {} (corr={}): {}",
+                    messageType,
+                    correlationId,
+                    jse.getMessage());
+            sendReply(
+                    correlationId,
+                    replyTypeBytes,
+                    CommandResult.error(
+                            CommandStatus.VALIDATION_FAILED,
                             CommandProblem.builder()
                                     .title("Failed to deserialize command payload")
                                     .detail(jse.getMessage())
@@ -358,10 +379,17 @@ public final class CommandsConsumer {
             return;
         } catch (Throwable t) {
             internalErrorsTotal.incrementAndGet();
-            log.error("Unexpected deserialization failure for command type {} (corr={}): {}",
-                    messageType, correlationId, t.getClass().getName(), t);
-            sendReply(correlationId, replyTypeBytes,
-                    CommandResult.error(CommandStatus.INTERNAL_ERROR,
+            log.error(
+                    "Unexpected deserialization failure for command type {} (corr={}): {}",
+                    messageType,
+                    correlationId,
+                    t.getClass().getName(),
+                    t);
+            sendReply(
+                    correlationId,
+                    replyTypeBytes,
+                    CommandResult.error(
+                            CommandStatus.INTERNAL_ERROR,
                             CommandProblem.builder()
                                     .title("Deserialization failure")
                                     .detail(String.valueOf(t.getMessage()))
@@ -381,9 +409,13 @@ public final class CommandsConsumer {
             result = raw;
         } catch (HostExecutorTimeoutException hte) {
             internalErrorsTotal.incrementAndGet();
-            log.warn("Handler for {} (corr={}) hit host-executor timeout after {}ms",
-                    messageType, correlationId, hte.getTimeoutMs());
-            result = CommandResult.error(CommandStatus.UNAVAILABLE,
+            log.warn(
+                    "Handler for {} (corr={}) hit host-executor timeout after {}ms",
+                    messageType,
+                    correlationId,
+                    hte.getTimeoutMs());
+            result = CommandResult.error(
+                    CommandStatus.UNAVAILABLE,
                     CommandProblem.builder()
                             .title("Host executor timeout")
                             .extension("error.cause", "host-executor-timeout")
@@ -391,9 +423,15 @@ public final class CommandsConsumer {
                             .build());
         } catch (RuntimeException re) {
             internalErrorsTotal.incrementAndGet();
-            log.warn("Handler for {} (corr={}) threw {}: {}",
-                    messageType, correlationId, re.getClass().getSimpleName(), re.getMessage(), re);
-            result = CommandResult.error(CommandStatus.INTERNAL_ERROR,
+            log.warn(
+                    "Handler for {} (corr={}) threw {}: {}",
+                    messageType,
+                    correlationId,
+                    re.getClass().getSimpleName(),
+                    re.getMessage(),
+                    re);
+            result = CommandResult.error(
+                    CommandStatus.INTERNAL_ERROR,
                     CommandProblem.builder()
                             .title("Handler threw " + re.getClass().getSimpleName())
                             .detail(String.valueOf(re.getMessage()))
@@ -404,11 +442,12 @@ public final class CommandsConsumer {
         // 4. Reply
         if (result == null) {
             internalErrorsTotal.incrementAndGet();
-            log.warn("Handler for {} (corr={}) returned null — auto-wrapping as INTERNAL_ERROR",
-                    messageType, correlationId);
-            result = CommandResult.error(CommandStatus.INTERNAL_ERROR,
-                    "Handler returned null",
-                    "error.cause", "handler-returned-null");
+            log.warn(
+                    "Handler for {} (corr={}) returned null — auto-wrapping as INTERNAL_ERROR",
+                    messageType,
+                    correlationId);
+            result = CommandResult.error(
+                    CommandStatus.INTERNAL_ERROR, "Handler returned null", "error.cause", "handler-returned-null");
         } else {
             handledTotal.incrementAndGet();
         }
@@ -426,10 +465,9 @@ public final class CommandsConsumer {
             return;
         }
         byte[] key = LongBytes.bigEndian(correlationId.getMostSignificantBits());
-        ProducerRecord<byte[], Object> record = new ProducerRecord<byte[], Object>(
-                repliesTopic, key, result);
-        record.headers().add(NxHeaders.NX_CORRELATION_ID,
-                correlationId.toString().getBytes(StandardCharsets.UTF_8));
+        ProducerRecord<byte[], Object> record = new ProducerRecord<byte[], Object>(repliesTopic, key, result);
+        record.headers()
+                .add(NxHeaders.NX_CORRELATION_ID, correlationId.toString().getBytes(StandardCharsets.UTF_8));
         record.headers().add(NxHeaders.NX_MESSAGE_TYPE, replyMessageTypeBytes);
 
         pendingReplies.incrementAndGet();
@@ -460,20 +498,24 @@ public final class CommandsConsumer {
                     replyDrainLock.notifyAll();
                 }
             }
-            log.error("Reply send threw for corr={}: {} ({})",
-                    correlationId, t.getClass().getName(), t.getMessage(), t);
+            log.error(
+                    "Reply send threw for corr={}: {} ({})",
+                    correlationId,
+                    t.getClass().getName(),
+                    t.getMessage(),
+                    t);
         }
     }
 
     private static byte[] computeReplyTypeBytes(String originalMessageType) {
-        return CommandTypeBinding.deriveReplyTypeName(originalMessageType)
-                .getBytes(StandardCharsets.UTF_8);
+        return CommandTypeBinding.deriveReplyTypeName(originalMessageType).getBytes(StandardCharsets.UTF_8);
     }
 
     private boolean targetsThisServer(Headers headers) {
         Header h = headers == null ? null : headers.lastHeader(NxHeaders.NX_TARGET_SERVER_ID);
         if (h == null || h.value() == null) {
-            log.warn("Inbound command record missing {} header — dropping (strict contract)",
+            log.warn(
+                    "Inbound command record missing {} header — dropping (strict contract)",
                     NxHeaders.NX_TARGET_SERVER_ID);
             return false;
         }
@@ -481,13 +523,14 @@ public final class CommandsConsumer {
         try {
             target = NxHeaders.decodeUuid(h.value());
         } catch (IllegalArgumentException ex) {
-            log.warn("Inbound command record has malformed {} header — dropping: {}",
-                    NxHeaders.NX_TARGET_SERVER_ID, ex.getMessage());
+            log.warn(
+                    "Inbound command record has malformed {} header — dropping: {}",
+                    NxHeaders.NX_TARGET_SERVER_ID,
+                    ex.getMessage());
             return false;
         }
         if (!ownServerId.equals(target)) {
-            log.debug("Skipping command record targeted at server {} (own server: {})",
-                    target, ownServerId);
+            log.debug("Skipping command record targeted at server {} (own server: {})", target, ownServerId);
             return false;
         }
         return true;
@@ -513,16 +556,21 @@ public final class CommandsConsumer {
         String raw = readStringHeader(headers, NxHeaders.NX_CORRELATION_ID);
         if (raw == null || raw.isEmpty()) {
             UUID fallback = UUIDv7.generate();
-            log.warn("Inbound command record missing {} header — generated fallback {}",
-                    NxHeaders.NX_CORRELATION_ID, fallback);
+            log.warn(
+                    "Inbound command record missing {} header — generated fallback {}",
+                    NxHeaders.NX_CORRELATION_ID,
+                    fallback);
             return fallback;
         }
         try {
             return UUID.fromString(raw);
         } catch (IllegalArgumentException ex) {
             UUID fallback = UUIDv7.generate();
-            log.warn("Inbound command record has malformed {} header '{}' — generated fallback {}",
-                    NxHeaders.NX_CORRELATION_ID, raw, fallback);
+            log.warn(
+                    "Inbound command record has malformed {} header '{}' — generated fallback {}",
+                    NxHeaders.NX_CORRELATION_ID,
+                    raw,
+                    fallback);
             return fallback;
         }
     }

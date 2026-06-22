@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One item required to learn a skill at a {@link SkillClassLearn} entry — an item-template
@@ -14,8 +13,7 @@ public final class SkillLearnItem {
     private final @Nullable Integer itemTemplateId;
     private final @Nullable Long itemTemplateCount;
 
-    public SkillLearnItem(@Nullable Integer itemTemplateId,
-                          @Nullable Long itemTemplateCount) {
+    public SkillLearnItem(@Nullable Integer itemTemplateId, @Nullable Long itemTemplateCount) {
         this.itemTemplateId = itemTemplateId;
         this.itemTemplateCount = itemTemplateCount;
     }
@@ -35,9 +33,7 @@ public final class SkillLearnItem {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .itemTemplateId(itemTemplateId)
-                .itemTemplateCount(itemTemplateCount);
+        return new Builder().itemTemplateId(itemTemplateId).itemTemplateCount(itemTemplateCount);
     }
 
     public static Builder builder() {
@@ -60,8 +56,7 @@ public final class SkillLearnItem {
 
     @Override
     public String toString() {
-        return "SkillLearnItem[itemTemplateId=" + itemTemplateId
-                + ", itemTemplateCount=" + itemTemplateCount + "]";
+        return "SkillLearnItem[itemTemplateId=" + itemTemplateId + ", itemTemplateCount=" + itemTemplateCount + "]";
     }
 
     public static final class Builder {

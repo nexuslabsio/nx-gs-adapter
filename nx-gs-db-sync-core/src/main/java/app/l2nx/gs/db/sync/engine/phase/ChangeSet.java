@@ -54,10 +54,8 @@ public final class ChangeSet {
      *                        "updated" detection)
      * @param entityName      entity scope key for snapshot lookup
      */
-    public static ChangeSet diff(Long2IntMap currentScan,
-                                 LongSet prevKeysInRange,
-                                 SnapshotStore snapshot,
-                                 String entityName) {
+    public static ChangeSet diff(
+            Long2IntMap currentScan, LongSet prevKeysInRange, SnapshotStore snapshot, String entityName) {
         LongOpenHashSet created = new LongOpenHashSet();
         LongOpenHashSet updated = new LongOpenHashSet();
         LongOpenHashSet deleted = new LongOpenHashSet();

@@ -7,12 +7,11 @@ import app.l2nx.gs.adapter.api.domain.item.ItemClass;
 import app.l2nx.gs.adapter.api.domain.item.ItemEquipSlot;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore.WellKnownGearScoreEnchantProfiles;
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic item-template wire DTO — the common L2 denominator for static
@@ -72,31 +71,32 @@ public final class ItemTemplate {
     private final @Nullable Integer gearScore;
     private final @Nullable String gearScoreEnchantProfile;
 
-    public ItemTemplate(int id,
-                        ItemClass type,
-                        @Nullable String icon,
-                        @Nullable LocalizedText name,
-                        @Nullable Integer weight,
-                        @Nullable Long referencePrice,
-                        @Nullable String material,
-                        @Nullable String grade,
-                        @Nullable ItemEquipSlot equipSlot,
-                        @Nullable WeaponType weaponType,
-                        @Nullable ArmorType armorType,
-                        @Nullable EtcItemType etcItemType,
-                        @Nullable Boolean stackable,
-                        @Nullable Boolean questItem,
-                        @Nullable Boolean petUsable,
-                        @Nullable String defaultAction,
-                        @Nullable String useHandler,
-                        @Nullable Integer duration,
-                        @Nullable Integer reuseDelayMs,
-                        @Nullable List<ItemSkillRef> skills,
-                        @Nullable ItemStats stats,
-                        @Nullable ItemRestrictions restrictions,
-                        @Nullable ItemUpgrade upgrade,
-                        @Nullable Integer gearScore,
-                        @Nullable String gearScoreEnchantProfile) {
+    public ItemTemplate(
+            int id,
+            ItemClass type,
+            @Nullable String icon,
+            @Nullable LocalizedText name,
+            @Nullable Integer weight,
+            @Nullable Long referencePrice,
+            @Nullable String material,
+            @Nullable String grade,
+            @Nullable ItemEquipSlot equipSlot,
+            @Nullable WeaponType weaponType,
+            @Nullable ArmorType armorType,
+            @Nullable EtcItemType etcItemType,
+            @Nullable Boolean stackable,
+            @Nullable Boolean questItem,
+            @Nullable Boolean petUsable,
+            @Nullable String defaultAction,
+            @Nullable String useHandler,
+            @Nullable Integer duration,
+            @Nullable Integer reuseDelayMs,
+            @Nullable List<ItemSkillRef> skills,
+            @Nullable ItemStats stats,
+            @Nullable ItemRestrictions restrictions,
+            @Nullable ItemUpgrade upgrade,
+            @Nullable Integer gearScore,
+            @Nullable String gearScoreEnchantProfile) {
         this.id = id;
         this.type = Objects.requireNonNull(type, "type");
         this.icon = icon;
@@ -116,8 +116,7 @@ public final class ItemTemplate {
         this.useHandler = useHandler;
         this.duration = duration;
         this.reuseDelayMs = reuseDelayMs;
-        this.skills = skills == null ? null
-                : Collections.unmodifiableList(new ArrayList<ItemSkillRef>(skills));
+        this.skills = skills == null ? null : Collections.unmodifiableList(new ArrayList<ItemSkillRef>(skills));
         this.stats = stats;
         this.restrictions = restrictions;
         this.upgrade = upgrade;
@@ -328,10 +327,32 @@ public final class ItemTemplate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, type, icon, name, weight, referencePrice, material,
-                grade, equipSlot, weaponType, armorType, etcItemType, stackable, questItem,
-                petUsable, defaultAction, useHandler, duration, reuseDelayMs, skills, stats,
-                restrictions, upgrade, gearScore, gearScoreEnchantProfile);
+        return Objects.hash(
+                id,
+                type,
+                icon,
+                name,
+                weight,
+                referencePrice,
+                material,
+                grade,
+                equipSlot,
+                weaponType,
+                armorType,
+                etcItemType,
+                stackable,
+                questItem,
+                petUsable,
+                defaultAction,
+                useHandler,
+                duration,
+                reuseDelayMs,
+                skills,
+                stats,
+                restrictions,
+                upgrade,
+                gearScore,
+                gearScoreEnchantProfile);
     }
 
     @Override
@@ -492,10 +513,32 @@ public final class ItemTemplate {
         }
 
         public ItemTemplate build() {
-            return new ItemTemplate(id, type, icon, name, weight, referencePrice, material,
-                    grade, equipSlot, weaponType, armorType, etcItemType, stackable, questItem,
-                    petUsable, defaultAction, useHandler, duration, reuseDelayMs, skills, stats,
-                    restrictions, upgrade, gearScore, gearScoreEnchantProfile);
+            return new ItemTemplate(
+                    id,
+                    type,
+                    icon,
+                    name,
+                    weight,
+                    referencePrice,
+                    material,
+                    grade,
+                    equipSlot,
+                    weaponType,
+                    armorType,
+                    etcItemType,
+                    stackable,
+                    questItem,
+                    petUsable,
+                    defaultAction,
+                    useHandler,
+                    duration,
+                    reuseDelayMs,
+                    skills,
+                    stats,
+                    restrictions,
+                    upgrade,
+                    gearScore,
+                    gearScoreEnchantProfile);
         }
     }
 }

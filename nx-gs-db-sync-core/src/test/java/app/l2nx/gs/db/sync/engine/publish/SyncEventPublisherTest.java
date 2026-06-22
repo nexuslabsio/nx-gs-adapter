@@ -1,15 +1,11 @@
 package app.l2nx.gs.db.sync.engine.publish;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.db.sync.engine.TestMappings;
-import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.serialization.LongSerializer;
-import org.junit.jupiter.api.Test;
-
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,8 +13,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.LongSerializer;
+import org.junit.jupiter.api.Test;
 
 class SyncEventPublisherTest {
 
@@ -74,8 +73,9 @@ class SyncEventPublisherTest {
         // Cross-check: identical bytes for any long → engine and external
         // LongSerializer-based writers land on the same partition.
         try (LongSerializer ls = new LongSerializer()) {
-            for (long pk : new long[]{0L, 1L, -1L, 12345L, Long.MIN_VALUE, Long.MAX_VALUE}) {
-                assertArrayEquals(ls.serialize("topic", pk),
+            for (long pk : new long[] {0L, 1L, -1L, 12345L, Long.MIN_VALUE, Long.MAX_VALUE}) {
+                assertArrayEquals(
+                        ls.serialize("topic", pk),
                         SyncEventPublisher.encodeKey(pk),
                         "LongSerializer parity for pk=" + pk);
             }
@@ -92,8 +92,7 @@ class SyncEventPublisherTest {
                 publisher.publish(clanMapping(), SyncEventPublisher.OP_UPDATED, 1L, dto, TOPIC);
         sender.completeLast(new RuntimeException("kafka down"));
 
-        ExecutionException ex = assertThrows(ExecutionException.class,
-                () -> future.get(1, TimeUnit.SECONDS));
+        ExecutionException ex = assertThrows(ExecutionException.class, () -> future.get(1, TimeUnit.SECONDS));
         assertEquals("kafka down", ex.getCause().getMessage());
     }
 
@@ -108,8 +107,7 @@ class SyncEventPublisherTest {
         CompletableFuture<RecordMetadata> future =
                 publisher.publish(clanMapping(), SyncEventPublisher.OP_CREATED, 1L, dto, TOPIC);
 
-        ExecutionException ex = assertThrows(ExecutionException.class,
-                () -> future.get(1, TimeUnit.SECONDS));
+        ExecutionException ex = assertThrows(ExecutionException.class, () -> future.get(1, TimeUnit.SECONDS));
         assertEquals("send rejected", ex.getCause().getMessage());
     }
 

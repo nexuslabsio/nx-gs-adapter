@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.character;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Discrete presence-change fact — one event per login or logout, emitted
@@ -56,22 +55,22 @@ public final class CharacterPresenceEvent {
     private final @Nullable String hwid;
     private final @Nullable Map<String, String> metadata;
 
-    public CharacterPresenceEvent(UUID eventId,
-                                  long charId,
-                                  boolean online,
-                                  @Nullable String accountName,
-                                  @Nullable String ip,
-                                  @Nullable String hwid,
-                                  @Nullable Map<String, String> metadata) {
+    public CharacterPresenceEvent(
+            UUID eventId,
+            long charId,
+            boolean online,
+            @Nullable String accountName,
+            @Nullable String ip,
+            @Nullable String hwid,
+            @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "CharacterPresenceEvent.eventId is required");
         this.charId = charId;
         this.online = online;
         this.accountName = accountName;
         this.ip = ip;
         this.hwid = hwid;
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {

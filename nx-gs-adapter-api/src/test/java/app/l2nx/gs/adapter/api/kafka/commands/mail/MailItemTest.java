@@ -1,17 +1,14 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class MailItemTest {
 
     @Test
     void builder_shouldRoundtripFields() {
-        MailItem item = MailItem.builder()
-                .itemTemplateId(57L)
-                .count(1_000_000L)
-                .build();
+        MailItem item = MailItem.builder().itemTemplateId(57L).count(1_000_000L).build();
 
         assertEquals(57L, item.getItemTemplateId().longValue());
         assertEquals(1_000_000L, item.getCount().longValue());
@@ -26,15 +23,13 @@ class MailItemTest {
 
     @Test
     void constructor_shouldRejectNullItemTemplateId() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new MailItem(null, 1L));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new MailItem(null, 1L));
         assertTrue(ex.getMessage().contains("itemTemplateId"));
     }
 
     @Test
     void constructor_shouldRejectNullCount() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new MailItem(57L, null));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new MailItem(57L, null));
         assertTrue(ex.getMessage().contains("count"));
     }
 

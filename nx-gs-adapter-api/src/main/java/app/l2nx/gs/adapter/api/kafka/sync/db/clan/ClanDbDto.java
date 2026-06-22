@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.clan;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO for one clan, payload of {@code SyncEvent<ClanDbDto>} on the
@@ -37,10 +36,14 @@ public final class ClanDbDto {
     private final @Nullable List<ClanSkillDbDto> skills;
     private final byte @Nullable [] icon;
 
-    public ClanDbDto(long id, String name, @Nullable Integer level,
-                     @Nullable Long leaderId, @Nullable Long allyId,
-                     @Nullable List<ClanSkillDbDto> skills,
-                     byte @Nullable [] icon) {
+    public ClanDbDto(
+            long id,
+            String name,
+            @Nullable Integer level,
+            @Nullable Long leaderId,
+            @Nullable Long allyId,
+            @Nullable List<ClanSkillDbDto> skills,
+            byte @Nullable [] icon) {
         this.id = id;
         this.name = Objects.requireNonNull(name, "ClanDbDto.name is required");
         this.level = level;

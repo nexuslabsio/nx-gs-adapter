@@ -1,5 +1,8 @@
 package app.l2nx.gs.db.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
@@ -11,15 +14,11 @@ import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
 import app.l2nx.gs.db.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.db.sync.engine.publish.TopicResolver;
 import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 class CdcEnginePoolTest {
 

@@ -28,8 +28,7 @@ import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
  */
 public final class GdResyncCommand implements NxCommand<GdResyncResult> {
 
-    public GdResyncCommand() {
-    }
+    public GdResyncCommand() {}
 
     public Builder toBuilder() {
         return new Builder();

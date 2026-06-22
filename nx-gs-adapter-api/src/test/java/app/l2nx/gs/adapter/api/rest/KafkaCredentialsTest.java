@@ -1,9 +1,9 @@
 package app.l2nx.gs.adapter.api.rest;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 class KafkaCredentialsTest {
 

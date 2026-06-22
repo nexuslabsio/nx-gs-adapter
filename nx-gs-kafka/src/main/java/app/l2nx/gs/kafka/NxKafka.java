@@ -5,13 +5,6 @@ import app.l2nx.gs.kafka.consumer.ReplyContext;
 import app.l2nx.gs.kafka.producer.NxProducer;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.admin.DescribeClusterResult;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.clients.producer.ProducerConfig;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -19,6 +12,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.DescribeClusterResult;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.ProducerConfig;
 
 /**
  * Singleton entry point for NxKafka library.
@@ -82,22 +81,23 @@ public final class NxKafka {
             scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "nx-gs-kafka-health");
                 t.setDaemon(true);
-                t.setUncaughtExceptionHandler((thr, ex) ->
-                        log.error("Uncaught exception on scheduler thread {}", thr.getName(), ex));
+                t.setUncaughtExceptionHandler(
+                        (thr, ex) -> log.error("Uncaught exception on scheduler thread {}", thr.getName(), ex));
                 return t;
             });
             scheduler.scheduleWithFixedDelay(
                     this::healthCheck,
                     config.getReconnectIntervalMs(),
                     config.getReconnectIntervalMs(),
-                    TimeUnit.MILLISECONDS
-            );
+                    TimeUnit.MILLISECONDS);
         } else {
             scheduler = null;
         }
 
-        log.debug("NxKafka initialized, reconnect={}, interval={}ms",
-                config.isReconnect(), config.getReconnectIntervalMs());
+        log.debug(
+                "NxKafka initialized, reconnect={}, interval={}ms",
+                config.isReconnect(),
+                config.getReconnectIntervalMs());
     }
 
     /**
@@ -278,8 +278,8 @@ public final class NxKafka {
      * @param record   pre-built record carrying topic + key + headers + value
      * @param callback invoked on the Kafka I/O thread when the broker acknowledges or rejects the record
      */
-    public void sendBytesKeyRecord(org.apache.kafka.clients.producer.ProducerRecord<byte[], Object> record,
-                                   Callback callback) {
+    public void sendBytesKeyRecord(
+            org.apache.kafka.clients.producer.ProducerRecord<byte[], Object> record, Callback callback) {
         if (rejectIfClosed(record.topic(), callback)) {
             return;
         }
@@ -502,8 +502,8 @@ public final class NxKafka {
         props.putAll(config.getProperties());
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, config.getBrokers());
         props.put(ProducerConfig.CLIENT_ID_CONFIG, config.getClientId() + "-producer");
-        return NxProducer.create(props, config.getGson(), config.getProducerStaticHeaders(),
-                config.getProducerCloseTimeout());
+        return NxProducer.create(
+                props, config.getGson(), config.getProducerStaticHeaders(), config.getProducerCloseTimeout());
     }
 
     private AdminClient createAdminClient() {
@@ -548,7 +548,9 @@ public final class NxKafka {
         try {
             DescribeClusterResult result = adminClient.describeCluster();
             String clusterId = result.clusterId().get(config.getConnectTimeoutMs(), TimeUnit.MILLISECONDS);
-            int brokerCount = result.nodes().get(config.getConnectTimeoutMs(), TimeUnit.MILLISECONDS).size();
+            int brokerCount = result.nodes()
+                    .get(config.getConnectTimeoutMs(), TimeUnit.MILLISECONDS)
+                    .size();
 
             if (!closed.get()) {
                 changeState(KafkaState.CONNECTED);

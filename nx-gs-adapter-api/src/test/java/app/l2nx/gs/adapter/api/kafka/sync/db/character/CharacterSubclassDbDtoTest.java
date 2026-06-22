@@ -1,10 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.character;
 
-import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
+import org.junit.jupiter.api.Test;
 
 class CharacterSubclassDbDtoTest {
 
@@ -22,13 +22,21 @@ class CharacterSubclassDbDtoTest {
     @Test
     void equals_shouldDistinguishOnFields() {
         CharacterSubclassDbDto a = CharacterSubclassDbDto.builder()
-                .classId(CharacterClass.CARDINAL).level(82).build();
+                .classId(CharacterClass.CARDINAL)
+                .level(82)
+                .build();
         CharacterSubclassDbDto b = CharacterSubclassDbDto.builder()
-                .classId(CharacterClass.CARDINAL).level(82).build();
+                .classId(CharacterClass.CARDINAL)
+                .level(82)
+                .build();
         CharacterSubclassDbDto c = CharacterSubclassDbDto.builder()
-                .classId(CharacterClass.CARDINAL).level(83).build();
+                .classId(CharacterClass.CARDINAL)
+                .level(83)
+                .build();
         CharacterSubclassDbDto d = CharacterSubclassDbDto.builder()
-                .classId(CharacterClass.HIEROPHANT).level(82).build();
+                .classId(CharacterClass.HIEROPHANT)
+                .level(82)
+                .build();
 
         assertEquals(a, b);
         assertEquals(a.hashCode(), b.hashCode());

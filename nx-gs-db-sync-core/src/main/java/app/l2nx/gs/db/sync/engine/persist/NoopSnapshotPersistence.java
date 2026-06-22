@@ -9,22 +9,17 @@ public final class NoopSnapshotPersistence implements SnapshotPersistence {
 
     public static final NoopSnapshotPersistence INSTANCE = new NoopSnapshotPersistence();
 
-    private NoopSnapshotPersistence() {
-    }
+    private NoopSnapshotPersistence() {}
 
     @Override
-    public void load(SnapshotStore target) {
-    }
+    public void load(SnapshotStore target) {}
 
     @Override
-    public void checkpoint(String entityName, SnapshotStore source) {
-    }
+    public void checkpoint(String entityName, SnapshotStore source) {}
 
     @Override
-    public void flushAll(SnapshotStore source) {
-    }
+    public void flushAll(SnapshotStore source) {}
 
     @Override
-    public void close() {
-    }
+    public void close() {}
 }

@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.commands;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class CommandResultTest {
 
@@ -39,8 +39,7 @@ class CommandResultTest {
 
     @Test
     void error_withSingleExtension_shouldExposeIt() {
-        CommandResult<Void> r = CommandResult.error(
-                CommandStatus.NOT_FOUND, "not found", "charId", 12345L);
+        CommandResult<Void> r = CommandResult.error(CommandStatus.NOT_FOUND, "not found", "charId", 12345L);
 
         assertEquals(CommandStatus.NOT_FOUND, r.getStatus());
         assertEquals(12345L, r.getProblem().getExtensions().get("charId"));
@@ -87,26 +86,27 @@ class CommandResultTest {
 
     @Test
     void constructor_shouldRejectOkWithProblem() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> new CommandResult<Void>(CommandStatus.OK, null, CommandProblem.of("oops")));
     }
 
     @Test
     void constructor_shouldRejectNonOkWithoutProblem() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new CommandResult<Void>(CommandStatus.NOT_FOUND, null, null));
+        assertThrows(
+                IllegalArgumentException.class, () -> new CommandResult<Void>(CommandStatus.NOT_FOUND, null, null));
     }
 
     @Test
     void constructor_shouldRejectNonOkWithPayload() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> new CommandResult<String>(CommandStatus.NOT_FOUND, "payload", CommandProblem.of("nope")));
     }
 
     @Test
     void constructor_shouldRejectNullStatus() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new CommandResult<Void>(null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new CommandResult<Void>(null, null, null));
     }
 
     @Test

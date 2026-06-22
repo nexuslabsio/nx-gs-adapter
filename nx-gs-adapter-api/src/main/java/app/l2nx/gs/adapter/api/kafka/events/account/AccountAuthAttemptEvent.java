@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.events.account;
 
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Discrete account-authentication attempt fact — one event per credential-entry
@@ -56,15 +55,16 @@ public final class AccountAuthAttemptEvent {
     private final @Nullable String failureDetail;
     private final @Nullable Map<String, String> metadata;
 
-    public AccountAuthAttemptEvent(String eventId,
-                                   String serverId,
-                                   String accountName,
-                                   String clientIp,
-                                   @Nullable String hwid,
-                                   String outcome,
-                                   Instant attemptedAt,
-                                   @Nullable String failureDetail,
-                                   @Nullable Map<String, String> metadata) {
+    public AccountAuthAttemptEvent(
+            String eventId,
+            String serverId,
+            String accountName,
+            String clientIp,
+            @Nullable String hwid,
+            String outcome,
+            Instant attemptedAt,
+            @Nullable String failureDetail,
+            @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "AccountAuthAttemptEvent.eventId is required");
         this.serverId = Objects.requireNonNull(serverId, "AccountAuthAttemptEvent.serverId is required");
         this.accountName = Objects.requireNonNull(accountName, "AccountAuthAttemptEvent.accountName is required");
@@ -73,7 +73,8 @@ public final class AccountAuthAttemptEvent {
         this.outcome = Objects.requireNonNull(outcome, "AccountAuthAttemptEvent.outcome is required");
         this.attemptedAt = Objects.requireNonNull(attemptedAt, "AccountAuthAttemptEvent.attemptedAt is required");
         this.failureDetail = failureDetail;
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public String getEventId() {
@@ -152,8 +153,8 @@ public final class AccountAuthAttemptEvent {
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, serverId, accountName, clientIp, hwid, outcome,
-                attemptedAt, failureDetail, metadata);
+        return Objects.hash(
+                eventId, serverId, accountName, clientIp, hwid, outcome, attemptedAt, failureDetail, metadata);
     }
 
     @Override
@@ -226,8 +227,8 @@ public final class AccountAuthAttemptEvent {
         }
 
         public AccountAuthAttemptEvent build() {
-            return new AccountAuthAttemptEvent(eventId, serverId, accountName, clientIp,
-                    hwid, outcome, attemptedAt, failureDetail, metadata);
+            return new AccountAuthAttemptEvent(
+                    eventId, serverId, accountName, clientIp, hwid, outcome, attemptedAt, failureDetail, metadata);
         }
     }
 }

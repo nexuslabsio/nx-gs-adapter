@@ -49,9 +49,7 @@ public final class LevelExpEntry {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .level(level)
-                .requiredExp(requiredExp);
+        return new Builder().level(level).requiredExp(requiredExp);
     }
 
     public static Builder builder() {
@@ -63,8 +61,7 @@ public final class LevelExpEntry {
         if (this == o) return true;
         if (!(o instanceof LevelExpEntry)) return false;
         LevelExpEntry that = (LevelExpEntry) o;
-        return level == that.level
-                && requiredExp == that.requiredExp;
+        return level == that.level && requiredExp == that.requiredExp;
     }
 
     @Override
@@ -74,8 +71,7 @@ public final class LevelExpEntry {
 
     @Override
     public String toString() {
-        return "LevelExpEntry[level=" + level
-                + ", requiredExp=" + requiredExp + "]";
+        return "LevelExpEntry[level=" + level + ", requiredExp=" + requiredExp + "]";
     }
 
     public static final class Builder {

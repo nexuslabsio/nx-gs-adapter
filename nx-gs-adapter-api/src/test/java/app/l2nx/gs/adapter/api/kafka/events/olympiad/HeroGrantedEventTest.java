@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
-import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
-import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
 
 class HeroGrantedEventTest {
 
@@ -18,8 +17,8 @@ class HeroGrantedEventTest {
 
     @Test
     void build_shouldThrowNpe_whenEventIdIsNull() {
-        HeroGrantedEvent.Builder b = HeroGrantedEvent.builder()
-                .charId(268437521L).classId(88).olympiadCycle(7);
+        HeroGrantedEvent.Builder b =
+                HeroGrantedEvent.builder().charId(268437521L).classId(88).olympiadCycle(7);
 
         assertThrows(NullPointerException.class, b::build);
     }

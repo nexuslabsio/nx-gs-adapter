@@ -43,5 +43,4 @@ package app.l2nx.gs.adapter.api.kafka.commands;
  * @see app.l2nx.gs.adapter.api.spi.CommandHandler
  * @see app.l2nx.gs.adapter.api.spi.NxCommands
  */
-public interface NxCommand<R> {
-}
+public interface NxCommand<R> {}

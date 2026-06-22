@@ -1,14 +1,13 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
-import app.l2nx.gs.adapter.api.domain.Attribute;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class MailItemMovementTest {
 
@@ -16,7 +15,8 @@ class MailItemMovementTest {
     void getAttributes_shouldReturnEmptyMap_whenBuilderOmits() {
         MailItemMovement movement = MailItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(268437521L).newItemId(268437521L)
+                .itemId(268437521L)
+                .newItemId(268437521L)
                 .count(1L)
                 .build();
 
@@ -27,7 +27,8 @@ class MailItemMovementTest {
     void getAttributes_shouldReturnEmptyMap_whenBuilderPassesNull() {
         MailItemMovement movement = MailItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(268437521L).newItemId(268437521L)
+                .itemId(268437521L)
+                .newItemId(268437521L)
                 .count(1L)
                 .attributes(null)
                 .build();
@@ -42,12 +43,14 @@ class MailItemMovementTest {
 
         MailItemMovement movement = MailItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(268437521L).newItemId(268437521L)
+                .itemId(268437521L)
+                .newItemId(268437521L)
                 .count(1L)
                 .attributes(source)
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> movement.getAttributes().put(Attribute.WATER, 150));
     }
 
@@ -58,7 +61,8 @@ class MailItemMovementTest {
 
         MailItemMovement movement = MailItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(268437521L).newItemId(268437521L)
+                .itemId(268437521L)
+                .newItemId(268437521L)
                 .count(1L)
                 .attributes(source)
                 .build();
@@ -73,7 +77,8 @@ class MailItemMovementTest {
     void enchantLevel_shouldDefaultToNull_signalingNotApplicable() {
         MailItemMovement movement = MailItemMovement.builder()
                 .itemTemplateId(57L)
-                .itemId(268437521L).newItemId(268437521L)
+                .itemId(268437521L)
+                .newItemId(268437521L)
                 .count(1L)
                 .build();
 
@@ -84,7 +89,8 @@ class MailItemMovementTest {
     void enchantLevel_shouldRoundtripExplicitZero() {
         MailItemMovement movement = MailItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(268437521L).newItemId(268437521L)
+                .itemId(268437521L)
+                .newItemId(268437521L)
                 .count(1L)
                 .enchantLevel(0)
                 .build();
@@ -127,9 +133,17 @@ class MailItemMovementTest {
     @Test
     void equals_shouldDistinguishNewItemId() {
         MailItemMovement a = MailItemMovement.builder()
-                .itemTemplateId(57L).itemId(1L).newItemId(2L).count(1L).build();
+                .itemTemplateId(57L)
+                .itemId(1L)
+                .newItemId(2L)
+                .count(1L)
+                .build();
         MailItemMovement b = MailItemMovement.builder()
-                .itemTemplateId(57L).itemId(1L).newItemId(3L).count(1L).build();
+                .itemTemplateId(57L)
+                .itemId(1L)
+                .newItemId(3L)
+                .count(1L)
+                .build();
 
         assertNotEquals(a, b);
     }
@@ -137,11 +151,17 @@ class MailItemMovementTest {
     @Test
     void equals_shouldDistinguishAttributes() {
         MailItemMovement a = MailItemMovement.builder()
-                .itemTemplateId(57L).itemId(1L).newItemId(1L).count(1L)
+                .itemTemplateId(57L)
+                .itemId(1L)
+                .newItemId(1L)
+                .count(1L)
                 .attributes(Collections.singletonMap(Attribute.FIRE, 300))
                 .build();
         MailItemMovement b = MailItemMovement.builder()
-                .itemTemplateId(57L).itemId(1L).newItemId(1L).count(1L)
+                .itemTemplateId(57L)
+                .itemId(1L)
+                .newItemId(1L)
+                .count(1L)
                 .attributes(Collections.singletonMap(Attribute.WATER, 300))
                 .build();
 

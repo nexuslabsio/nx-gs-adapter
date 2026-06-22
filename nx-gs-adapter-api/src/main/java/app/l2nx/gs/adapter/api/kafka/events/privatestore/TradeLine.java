@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
 import app.l2nx.gs.adapter.api.domain.Attribute;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One transferred position in a closed {@link PrivateStorePurchaseEvent}.
@@ -22,12 +21,13 @@ public final class TradeLine {
     private final long unitPrice;
     private final long currencyItemId;
 
-    public TradeLine(long itemId,
-                     @Nullable Integer enchantLevel,
-                     @Nullable Map<Attribute, Integer> attributes,
-                     long count,
-                     long unitPrice,
-                     long currencyItemId) {
+    public TradeLine(
+            long itemId,
+            @Nullable Integer enchantLevel,
+            @Nullable Map<Attribute, Integer> attributes,
+            long count,
+            long unitPrice,
+            long currencyItemId) {
         this.itemId = itemId;
         this.enchantLevel = enchantLevel;
         this.attributes = freezeMap(attributes);

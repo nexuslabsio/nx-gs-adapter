@@ -1,7 +1,6 @@
 package app.l2nx.gs.kafka;
 
 import com.google.gson.Gson;
-
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
@@ -113,8 +112,7 @@ public final class KafkaConfig {
         private Gson gson = new Gson();
         private Consumer<KafkaState> stateChangeListener;
 
-        Builder() {
-        }
+        Builder() {}
 
         /**
          * Kafka bootstrap servers (required). Comma-separated, e.g. {@code "kafka1:9092,kafka2:9092"}.

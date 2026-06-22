@@ -1,12 +1,11 @@
 package app.l2nx.gs.commons.privatestore;
 
-import app.l2nx.gs.adapter.api.domain.Attribute;
-import org.junit.jupiter.api.Test;
-
-import java.util.*;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import app.l2nx.gs.adapter.api.domain.Attribute;
+import java.util.*;
+import org.junit.jupiter.api.Test;
 
 class PrivateStoreOfferHasherTest {
 
@@ -48,30 +47,24 @@ class PrivateStoreOfferHasherTest {
 
     @Test
     void hash_shouldChange_whenUnitPriceChanges() {
-        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 100L, 57L)));
-        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 101L, 57L)));
+        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
+        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 101L, 57L)));
 
         assertNotEquals(h1, h2);
     }
 
     @Test
     void hash_shouldChange_whenCountChanges() {
-        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 5L, 100L, 57L)));
-        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 6L, 100L, 57L)));
+        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 5L, 100L, 57L)));
+        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 6L, 100L, 57L)));
 
         assertNotEquals(h1, h2);
     }
 
     @Test
     void hash_shouldChange_whenEnchantLevelChanges() {
-        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 100L, 57L)));
-        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 16, null, 1L, 100L, 57L)));
+        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
+        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 16, null, 1L, 100L, 57L)));
 
         assertNotEquals(h1, h2);
     }
@@ -80,40 +73,32 @@ class PrivateStoreOfferHasherTest {
     void hash_shouldDistinguishNullEnchantFromZeroEnchant() {
         // null = "item type has no enchant concept" (consumable / material);
         // 0 = "enchantable but unenchanted". These MUST hash differently.
-        long hashNull = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, null, null, 1L, 100L, 57L)));
-        long hashZero = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 100L, 57L)));
+        long hashNull = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, null, null, 1L, 100L, 57L)));
+        long hashZero = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
 
         assertNotEquals(hashNull, hashZero);
     }
 
     @Test
     void hash_shouldBeStable_acrossNullEnchantInputs() {
-        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, null, null, 1L, 100L, 57L)));
-        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, null, null, 1L, 100L, 57L)));
+        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, null, null, 1L, 100L, 57L)));
+        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, null, null, 1L, 100L, 57L)));
 
         assertEquals(h1, h2);
     }
 
     @Test
     void hash_shouldChange_whenTraderIdChanges() {
-        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 100L, 57L)));
-        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(2L, 0, null, 1L, 100L, 57L)));
+        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
+        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(2L, 0, null, 1L, 100L, 57L)));
 
         assertNotEquals(h1, h2);
     }
 
     @Test
     void hash_shouldChange_whenCurrencyChanges() {
-        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 100L, 57L)));
-        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 100L, 4037L)));
+        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
+        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 4037L)));
 
         assertNotEquals(h1, h2);
     }
@@ -130,20 +115,18 @@ class PrivateStoreOfferHasherTest {
         linkedDesc.put(Attribute.FIRE, 300);
         linkedDesc.put(Attribute.DARK, 100);
 
-        long hashAsc = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, linkedAsc, 1L, 100L, 57L)));
-        long hashDesc = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, linkedDesc, 1L, 100L, 57L)));
+        long hashAsc = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, linkedAsc, 1L, 100L, 57L)));
+        long hashDesc = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, linkedDesc, 1L, 100L, 57L)));
 
         assertEquals(hashAsc, hashDesc);
     }
 
     @Test
     void hash_shouldChange_whenAttributesValueChanges() {
-        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, Collections.singletonMap(Attribute.FIRE, 300), 1L, 100L, 57L)));
-        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, Collections.singletonMap(Attribute.FIRE, 301), 1L, 100L, 57L)));
+        long h1 = PrivateStoreOfferHasher.hash(
+                Collections.singletonList(row(1L, 0, Collections.singletonMap(Attribute.FIRE, 300), 1L, 100L, 57L)));
+        long h2 = PrivateStoreOfferHasher.hash(
+                Collections.singletonList(row(1L, 0, Collections.singletonMap(Attribute.FIRE, 301), 1L, 100L, 57L)));
 
         assertNotEquals(h1, h2);
     }
@@ -153,20 +136,18 @@ class PrivateStoreOfferHasherTest {
         // null and empty are normalized to the same sentinel — a host that
         // sometimes passes empty maps and sometimes nulls must NOT see false
         // positives in change-detection.
-        long hashNull = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 100L, 57L)));
-        long hashEmpty = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, new HashMap<Attribute, Integer>(), 1L, 100L, 57L)));
+        long hashNull = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
+        long hashEmpty = PrivateStoreOfferHasher.hash(
+                Collections.singletonList(row(1L, 0, new HashMap<Attribute, Integer>(), 1L, 100L, 57L)));
 
         assertEquals(hashNull, hashEmpty);
     }
 
     @Test
     void hash_shouldDistinguishEmptyAttrsFromOneZeroValueAttr() {
-        long hashEmpty = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 100L, 57L)));
-        long hashZero = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, Collections.singletonMap(Attribute.FIRE, 0), 1L, 100L, 57L)));
+        long hashEmpty = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
+        long hashZero = PrivateStoreOfferHasher.hash(
+                Collections.singletonList(row(1L, 0, Collections.singletonMap(Attribute.FIRE, 0), 1L, 100L, 57L)));
 
         assertNotEquals(hashEmpty, hashZero);
     }
@@ -179,8 +160,7 @@ class PrivateStoreOfferHasherTest {
         assertEquals(h, PrivateStoreOfferHasher.hash(Collections.emptyList()));
 
         // Distinct from any non-empty hash.
-        long oneOffer = PrivateStoreOfferHasher.hash(Collections.singletonList(
-                row(1L, 0, null, 1L, 100L, 57L)));
+        long oneOffer = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
         assertNotEquals(h, oneOffer);
     }
 
@@ -197,9 +177,13 @@ class PrivateStoreOfferHasherTest {
         assertEquals(snapshot, source);
     }
 
-    private static OfferRow row(long traderId, Integer enchantLevel,
-                                Map<Attribute, Integer> attrs,
-                                long count, long unitPrice, long currencyItemId) {
+    private static OfferRow row(
+            long traderId,
+            Integer enchantLevel,
+            Map<Attribute, Integer> attrs,
+            long count,
+            long unitPrice,
+            long currencyItemId) {
         return new OfferRow(traderId, enchantLevel, attrs, count, unitPrice, currencyItemId);
     }
 }

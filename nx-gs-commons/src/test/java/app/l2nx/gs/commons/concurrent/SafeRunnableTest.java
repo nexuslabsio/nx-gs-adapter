@@ -1,14 +1,13 @@
 package app.l2nx.gs.commons.concurrent;
 
-import app.l2nx.gs.log.NxLog;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import app.l2nx.gs.log.NxLog;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 class SafeRunnableTest {
 
@@ -23,7 +22,8 @@ class SafeRunnableTest {
         wrapped.run();
 
         assertEquals(1, log.errorCalls);
-        assertTrue(log.lastError.contains("Wrapped runnable threw"),
+        assertTrue(
+                log.lastError.contains("Wrapped runnable threw"),
                 "log message should mention wrapped runnable failure");
     }
 
@@ -67,8 +67,7 @@ class SafeRunnableTest {
         final List<String> messages = new ArrayList<>();
 
         @Override
-        public void debug(String message, Object... args) {
-        }
+        public void debug(String message, Object... args) {}
 
         @Override
         public void info(String message, Object... args) {

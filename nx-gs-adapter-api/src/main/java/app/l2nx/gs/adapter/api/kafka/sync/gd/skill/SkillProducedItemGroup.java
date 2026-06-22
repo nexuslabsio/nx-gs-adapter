@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One produced item group of an extractable {@link SkillLevel} — skills that open /
@@ -23,13 +22,12 @@ public final class SkillProducedItemGroup {
     private final @Nullable Integer enchantLevel;
     private final List<SkillProducedItem> items;
 
-    public SkillProducedItemGroup(@Nullable Double chancePercent,
-                                  @Nullable Integer enchantLevel,
-                                  List<SkillProducedItem> items) {
+    public SkillProducedItemGroup(
+            @Nullable Double chancePercent, @Nullable Integer enchantLevel, List<SkillProducedItem> items) {
         this.chancePercent = chancePercent;
         this.enchantLevel = enchantLevel;
-        this.items = Collections.unmodifiableList(
-                new ArrayList<SkillProducedItem>(Objects.requireNonNull(items, "items")));
+        this.items =
+                Collections.unmodifiableList(new ArrayList<SkillProducedItem>(Objects.requireNonNull(items, "items")));
     }
 
     public @Nullable Double getChancePercent() {
@@ -78,8 +76,7 @@ public final class SkillProducedItemGroup {
 
     @Override
     public String toString() {
-        return "SkillProducedItemGroup[chancePercent=" + chancePercent
-                + ", items=" + items.size() + "]";
+        return "SkillProducedItemGroup[chancePercent=" + chancePercent + ", items=" + items.size() + "]";
     }
 
     public static final class Builder {

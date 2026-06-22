@@ -6,15 +6,14 @@ import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Bounded-queue + single-daemon-thread fan-out for outbound events. Caller
@@ -55,10 +54,12 @@ public final class EventsPublisher {
      */
     private static final long SHUTDOWN_GRACE_MS = 1000L;
 
-    private static final ProducerFlusher NO_OP_FLUSHER = () -> {
-    };
+    private static final ProducerFlusher NO_OP_FLUSHER = () -> {};
 
-    public enum DropPolicy {OLDEST, NEWEST}
+    public enum DropPolicy {
+        OLDEST,
+        NEWEST
+    }
 
     /**
      * Bridge to the actual Kafka send. Production wires this to
@@ -95,18 +96,20 @@ public final class EventsPublisher {
     private final AtomicLong failedTotal = new AtomicLong();
     private volatile boolean running = false;
 
-    public EventsPublisher(@Nullable Map<String, String> familyTopics,
-                           Sender sender,
-                           EventsConfig config,
-                           EventTypeRegistry registry) {
+    public EventsPublisher(
+            @Nullable Map<String, String> familyTopics,
+            Sender sender,
+            EventsConfig config,
+            EventTypeRegistry registry) {
         this(familyTopics, sender, NO_OP_FLUSHER, config, registry);
     }
 
-    public EventsPublisher(@Nullable Map<String, String> familyTopics,
-                           Sender sender,
-                           ProducerFlusher producerFlusher,
-                           EventsConfig config,
-                           EventTypeRegistry registry) {
+    public EventsPublisher(
+            @Nullable Map<String, String> familyTopics,
+            Sender sender,
+            ProducerFlusher producerFlusher,
+            EventsConfig config,
+            EventTypeRegistry registry) {
         int capacity = Math.max(1, config.getQueueCapacity());
         this.familyTopics = familyTopics == null
                 ? Collections.emptyMap()
@@ -208,16 +211,17 @@ public final class EventsPublisher {
         while ((envelope = queue.poll()) != null) {
             doSend(envelope);
             if (timeoutMs > 0 && System.currentTimeMillis() >= deadline) {
-                log.warn("Events flush timed out draining queue after {}ms — {} envelope(s) still queued",
-                        timeoutMs, queue.size());
+                log.warn(
+                        "Events flush timed out draining queue after {}ms — {} envelope(s) still queued",
+                        timeoutMs,
+                        queue.size());
                 return false;
             }
         }
         try {
             producerFlusher.flush();
         } catch (Throwable t) {
-            log.warn("Events flush: producer flush threw {} — {}",
-                    t.getClass().getName(), t.getMessage());
+            log.warn("Events flush: producer flush threw {} — {}", t.getClass().getName(), t.getMessage());
             return false;
         }
         return timeoutMs <= 0 || System.currentTimeMillis() < deadline;
@@ -297,7 +301,8 @@ public final class EventsPublisher {
         if (remaining > 0) {
             droppedTotal.addAndGet(remaining);
             queue.clear();
-            log.warn("Events publisher dropped {} envelope(s) on shutdown after {}ms drain", remaining, shutdownDrainMs);
+            log.warn(
+                    "Events publisher dropped {} envelope(s) on shutdown after {}ms drain", remaining, shutdownDrainMs);
         }
     }
 
@@ -323,13 +328,15 @@ public final class EventsPublisher {
             // condition. Surface it explicitly rather than letting the generic
             // Throwable handler swallow the class name.
             failedTotal.incrementAndGet();
-            log.error("Events type-binding mismatch for {}: {}",
-                    envelope.payload.getClass().getName(), cce.getMessage());
+            log.error(
+                    "Events type-binding mismatch for {}: {}",
+                    envelope.payload.getClass().getName(),
+                    cce.getMessage());
             return;
         }
         try {
-            ProducerRecord<byte[], Object> record = new ProducerRecord<byte[], Object>(
-                    topic, partitionKey, envelope.payload);
+            ProducerRecord<byte[], Object> record =
+                    new ProducerRecord<byte[], Object>(topic, partitionKey, envelope.payload);
             record.headers().add(NxHeaders.NX_MESSAGE_TYPE, envelope.binding.messageTypeBytes());
             sender.send(record, (metadata, exception) -> {
                 if (exception != null) {

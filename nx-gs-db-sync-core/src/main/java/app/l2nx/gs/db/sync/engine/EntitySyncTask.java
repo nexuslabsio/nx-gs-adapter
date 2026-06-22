@@ -15,9 +15,6 @@ import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import it.unimi.dsi.fastutil.longs.*;
-import org.apache.kafka.clients.producer.RecordMetadata;
-import org.jspecify.annotations.Nullable;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
@@ -26,6 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Runs one CDC cycle for one entity: plan windows, Phase-1 CRC (primary +
@@ -50,15 +49,16 @@ public final class EntitySyncTask {
     private final StatementRegistry statementRegistry = new StatementRegistry();
     private volatile JdbcDialect dialect;
 
-    public EntitySyncTask(EntityMapping<?> mapping,
-                          JdbcConnectionSource jdbcSource,
-                          SnapshotStore snapshot,
-                          WindowPlanner planner,
-                          Phase1Hasher hasher,
-                          Phase2Fetcher fetcher,
-                          SyncEventPublisher publisher,
-                          TopicResolver topicResolver,
-                          EngineConfig config) {
+    public EntitySyncTask(
+            EntityMapping<?> mapping,
+            JdbcConnectionSource jdbcSource,
+            SnapshotStore snapshot,
+            WindowPlanner planner,
+            Phase1Hasher hasher,
+            Phase2Fetcher fetcher,
+            SyncEventPublisher publisher,
+            TopicResolver topicResolver,
+            EngineConfig config) {
         this.mapping = mapping;
         this.jdbcSource = jdbcSource;
         this.snapshot = snapshot;
@@ -87,8 +87,11 @@ public final class EntitySyncTask {
             log.error("Entity {} borrow failed: {}", entity, borrowFailure.getMessage());
             return CycleResult.degraded(elapsed(started));
         } catch (RuntimeException borrowBug) {
-            log.error("Entity {} JdbcConnectionSource.getConnection threw {}: {}",
-                    entity, borrowBug.getClass().getName(), borrowBug.getMessage());
+            log.error(
+                    "Entity {} JdbcConnectionSource.getConnection threw {}: {}",
+                    entity,
+                    borrowBug.getClass().getName(),
+                    borrowBug.getMessage());
             return CycleResult.degraded(elapsed(started));
         }
 
@@ -108,11 +111,10 @@ public final class EntitySyncTask {
                 log.info("Entity {} JDBC dialect detected: {}", entity, detected);
             }
 
-            List<Window> windows = planner.plan(mapping, conn, snapshot,
-                    config.rowsPerWindow(), config.queryTimeoutSeconds());
+            List<Window> windows =
+                    planner.plan(mapping, conn, snapshot, config.rowsPerWindow(), config.queryTimeoutSeconds());
 
-            Long2ObjectOpenHashMap<LongSet> snapshotBuckets =
-                    snapshot.bucketByWindows(entity, windows);
+            Long2ObjectOpenHashMap<LongSet> snapshotBuckets = snapshot.bucketByWindows(entity, windows);
 
             for (int wIdx = 0; wIdx < windows.size(); wIdx++) {
                 Window window = windows.get(wIdx);
@@ -121,7 +123,9 @@ public final class EntitySyncTask {
                     final Window finalWindow = window;
                     currentScan = ConsistentSnapshotTxn.runReadOnly(conn, txnConn -> {
                         Long2IntMap primaryScan = hasher.hashPrimary(
-                                txnConn, finalWindow, mapping.primary(),
+                                txnConn,
+                                finalWindow,
+                                mapping.primary(),
                                 config.queryTimeoutSeconds(),
                                 config.fetchSize(),
                                 dialect,
@@ -130,13 +134,15 @@ public final class EntitySyncTask {
                         return primaryScan;
                     });
                 } catch (SQLTimeoutException timeout) {
-                    log.warn("Entity {} window {} Phase-1 timed out — DEGRADED, skipping window",
-                            entity, window);
+                    log.warn("Entity {} window {} Phase-1 timed out — DEGRADED, skipping window", entity, window);
                     degradedFromTimeout = true;
                     continue;
                 } catch (SQLException sqlError) {
-                    log.error("Entity {} window {} Phase-1 SQL error: {} — aborting cycle",
-                            entity, window, sqlError.getMessage());
+                    log.error(
+                            "Entity {} window {} Phase-1 SQL error: {} — aborting cycle",
+                            entity,
+                            window,
+                            sqlError.getMessage());
                     cycleAborted = true;
                     break;
                 }
@@ -158,13 +164,15 @@ public final class EntitySyncTask {
                         // re-detects via next cycle's Phase-1 diff.
                         assembled = assembleEntities(createUpdate, conn);
                     } catch (SQLTimeoutException timeout) {
-                        log.warn("Entity {} window {} Phase-2 timed out — DEGRADED, skipping window",
-                                entity, window);
+                        log.warn("Entity {} window {} Phase-2 timed out — DEGRADED, skipping window", entity, window);
                         degradedFromTimeout = true;
                         continue;
                     } catch (SQLException sqlError) {
-                        log.error("Entity {} window {} Phase-2 SQL error: {} — aborting cycle",
-                                entity, window, sqlError.getMessage());
+                        log.error(
+                                "Entity {} window {} Phase-2 SQL error: {} — aborting cycle",
+                                entity,
+                                window,
+                                sqlError.getMessage());
                         cycleAborted = true;
                         break;
                     }
@@ -182,11 +190,18 @@ public final class EntitySyncTask {
                 LongSet pendingCreates = new LongOpenHashSet(createdSize);
                 LongSet pendingDeletes = new LongOpenHashSet(deletedSize);
 
-                publishChanges(diff, assembled, currentScan, topic,
-                        inFlight, pendingCrcAdvance, pendingCreates, pendingDeletes);
+                publishChanges(
+                        diff,
+                        assembled,
+                        currentScan,
+                        topic,
+                        inFlight,
+                        pendingCrcAdvance,
+                        pendingCreates,
+                        pendingDeletes);
 
-                long[] applied = walkInFlightAndAdvance(entity, inFlight, pendingCrcAdvance,
-                        pendingCreates, pendingDeletes);
+                long[] applied =
+                        walkInFlightAndAdvance(entity, inFlight, pendingCrcAdvance, pendingCreates, pendingDeletes);
                 createdCount += applied[0];
                 updatedCount += applied[1];
                 deletedCount += applied[2];
@@ -214,11 +229,24 @@ public final class EntitySyncTask {
         long rowCount = snapshot.sizeOf(entity);
         EntityState finalState = degradedFromTimeout ? EntityState.DEGRADED : EntityState.HEALTHY;
         long elapsedMs = elapsed(started);
-        log.debug("Entity {} cycle {}: +{} ~{} -{}, rowCount={}, elapsedMs={}",
-                entity, finalState, createdCount, updatedCount, deletedCount, rowCount, elapsedMs);
-        return new CycleResult(finalState, elapsedMs,
-                createdCount, updatedCount, deletedCount, rowCount,
-                failedPublishCount, pendingPublishCount);
+        log.debug(
+                "Entity {} cycle {}: +{} ~{} -{}, rowCount={}, elapsedMs={}",
+                entity,
+                finalState,
+                createdCount,
+                updatedCount,
+                deletedCount,
+                rowCount,
+                elapsedMs);
+        return new CycleResult(
+                finalState,
+                elapsedMs,
+                createdCount,
+                updatedCount,
+                deletedCount,
+                rowCount,
+                failedPublishCount,
+                pendingPublishCount);
     }
 
     /**
@@ -230,16 +258,10 @@ public final class EntitySyncTask {
         statementRegistry.cancelCurrent();
     }
 
-    private void foldChildrenInto(Long2IntMap currentScan,
-                                  Window window,
-                                  Connection conn) throws SQLException {
+    private void foldChildrenInto(Long2IntMap currentScan, Window window, Connection conn) throws SQLException {
         for (ChildSource<?> child : mapping.children()) {
             Long2IntMap childHash = hasher.hashChild(
-                    conn, window, child,
-                    config.queryTimeoutSeconds(),
-                    config.fetchSize(),
-                    dialect,
-                    statementRegistry);
+                    conn, window, child, config.queryTimeoutSeconds(), config.fetchSize(), dialect, statementRegistry);
             for (Long2IntMap.Entry e : childHash.long2IntEntrySet()) {
                 long pk = e.getLongKey();
                 int xorCrc = e.getIntValue();
@@ -253,7 +275,9 @@ public final class EntitySyncTask {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Long2ObjectMap<Object> assembleEntities(LongList createUpdate, Connection conn) throws SQLException {
         Long2ObjectMap<Object> primaryRows = fetcher.fetchPrimary(
-                conn, mapping.primary(), createUpdate,
+                conn,
+                mapping.primary(),
+                createUpdate,
                 config.queryTimeoutSeconds(),
                 config.fetchSize(),
                 dialect,
@@ -262,8 +286,12 @@ public final class EntitySyncTask {
         Map<String, Long2ObjectMap<List<Object>>> childRowsByTable =
                 new LinkedHashMap<String, Long2ObjectMap<List<Object>>>();
         for (ChildSource<?> child : mapping.children()) {
-            childRowsByTable.put(child.tableName(),
-                    fetcher.fetchChild(conn, child, createUpdate,
+            childRowsByTable.put(
+                    child.tableName(),
+                    fetcher.fetchChild(
+                            conn,
+                            child,
+                            createUpdate,
                             config.queryTimeoutSeconds(),
                             config.fetchSize(),
                             dialect,
@@ -300,14 +328,15 @@ public final class EntitySyncTask {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void publishChanges(ChangeSet diff,
-                                Long2ObjectMap<Object> assembled,
-                                Long2IntMap currentScan,
-                                String topic,
-                                Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
-                                Long2IntMap pendingCrcAdvance,
-                                LongSet pendingCreates,
-                                LongSet pendingDeletes) {
+    private void publishChanges(
+            ChangeSet diff,
+            Long2ObjectMap<Object> assembled,
+            Long2IntMap currentScan,
+            String topic,
+            Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
+            Long2IntMap pendingCrcAdvance,
+            LongSet pendingCreates,
+            LongSet pendingDeletes) {
         EntityMapping erased = mapping;
         LongIterator createIt = diff.created().iterator();
         while (createIt.hasNext()) {
@@ -316,8 +345,8 @@ public final class EntitySyncTask {
             if (dto == null) {
                 continue;
             }
-            CompletableFuture<RecordMetadata> f = publisher.publish(
-                    erased, SyncEventPublisher.OP_CREATED, pk, dto, topic);
+            CompletableFuture<RecordMetadata> f =
+                    publisher.publish(erased, SyncEventPublisher.OP_CREATED, pk, dto, topic);
             inFlight.put(pk, f);
             pendingCrcAdvance.put(pk, currentScan.get(pk));
             pendingCreates.add(pk);
@@ -329,16 +358,16 @@ public final class EntitySyncTask {
             if (dto == null) {
                 continue;
             }
-            CompletableFuture<RecordMetadata> f = publisher.publish(
-                    erased, SyncEventPublisher.OP_UPDATED, pk, dto, topic);
+            CompletableFuture<RecordMetadata> f =
+                    publisher.publish(erased, SyncEventPublisher.OP_UPDATED, pk, dto, topic);
             inFlight.put(pk, f);
             pendingCrcAdvance.put(pk, currentScan.get(pk));
         }
         LongIterator deleteIt = diff.deleted().iterator();
         while (deleteIt.hasNext()) {
             long pk = deleteIt.nextLong();
-            CompletableFuture<RecordMetadata> f = publisher.publish(
-                    erased, SyncEventPublisher.OP_DELETED, pk, null, topic);
+            CompletableFuture<RecordMetadata> f =
+                    publisher.publish(erased, SyncEventPublisher.OP_DELETED, pk, null, topic);
             inFlight.put(pk, f);
             pendingDeletes.add(pk);
         }
@@ -356,11 +385,12 @@ public final class EntitySyncTask {
      * flush deadline; both feed the cycle's fully-successful gate.
      * Package-private for the publish-walk unit tests.</p>
      */
-    long[] walkInFlightAndAdvance(String entity,
-                                  Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
-                                  Long2IntMap pendingCrcAdvance,
-                                  LongSet pendingCreates,
-                                  LongSet pendingDeletes) {
+    long[] walkInFlightAndAdvance(
+            String entity,
+            Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
+            Long2IntMap pendingCrcAdvance,
+            LongSet pendingCreates,
+            LongSet pendingDeletes) {
         long[] tally = new long[5];
         long failed = 0L;
         long pending = 0L;
@@ -368,8 +398,7 @@ public final class EntitySyncTask {
         LongList stillPending = new LongArrayList();
         LongList doneSuccess = new LongArrayList();
 
-        for (Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>> e
-                : inFlight.long2ObjectEntrySet()) {
+        for (Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>> e : inFlight.long2ObjectEntrySet()) {
             long pk = e.getLongKey();
             CompletableFuture<RecordMetadata> future = e.getValue();
 
@@ -377,8 +406,10 @@ public final class EntitySyncTask {
                 if (future.isCompletedExceptionally()) {
                     if (failed == 0L) {
                         Throwable cause = extractCause(future);
-                        log.warn("Entity {} first publish failure: {} — replaying failed PKs next cycle",
-                                entity, cause == null ? "<unknown>" : cause.getMessage());
+                        log.warn(
+                                "Entity {} first publish failure: {} — replaying failed PKs next cycle",
+                                entity,
+                                cause == null ? "<unknown>" : cause.getMessage());
                     }
                     failed++;
                 } else {
@@ -394,8 +425,7 @@ public final class EntitySyncTask {
         }
 
         if (!stillPending.isEmpty()) {
-            long deadlineNanos = System.nanoTime()
-                    + TimeUnit.SECONDS.toNanos(config.publishFlushSeconds());
+            long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(config.publishFlushSeconds());
             for (LongIterator it = stillPending.iterator(); it.hasNext(); ) {
                 long pk = it.nextLong();
                 CompletableFuture<RecordMetadata> future = inFlight.get(pk);
@@ -414,8 +444,10 @@ public final class EntitySyncTask {
                     continue;
                 } catch (ExecutionException ex) {
                     if (failed == 0L) {
-                        log.warn("Entity {} first publish failure: {} — replaying failed PKs next cycle",
-                                entity, rootCause(ex).getMessage());
+                        log.warn(
+                                "Entity {} first publish failure: {} — replaying failed PKs next cycle",
+                                entity,
+                                rootCause(ex).getMessage());
                     }
                     failed++;
                     continue;
@@ -428,19 +460,24 @@ public final class EntitySyncTask {
             log.warn("Entity {} {} additional publish failures suppressed", entity, failed - 1L);
         }
         if (pending > 0L) {
-            log.warn("Entity {} {} publishes still pending past flush deadline ({}s) — replaying next cycle",
-                    entity, pending, config.publishFlushSeconds());
+            log.warn(
+                    "Entity {} {} publishes still pending past flush deadline ({}s) — replaying next cycle",
+                    entity,
+                    pending,
+                    config.publishFlushSeconds());
         }
         tally[3] = failed;
         tally[4] = pending;
         return tally;
     }
 
-    private void applyAck(String entity, long pk,
-                          Long2IntMap pendingCrcAdvance,
-                          LongSet pendingCreates,
-                          LongSet pendingDeletes,
-                          long[] tally) {
+    private void applyAck(
+            String entity,
+            long pk,
+            Long2IntMap pendingCrcAdvance,
+            LongSet pendingCreates,
+            LongSet pendingDeletes,
+            long[] tally) {
         if (pendingDeletes.contains(pk)) {
             snapshot.removeCrc(entity, pk);
             tally[2]++;

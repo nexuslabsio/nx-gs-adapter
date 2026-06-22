@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -9,9 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Stream;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Test;
 
 /**
  * Enforces the platform-wide UTC contract: every field in any wire DTO
@@ -43,20 +42,17 @@ class WireTimestampConformanceTest {
             java.util.Calendar.class,
             java.sql.Date.class,
             java.sql.Time.class,
-            java.sql.Timestamp.class
-    )));
+            java.sql.Timestamp.class)));
 
-    private static final List<String> SCANNED_PACKAGES = Arrays.asList(
-            "app/l2nx/gs/adapter/api/kafka",
-            "app/l2nx/gs/adapter/api/rest"
-    );
+    private static final List<String> SCANNED_PACKAGES =
+            Arrays.asList("app/l2nx/gs/adapter/api/kafka", "app/l2nx/gs/adapter/api/rest");
 
     @Test
     void wireDtoFields_shouldUseInstantOnlyForTimestamps() throws Exception {
         Path classesRoot = locateClassesRoot();
-        assertTrue(Files.isDirectory(classesRoot),
-                "Build classes directory not found at " + classesRoot
-                        + " — run `./gradlew compileJava` first.");
+        assertTrue(
+                Files.isDirectory(classesRoot),
+                "Build classes directory not found at " + classesRoot + " — run `./gradlew compileJava` first.");
 
         List<String> violations = new ArrayList<>();
         for (String pkg : SCANNED_PACKAGES) {
@@ -90,7 +86,8 @@ class WireTimestampConformanceTest {
         String relPath = classesRoot.relativize(classFile).toString().replace('\\', '/');
         // Strip only the trailing ".class" extension — a plain replace(".class","") would also
         // mangle package segments containing that substring (e.g. gd/classtemplate).
-        String className = relPath.substring(0, relPath.length() - ".class".length()).replace('/', '.');
+        String className =
+                relPath.substring(0, relPath.length() - ".class".length()).replace('/', '.');
         Class<?> clazz;
         try {
             clazz = Class.forName(className, false, WireTimestampConformanceTest.class.getClassLoader());
@@ -98,8 +95,8 @@ class WireTimestampConformanceTest {
             // Compiled class file present but its transitive dependency is not
             // on the test classpath — surface as a violation so the gap can't
             // hide a real timestamp-field issue in the unloaded class.
-            violations.add(className + " : could not load for inspection (" + missing.getClass().getSimpleName()
-                    + ": " + missing.getMessage() + ")");
+            violations.add(className + " : could not load for inspection ("
+                    + missing.getClass().getSimpleName() + ": " + missing.getMessage() + ")");
             return;
         }
         if (clazz.isInterface() || clazz.isAnnotation()) {

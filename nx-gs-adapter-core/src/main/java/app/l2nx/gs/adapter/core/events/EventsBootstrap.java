@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.core.events;
 
 import app.l2nx.gs.adapter.api.spi.NxEvents;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Public factory for the events publish subsystem. {@code NxAdapter} calls
@@ -20,8 +19,7 @@ import java.util.Map;
  */
 public final class EventsBootstrap {
 
-    private EventsBootstrap() {
-    }
+    private EventsBootstrap() {}
 
     /**
      * Materializes the registry, instantiates the publisher, starts its daemon
@@ -39,10 +37,11 @@ public final class EventsBootstrap {
      * @param config          operator-tunable knobs (queue capacity, drop policy,
      *                        shutdown drain).
      */
-    public static Started start(@Nullable Map<String, String> familyTopics,
-                                EventsPublisher.Sender sender,
-                                EventsPublisher.ProducerFlusher producerFlusher,
-                                EventsConfig config) {
+    public static Started start(
+            @Nullable Map<String, String> familyTopics,
+            EventsPublisher.Sender sender,
+            EventsPublisher.ProducerFlusher producerFlusher,
+            EventsConfig config) {
         EventTypeRegistry registry = new EventTypeRegistry();
         EventsPublisher publisher = new EventsPublisher(familyTopics, sender, producerFlusher, config, registry);
         publisher.start();
@@ -56,15 +55,15 @@ public final class EventsBootstrap {
      * earlier {@code onConnect} keep publishing into the new publisher with
      * no re-registration.
      */
-    public static EventsPublisher swap(NxEvents facade,
-                                       @Nullable Map<String, String> familyTopics,
-                                       EventsPublisher.Sender sender,
-                                       EventsPublisher.ProducerFlusher producerFlusher,
-                                       EventsConfig config) {
+    public static EventsPublisher swap(
+            NxEvents facade,
+            @Nullable Map<String, String> familyTopics,
+            EventsPublisher.Sender sender,
+            EventsPublisher.ProducerFlusher producerFlusher,
+            EventsConfig config) {
         if (!(facade instanceof NxEventsImpl)) {
-            throw new IllegalArgumentException(
-                    "swap() requires a facade produced by EventsBootstrap.start(); got "
-                            + (facade == null ? "null" : facade.getClass().getName()));
+            throw new IllegalArgumentException("swap() requires a facade produced by EventsBootstrap.start(); got "
+                    + (facade == null ? "null" : facade.getClass().getName()));
         }
         EventTypeRegistry registry = new EventTypeRegistry();
         EventsPublisher publisher = new EventsPublisher(familyTopics, sender, producerFlusher, config, registry);

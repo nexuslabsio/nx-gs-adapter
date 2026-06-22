@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatetrade;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Closed personal player-to-player trade. Successes only — cancellations
@@ -24,16 +23,14 @@ public final class PrivateTradeFinishedEvent {
     private final TradeParty partyB;
     private final @Nullable Map<String, String> metadata;
 
-    public PrivateTradeFinishedEvent(UUID eventId,
-                                     UUID tradeId,
-                                     TradeParty partyA,
-                                     TradeParty partyB,
-                                     @Nullable Map<String, String> metadata) {
+    public PrivateTradeFinishedEvent(
+            UUID eventId, UUID tradeId, TradeParty partyA, TradeParty partyB, @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.tradeId = tradeId;
         this.partyA = partyA;
         this.partyB = partyB;
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     public UUID getEventId() {

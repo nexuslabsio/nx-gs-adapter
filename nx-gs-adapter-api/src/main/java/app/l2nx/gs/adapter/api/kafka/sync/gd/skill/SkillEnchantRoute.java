@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One enchant-route variant of a {@link Skill} — an enchanted level beyond the base
@@ -64,32 +63,33 @@ public final class SkillEnchantRoute {
     private final @Nullable Long enchantSp;
     private final @Nullable Map<Integer, Integer> enchantChanceByCharLevelPercent;
 
-    public SkillEnchantRoute(int baseLevel,
-                             int route,
-                             int enchantLevel,
-                             @Nullable Integer mpConsume,
-                             @Nullable Integer mpInitialConsume,
-                             @Nullable Integer hpConsume,
-                             @Nullable Integer itemTemplateId,
-                             @Nullable Integer itemTemplateCount,
-                             @Nullable Integer castRange,
-                             @Nullable Integer effectRange,
-                             @Nullable Integer magicLevel,
-                             @Nullable Integer abnormalLevel,
-                             @Nullable Integer abnormalTimeSec,
-                             @Nullable Integer hitTimeMs,
-                             @Nullable Integer coolTimeMs,
-                             @Nullable Integer reuseDelayMs,
-                             @Nullable Double power,
-                             @Nullable String attribute,
-                             @Nullable Integer attributePower,
-                             @Nullable String enchantIcon,
-                             @Nullable LocalizedText enchantName,
-                             @Nullable LocalizedText enchantDescription,
-                             @Nullable Long enchantAdena,
-                             @Nullable Long enchantExp,
-                             @Nullable Long enchantSp,
-                             @Nullable Map<Integer, Integer> enchantChanceByCharLevelPercent) {
+    public SkillEnchantRoute(
+            int baseLevel,
+            int route,
+            int enchantLevel,
+            @Nullable Integer mpConsume,
+            @Nullable Integer mpInitialConsume,
+            @Nullable Integer hpConsume,
+            @Nullable Integer itemTemplateId,
+            @Nullable Integer itemTemplateCount,
+            @Nullable Integer castRange,
+            @Nullable Integer effectRange,
+            @Nullable Integer magicLevel,
+            @Nullable Integer abnormalLevel,
+            @Nullable Integer abnormalTimeSec,
+            @Nullable Integer hitTimeMs,
+            @Nullable Integer coolTimeMs,
+            @Nullable Integer reuseDelayMs,
+            @Nullable Double power,
+            @Nullable String attribute,
+            @Nullable Integer attributePower,
+            @Nullable String enchantIcon,
+            @Nullable LocalizedText enchantName,
+            @Nullable LocalizedText enchantDescription,
+            @Nullable Long enchantAdena,
+            @Nullable Long enchantExp,
+            @Nullable Long enchantSp,
+            @Nullable Map<Integer, Integer> enchantChanceByCharLevelPercent) {
         this.baseLevel = baseLevel;
         this.route = route;
         this.enchantLevel = enchantLevel;
@@ -115,9 +115,9 @@ public final class SkillEnchantRoute {
         this.enchantAdena = enchantAdena;
         this.enchantExp = enchantExp;
         this.enchantSp = enchantSp;
-        this.enchantChanceByCharLevelPercent = enchantChanceByCharLevelPercent == null ? null
-                : Collections.unmodifiableMap(
-                new LinkedHashMap<Integer, Integer>(enchantChanceByCharLevelPercent));
+        this.enchantChanceByCharLevelPercent = enchantChanceByCharLevelPercent == null
+                ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<Integer, Integer>(enchantChanceByCharLevelPercent));
     }
 
     /**
@@ -334,23 +334,43 @@ public final class SkillEnchantRoute {
                 && Objects.equals(enchantAdena, that.enchantAdena)
                 && Objects.equals(enchantExp, that.enchantExp)
                 && Objects.equals(enchantSp, that.enchantSp)
-                && Objects.equals(enchantChanceByCharLevelPercent,
-                that.enchantChanceByCharLevelPercent);
+                && Objects.equals(enchantChanceByCharLevelPercent, that.enchantChanceByCharLevelPercent);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(baseLevel, route, enchantLevel, mpConsume, mpInitialConsume, hpConsume,
-                itemTemplateId, itemTemplateCount, castRange, effectRange, magicLevel,
-                abnormalLevel, abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs, power,
-                attribute, attributePower, enchantIcon, enchantName, enchantDescription,
-                enchantAdena, enchantExp, enchantSp, enchantChanceByCharLevelPercent);
+        return Objects.hash(
+                baseLevel,
+                route,
+                enchantLevel,
+                mpConsume,
+                mpInitialConsume,
+                hpConsume,
+                itemTemplateId,
+                itemTemplateCount,
+                castRange,
+                effectRange,
+                magicLevel,
+                abnormalLevel,
+                abnormalTimeSec,
+                hitTimeMs,
+                coolTimeMs,
+                reuseDelayMs,
+                power,
+                attribute,
+                attributePower,
+                enchantIcon,
+                enchantName,
+                enchantDescription,
+                enchantAdena,
+                enchantExp,
+                enchantSp,
+                enchantChanceByCharLevelPercent);
     }
 
     @Override
     public String toString() {
-        return "SkillEnchantRoute[baseLevel=" + baseLevel + ", route=" + route
-                + ", enchantLevel=" + enchantLevel + "]";
+        return "SkillEnchantRoute[baseLevel=" + baseLevel + ", route=" + route + ", enchantLevel=" + enchantLevel + "]";
     }
 
     public static final class Builder {
@@ -513,11 +533,32 @@ public final class SkillEnchantRoute {
         }
 
         public SkillEnchantRoute build() {
-            return new SkillEnchantRoute(baseLevel, route, enchantLevel, mpConsume,
-                    mpInitialConsume, hpConsume, itemTemplateId, itemTemplateCount, castRange,
-                    effectRange, magicLevel, abnormalLevel, abnormalTimeSec, hitTimeMs, coolTimeMs,
-                    reuseDelayMs, power, attribute, attributePower, enchantIcon, enchantName,
-                    enchantDescription, enchantAdena, enchantExp, enchantSp,
+            return new SkillEnchantRoute(
+                    baseLevel,
+                    route,
+                    enchantLevel,
+                    mpConsume,
+                    mpInitialConsume,
+                    hpConsume,
+                    itemTemplateId,
+                    itemTemplateCount,
+                    castRange,
+                    effectRange,
+                    magicLevel,
+                    abnormalLevel,
+                    abnormalTimeSec,
+                    hitTimeMs,
+                    coolTimeMs,
+                    reuseDelayMs,
+                    power,
+                    attribute,
+                    attributePower,
+                    enchantIcon,
+                    enchantName,
+                    enchantDescription,
+                    enchantAdena,
+                    enchantExp,
+                    enchantSp,
                     enchantChanceByCharLevelPercent);
         }
     }

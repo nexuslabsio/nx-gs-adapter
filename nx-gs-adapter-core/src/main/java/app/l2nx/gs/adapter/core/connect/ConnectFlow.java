@@ -2,7 +2,6 @@ package app.l2nx.gs.adapter.core.connect;
 
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
-
 import java.net.HttpURLConnection;
 import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
@@ -61,18 +60,20 @@ public final class ConnectFlow implements Runnable {
 
     private final AtomicInteger attempt = new AtomicInteger(0);
 
-    public ConnectFlow(HostConnectFlow<?> flow,
-                       BackoffSchedule backoff,
-                       ScheduledExecutorService scheduler,
-                       Consumer<Outcome> onOutcome) {
+    public ConnectFlow(
+            HostConnectFlow<?> flow,
+            BackoffSchedule backoff,
+            ScheduledExecutorService scheduler,
+            Consumer<Outcome> onOutcome) {
         this(flow, backoff, scheduler, onOutcome, null);
     }
 
-    public ConnectFlow(HostConnectFlow<?> flow,
-                       BackoffSchedule backoff,
-                       ScheduledExecutorService scheduler,
-                       Consumer<Outcome> onOutcome,
-                       Consumer<HostConnectFlow<?>> onActiveFlow) {
+    public ConnectFlow(
+            HostConnectFlow<?> flow,
+            BackoffSchedule backoff,
+            ScheduledExecutorService scheduler,
+            Consumer<Outcome> onOutcome,
+            Consumer<HostConnectFlow<?>> onActiveFlow) {
         this.flow = flow;
         this.backoff = backoff;
         this.scheduler = scheduler;
@@ -102,7 +103,8 @@ public final class ConnectFlow implements Runnable {
 
     private void dispatch(TypedConnectOutcome<?> result) {
         if (result.isIoFailure()) {
-            String msg = sanitize(result.getIoException().map(Throwable::getMessage).orElse(null));
+            String msg =
+                    sanitize(result.getIoException().map(Throwable::getMessage).orElse(null));
             log.warn("Connect IO failure: {} — retrying with backoff", msg);
             emit(Outcome.TRANSIENT);
             scheduleRetry();
@@ -135,14 +137,12 @@ public final class ConnectFlow implements Runnable {
             emit(Outcome.FAILED);
             return;
         }
-        if (status == HttpURLConnection.HTTP_FORBIDDEN
-                && hasCode(result, CODE_GAME_SERVER_DEACTIVATED)) {
+        if (status == HttpURLConnection.HTTP_FORBIDDEN && hasCode(result, CODE_GAME_SERVER_DEACTIVATED)) {
             log.error("Connect rejected with 403 GAME_SERVER_DEACTIVATED (terminal)");
             emit(Outcome.REJECTED);
             return;
         }
-        if (status == HttpURLConnection.HTTP_CONFLICT
-                && hasCode(result, CODE_KAFKA_CREDENTIALS_MISSING)) {
+        if (status == HttpURLConnection.HTTP_CONFLICT && hasCode(result, CODE_KAFKA_CREDENTIALS_MISSING)) {
             log.warn("Connect 409 KAFKA_CREDENTIALS_MISSING — retrying with backoff");
             emit(Outcome.TRANSIENT);
             scheduleRetry();
@@ -176,7 +176,11 @@ public final class ConnectFlow implements Runnable {
         } catch (Throwable t) {
             // Scheduler is shutting down — can't retry. Surface as terminal so
             // upstream stops waiting in REGISTERING / DEGRADED forever.
-            log.error("Failed to schedule connect retry attempt {}: {}", n, t.getClass().getName(), t);
+            log.error(
+                    "Failed to schedule connect retry attempt {}: {}",
+                    n,
+                    t.getClass().getName(),
+                    t);
             emit(Outcome.FAILED);
         }
     }
@@ -192,9 +196,7 @@ public final class ConnectFlow implements Runnable {
      * bypass the resolver via fixtures.
      */
     static String buildUrl(String platformUrl, String connectPath) {
-        String base = platformUrl.endsWith("/")
-                ? platformUrl.substring(0, platformUrl.length() - 1)
-                : platformUrl;
+        String base = platformUrl.endsWith("/") ? platformUrl.substring(0, platformUrl.length() - 1) : platformUrl;
         return base + connectPath;
     }
 

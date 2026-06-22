@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.commands.sync;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Inbound command instructing the db-sync engine to force a full re-sync of
@@ -46,8 +45,7 @@ public final class ResyncEntitiesCommand implements NxCommand<ResyncEntitiesResu
     private final UUID resyncId;
     private final List<String> entities;
 
-    public ResyncEntitiesCommand(UUID resyncId,
-                                 @Nullable List<String> entities) {
+    public ResyncEntitiesCommand(UUID resyncId, @Nullable List<String> entities) {
         if (resyncId == null) {
             throw new IllegalArgumentException("resyncId is required");
         }
@@ -80,9 +78,7 @@ public final class ResyncEntitiesCommand implements NxCommand<ResyncEntitiesResu
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .resyncId(resyncId)
-                .entities(entities);
+        return new Builder().resyncId(resyncId).entities(entities);
     }
 
     public static Builder builder() {
@@ -94,8 +90,7 @@ public final class ResyncEntitiesCommand implements NxCommand<ResyncEntitiesResu
         if (this == o) return true;
         if (!(o instanceof ResyncEntitiesCommand)) return false;
         ResyncEntitiesCommand that = (ResyncEntitiesCommand) o;
-        return resyncId.equals(that.resyncId)
-                && entities.equals(that.entities);
+        return resyncId.equals(that.resyncId) && entities.equals(that.entities);
     }
 
     @Override
@@ -105,8 +100,7 @@ public final class ResyncEntitiesCommand implements NxCommand<ResyncEntitiesResu
 
     @Override
     public String toString() {
-        return "ResyncEntitiesCommand[resyncId=" + resyncId
-                + ", entities=" + entities + "]";
+        return "ResyncEntitiesCommand[resyncId=" + resyncId + ", entities=" + entities + "]";
     }
 
     public static final class Builder {

@@ -1,7 +1,17 @@
 package app.l2nx.gs.kafka.integration;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -14,17 +24,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
  * Verifies the at-least-once contract: when a handler throws, the offset is
  * not committed and the record is redelivered on next poll / restart.
@@ -34,9 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class HandlerCommitIntegrationTest {
 
     @Container
-    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer(
-            "confluentinc/cp-kafka:7.7.0"
-    );
+    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer("confluentinc/cp-kafka:7.7.0");
 
     @AfterEach
     void tearDown() {
@@ -72,8 +69,7 @@ class HandlerCommitIntegrationTest {
         CountDownLatch secondSeen = new CountDownLatch(1);
         second.subscribe(topic, groupId, TestEvent.class, event -> secondSeen.countDown());
 
-        assertTrue(secondSeen.await(15, TimeUnit.SECONDS),
-                "Second instance should receive the uncommitted record");
+        assertTrue(secondSeen.await(15, TimeUnit.SECONDS), "Second instance should receive the uncommitted record");
     }
 
     @Test
@@ -117,9 +113,10 @@ class HandlerCommitIntegrationTest {
             }
         });
 
-        assertTrue(sawThree.await(15, TimeUnit.SECONDS),
-                "Second instance must redeliver the failed record (score=3); first saw " + firstSeen
-                        + ", second saw " + secondSeen);
+        assertTrue(
+                sawThree.await(15, TimeUnit.SECONDS),
+                "Second instance must redeliver the failed record (score=3); first saw " + firstSeen + ", second saw "
+                        + secondSeen);
     }
 
     private NxKafka buildKafka(String clientId) {
@@ -135,7 +132,7 @@ class HandlerCommitIntegrationTest {
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
 
         try (KafkaProducer<String, byte[]> producer =
-                     new KafkaProducer<>(props, new StringSerializer(), new ByteArraySerializer())) {
+                new KafkaProducer<>(props, new StringSerializer(), new ByteArraySerializer())) {
             producer.send(new ProducerRecord<>(topic, json.getBytes(StandardCharsets.UTF_8)));
             producer.flush();
         }

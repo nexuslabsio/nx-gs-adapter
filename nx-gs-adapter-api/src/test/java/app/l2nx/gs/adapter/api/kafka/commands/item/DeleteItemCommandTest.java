@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.commands.item;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class DeleteItemCommandTest {
 
@@ -21,51 +21,48 @@ class DeleteItemCommandTest {
 
     @Test
     void builder_shouldDefaultCountToOne_whenNotSet() {
-        DeleteItemCommand cmd = DeleteItemCommand.builder()
-                .charId(42L)
-                .itemId(1234567L)
-                .build();
+        DeleteItemCommand cmd =
+                DeleteItemCommand.builder().charId(42L).itemId(1234567L).build();
 
         assertEquals(1L, cmd.getCount().longValue());
     }
 
     @Test
     void constructor_shouldRejectNullCharId() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new DeleteItemCommand(null, 1L, 1L));
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class, () -> new DeleteItemCommand(null, 1L, 1L));
         assertTrue(ex.getMessage().contains("charId"));
     }
 
     @Test
     void constructor_shouldRejectNullItemId() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new DeleteItemCommand(1L, null, 1L));
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class, () -> new DeleteItemCommand(1L, null, 1L));
         assertTrue(ex.getMessage().contains("itemId"));
     }
 
     @Test
     void constructor_shouldRejectNullCount() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new DeleteItemCommand(1L, 1L, null));
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class, () -> new DeleteItemCommand(1L, 1L, null));
         assertTrue(ex.getMessage().contains("count"));
     }
 
     @Test
     void constructor_shouldRejectZeroCount() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new DeleteItemCommand(1L, 1L, 0L));
+        assertThrows(IllegalArgumentException.class, () -> new DeleteItemCommand(1L, 1L, 0L));
     }
 
     @Test
     void constructor_shouldRejectNegativeCount() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new DeleteItemCommand(1L, 1L, -5L));
+        assertThrows(IllegalArgumentException.class, () -> new DeleteItemCommand(1L, 1L, -5L));
     }
 
     @Test
     void builder_buildWithoutRequiredField_shouldThrow() {
         // charId not set → null → constructor rejects
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> DeleteItemCommand.builder().itemId(1L).build());
     }
 
@@ -93,23 +90,28 @@ class DeleteItemCommandTest {
     @Test
     void equals_shouldDistinguishOnItemId() {
         DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemId(99L).build();
-        DeleteItemCommand b = DeleteItemCommand.builder().charId(1L).itemId(100L).build();
+        DeleteItemCommand b =
+                DeleteItemCommand.builder().charId(1L).itemId(100L).build();
 
         assertNotEquals(a, b);
     }
 
     @Test
     void equals_shouldDistinguishOnCount() {
-        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemId(99L).count(1L).build();
-        DeleteItemCommand b = DeleteItemCommand.builder().charId(1L).itemId(99L).count(5L).build();
+        DeleteItemCommand a =
+                DeleteItemCommand.builder().charId(1L).itemId(99L).count(1L).build();
+        DeleteItemCommand b =
+                DeleteItemCommand.builder().charId(1L).itemId(99L).count(5L).build();
 
         assertNotEquals(a, b);
     }
 
     @Test
     void hashCode_shouldMatchEquals() {
-        DeleteItemCommand a = DeleteItemCommand.builder().charId(1L).itemId(99L).count(3L).build();
-        DeleteItemCommand b = DeleteItemCommand.builder().charId(1L).itemId(99L).count(3L).build();
+        DeleteItemCommand a =
+                DeleteItemCommand.builder().charId(1L).itemId(99L).count(3L).build();
+        DeleteItemCommand b =
+                DeleteItemCommand.builder().charId(1L).itemId(99L).count(3L).build();
 
         assertEquals(a.hashCode(), b.hashCode());
     }
@@ -131,7 +133,8 @@ class DeleteItemCommandTest {
 
     @Test
     void implementsNxCommandMarker() {
-        DeleteItemCommand cmd = DeleteItemCommand.builder().charId(1L).itemId(2L).build();
+        DeleteItemCommand cmd =
+                DeleteItemCommand.builder().charId(1L).itemId(2L).build();
 
         assertInstanceOf(app.l2nx.gs.adapter.api.kafka.commands.NxCommand.class, cmd);
     }

@@ -39,9 +39,7 @@ public final class MailReadEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .mailId(mailId);
+        return new Builder().eventId(eventId).mailId(mailId);
     }
 
     public static Builder builder() {

@@ -1,7 +1,6 @@
 package app.l2nx.gs.commons.concurrent;
 
 import app.l2nx.gs.log.NxLog;
-
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -43,9 +42,8 @@ public final class DaemonThreadFactory implements ThreadFactory {
     public static Thread newDaemonThread(String name, Runnable r, NxLog log) {
         Thread t = new Thread(r, name);
         t.setDaemon(true);
-        t.setUncaughtExceptionHandler((thread, ex) ->
-                log.error("Uncaught exception in {}: {}",
-                        thread.getName(), ex.getClass().getName(), ex));
+        t.setUncaughtExceptionHandler((thread, ex) -> log.error(
+                "Uncaught exception in {}: {}", thread.getName(), ex.getClass().getName(), ex));
         return t;
     }
 

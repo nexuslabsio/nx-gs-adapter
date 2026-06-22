@@ -1,12 +1,11 @@
 package app.l2nx.gs.db.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class EntityStatsTrackerTest {
 
@@ -51,8 +50,7 @@ class EntityStatsTrackerTest {
         tracker.recordCycleResult("clan", CycleResult.degraded(50L));
         assertEquals(3, tracker.consecutiveErrors("clan"));
 
-        tracker.recordCycleResult("clan",
-                new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 100L));
+        tracker.recordCycleResult("clan", new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 100L));
         assertEquals(0, tracker.consecutiveErrors("clan"));
     }
 
@@ -60,12 +58,9 @@ class EntityStatsTrackerTest {
     void currentStatuses_shouldPreserveInsertionOrder_acrossEntities() {
         EntityStatsTracker tracker = new EntityStatsTracker();
 
-        tracker.recordCycleResult("clan",
-                new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 100L));
-        tracker.recordCycleResult("character",
-                new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 200L));
-        tracker.recordCycleResult("item",
-                new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 300L));
+        tracker.recordCycleResult("clan", new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 100L));
+        tracker.recordCycleResult("character", new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 200L));
+        tracker.recordCycleResult("item", new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 300L));
 
         List<EntityStats> snapshot = tracker.currentStatuses();
 
@@ -79,10 +74,8 @@ class EntityStatsTrackerTest {
     void currentStatuses_shouldOverwriteEntityRow_onSubsequentCycle() {
         EntityStatsTracker tracker = new EntityStatsTracker();
 
-        tracker.recordCycleResult("clan",
-                new CycleResult(EntityState.HEALTHY, 50L, 1L, 0L, 0L, 100L));
-        tracker.recordCycleResult("clan",
-                new CycleResult(EntityState.HEALTHY, 60L, 0L, 5L, 1L, 105L));
+        tracker.recordCycleResult("clan", new CycleResult(EntityState.HEALTHY, 50L, 1L, 0L, 0L, 100L));
+        tracker.recordCycleResult("clan", new CycleResult(EntityState.HEALTHY, 60L, 0L, 5L, 1L, 105L));
 
         List<EntityStats> snapshot = tracker.currentStatuses();
 
@@ -97,8 +90,7 @@ class EntityStatsTrackerTest {
     @Test
     void currentStatuses_shouldReturnUnmodifiableList() {
         EntityStatsTracker tracker = new EntityStatsTracker();
-        tracker.recordCycleResult("clan",
-                new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 100L));
+        tracker.recordCycleResult("clan", new CycleResult(EntityState.HEALTHY, 50L, 0L, 0L, 0L, 100L));
 
         List<EntityStats> snapshot = tracker.currentStatuses();
 

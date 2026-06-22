@@ -1,24 +1,23 @@
 package app.l2nx.gs.adapter.core.connect;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.rest.LoginServerConnectResponse;
 import app.l2nx.gs.adapter.core.concurrent.CapturingScheduler;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.AdapterConfigFixtures;
 import com.github.tomakehurst.wiremock.WireMockServer;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class LoginServerConnectFlowTest {
 
@@ -58,7 +57,8 @@ class LoginServerConnectFlowTest {
     @Test
     void connect_shouldHitLoginServersPath() {
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(200)
+                .willReturn(aResponse()
+                        .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_LS_RESPONSE)));
 
@@ -69,14 +69,14 @@ class LoginServerConnectFlowTest {
         assertEquals(200, outcome.getStatusCode());
         assertTrue(outcome.getResponse().isPresent());
         wireMock.verify(postRequestedFor(urlEqualTo(CONNECT_PATH))
-                .withHeader("Authorization",
-                        equalTo("Bearer " + AdapterConfigFixtures.VALID_SERVER_KEY)));
+                .withHeader("Authorization", equalTo("Bearer " + AdapterConfigFixtures.VALID_SERVER_KEY)));
     }
 
     @Test
     void connect_shouldDeserializeLoginServerConnectResponse() {
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(200)
+                .willReturn(aResponse()
+                        .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_LS_RESPONSE)));
 
@@ -95,14 +95,16 @@ class LoginServerConnectFlowTest {
         assertNotNull(response.getKafka());
         assertEquals("kafka.l2nx.app:9092", response.getKafka().getBootstrap());
         assertNotNull(response.getMessagingTopics());
-        assertEquals("acme.ls.events.account",
+        assertEquals(
+                "acme.ls.events.account",
                 response.getMessagingTopics().getEvents().get("account"));
     }
 
     @Test
     void accessors_shouldProjectCapturedResponse() {
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(200)
+                .willReturn(aResponse()
+                        .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_LS_RESPONSE)));
 
@@ -142,7 +144,8 @@ class LoginServerConnectFlowTest {
         // LS deployments carry no sync streams — syncTopics() returns null both
         // before and after a successful connect.
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(200)
+                .willReturn(aResponse()
+                        .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_LS_RESPONSE)));
 
@@ -164,7 +167,8 @@ class LoginServerConnectFlowTest {
     @Test
     void connect_shouldEncodeHttpError_whenNon200() {
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(401)
+                .willReturn(aResponse()
+                        .withStatus(401)
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"code\":\"INVALID_SERVER_KEY\",\"message\":\"x\"}")));
 
@@ -195,7 +199,8 @@ class LoginServerConnectFlowTest {
     @Test
     void productionRetryLoop_shouldDriveLoginServerFlow_andDeserializeTypedResponse() {
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
-                .willReturn(aResponse().withStatus(200)
+                .willReturn(aResponse()
+                        .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(VALID_LS_RESPONSE)));
 
@@ -205,12 +210,7 @@ class LoginServerConnectFlowTest {
         List<ConnectFlow.Outcome> outcomes = new ArrayList<ConnectFlow.Outcome>();
         AtomicReference<HostConnectFlow<?>> active = new AtomicReference<HostConnectFlow<?>>();
 
-        ConnectFlow loop = new ConnectFlow(
-                lsFlow,
-                new DefaultBackoffSchedule(),
-                scheduler,
-                outcomes::add,
-                active::set);
+        ConnectFlow loop = new ConnectFlow(lsFlow, new DefaultBackoffSchedule(), scheduler, outcomes::add, active::set);
         loop.run();
 
         // STARTING only — onActiveFlow consumed the success path before bare ACTIVE.
@@ -220,7 +220,9 @@ class LoginServerConnectFlowTest {
         assertSame(lsFlow, captured, "production loop must pass through the host flow strategy itself");
         Object response = captured.response();
         assertNotNull(response);
-        assertEquals(LoginServerConnectResponse.class, response.getClass(),
+        assertEquals(
+                LoginServerConnectResponse.class,
+                response.getClass(),
                 "LS retry loop must deserialize as LoginServerConnectResponse, never ConnectResponse");
         assertNotEquals(ConnectResponse.class, response.getClass());
         wireMock.verify(postRequestedFor(urlEqualTo(CONNECT_PATH)));

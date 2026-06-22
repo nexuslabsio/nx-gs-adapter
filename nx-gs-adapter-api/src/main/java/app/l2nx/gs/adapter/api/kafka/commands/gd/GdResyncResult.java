@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.commands.gd;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Success payload of {@link GdResyncCommand}. Carries the names of every
@@ -37,8 +36,7 @@ public final class GdResyncResult {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .acceptedEntities(acceptedEntities);
+        return new Builder().acceptedEntities(acceptedEntities);
     }
 
     public static Builder builder() {

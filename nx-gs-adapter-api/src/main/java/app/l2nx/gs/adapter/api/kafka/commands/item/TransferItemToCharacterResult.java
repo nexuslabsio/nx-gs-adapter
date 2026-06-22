@@ -19,10 +19,7 @@ public final class TransferItemToCharacterResult {
     private final Long fromCharId;
     private final Long toCharId;
 
-    public TransferItemToCharacterResult(Long itemId,
-                                         Long countTransferred,
-                                         Long fromCharId,
-                                         Long toCharId) {
+    public TransferItemToCharacterResult(Long itemId, Long countTransferred, Long fromCharId, Long toCharId) {
         if (itemId == null) {
             throw new IllegalArgumentException("itemId is required");
         }

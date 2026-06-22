@@ -1,13 +1,12 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
-import app.l2nx.gs.adapter.api.domain.Attribute;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class TradeLineTest {
 
@@ -49,8 +48,8 @@ class TradeLineTest {
                 .currencyItemId(57L)
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> line.getAttributes().put(Attribute.WATER, 150));
+        assertThrows(
+                UnsupportedOperationException.class, () -> line.getAttributes().put(Attribute.WATER, 150));
     }
 
     @Test
@@ -75,7 +74,10 @@ class TradeLineTest {
     @Test
     void enchantLevel_shouldDefaultToNull_signalingNotApplicable() {
         TradeLine line = TradeLine.builder()
-                .itemId(1234L).count(1L).unitPrice(1L).currencyItemId(57L)
+                .itemId(1234L)
+                .count(1L)
+                .unitPrice(1L)
+                .currencyItemId(57L)
                 .build();
 
         assertNull(line.getEnchantLevel());
@@ -84,8 +86,11 @@ class TradeLineTest {
     @Test
     void enchantLevel_shouldRoundtripExplicitZero() {
         TradeLine line = TradeLine.builder()
-                .itemId(1234L).enchantLevel(0)
-                .count(1L).unitPrice(1L).currencyItemId(57L)
+                .itemId(1234L)
+                .enchantLevel(0)
+                .count(1L)
+                .unitPrice(1L)
+                .currencyItemId(57L)
                 .build();
 
         assertEquals(Integer.valueOf(0), line.getEnchantLevel());
@@ -113,18 +118,36 @@ class TradeLineTest {
 
     @Test
     void equals_shouldDistinguishUnitPrice() {
-        TradeLine a = TradeLine.builder().itemId(1L).count(1L).unitPrice(100L).currencyItemId(57L).build();
-        TradeLine b = TradeLine.builder().itemId(1L).count(1L).unitPrice(101L).currencyItemId(57L).build();
+        TradeLine a = TradeLine.builder()
+                .itemId(1L)
+                .count(1L)
+                .unitPrice(100L)
+                .currencyItemId(57L)
+                .build();
+        TradeLine b = TradeLine.builder()
+                .itemId(1L)
+                .count(1L)
+                .unitPrice(101L)
+                .currencyItemId(57L)
+                .build();
 
         assertNotEquals(a, b);
     }
 
     @Test
     void equals_shouldDistinguishAttributes() {
-        TradeLine a = TradeLine.builder().itemId(1L).count(1L).unitPrice(1L).currencyItemId(57L)
+        TradeLine a = TradeLine.builder()
+                .itemId(1L)
+                .count(1L)
+                .unitPrice(1L)
+                .currencyItemId(57L)
                 .attributes(java.util.Collections.singletonMap(Attribute.FIRE, 300))
                 .build();
-        TradeLine b = TradeLine.builder().itemId(1L).count(1L).unitPrice(1L).currencyItemId(57L)
+        TradeLine b = TradeLine.builder()
+                .itemId(1L)
+                .count(1L)
+                .unitPrice(1L)
+                .currencyItemId(57L)
                 .attributes(java.util.Collections.singletonMap(Attribute.WATER, 300))
                 .build();
 

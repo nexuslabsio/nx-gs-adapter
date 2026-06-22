@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.skill;
 
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One base level of a {@link Skill} — the per-level stats, localization and effects.
@@ -75,49 +74,50 @@ public final class SkillLevel {
     private final @Nullable List<SkillStatModifier> statModifiers;
     private final @Nullable List<SkillProducedItemGroup> producedItems;
 
-    public SkillLevel(int level,
-                      @Nullable String icon,
-                      @Nullable Integer mpConsume,
-                      @Nullable Integer mpInitialConsume,
-                      @Nullable Integer hpConsume,
-                      @Nullable Integer itemTemplateId,
-                      @Nullable Integer itemTemplateCount,
-                      @Nullable Integer soulMaxConsume,
-                      @Nullable Integer energyConsume,
-                      @Nullable Integer chargeConsume,
-                      @Nullable Integer castRange,
-                      @Nullable Integer effectRange,
-                      @Nullable Integer affectRange,
-                      @Nullable Integer affectLimit,
-                      @Nullable Integer fanStartAngle,
-                      @Nullable Integer fanRadius,
-                      @Nullable Integer fanAngle,
-                      @Nullable Integer magicLevel,
-                      @Nullable Integer abnormalLevel,
-                      @Nullable Integer abnormalTimeSec,
-                      @Nullable Integer hitTimeMs,
-                      @Nullable Integer coolTimeMs,
-                      @Nullable Integer reuseDelayMs,
-                      @Nullable Integer baseCritRate,
-                      @Nullable Double power,
-                      @Nullable Double pvpPower,
-                      @Nullable Double pvePower,
-                      @Nullable Integer minChancePercent,
-                      @Nullable Integer maxChancePercent,
-                      @Nullable Integer activateRatePercent,
-                      @Nullable Integer levelModifier,
-                      @Nullable Integer lethalStrikeRatePercent,
-                      @Nullable Integer halfKillRatePercent,
-                      @Nullable Integer negateRatePercent,
-                      @Nullable Map<String, Integer> negateAbnormalTypes,
-                      @Nullable Integer aggroPoints,
-                      @Nullable String attribute,
-                      @Nullable Integer attributePower,
-                      @Nullable LocalizedText name,
-                      @Nullable LocalizedText description,
-                      @Nullable List<SkillEffect> effects,
-                      @Nullable List<SkillStatModifier> statModifiers,
-                      @Nullable List<SkillProducedItemGroup> producedItems) {
+    public SkillLevel(
+            int level,
+            @Nullable String icon,
+            @Nullable Integer mpConsume,
+            @Nullable Integer mpInitialConsume,
+            @Nullable Integer hpConsume,
+            @Nullable Integer itemTemplateId,
+            @Nullable Integer itemTemplateCount,
+            @Nullable Integer soulMaxConsume,
+            @Nullable Integer energyConsume,
+            @Nullable Integer chargeConsume,
+            @Nullable Integer castRange,
+            @Nullable Integer effectRange,
+            @Nullable Integer affectRange,
+            @Nullable Integer affectLimit,
+            @Nullable Integer fanStartAngle,
+            @Nullable Integer fanRadius,
+            @Nullable Integer fanAngle,
+            @Nullable Integer magicLevel,
+            @Nullable Integer abnormalLevel,
+            @Nullable Integer abnormalTimeSec,
+            @Nullable Integer hitTimeMs,
+            @Nullable Integer coolTimeMs,
+            @Nullable Integer reuseDelayMs,
+            @Nullable Integer baseCritRate,
+            @Nullable Double power,
+            @Nullable Double pvpPower,
+            @Nullable Double pvePower,
+            @Nullable Integer minChancePercent,
+            @Nullable Integer maxChancePercent,
+            @Nullable Integer activateRatePercent,
+            @Nullable Integer levelModifier,
+            @Nullable Integer lethalStrikeRatePercent,
+            @Nullable Integer halfKillRatePercent,
+            @Nullable Integer negateRatePercent,
+            @Nullable Map<String, Integer> negateAbnormalTypes,
+            @Nullable Integer aggroPoints,
+            @Nullable String attribute,
+            @Nullable Integer attributePower,
+            @Nullable LocalizedText name,
+            @Nullable LocalizedText description,
+            @Nullable List<SkillEffect> effects,
+            @Nullable List<SkillStatModifier> statModifiers,
+            @Nullable List<SkillProducedItemGroup> producedItems) {
         this.level = level;
         this.icon = icon;
         this.mpConsume = mpConsume;
@@ -152,18 +152,20 @@ public final class SkillLevel {
         this.lethalStrikeRatePercent = lethalStrikeRatePercent;
         this.halfKillRatePercent = halfKillRatePercent;
         this.negateRatePercent = negateRatePercent;
-        this.negateAbnormalTypes = negateAbnormalTypes == null ? null
+        this.negateAbnormalTypes = negateAbnormalTypes == null
+                ? null
                 : Collections.unmodifiableMap(new LinkedHashMap<String, Integer>(negateAbnormalTypes));
         this.aggroPoints = aggroPoints;
         this.attribute = attribute;
         this.attributePower = attributePower;
         this.name = name;
         this.description = description;
-        this.effects = effects == null ? null
-                : Collections.unmodifiableList(new ArrayList<SkillEffect>(effects));
-        this.statModifiers = statModifiers == null ? null
+        this.effects = effects == null ? null : Collections.unmodifiableList(new ArrayList<SkillEffect>(effects));
+        this.statModifiers = statModifiers == null
+                ? null
                 : Collections.unmodifiableList(new ArrayList<SkillStatModifier>(statModifiers));
-        this.producedItems = producedItems == null ? null
+        this.producedItems = producedItems == null
+                ? null
                 : Collections.unmodifiableList(new ArrayList<SkillProducedItemGroup>(producedItems));
     }
 
@@ -549,14 +551,50 @@ public final class SkillLevel {
 
     @Override
     public int hashCode() {
-        return Objects.hash(level, icon, mpConsume, mpInitialConsume, hpConsume, itemTemplateId,
-                itemTemplateCount, soulMaxConsume, energyConsume, chargeConsume, castRange,
-                effectRange, affectRange, affectLimit, fanStartAngle, fanRadius, fanAngle,
-                magicLevel, abnormalLevel, abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs,
-                baseCritRate, power, pvpPower, pvePower, minChancePercent, maxChancePercent,
-                activateRatePercent, levelModifier, lethalStrikeRatePercent, halfKillRatePercent,
-                negateRatePercent, negateAbnormalTypes, aggroPoints, attribute, attributePower,
-                name, description, effects, statModifiers, producedItems);
+        return Objects.hash(
+                level,
+                icon,
+                mpConsume,
+                mpInitialConsume,
+                hpConsume,
+                itemTemplateId,
+                itemTemplateCount,
+                soulMaxConsume,
+                energyConsume,
+                chargeConsume,
+                castRange,
+                effectRange,
+                affectRange,
+                affectLimit,
+                fanStartAngle,
+                fanRadius,
+                fanAngle,
+                magicLevel,
+                abnormalLevel,
+                abnormalTimeSec,
+                hitTimeMs,
+                coolTimeMs,
+                reuseDelayMs,
+                baseCritRate,
+                power,
+                pvpPower,
+                pvePower,
+                minChancePercent,
+                maxChancePercent,
+                activateRatePercent,
+                levelModifier,
+                lethalStrikeRatePercent,
+                halfKillRatePercent,
+                negateRatePercent,
+                negateAbnormalTypes,
+                aggroPoints,
+                attribute,
+                attributePower,
+                name,
+                description,
+                effects,
+                statModifiers,
+                producedItems);
     }
 
     @Override
@@ -825,15 +863,50 @@ public final class SkillLevel {
         }
 
         public SkillLevel build() {
-            return new SkillLevel(level, icon, mpConsume, mpInitialConsume, hpConsume,
-                    itemTemplateId, itemTemplateCount, soulMaxConsume, energyConsume,
-                    chargeConsume, castRange, effectRange, affectRange, affectLimit,
-                    fanStartAngle, fanRadius, fanAngle, magicLevel, abnormalLevel,
-                    abnormalTimeSec, hitTimeMs, coolTimeMs, reuseDelayMs, baseCritRate, power,
-                    pvpPower, pvePower, minChancePercent, maxChancePercent, activateRatePercent,
-                    levelModifier, lethalStrikeRatePercent, halfKillRatePercent,
-                    negateRatePercent, negateAbnormalTypes, aggroPoints, attribute, attributePower,
-                    name, description, effects, statModifiers, producedItems);
+            return new SkillLevel(
+                    level,
+                    icon,
+                    mpConsume,
+                    mpInitialConsume,
+                    hpConsume,
+                    itemTemplateId,
+                    itemTemplateCount,
+                    soulMaxConsume,
+                    energyConsume,
+                    chargeConsume,
+                    castRange,
+                    effectRange,
+                    affectRange,
+                    affectLimit,
+                    fanStartAngle,
+                    fanRadius,
+                    fanAngle,
+                    magicLevel,
+                    abnormalLevel,
+                    abnormalTimeSec,
+                    hitTimeMs,
+                    coolTimeMs,
+                    reuseDelayMs,
+                    baseCritRate,
+                    power,
+                    pvpPower,
+                    pvePower,
+                    minChancePercent,
+                    maxChancePercent,
+                    activateRatePercent,
+                    levelModifier,
+                    lethalStrikeRatePercent,
+                    halfKillRatePercent,
+                    negateRatePercent,
+                    negateAbnormalTypes,
+                    aggroPoints,
+                    attribute,
+                    attributePower,
+                    name,
+                    description,
+                    effects,
+                    statModifiers,
+                    producedItems);
         }
     }
 }

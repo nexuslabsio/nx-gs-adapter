@@ -22,8 +22,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore;
  */
 public final class WellKnownGearScoreEnchantProfiles {
 
-    private WellKnownGearScoreEnchantProfiles() {
-    }
+    private WellKnownGearScoreEnchantProfiles() {}
 
     public static final String WEAPON = "WEAPON";
     public static final String NONWEAPON = "NONWEAPON";

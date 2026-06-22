@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.commands.sync;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Success payload of {@link ResyncEntitiesCommand}. Carries the entity names
@@ -37,8 +36,7 @@ public final class ResyncEntitiesResult {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .acceptedEntities(acceptedEntities);
+        return new Builder().acceptedEntities(acceptedEntities);
     }
 
     public static Builder builder() {

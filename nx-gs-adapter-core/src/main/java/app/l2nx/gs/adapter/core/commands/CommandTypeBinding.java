@@ -2,7 +2,6 @@ package app.l2nx.gs.adapter.core.commands;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import app.l2nx.gs.adapter.api.spi.CommandHandler;
-
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -27,15 +26,15 @@ final class CommandTypeBinding {
 
     private final Class<? extends NxCommand<?>> commandClass;
     private final byte[] replyMessageTypeBytes;
+
     @SuppressWarnings("rawtypes")
     private final CommandHandler handler;
 
     @SuppressWarnings("rawtypes")
-    CommandTypeBinding(Class<? extends NxCommand<?>> commandClass,
-                       CommandHandler handler) {
+    CommandTypeBinding(Class<? extends NxCommand<?>> commandClass, CommandHandler handler) {
         this.commandClass = commandClass;
-        this.replyMessageTypeBytes = deriveReplyTypeName(commandClass.getSimpleName())
-                .getBytes(StandardCharsets.UTF_8);
+        this.replyMessageTypeBytes =
+                deriveReplyTypeName(commandClass.getSimpleName()).getBytes(StandardCharsets.UTF_8);
         this.handler = handler;
     }
 

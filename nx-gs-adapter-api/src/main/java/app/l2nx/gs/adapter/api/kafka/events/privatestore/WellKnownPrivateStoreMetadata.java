@@ -17,8 +17,7 @@ package app.l2nx.gs.adapter.api.kafka.events.privatestore;
  */
 public final class WellKnownPrivateStoreMetadata {
 
-    private WellKnownPrivateStoreMetadata() {
-    }
+    private WellKnownPrivateStoreMetadata() {}
 
     public static final String STORE_OWNER_ADENA = "store_owner_adena";
 }

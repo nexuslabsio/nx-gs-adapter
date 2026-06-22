@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.spi;
 
-import app.l2nx.gs.adapter.api.rest.SyncTopics;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import java.util.Collections;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ConnectContextTest {
 
@@ -62,7 +61,8 @@ class ConnectContextTest {
         ConnectContext ctx = ConnectContext.builder().syncTopics(topics).build();
 
         assertEquals("bohpts.gs.sync.db.clan", ctx.getSyncTopics().getDb().get("clan"));
-        assertEquals("bohpts.gs.sync.runtime.character",
+        assertEquals(
+                "bohpts.gs.sync.runtime.character",
                 ctx.getSyncTopics().getRuntime().get("character"));
         assertTrue(ctx.getSyncTopics().getGd().isEmpty());
     }
@@ -74,7 +74,8 @@ class ConnectContextTest {
                 .build();
         ConnectContext ctx = ConnectContext.builder().syncTopics(topics).build();
 
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> ctx.getSyncTopics().getDb().put("character", "x"));
     }
 

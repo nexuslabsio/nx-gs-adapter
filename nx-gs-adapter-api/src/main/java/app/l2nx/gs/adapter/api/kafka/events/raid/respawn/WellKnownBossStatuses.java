@@ -29,8 +29,7 @@ package app.l2nx.gs.adapter.api.kafka.events.raid.respawn;
  */
 public final class WellKnownBossStatuses {
 
-    private WellKnownBossStatuses() {
-    }
+    private WellKnownBossStatuses() {}
 
     /**
      * Boss is up and idle (standing / killable, nobody engaging).

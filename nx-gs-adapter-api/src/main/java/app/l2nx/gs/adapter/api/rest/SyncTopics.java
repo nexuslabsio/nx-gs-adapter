@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.rest;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Per-namespace per-entity Kafka topic addressing returned in {@link ConnectResponse}.
@@ -40,9 +39,8 @@ public final class SyncTopics {
     private final Map<String, String> runtime;
     private final Map<String, String> gd;
 
-    public SyncTopics(@Nullable Map<String, String> db,
-                      @Nullable Map<String, String> runtime,
-                      @Nullable Map<String, String> gd) {
+    public SyncTopics(
+            @Nullable Map<String, String> db, @Nullable Map<String, String> runtime, @Nullable Map<String, String> gd) {
         this.db = freeze(db);
         this.runtime = freeze(runtime);
         this.gd = freeze(gd);
@@ -95,9 +93,7 @@ public final class SyncTopics {
         if (this == o) return true;
         if (!(o instanceof SyncTopics)) return false;
         SyncTopics that = (SyncTopics) o;
-        return Objects.equals(db, that.db)
-                && Objects.equals(runtime, that.runtime)
-                && Objects.equals(gd, that.gd);
+        return Objects.equals(db, that.db) && Objects.equals(runtime, that.runtime) && Objects.equals(gd, that.gd);
     }
 
     @Override

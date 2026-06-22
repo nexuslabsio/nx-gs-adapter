@@ -1,21 +1,19 @@
 package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ServerOnlineSnapshotEventTest {
 
     @Test
     void getBuckets_shouldReturnEmptyMap_whenBuilderOmits() {
-        ServerOnlineSnapshotEvent event = ServerOnlineSnapshotEvent.builder()
-                .eventId(UUID.randomUUID())
-                .build();
+        ServerOnlineSnapshotEvent event =
+                ServerOnlineSnapshotEvent.builder().eventId(UUID.randomUUID()).build();
 
         assertTrue(event.getBuckets().isEmpty());
     }
@@ -40,7 +38,8 @@ class ServerOnlineSnapshotEventTest {
                 .buckets(source)
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> event.getBuckets().put(WellKnownServerOnlineBuckets.UNIQUE, 99L));
     }
 
@@ -103,8 +102,14 @@ class ServerOnlineSnapshotEventTest {
         Map<String, Long> bucketsB = new HashMap<String, Long>();
         bucketsB.put(WellKnownServerOnlineBuckets.TOTAL, 101L);
 
-        ServerOnlineSnapshotEvent a = ServerOnlineSnapshotEvent.builder().eventId(id).buckets(bucketsA).build();
-        ServerOnlineSnapshotEvent b = ServerOnlineSnapshotEvent.builder().eventId(id).buckets(bucketsB).build();
+        ServerOnlineSnapshotEvent a = ServerOnlineSnapshotEvent.builder()
+                .eventId(id)
+                .buckets(bucketsA)
+                .build();
+        ServerOnlineSnapshotEvent b = ServerOnlineSnapshotEvent.builder()
+                .eventId(id)
+                .buckets(bucketsB)
+                .build();
 
         assertNotEquals(a, b);
     }
@@ -115,10 +120,8 @@ class ServerOnlineSnapshotEventTest {
         Map<String, Long> buckets = new LinkedHashMap<String, Long>();
         buckets.put(WellKnownServerOnlineBuckets.TOTAL, 1808L);
 
-        ServerOnlineSnapshotEvent event = ServerOnlineSnapshotEvent.builder()
-                .eventId(id)
-                .buckets(buckets)
-                .build();
+        ServerOnlineSnapshotEvent event =
+                ServerOnlineSnapshotEvent.builder().eventId(id).buckets(buckets).build();
 
         String s = event.toString();
         assertTrue(s.contains("eventId=" + id));

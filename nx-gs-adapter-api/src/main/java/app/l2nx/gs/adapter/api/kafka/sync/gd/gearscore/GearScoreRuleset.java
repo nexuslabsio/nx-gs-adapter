@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic gear-score ruleset wire DTO — the global "what earns gear score and
@@ -23,8 +22,7 @@ public final class GearScoreRuleset {
     private final boolean enabled;
     private final List<GearScoreRuleGroup> groups;
 
-    public GearScoreRuleset(boolean enabled,
-                            @Nullable List<GearScoreRuleGroup> groups) {
+    public GearScoreRuleset(boolean enabled, @Nullable List<GearScoreRuleGroup> groups) {
         this.enabled = enabled;
         this.groups = groups == null
                 ? Collections.<GearScoreRuleGroup>emptyList()
@@ -46,9 +44,7 @@ public final class GearScoreRuleset {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .enabled(enabled)
-                .groups(groups);
+        return new Builder().enabled(enabled).groups(groups);
     }
 
     public static Builder builder() {
@@ -60,8 +56,7 @@ public final class GearScoreRuleset {
         if (this == o) return true;
         if (!(o instanceof GearScoreRuleset)) return false;
         GearScoreRuleset that = (GearScoreRuleset) o;
-        return enabled == that.enabled
-                && groups.equals(that.groups);
+        return enabled == that.enabled && groups.equals(that.groups);
     }
 
     @Override
@@ -71,8 +66,7 @@ public final class GearScoreRuleset {
 
     @Override
     public String toString() {
-        return "GearScoreRuleset[enabled=" + enabled
-                + ", groups=" + groups.size() + "]";
+        return "GearScoreRuleset[enabled=" + enabled + ", groups=" + groups.size() + "]";
     }
 
     public static final class Builder {

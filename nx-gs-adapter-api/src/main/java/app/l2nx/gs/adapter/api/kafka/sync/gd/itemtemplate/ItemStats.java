@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate;
 
 import app.l2nx.gs.adapter.api.domain.stat.Stat;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Stats block of an {@link ItemTemplate} — the gameplay numbers that make a weapon a
@@ -23,8 +22,7 @@ public final class ItemStats {
     private final @Nullable Boolean magicWeapon;
     private final @Nullable Map<String, Double> stats;
 
-    public ItemStats(@Nullable Boolean magicWeapon,
-                     @Nullable Map<String, Double> stats) {
+    public ItemStats(@Nullable Boolean magicWeapon, @Nullable Map<String, Double> stats) {
         this.magicWeapon = magicWeapon;
         this.stats = stats;
     }
@@ -45,9 +43,7 @@ public final class ItemStats {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .magicWeapon(magicWeapon)
-                .stats(stats);
+        return new Builder().magicWeapon(magicWeapon).stats(stats);
     }
 
     public static Builder builder() {
@@ -59,8 +55,7 @@ public final class ItemStats {
         if (this == o) return true;
         if (!(o instanceof ItemStats)) return false;
         ItemStats that = (ItemStats) o;
-        return Objects.equals(magicWeapon, that.magicWeapon)
-                && Objects.equals(stats, that.stats);
+        return Objects.equals(magicWeapon, that.magicWeapon) && Objects.equals(stats, that.stats);
     }
 
     @Override

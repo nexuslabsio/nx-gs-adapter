@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO published to the {@code privatestore} family topic
@@ -45,16 +44,18 @@ public final class PrivateStoreSnapshotEvent {
     private final List<Offer> offers;
     private final @Nullable Map<String, String> metadata;
 
-    public PrivateStoreSnapshotEvent(UUID eventId,
-                                     long itemId,
-                                     PrivateStoreSide side,
-                                     @Nullable List<Offer> offers,
-                                     @Nullable Map<String, String> metadata) {
+    public PrivateStoreSnapshotEvent(
+            UUID eventId,
+            long itemId,
+            PrivateStoreSide side,
+            @Nullable List<Offer> offers,
+            @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.itemId = itemId;
         this.side = side;
         this.offers = freezeList(offers);
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**

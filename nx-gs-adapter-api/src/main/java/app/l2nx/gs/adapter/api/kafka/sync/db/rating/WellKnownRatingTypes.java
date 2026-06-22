@@ -16,8 +16,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.db.rating;
  */
 public final class WellKnownRatingTypes {
 
-    private WellKnownRatingTypes() {
-    }
+    private WellKnownRatingTypes() {}
 
     public static final String FISHING = "fishing";
 }

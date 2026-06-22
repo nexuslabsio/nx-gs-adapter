@@ -1,7 +1,6 @@
 package app.l2nx.gs.kafka;
 
 import com.google.gson.*;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetTime;
@@ -21,8 +20,7 @@ import java.time.format.DateTimeFormatter;
  */
 public final class NxGsonAdapters {
 
-    private NxGsonAdapters() {
-    }
+    private NxGsonAdapters() {}
 
     /**
      * Returns a fresh {@link Gson} configured with the standard nx-gs adapters.
@@ -44,7 +42,8 @@ public final class NxGsonAdapters {
         // Fixed HH:mm:ss + offset (Z for UTC) — toString() would drop zero seconds,
         // making the wire format vary; parsing stays lenient via ISO_OFFSET_TIME.
         DateTimeFormatter offsetTimeFmt = DateTimeFormatter.ofPattern("HH:mm:ssXXX");
-        JsonSerializer<OffsetTime> offsetTimeSer = (src, typeOfSrc, ctx) -> new JsonPrimitive(src.format(offsetTimeFmt));
+        JsonSerializer<OffsetTime> offsetTimeSer =
+                (src, typeOfSrc, ctx) -> new JsonPrimitive(src.format(offsetTimeFmt));
         JsonDeserializer<OffsetTime> offsetTimeDe = (json, typeOfT, ctx) -> OffsetTime.parse(json.getAsString());
         return new GsonBuilder()
                 .disableHtmlEscaping()

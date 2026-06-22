@@ -1,5 +1,7 @@
 package app.l2nx.gs.db.sync;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
@@ -9,21 +11,17 @@ import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.TestMappings;
 import app.l2nx.gs.db.sync.engine.publish.KafkaSender;
-import org.junit.jupiter.api.Test;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class DbSyncModuleTest {
 
-    private static final Map<String, String> CLAN_TOPIC =
-            Collections.singletonMap("clan", "bohpts.gs.sync.clans");
+    private static final Map<String, String> CLAN_TOPIC = Collections.singletonMap("clan", "bohpts.gs.sync.clans");
 
     private static final ConnectContext CTX_WITH_TOPICS = ctx(CLAN_TOPIC);
     private static final ConnectContext CTX_NO_TOPICS = ctx(null);
@@ -67,10 +65,8 @@ class DbSyncModuleTest {
 
     @Test
     void onConnect_shouldFail_whenMultipleJdbcSources() {
-        DbSyncModule module = build(
-                () -> Arrays.asList(stub("a", null), stub("b", null)),
-                singleSchema(clanProvider()),
-                passSmoke());
+        DbSyncModule module =
+                build(() -> Arrays.asList(stub("a", null), stub("b", null)), singleSchema(clanProvider()), passSmoke());
 
         module.onConnect(CTX_WITH_TOPICS);
 
@@ -88,9 +84,8 @@ class DbSyncModuleTest {
 
     @Test
     void onConnect_shouldFail_whenMultipleSchemaProviders() {
-        DbSyncModule module = build(singleJdbc(stub("a", null)),
-                () -> Arrays.asList(clanProvider(), clanProvider()),
-                passSmoke());
+        DbSyncModule module =
+                build(singleJdbc(stub("a", null)), () -> Arrays.asList(clanProvider(), clanProvider()), passSmoke());
 
         module.onConnect(CTX_WITH_TOPICS);
 
@@ -205,9 +200,10 @@ class DbSyncModuleTest {
         assertFalse(status.getStats().getEntities().isPresent());
     }
 
-    private static DbSyncModule build(Supplier<List<JdbcConnectionSource>> jdbc,
-                                      Supplier<List<DbSchemaProvider>> schema,
-                                      Predicate<JdbcConnectionSource> smoke) {
+    private static DbSyncModule build(
+            Supplier<List<JdbcConnectionSource>> jdbc,
+            Supplier<List<DbSchemaProvider>> schema,
+            Predicate<JdbcConnectionSource> smoke) {
         Function<String, String> noSysprops = k -> null;
         return new DbSyncModule(jdbc, schema, smoke, noSysprops, NEVER_CALLED);
     }
@@ -217,8 +213,11 @@ class DbSyncModuleTest {
                 ? null
                 : app.l2nx.gs.adapter.api.rest.SyncTopics.builder().db(dbTopics).build();
         return ConnectContext.builder()
-                .tenantId(UUID.randomUUID()).tenantSlug("acme")
-                .serverId(UUID.randomUUID()).serverSlug("primary").serverName("Acme Primary")
+                .tenantId(UUID.randomUUID())
+                .tenantSlug("acme")
+                .serverId(UUID.randomUUID())
+                .serverSlug("primary")
+                .serverName("Acme Primary")
                 .adapterVersion("0.1.0")
                 .syncTopics(topics)
                 .build();

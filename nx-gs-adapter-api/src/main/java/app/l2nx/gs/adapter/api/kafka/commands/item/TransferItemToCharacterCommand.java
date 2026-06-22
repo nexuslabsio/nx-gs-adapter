@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.commands.item;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-
 import java.util.Objects;
 
 /**
@@ -75,10 +74,7 @@ public final class TransferItemToCharacterCommand implements NxCommand<TransferI
     private final Long itemId;
     private final Long count;
 
-    public TransferItemToCharacterCommand(Long charIdFrom,
-                                          Long charIdTo,
-                                          Long itemId,
-                                          Long count) {
+    public TransferItemToCharacterCommand(Long charIdFrom, Long charIdTo, Long itemId, Long count) {
         if (charIdFrom == null) {
             throw new IllegalArgumentException("charIdFrom is required");
         }

@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.core.commands;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandStatus;
@@ -8,6 +10,12 @@ import app.l2nx.gs.adapter.api.spi.CommandHandler;
 import app.l2nx.gs.adapter.api.spi.HostExecutorTimeoutException;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
 import com.google.gson.Gson;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.MockConsumer;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
@@ -15,15 +23,6 @@ import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class CommandsConsumerTest {
 
@@ -57,8 +56,7 @@ class CommandsConsumerTest {
 
     static final class FakeNxEvents implements NxEvents {
         @Override
-        public void publish(Object event) {
-        }
+        public void publish(Object event) {}
 
         @Override
         public boolean flush(long timeoutMs) {
@@ -95,15 +93,14 @@ class CommandsConsumerTest {
                 CommandsConfig.defaults());
     }
 
-    private static ConsumerRecord<byte[], byte[]> recordWithHeaders(String topic, String messageType,
-                                                                    UUID corrId, byte[] value) {
+    private static ConsumerRecord<byte[], byte[]> recordWithHeaders(
+            String topic, String messageType, UUID corrId, byte[] value) {
         return recordWithHeaders(topic, messageType, corrId, value, OWN_SERVER_ID);
     }
 
-    private static ConsumerRecord<byte[], byte[]> recordWithHeaders(String topic, String messageType,
-                                                                    UUID corrId, byte[] value,
-                                                                    UUID targetServerId) {
-        ConsumerRecord<byte[], byte[]> r = new ConsumerRecord<>(topic, 0, 0L, new byte[]{1, 2}, value);
+    private static ConsumerRecord<byte[], byte[]> recordWithHeaders(
+            String topic, String messageType, UUID corrId, byte[] value, UUID targetServerId) {
+        ConsumerRecord<byte[], byte[]> r = new ConsumerRecord<>(topic, 0, 0L, new byte[] {1, 2}, value);
         if (messageType != null) {
             r.headers().add(NxHeaders.NX_MESSAGE_TYPE, messageType.getBytes(StandardCharsets.UTF_8));
         }
@@ -128,8 +125,8 @@ class CommandsConsumerTest {
         CommandsConsumer consumer = build("out");
         UUID corr = UUID.randomUUID();
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", corr,
-                "{\"charId\":123}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(
+                recordWithHeaders("in", "FakeCommand", corr, "{\"charId\":123}".getBytes(StandardCharsets.UTF_8)));
 
         assertTrue(handlerCalled.get());
         assertEquals(1L, consumer.handledTotal());
@@ -138,9 +135,11 @@ class CommandsConsumerTest {
 
         ProducerRecord<byte[], Object> reply = sender.sent.get(0);
         assertEquals("out", reply.topic());
-        assertArrayEquals("FakeResult".getBytes(StandardCharsets.UTF_8),
+        assertArrayEquals(
+                "FakeResult".getBytes(StandardCharsets.UTF_8),
                 reply.headers().lastHeader(NxHeaders.NX_MESSAGE_TYPE).value());
-        assertArrayEquals(corr.toString().getBytes(StandardCharsets.UTF_8),
+        assertArrayEquals(
+                corr.toString().getBytes(StandardCharsets.UTF_8),
                 reply.headers().lastHeader(NxHeaders.NX_CORRELATION_ID).value());
         CommandResult<?> body = (CommandResult<?>) reply.value();
         assertTrue(body.isOk());
@@ -150,26 +149,30 @@ class CommandsConsumerTest {
     void processRecord_missingMessageTypeHeader_shouldReplyUnsupported() {
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", null, UUID.randomUUID(),
-                "{}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders("in", null, UUID.randomUUID(), "{}".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1L, consumer.unsupportedTotal());
         assertEquals(1, sender.sent.size());
         CommandResult<?> body = (CommandResult<?>) sender.sent.get(0).value();
         assertFalse(body.isOk());
         assertEquals(CommandStatus.UNSUPPORTED_COMMAND, body.getStatus());
-        assertEquals("missing-message-type-header",
-                body.getProblem().getExtensions().get("error.cause"));
-        assertArrayEquals("CommandResult".getBytes(StandardCharsets.UTF_8),
-                sender.sent.get(0).headers().lastHeader(NxHeaders.NX_MESSAGE_TYPE).value());
+        assertEquals(
+                "missing-message-type-header", body.getProblem().getExtensions().get("error.cause"));
+        assertArrayEquals(
+                "CommandResult".getBytes(StandardCharsets.UTF_8),
+                sender.sent
+                        .get(0)
+                        .headers()
+                        .lastHeader(NxHeaders.NX_MESSAGE_TYPE)
+                        .value());
     }
 
     @Test
     void processRecord_unknownType_shouldReplyUnsupported() {
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "GhostCommand", UUID.randomUUID(),
-                "{}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(
+                recordWithHeaders("in", "GhostCommand", UUID.randomUUID(), "{}".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1L, consumer.unsupportedTotal());
         CommandResult<?> body = (CommandResult<?>) sender.sent.get(0).value();
@@ -182,8 +185,8 @@ class CommandsConsumerTest {
         registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.ok());
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{not valid json".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{not valid json".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1L, consumer.validationFailedTotal());
         CommandResult<?> body = (CommandResult<?>) sender.sent.get(0).value();
@@ -199,14 +202,13 @@ class CommandsConsumerTest {
         });
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1L, consumer.internalErrorsTotal());
         CommandResult<?> body = (CommandResult<?>) sender.sent.get(0).value();
         assertEquals(CommandStatus.INTERNAL_ERROR, body.getStatus());
-        assertEquals("IllegalStateException",
-                body.getProblem().getExtensions().get("error.class"));
+        assertEquals("IllegalStateException", body.getProblem().getExtensions().get("error.class"));
         assertEquals("boom", body.getProblem().getDetail());
     }
 
@@ -217,14 +219,13 @@ class CommandsConsumerTest {
         });
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1L, consumer.internalErrorsTotal());
         CommandResult<?> body = (CommandResult<?>) sender.sent.get(0).value();
         assertEquals(CommandStatus.UNAVAILABLE, body.getStatus());
-        assertEquals("host-executor-timeout",
-                body.getProblem().getExtensions().get("error.cause"));
+        assertEquals("host-executor-timeout", body.getProblem().getExtensions().get("error.cause"));
         assertEquals(30_000L, body.getProblem().getExtensions().get("timeout.ms"));
     }
 
@@ -233,14 +234,13 @@ class CommandsConsumerTest {
         registry.register(FakeCommand.class, (cmd, ctx) -> null);
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1L, consumer.internalErrorsTotal());
         CommandResult<?> body = (CommandResult<?>) sender.sent.get(0).value();
         assertEquals(CommandStatus.INTERNAL_ERROR, body.getStatus());
-        assertEquals("handler-returned-null",
-                body.getProblem().getExtensions().get("error.cause"));
+        assertEquals("handler-returned-null", body.getProblem().getExtensions().get("error.cause"));
     }
 
     @Test
@@ -248,8 +248,8 @@ class CommandsConsumerTest {
         registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.ok());
         CommandsConsumer consumer = build(null);
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1L, consumer.handledTotal());
         assertEquals(0L, consumer.repliesPublishedTotal());
@@ -267,8 +267,8 @@ class CommandsConsumerTest {
         });
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":42}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":42}".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1, calls.get());
     }
@@ -281,8 +281,8 @@ class CommandsConsumerTest {
         });
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", null,
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(
+                recordWithHeaders("in", "FakeCommand", null, "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1, sender.sent.size());
     }
@@ -293,8 +293,8 @@ class CommandsConsumerTest {
         registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.ok());
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(1L, consumer.repliesFailedTotal());
         assertEquals(0L, consumer.repliesPublishedTotal());
@@ -309,11 +309,10 @@ class CommandsConsumerTest {
         });
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
 
-        assertTrue(ioObserved.get(),
-                "ctx.io().execute() must run on the supplied executor (direct-run double)");
+        assertTrue(ioObserved.get(), "ctx.io().execute() must run on the supplied executor (direct-run double)");
     }
 
     @Test
@@ -321,11 +320,11 @@ class CommandsConsumerTest {
         registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.ok());
         CommandsConsumer consumer = build("out");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
 
-        assertEquals(0, consumer.pendingReplies(),
-                "callback fired synchronously in fake — pending should be back to 0");
+        assertEquals(
+                0, consumer.pendingReplies(), "callback fired synchronously in fake — pending should be back to 0");
     }
 
     @Test
@@ -338,8 +337,12 @@ class CommandsConsumerTest {
         CommandsConsumer consumer = build("out");
         UUID otherServer = UUID.fromString("019a0000-0000-7000-8000-00000000beef");
 
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8), otherServer));
+        consumer.processRecord(recordWithHeaders(
+                "in",
+                "FakeCommand",
+                UUID.randomUUID(),
+                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8),
+                otherServer));
 
         assertFalse(handlerCalled.get(), "handler MUST NOT run for a record targeted at another server");
         assertEquals(1L, consumer.otherServerSkippedTotal());
@@ -356,8 +359,8 @@ class CommandsConsumerTest {
         CommandsConsumer consumer = build("out");
 
         // null target → no NX_TARGET_SERVER_ID header stamped
-        consumer.processRecord(recordWithHeaders("in", "FakeCommand", UUID.randomUUID(),
-                "{\"charId\":1}".getBytes(StandardCharsets.UTF_8), null));
+        consumer.processRecord(recordWithHeaders(
+                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8), null));
 
         assertFalse(handlerCalled.get(), "missing target header → strict drop");
         assertEquals(1L, consumer.otherServerSkippedTotal());

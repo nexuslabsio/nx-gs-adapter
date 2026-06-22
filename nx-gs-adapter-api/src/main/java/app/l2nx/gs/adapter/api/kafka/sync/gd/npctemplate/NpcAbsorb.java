@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
 import app.l2nx.gs.adapter.api.domain.npc.NpcAbsorbType;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One soul-absorb rule of an NPC — who may absorb, within which player-level band, at what
@@ -24,12 +23,13 @@ public final class NpcAbsorb {
     private final @Nullable Integer cursedChancePercent;
     private final @Nullable Boolean skill;
 
-    public NpcAbsorb(@Nullable NpcAbsorbType type,
-                     @Nullable Integer minLevel,
-                     @Nullable Integer maxLevel,
-                     @Nullable Integer chancePercent,
-                     @Nullable Integer cursedChancePercent,
-                     @Nullable Boolean skill) {
+    public NpcAbsorb(
+            @Nullable NpcAbsorbType type,
+            @Nullable Integer minLevel,
+            @Nullable Integer maxLevel,
+            @Nullable Integer chancePercent,
+            @Nullable Integer cursedChancePercent,
+            @Nullable Boolean skill) {
         this.type = type;
         this.minLevel = minLevel;
         this.maxLevel = maxLevel;

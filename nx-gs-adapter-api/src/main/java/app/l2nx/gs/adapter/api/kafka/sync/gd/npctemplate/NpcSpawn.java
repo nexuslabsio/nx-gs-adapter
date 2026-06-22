@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One spawn definition for an NPC — where / how many / how often it appears. Carried in
@@ -31,16 +30,17 @@ public final class NpcSpawn {
     private final @Nullable String respawnPattern;
     private final @Nullable List<NpcSpawnPoint> territory;
 
-    public NpcSpawn(@Nullable Integer x,
-                    @Nullable Integer y,
-                    @Nullable Integer z,
-                    @Nullable Integer heading,
-                    @Nullable Integer count,
-                    @Nullable Integer respawnSec,
-                    @Nullable Integer respawnRandomSec,
-                    @Nullable String periodOfDay,
-                    @Nullable String respawnPattern,
-                    @Nullable List<NpcSpawnPoint> territory) {
+    public NpcSpawn(
+            @Nullable Integer x,
+            @Nullable Integer y,
+            @Nullable Integer z,
+            @Nullable Integer heading,
+            @Nullable Integer count,
+            @Nullable Integer respawnSec,
+            @Nullable Integer respawnRandomSec,
+            @Nullable String periodOfDay,
+            @Nullable String respawnPattern,
+            @Nullable List<NpcSpawnPoint> territory) {
         this.x = x;
         this.y = y;
         this.z = z;
@@ -50,8 +50,8 @@ public final class NpcSpawn {
         this.respawnRandomSec = respawnRandomSec;
         this.periodOfDay = periodOfDay;
         this.respawnPattern = respawnPattern;
-        this.territory = territory == null ? null
-                : Collections.unmodifiableList(new ArrayList<NpcSpawnPoint>(territory));
+        this.territory =
+                territory == null ? null : Collections.unmodifiableList(new ArrayList<NpcSpawnPoint>(territory));
     }
 
     public @Nullable Integer getX() {
@@ -131,8 +131,8 @@ public final class NpcSpawn {
 
     @Override
     public int hashCode() {
-        return Objects.hash(x, y, z, heading, count, respawnSec, respawnRandomSec, periodOfDay,
-                respawnPattern, territory);
+        return Objects.hash(
+                x, y, z, heading, count, respawnSec, respawnRandomSec, periodOfDay, respawnPattern, territory);
     }
 
     @Override
@@ -203,8 +203,8 @@ public final class NpcSpawn {
         }
 
         public NpcSpawn build() {
-            return new NpcSpawn(x, y, z, heading, count, respawnSec, respawnRandomSec, periodOfDay,
-                    respawnPattern, territory);
+            return new NpcSpawn(
+                    x, y, z, heading, count, respawnSec, respawnRandomSec, periodOfDay, respawnPattern, territory);
         }
     }
 }

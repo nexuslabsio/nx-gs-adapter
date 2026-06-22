@@ -1,16 +1,15 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 
-import app.l2nx.gs.adapter.api.domain.npc.NpcRace;
-import app.l2nx.gs.adapter.api.localization.LocalizedText;
-import org.junit.jupiter.api.Test;
-
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import app.l2nx.gs.adapter.api.domain.npc.NpcRace;
+import app.l2nx.gs.adapter.api.localization.LocalizedText;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 
 /**
  * Guards the 37-parameter constructor/builder ordering: with runs of adjacent same-typed
@@ -83,7 +82,8 @@ class NpcTemplateTest {
     void stats_shouldBeDefensivelyCopiedAndUnmodifiable() {
         Map<String, Double> source = new LinkedHashMap<String, Double>();
         source.put("MAX_HP", 100.0);
-        NpcTemplate t = NpcTemplate.builder().id(1).type("MONSTER").stats(source).build();
+        NpcTemplate t =
+                NpcTemplate.builder().id(1).type("MONSTER").stats(source).build();
 
         source.put("MAX_MP", 50.0);
         assertEquals(1, t.getStats().size());
@@ -131,16 +131,22 @@ class NpcTemplateTest {
                 .title(LocalizedText.of(title))
                 .rightHand(80)
                 .leftHand(641)
-                .skills(Collections.singletonList(NpcSkillRef.builder().id(4045).level(1).build()))
+                .skills(Collections.singletonList(
+                        NpcSkillRef.builder().id(4045).level(1).build()))
                 .drops(Collections.singletonList(NpcDropGroup.builder()
                         .groupIndex(0)
                         .items(Collections.singletonList(
                                 NpcDropItem.builder().itemTemplateId(57).build()))
                         .build()))
-                .minions(Collections.singletonList(
-                        NpcMinionRef.builder().minionNpcTemplateId(25502).count(2).build()))
-                .absorbs(Collections.singletonList(
-                        NpcAbsorb.builder().minLevel(13).maxLevel(13).skill(Boolean.TRUE).build()))
+                .minions(Collections.singletonList(NpcMinionRef.builder()
+                        .minionNpcTemplateId(25502)
+                        .count(2)
+                        .build()))
+                .absorbs(Collections.singletonList(NpcAbsorb.builder()
+                        .minLevel(13)
+                        .maxLevel(13)
+                        .skill(Boolean.TRUE)
+                        .build()))
                 .spawns(Collections.singletonList(
                         NpcSpawn.builder().x(1).y(2).z(3).heading(0).build()))
                 .build();

@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.item;
 
 import app.l2nx.gs.adapter.api.domain.Attribute;
-
 import java.util.Objects;
 
 /**

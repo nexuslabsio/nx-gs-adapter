@@ -1,7 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Optional;

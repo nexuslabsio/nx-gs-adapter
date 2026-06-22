@@ -49,10 +49,7 @@ public final class MailDeletedEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .mailId(mailId)
-                .side(side);
+        return new Builder().eventId(eventId).mailId(mailId).side(side);
     }
 
     public static Builder builder() {
@@ -64,9 +61,7 @@ public final class MailDeletedEvent {
         if (this == o) return true;
         if (!(o instanceof MailDeletedEvent)) return false;
         MailDeletedEvent that = (MailDeletedEvent) o;
-        return mailId == that.mailId
-                && Objects.equals(eventId, that.eventId)
-                && side == that.side;
+        return mailId == that.mailId && Objects.equals(eventId, that.eventId) && side == that.side;
     }
 
     @Override
@@ -76,9 +71,7 @@ public final class MailDeletedEvent {
 
     @Override
     public String toString() {
-        return "MailDeletedEvent[eventId=" + eventId
-                + ", mailId=" + mailId
-                + ", side=" + side + "]";
+        return "MailDeletedEvent[eventId=" + eventId + ", mailId=" + mailId + ", side=" + side + "]";
     }
 
     public static final class Builder {

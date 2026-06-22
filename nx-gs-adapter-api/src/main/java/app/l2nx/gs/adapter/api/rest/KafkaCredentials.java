@@ -19,11 +19,8 @@ public final class KafkaCredentials {
     private final String saslUsername;
     private final String saslPassword;
 
-    public KafkaCredentials(String bootstrap,
-                            String securityProtocol,
-                            String saslMechanism,
-                            String saslUsername,
-                            String saslPassword) {
+    public KafkaCredentials(
+            String bootstrap, String securityProtocol, String saslMechanism, String saslUsername, String saslPassword) {
         this.bootstrap = bootstrap;
         this.securityProtocol = securityProtocol;
         this.saslMechanism = saslMechanism;

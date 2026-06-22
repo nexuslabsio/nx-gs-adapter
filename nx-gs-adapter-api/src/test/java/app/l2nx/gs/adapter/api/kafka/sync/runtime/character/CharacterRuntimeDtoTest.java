@@ -1,21 +1,19 @@
 package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class CharacterRuntimeDtoTest {
 
     private static CustomActivity fishing() {
         return CustomActivity.builder()
                 .type(WellKnownCustomActivities.FISHING)
-                .metadata(Collections.singletonMap(
-                        WellKnownCustomActivityMetadata.ELAPSED_SECONDS, "1820"))
+                .metadata(Collections.singletonMap(WellKnownCustomActivityMetadata.ELAPSED_SECONDS, "1820"))
                 .build();
     }
 
@@ -38,10 +36,8 @@ class CharacterRuntimeDtoTest {
 
     @Test
     void builder_shouldPopulateOfflineTombstone() {
-        CharacterRuntimeDto dto = CharacterRuntimeDto.builder()
-                .id(42L)
-                .online(Boolean.FALSE)
-                .build();
+        CharacterRuntimeDto dto =
+                CharacterRuntimeDto.builder().id(42L).online(Boolean.FALSE).build();
 
         assertEquals(42L, dto.getId());
         assertEquals(Boolean.FALSE, dto.getOnline());
@@ -53,7 +49,8 @@ class CharacterRuntimeDtoTest {
     @Test
     void onlineNullAndTrue_shouldNotBeEqual_perFieldSemantics() {
         CharacterRuntimeDto omittedOnline = CharacterRuntimeDto.builder().id(1L).build();
-        CharacterRuntimeDto explicitTrue = CharacterRuntimeDto.builder().id(1L).online(Boolean.TRUE).build();
+        CharacterRuntimeDto explicitTrue =
+                CharacterRuntimeDto.builder().id(1L).online(Boolean.TRUE).build();
 
         // Consumer-side semantics treat null and true alike, but the DTO itself
         // preserves the distinction — equals reflects raw field state.
@@ -63,9 +60,22 @@ class CharacterRuntimeDtoTest {
     @Test
     void toBuilder_shouldRoundtrip() {
         CharacterRuntimeDto original = new CharacterRuntimeDto(
-                123L, 100, 200, 50, 100, 25, 50,
-                1000, 2000, 500, 600, -700, Boolean.TRUE, "attack",
-                4_500_000_000L, Collections.singletonList(fishing()));
+                123L,
+                100,
+                200,
+                50,
+                100,
+                25,
+                50,
+                1000,
+                2000,
+                500,
+                600,
+                -700,
+                Boolean.TRUE,
+                "attack",
+                4_500_000_000L,
+                Collections.singletonList(fishing()));
 
         assertEquals(original, original.toBuilder().build());
     }
@@ -82,16 +92,16 @@ class CharacterRuntimeDtoTest {
         assertEquals("idle", dto.getAiStatus());
         assertEquals(Collections.singletonList(activity), dto.getCustomActivities());
         assertEquals("fishing", dto.getCustomActivities().get(0).getType());
-        assertEquals("1820", dto.getCustomActivities().get(0).getMetadata()
-                .get(WellKnownCustomActivityMetadata.ELAPSED_SECONDS));
+        assertEquals(
+                "1820",
+                dto.getCustomActivities().get(0).getMetadata().get(WellKnownCustomActivityMetadata.ELAPSED_SECONDS));
     }
 
     @Test
     void customActivities_shouldCarryMultipleEntries() {
         CustomActivity autofarming = CustomActivity.builder()
                 .type(WellKnownCustomActivities.AUTOFARMING)
-                .metadata(Collections.singletonMap(
-                        WellKnownCustomActivityMetadata.SECONDS_REMAINING, "3600"))
+                .metadata(Collections.singletonMap(WellKnownCustomActivityMetadata.SECONDS_REMAINING, "3600"))
                 .build();
         CharacterRuntimeDto dto = CharacterRuntimeDto.builder()
                 .id(42L)
@@ -107,11 +117,13 @@ class CharacterRuntimeDtoTest {
     void customActivities_shouldBeUnmodifiableAndDefensivelyCopied() {
         List<CustomActivity> source = new ArrayList<>();
         source.add(fishing());
-        CharacterRuntimeDto dto = CharacterRuntimeDto.builder().id(1L).customActivities(source).build();
+        CharacterRuntimeDto dto =
+                CharacterRuntimeDto.builder().id(1L).customActivities(source).build();
 
         source.clear();
         assertEquals(1, dto.getCustomActivities().size());
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> dto.getCustomActivities().add(fishing()));
     }
 
@@ -126,9 +138,12 @@ class CharacterRuntimeDtoTest {
     @Test
     void activityFields_shouldBeIndependentInEquals() {
         CharacterRuntimeDto fishingIdle = CharacterRuntimeDto.builder()
-                .id(1L).aiStatus("idle").customActivities(Collections.singletonList(fishing())).build();
-        CharacterRuntimeDto plainIdle = CharacterRuntimeDto.builder()
-                .id(1L).aiStatus("idle").build();
+                .id(1L)
+                .aiStatus("idle")
+                .customActivities(Collections.singletonList(fishing()))
+                .build();
+        CharacterRuntimeDto plainIdle =
+                CharacterRuntimeDto.builder().id(1L).aiStatus("idle").build();
 
         // customActivities differ (fishing vs none) though aiStatus matches —
         // the two fields are orthogonal and both participate in equality.
@@ -138,7 +153,10 @@ class CharacterRuntimeDtoTest {
     @Test
     void toBuilder_shouldRoundtripActivityFields() {
         CharacterRuntimeDto original = CharacterRuntimeDto.builder()
-                .id(9L).aiStatus("cast").customActivities(Collections.singletonList(fishing())).build();
+                .id(9L)
+                .aiStatus("cast")
+                .customActivities(Collections.singletonList(fishing()))
+                .build();
 
         assertEquals(original, original.toBuilder().build());
     }
@@ -147,8 +165,7 @@ class CharacterRuntimeDtoTest {
     void builder_andConstructor_shouldProduceEqualObjects_whenAllOptionalNull() {
         CharacterRuntimeDto fromBuilder = CharacterRuntimeDto.builder().id(7L).build();
         CharacterRuntimeDto fromCtor = new CharacterRuntimeDto(
-                7L, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+                7L, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -158,7 +175,8 @@ class CharacterRuntimeDtoTest {
     void exp_shouldBeNullByDefaultAndRoundtrip() {
         assertNull(CharacterRuntimeDto.builder().id(1L).build().getExp());
 
-        CharacterRuntimeDto withExp = CharacterRuntimeDto.builder().id(1L).exp(4_500_000_000L).build();
+        CharacterRuntimeDto withExp =
+                CharacterRuntimeDto.builder().id(1L).exp(4_500_000_000L).build();
         assertEquals(Long.valueOf(4_500_000_000L), withExp.getExp());
         assertEquals(withExp, withExp.toBuilder().build());
 

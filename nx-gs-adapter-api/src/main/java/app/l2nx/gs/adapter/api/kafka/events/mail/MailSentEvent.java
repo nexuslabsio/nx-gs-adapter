@@ -1,9 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Mail row created on the host. One event per row; batched sends emit one
@@ -35,17 +34,18 @@ public final class MailSentEvent {
     private final List<MailItemMovement> attachments;
     private final @Nullable Map<String, String> metadata;
 
-    public MailSentEvent(UUID eventId,
-                         long mailId,
-                         long senderCharId,
-                         @Nullable String senderName,
-                         long receiverCharId,
-                         String subject,
-                         @Nullable String body,
-                         Instant expiresAt,
-                         long codAmount,
-                         @Nullable List<MailItemMovement> attachments,
-                         @Nullable Map<String, String> metadata) {
+    public MailSentEvent(
+            UUID eventId,
+            long mailId,
+            long senderCharId,
+            @Nullable String senderName,
+            long receiverCharId,
+            String subject,
+            @Nullable String body,
+            Instant expiresAt,
+            long codAmount,
+            @Nullable List<MailItemMovement> attachments,
+            @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.mailId = mailId;
         this.senderCharId = senderCharId;
@@ -56,7 +56,8 @@ public final class MailSentEvent {
         this.expiresAt = expiresAt;
         this.codAmount = codAmount;
         this.attachments = freezeList(attachments);
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -167,8 +168,18 @@ public final class MailSentEvent {
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, mailId, senderCharId, senderName, receiverCharId,
-                subject, body, expiresAt, codAmount, attachments, metadata);
+        return Objects.hash(
+                eventId,
+                mailId,
+                senderCharId,
+                senderName,
+                receiverCharId,
+                subject,
+                body,
+                expiresAt,
+                codAmount,
+                attachments,
+                metadata);
     }
 
     @Override
@@ -255,8 +266,18 @@ public final class MailSentEvent {
         }
 
         public MailSentEvent build() {
-            return new MailSentEvent(eventId, mailId, senderCharId, senderName, receiverCharId,
-                    subject, body, expiresAt, codAmount, attachments, metadata);
+            return new MailSentEvent(
+                    eventId,
+                    mailId,
+                    senderCharId,
+                    senderName,
+                    receiverCharId,
+                    subject,
+                    body,
+                    expiresAt,
+                    codAmount,
+                    attachments,
+                    metadata);
         }
     }
 }

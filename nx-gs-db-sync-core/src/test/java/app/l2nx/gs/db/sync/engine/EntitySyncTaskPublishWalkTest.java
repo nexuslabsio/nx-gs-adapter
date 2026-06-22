@@ -1,20 +1,19 @@
 package app.l2nx.gs.db.sync.engine;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.Mockito.mock;
+
 import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
 import app.l2nx.gs.db.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.db.sync.engine.window.WindowPlanner;
 import it.unimi.dsi.fastutil.longs.*;
+import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Test;
-
-import java.util.concurrent.CompletableFuture;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.mockito.Mockito.mock;
 
 /**
  * Publish-walk seam: created/updated/deleted advance the snapshot, failed and
@@ -23,8 +22,7 @@ import static org.mockito.Mockito.mock;
  */
 class EntitySyncTaskPublishWalkTest {
 
-    private static final RecordMetadata META =
-            new RecordMetadata(new TopicPartition("t", 0), 0L, 0, 0L, 0, 0);
+    private static final RecordMetadata META = new RecordMetadata(new TopicPartition("t", 0), 0L, 0, 0L, 0, 0);
 
     private final SnapshotStore snapshot = new SnapshotStore();
 
@@ -50,8 +48,8 @@ class EntitySyncTaskPublishWalkTest {
         pendingCreates.add(2L);
         pendingCreates.add(3L);
 
-        long[] tally = task.walkInFlightAndAdvance("clan", inFlight, pendingCrcAdvance,
-                pendingCreates, new LongOpenHashSet());
+        long[] tally =
+                task.walkInFlightAndAdvance("clan", inFlight, pendingCrcAdvance, pendingCreates, new LongOpenHashSet());
 
         assertEquals(1L, tally[0], "one acked create");
         assertEquals(0L, tally[1]);
@@ -81,8 +79,7 @@ class EntitySyncTaskPublishWalkTest {
         pendingDeletes.add(2L);
         snapshot.putCrc("clan", 2L, 200);
 
-        long[] tally = task.walkInFlightAndAdvance("clan", inFlight, pendingCrcAdvance,
-                pendingCreates, pendingDeletes);
+        long[] tally = task.walkInFlightAndAdvance("clan", inFlight, pendingCrcAdvance, pendingCreates, pendingDeletes);
 
         assertEquals(1L, tally[0]);
         assertEquals(0L, tally[1]);

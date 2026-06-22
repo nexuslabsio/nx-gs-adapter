@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.events.account;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Instant;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class AccountAuthAttemptEventTest {
 
@@ -45,53 +44,81 @@ class AccountAuthAttemptEventTest {
 
     @Test
     void getFailureDetail_shouldBeNullable_forSuccessfulLogin() {
-        AccountAuthAttemptEvent event = minimal()
-                .outcome(AuthOutcomes.SUCCESS)
-                .build();
+        AccountAuthAttemptEvent event = minimal().outcome(AuthOutcomes.SUCCESS).build();
 
         assertNull(event.getFailureDetail());
     }
 
     @Test
     void constructor_shouldRejectNullEventId() {
-        assertThrows(NullPointerException.class, () ->
-                new AccountAuthAttemptEvent(null, SAMPLE_SERVER_ID, "a", "1.1.1.1",
-                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
+        assertThrows(
+                NullPointerException.class,
+                () -> new AccountAuthAttemptEvent(
+                        null, SAMPLE_SERVER_ID, "a", "1.1.1.1", null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
     }
 
     @Test
     void constructor_shouldRejectNullServerId() {
-        assertThrows(NullPointerException.class, () ->
-                new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, null, "a", "1.1.1.1",
-                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
+        assertThrows(
+                NullPointerException.class,
+                () -> new AccountAuthAttemptEvent(
+                        SAMPLE_EVENT_ID, null, "a", "1.1.1.1", null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
     }
 
     @Test
     void constructor_shouldRejectNullAccountName() {
-        assertThrows(NullPointerException.class, () ->
-                new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, SAMPLE_SERVER_ID, null, "1.1.1.1",
-                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
+        assertThrows(
+                NullPointerException.class,
+                () -> new AccountAuthAttemptEvent(
+                        SAMPLE_EVENT_ID,
+                        SAMPLE_SERVER_ID,
+                        null,
+                        "1.1.1.1",
+                        null,
+                        AuthOutcomes.SUCCESS,
+                        SAMPLE_AT,
+                        null,
+                        null));
     }
 
     @Test
     void constructor_shouldRejectNullClientIp() {
-        assertThrows(NullPointerException.class, () ->
-                new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, SAMPLE_SERVER_ID, "a", null,
-                        null, AuthOutcomes.SUCCESS, SAMPLE_AT, null, null));
+        assertThrows(
+                NullPointerException.class,
+                () -> new AccountAuthAttemptEvent(
+                        SAMPLE_EVENT_ID,
+                        SAMPLE_SERVER_ID,
+                        "a",
+                        null,
+                        null,
+                        AuthOutcomes.SUCCESS,
+                        SAMPLE_AT,
+                        null,
+                        null));
     }
 
     @Test
     void constructor_shouldRejectNullOutcome() {
-        assertThrows(NullPointerException.class, () ->
-                new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, SAMPLE_SERVER_ID, "a", "1.1.1.1",
-                        null, null, SAMPLE_AT, null, null));
+        assertThrows(
+                NullPointerException.class,
+                () -> new AccountAuthAttemptEvent(
+                        SAMPLE_EVENT_ID, SAMPLE_SERVER_ID, "a", "1.1.1.1", null, null, SAMPLE_AT, null, null));
     }
 
     @Test
     void constructor_shouldRejectNullAttemptedAt() {
-        assertThrows(NullPointerException.class, () ->
-                new AccountAuthAttemptEvent(SAMPLE_EVENT_ID, SAMPLE_SERVER_ID, "a", "1.1.1.1",
-                        null, AuthOutcomes.SUCCESS, null, null, null));
+        assertThrows(
+                NullPointerException.class,
+                () -> new AccountAuthAttemptEvent(
+                        SAMPLE_EVENT_ID,
+                        SAMPLE_SERVER_ID,
+                        "a",
+                        "1.1.1.1",
+                        null,
+                        AuthOutcomes.SUCCESS,
+                        null,
+                        null,
+                        null));
     }
 
     @Test
@@ -113,7 +140,8 @@ class AccountAuthAttemptEventTest {
     @Test
     void equals_shouldDistinguishOutcome() {
         AccountAuthAttemptEvent a = minimal().outcome(AuthOutcomes.SUCCESS).build();
-        AccountAuthAttemptEvent b = minimal().outcome(AuthOutcomes.WRONG_PASSWORD).build();
+        AccountAuthAttemptEvent b =
+                minimal().outcome(AuthOutcomes.WRONG_PASSWORD).build();
 
         assertNotEquals(a, b);
     }
@@ -141,7 +169,8 @@ class AccountAuthAttemptEventTest {
     @Test
     void getOutcome_shouldAcceptUnknownString() {
         // Consumers MUST handle unknown values gracefully — the wire is free-form.
-        AccountAuthAttemptEvent event = minimal().outcome("CORE_VERSION_MISMATCH").build();
+        AccountAuthAttemptEvent event =
+                minimal().outcome("CORE_VERSION_MISMATCH").build();
 
         assertEquals("CORE_VERSION_MISMATCH", event.getOutcome());
     }

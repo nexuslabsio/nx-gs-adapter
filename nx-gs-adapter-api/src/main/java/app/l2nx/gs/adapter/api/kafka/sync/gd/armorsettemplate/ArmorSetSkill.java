@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.armorsettemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One skill an {@link ArmorSetTemplate} grants. {@code skillTemplateId} is the non-null FK to
@@ -23,11 +22,12 @@ public final class ArmorSetSkill {
     private final @Nullable Integer minPieces;
     private final @Nullable Integer enchantLevel;
 
-    public ArmorSetSkill(int skillTemplateId,
-                         @Nullable Integer skillLevel,
-                         String kind,
-                         @Nullable Integer minPieces,
-                         @Nullable Integer enchantLevel) {
+    public ArmorSetSkill(
+            int skillTemplateId,
+            @Nullable Integer skillLevel,
+            String kind,
+            @Nullable Integer minPieces,
+            @Nullable Integer enchantLevel) {
         this.skillTemplateId = skillTemplateId;
         this.skillLevel = skillLevel;
         this.kind = Objects.requireNonNull(kind, "kind");
@@ -97,8 +97,8 @@ public final class ArmorSetSkill {
 
     @Override
     public String toString() {
-        return "ArmorSetSkill[skillTemplateId=" + skillTemplateId + ", skillLevel=" + skillLevel
-                + ", kind=" + kind + "]";
+        return "ArmorSetSkill[skillTemplateId=" + skillTemplateId + ", skillLevel=" + skillLevel + ", kind=" + kind
+                + "]";
     }
 
     public static final class Builder {

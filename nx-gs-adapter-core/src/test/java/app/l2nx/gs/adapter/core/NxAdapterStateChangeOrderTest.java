@@ -1,22 +1,16 @@
 package app.l2nx.gs.adapter.core;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import app.l2nx.gs.adapter.core.connect.ConnectFlow;
+import java.util.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 class NxAdapterStateChangeOrderTest {
 
-    private static final String[] L2NX_PROPS = {
-            "l2nx.gs-key",
-            "l2nx.platform-url",
-            "l2nx.enabled",
-            "l2nx.config-file"
-    };
+    private static final String[] L2NX_PROPS = {"l2nx.gs-key", "l2nx.platform-url", "l2nx.enabled", "l2nx.config-file"};
 
     private final Map<String, String> savedProps = new HashMap<>();
 
@@ -51,12 +45,9 @@ class NxAdapterStateChangeOrderTest {
         // start() with no l2nx.gs-key fails config resolve → FAILED before CLOSED.
         NxAdapter.start().shutdown();
 
-        assertEquals(Arrays.asList(
-                AdapterState.REGISTERING,
-                AdapterState.ACTIVE,
-                AdapterState.FAILED,
-                AdapterState.CLOSED
-        ), captured);
+        assertEquals(
+                Arrays.asList(AdapterState.REGISTERING, AdapterState.ACTIVE, AdapterState.FAILED, AdapterState.CLOSED),
+                captured);
     }
 
     @Test
@@ -67,7 +58,6 @@ class NxAdapterStateChangeOrderTest {
         NxAdapter.simulateConnectOutcomeForTesting(ConnectFlow.Outcome.STARTING);
         NxAdapter.simulateConnectOutcomeForTesting(ConnectFlow.Outcome.ACTIVE);
 
-        assertEquals(Arrays.asList(AdapterState.REGISTERING, AdapterState.ACTIVE),
-                seenInsideCallback);
+        assertEquals(Arrays.asList(AdapterState.REGISTERING, AdapterState.ACTIVE), seenInsideCallback);
     }
 }

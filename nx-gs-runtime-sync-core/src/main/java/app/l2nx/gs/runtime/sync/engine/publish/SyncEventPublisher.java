@@ -2,10 +2,9 @@ package app.l2nx.gs.runtime.sync.engine.publish;
 
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
 import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
-import org.apache.kafka.clients.producer.RecordMetadata;
-
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
+import org.apache.kafka.clients.producer.RecordMetadata;
 
 /**
  * Builds {@link SyncEvent} payloads for created / updated PKs and forwards them
@@ -28,11 +27,8 @@ public final class SyncEventPublisher {
         this.sender = sender;
     }
 
-    public <T> CompletableFuture<RecordMetadata> publish(RuntimeEntityMapping<T> mapping,
-                                                         String op,
-                                                         long pk,
-                                                         T dto,
-                                                         String topic) {
+    public <T> CompletableFuture<RecordMetadata> publish(
+            RuntimeEntityMapping<T> mapping, String op, long pk, T dto, String topic) {
         SyncEvent<T> value = SyncEvent.<T>builder()
                 .entityName(mapping.entityName())
                 .pk(pk)

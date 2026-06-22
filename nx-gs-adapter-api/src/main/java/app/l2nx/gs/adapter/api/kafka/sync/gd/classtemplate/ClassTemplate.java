@@ -4,9 +4,8 @@ import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClassTier;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClassType;
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic playable-class wire DTO — the common L2 denominator for the static class catalog,
@@ -33,11 +32,12 @@ public final class ClassTemplate {
     private final @Nullable CharacterClassType type;
     private final @Nullable CharacterClassTier tier;
 
-    public ClassTemplate(@Nullable CharacterClass clazz,
-                         @Nullable CharacterClass parentClazz,
-                         @Nullable CharacterRace race,
-                         @Nullable CharacterClassType type,
-                         @Nullable CharacterClassTier tier) {
+    public ClassTemplate(
+            @Nullable CharacterClass clazz,
+            @Nullable CharacterClass parentClazz,
+            @Nullable CharacterRace race,
+            @Nullable CharacterClassType type,
+            @Nullable CharacterClassTier tier) {
         this.clazz = clazz;
         this.parentClazz = parentClazz;
         this.race = race;

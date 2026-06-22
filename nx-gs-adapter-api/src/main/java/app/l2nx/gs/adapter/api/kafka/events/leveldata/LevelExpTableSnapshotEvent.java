@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.leveldata;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO riding the {@code character} family topic
@@ -48,14 +47,12 @@ public final class LevelExpTableSnapshotEvent {
     private final List<LevelExpEntry> levels;
     private final @Nullable Map<String, String> metadata;
 
-    public LevelExpTableSnapshotEvent(UUID eventId,
-                                      @Nullable List<LevelExpEntry> levels,
-                                      @Nullable Map<String, String> metadata) {
+    public LevelExpTableSnapshotEvent(
+            UUID eventId, @Nullable List<LevelExpEntry> levels, @Nullable Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "LevelExpTableSnapshotEvent.eventId is required");
         this.levels = freezeList(levels);
-        this.metadata = metadata == null
-                ? null
-                : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -85,10 +82,7 @@ public final class LevelExpTableSnapshotEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .levels(levels)
-                .metadata(metadata);
+        return new Builder().eventId(eventId).levels(levels).metadata(metadata);
     }
 
     public static Builder builder() {
@@ -119,9 +113,7 @@ public final class LevelExpTableSnapshotEvent {
 
     @Override
     public String toString() {
-        return "LevelExpTableSnapshotEvent[eventId=" + eventId
-                + ", levels=" + levels
-                + ", metadata=" + metadata + "]";
+        return "LevelExpTableSnapshotEvent[eventId=" + eventId + ", levels=" + levels + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {

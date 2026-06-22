@@ -1,7 +1,6 @@
 package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
-
 import java.util.Objects;
 
 /**
@@ -27,23 +26,19 @@ public final class CycleResult {
     private final long failedPublishes;
     private final long pendingPublishes;
 
-    public CycleResult(EntityState state,
-                       long durationMs,
-                       long created,
-                       long updated,
-                       long deleted,
-                       long rowCount) {
+    public CycleResult(EntityState state, long durationMs, long created, long updated, long deleted, long rowCount) {
         this(state, durationMs, created, updated, deleted, rowCount, 0L, 0L);
     }
 
-    public CycleResult(EntityState state,
-                       long durationMs,
-                       long created,
-                       long updated,
-                       long deleted,
-                       long rowCount,
-                       long failedPublishes,
-                       long pendingPublishes) {
+    public CycleResult(
+            EntityState state,
+            long durationMs,
+            long created,
+            long updated,
+            long deleted,
+            long rowCount,
+            long failedPublishes,
+            long pendingPublishes) {
         this.state = state;
         this.durationMs = durationMs;
         this.created = created;
@@ -107,8 +102,7 @@ public final class CycleResult {
 
     @Override
     public int hashCode() {
-        return Objects.hash(state, durationMs, created, updated, deleted, rowCount,
-                failedPublishes, pendingPublishes);
+        return Objects.hash(state, durationMs, created, updated, deleted, rowCount, failedPublishes, pendingPublishes);
     }
 
     @Override

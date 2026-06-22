@@ -1,10 +1,19 @@
 package app.l2nx.gs.kafka.integration;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.KafkaState;
 import app.l2nx.gs.kafka.NxKafka;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -23,24 +32,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class NxKafkaAdvancedIntegrationTest {
 
     @Container
-    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer(
-            "confluentinc/cp-kafka:7.7.0"
-    );
+    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer("confluentinc/cp-kafka:7.7.0");
 
     @AfterEach
     void tearDown() {
@@ -152,7 +149,7 @@ class NxKafkaAdvancedIntegrationTest {
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
 
         try (KafkaProducer<String, byte[]> producer =
-                     new KafkaProducer<>(props, new StringSerializer(), new ByteArraySerializer())) {
+                new KafkaProducer<>(props, new StringSerializer(), new ByteArraySerializer())) {
             producer.send(new ProducerRecord<>(topic, json.getBytes(StandardCharsets.UTF_8)));
             producer.flush();
         }
@@ -165,7 +162,7 @@ class NxKafkaAdvancedIntegrationTest {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
         try (KafkaConsumer<String, byte[]> consumer =
-                     new KafkaConsumer<>(props, new StringDeserializer(), new ByteArrayDeserializer())) {
+                new KafkaConsumer<>(props, new StringDeserializer(), new ByteArrayDeserializer())) {
             consumer.subscribe(Collections.singletonList(topic));
             ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofSeconds(10));
             if (records.isEmpty()) {
@@ -179,8 +176,7 @@ class NxKafkaAdvancedIntegrationTest {
         String name;
         Date date;
 
-        DateEvent() {
-        }
+        DateEvent() {}
 
         DateEvent(String name, Date date) {
             this.name = name;

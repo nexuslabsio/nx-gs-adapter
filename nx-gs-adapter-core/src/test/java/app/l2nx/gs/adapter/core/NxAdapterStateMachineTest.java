@@ -1,18 +1,17 @@
 package app.l2nx.gs.adapter.core;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.adapter.core.connect.ConnectFlow;
 import app.l2nx.gs.adapter.core.kafka.CapturingKafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
 import app.l2nx.gs.kafka.KafkaState;
+import java.util.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Drives the {@link NxAdapter} state machine via package-private simulate helpers
@@ -66,10 +65,7 @@ class NxAdapterStateMachineTest {
         NxAdapter.simulateKafkaStateChangeForTesting(KafkaState.CONNECTED);
 
         assertEquals(AdapterState.ACTIVE, NxAdapter.state());
-        assertEquals(Arrays.asList(
-                AdapterState.ACTIVE,
-                AdapterState.DEGRADED,
-                AdapterState.ACTIVE), captured);
+        assertEquals(Arrays.asList(AdapterState.ACTIVE, AdapterState.DEGRADED, AdapterState.ACTIVE), captured);
     }
 
     @Test

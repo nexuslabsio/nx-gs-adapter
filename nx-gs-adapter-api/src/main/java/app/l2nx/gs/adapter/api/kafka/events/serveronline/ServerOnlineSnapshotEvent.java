@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire DTO published to the {@code serveronline} family topic
@@ -45,12 +44,12 @@ public final class ServerOnlineSnapshotEvent {
     private final Map<String, Long> buckets;
     private final @Nullable Map<String, String> metadata;
 
-    public ServerOnlineSnapshotEvent(UUID eventId,
-                                     @Nullable Map<String, Long> buckets,
-                                     @Nullable Map<String, String> metadata) {
+    public ServerOnlineSnapshotEvent(
+            UUID eventId, @Nullable Map<String, Long> buckets, @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
         this.buckets = freezeMap(buckets);
-        this.metadata = metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.metadata =
+                metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
     /**
@@ -89,10 +88,7 @@ public final class ServerOnlineSnapshotEvent {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .eventId(eventId)
-                .buckets(buckets)
-                .metadata(metadata);
+        return new Builder().eventId(eventId).buckets(buckets).metadata(metadata);
     }
 
     public static Builder builder() {
@@ -123,9 +119,7 @@ public final class ServerOnlineSnapshotEvent {
 
     @Override
     public String toString() {
-        return "ServerOnlineSnapshotEvent[eventId=" + eventId
-                + ", buckets=" + buckets
-                + ", metadata=" + metadata + "]";
+        return "ServerOnlineSnapshotEvent[eventId=" + eventId + ", buckets=" + buckets + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {

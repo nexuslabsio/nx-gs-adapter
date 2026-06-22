@@ -1,24 +1,18 @@
 package app.l2nx.gs.adapter.core;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class NxAdapterTest {
 
-    private static final String[] L2NX_PROPS = {
-            "l2nx.gs-key",
-            "l2nx.platform-url",
-            "l2nx.enabled",
-            "l2nx.config-file"
-    };
+    private static final String[] L2NX_PROPS = {"l2nx.gs-key", "l2nx.platform-url", "l2nx.enabled", "l2nx.config-file"};
 
     private final Map<String, String> savedProps = new HashMap<>();
 
@@ -100,7 +94,6 @@ class NxAdapterTest {
         NxAdapter.start(); // third call too
 
         assertEquals(afterFirst, NxAdapter.state(), "state must not change on duplicate start()");
-        assertEquals(afterFirstCount, transitions.get(),
-                "duplicate start() must not emit additional transitions");
+        assertEquals(afterFirstCount, transitions.get(), "duplicate start() must not emit additional transitions");
     }
 }

@@ -1,21 +1,20 @@
 package app.l2nx.gs.db.sync.engine.phase;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
 import app.l2nx.gs.adapter.api.spi.ChildSource;
 import app.l2nx.gs.adapter.api.spi.PrimarySource;
 import app.l2nx.gs.db.sync.engine.JdbcDialect;
 import it.unimi.dsi.fastutil.longs.*;
-import org.junit.jupiter.api.Test;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
 
 class Phase2FetcherTest {
 
@@ -35,10 +34,8 @@ class Phase2FetcherTest {
 
     @Test
     void buildSql_shouldThrow_whenPlaceholderCountZeroOrNegative() {
-        assertThrows(IllegalArgumentException.class,
-                () -> Phase2Fetcher.buildSql("t", "id", 0));
-        assertThrows(IllegalArgumentException.class,
-                () -> Phase2Fetcher.buildSql("t", "id", -1));
+        assertThrows(IllegalArgumentException.class, () -> Phase2Fetcher.buildSql("t", "id", 0));
+        assertThrows(IllegalArgumentException.class, () -> Phase2Fetcher.buildSql("t", "id", -1));
     }
 
     @Test
@@ -75,10 +72,10 @@ class Phase2FetcherTest {
         when(rs.getString("clan_name")).thenReturn("A", "B");
         when(rs.getInt("clan_level")).thenReturn(5, 7);
 
-        LongList pks = new LongArrayList(new long[]{1L, 2L, 3L});
+        LongList pks = new LongArrayList(new long[] {1L, 2L, 3L});
 
-        Long2ObjectMap<Object> result = new Phase2Fetcher().fetchPrimary(
-                conn, primary, pks, 5, 10_000, JdbcDialect.OTHER);
+        Long2ObjectMap<Object> result =
+                new Phase2Fetcher().fetchPrimary(conn, primary, pks, 5, 10_000, JdbcDialect.OTHER);
 
         verify(conn, times(1)).prepareStatement(anyString());
         verify(ps, times(Phase2Fetcher.CHUNK_SIZE))
@@ -108,10 +105,10 @@ class Phase2FetcherTest {
         when(rs.getInt("skill_id")).thenReturn(101, 102, 201);
         when(rs.getInt("skill_level")).thenReturn(1, 2, 1);
 
-        LongList fks = new LongArrayList(new long[]{1L, 2L, 3L});
+        LongList fks = new LongArrayList(new long[] {1L, 2L, 3L});
 
-        Long2ObjectMap<List<Object>> result = new Phase2Fetcher().fetchChild(
-                conn, child, fks, 5, 10_000, JdbcDialect.OTHER);
+        Long2ObjectMap<List<Object>> result =
+                new Phase2Fetcher().fetchChild(conn, child, fks, 5, 10_000, JdbcDialect.OTHER);
 
         assertEquals(2, result.size(), "FK 3 absent from result map (no children)");
         assertEquals(2, result.get(1L).size(), "FK 1 has 2 skills");
@@ -128,9 +125,10 @@ class Phase2FetcherTest {
         when(conn.prepareStatement(anyString())).thenReturn(ps);
         when(ps.executeQuery()).thenThrow(new SQLException("boom"));
 
-        LongList pks = new LongArrayList(new long[]{1L, 2L});
+        LongList pks = new LongArrayList(new long[] {1L, 2L});
 
-        assertThrows(SQLException.class,
+        assertThrows(
+                SQLException.class,
                 () -> new Phase2Fetcher().fetchPrimary(conn, primary, pks, 5, 10_000, JdbcDialect.OTHER));
     }
 
@@ -138,8 +136,8 @@ class Phase2FetcherTest {
     void fetchPrimary_shouldReturnEmptyMap_whenPksEmpty() throws SQLException {
         Connection conn = mock(Connection.class);
 
-        Long2ObjectMap<Object> result = new Phase2Fetcher().fetchPrimary(
-                conn, clanPrimary(), new LongArrayList(), 5, 10_000, JdbcDialect.OTHER);
+        Long2ObjectMap<Object> result = new Phase2Fetcher()
+                .fetchPrimary(conn, clanPrimary(), new LongArrayList(), 5, 10_000, JdbcDialect.OTHER);
 
         assertTrue(result.isEmpty());
         verify(conn, times(0)).prepareStatement(anyString());
@@ -149,8 +147,8 @@ class Phase2FetcherTest {
     void fetchChild_shouldReturnEmptyMap_whenFksEmpty() throws SQLException {
         Connection conn = mock(Connection.class);
 
-        Long2ObjectMap<List<Object>> result = new Phase2Fetcher().fetchChild(
-                conn, skillChild(), new LongArrayList(), 5, 10_000, JdbcDialect.OTHER);
+        Long2ObjectMap<List<Object>> result =
+                new Phase2Fetcher().fetchChild(conn, skillChild(), new LongArrayList(), 5, 10_000, JdbcDialect.OTHER);
 
         assertTrue(result.isEmpty());
         verify(conn, times(0)).prepareStatement(anyString());

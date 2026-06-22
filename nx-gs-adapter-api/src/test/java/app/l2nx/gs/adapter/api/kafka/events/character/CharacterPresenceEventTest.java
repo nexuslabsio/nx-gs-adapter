@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.character;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class CharacterPresenceEventTest {
 
@@ -14,8 +13,9 @@ class CharacterPresenceEventTest {
 
     @Test
     void constructor_shouldRejectNullEventId() {
-        assertThrows(NullPointerException.class, () ->
-                CharacterPresenceEvent.builder().charId(1L).online(true).build());
+        assertThrows(
+                NullPointerException.class,
+                () -> CharacterPresenceEvent.builder().charId(1L).online(true).build());
     }
 
     @Test
@@ -53,8 +53,8 @@ class CharacterPresenceEventTest {
                 .metadata(source)
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getMetadata().put("k", "v"));
+        assertThrows(
+                UnsupportedOperationException.class, () -> event.getMetadata().put("k", "v"));
     }
 
     @Test
@@ -72,7 +72,8 @@ class CharacterPresenceEventTest {
         source.put("late", "value");
 
         assertEquals(1, event.getMetadata().size());
-        assertEquals(WellKnownPresenceMetadata.LOGOUT_REASON_DISCONNECT,
+        assertEquals(
+                WellKnownPresenceMetadata.LOGOUT_REASON_DISCONNECT,
                 event.getMetadata().get(WellKnownPresenceMetadata.LOGOUT_REASON));
     }
 
@@ -104,8 +105,16 @@ class CharacterPresenceEventTest {
     @Test
     void equals_shouldDistinguishOnline() {
         UUID id = id();
-        CharacterPresenceEvent login = CharacterPresenceEvent.builder().eventId(id).charId(1L).online(true).build();
-        CharacterPresenceEvent logout = CharacterPresenceEvent.builder().eventId(id).charId(1L).online(false).build();
+        CharacterPresenceEvent login = CharacterPresenceEvent.builder()
+                .eventId(id)
+                .charId(1L)
+                .online(true)
+                .build();
+        CharacterPresenceEvent logout = CharacterPresenceEvent.builder()
+                .eventId(id)
+                .charId(1L)
+                .online(false)
+                .build();
 
         assertNotEquals(login, logout);
     }
@@ -113,11 +122,17 @@ class CharacterPresenceEventTest {
     @Test
     void equals_shouldDistinguishMetadata() {
         UUID id = id();
-        CharacterPresenceEvent plain = CharacterPresenceEvent.builder().eventId(id).charId(1L).online(false).build();
+        CharacterPresenceEvent plain = CharacterPresenceEvent.builder()
+                .eventId(id)
+                .charId(1L)
+                .online(false)
+                .build();
         CharacterPresenceEvent disconnect = CharacterPresenceEvent.builder()
-                .eventId(id).charId(1L).online(false)
-                .metadata(Collections.singletonMap(WellKnownPresenceMetadata.LOGOUT_REASON,
-                        WellKnownPresenceMetadata.LOGOUT_REASON_DISCONNECT))
+                .eventId(id)
+                .charId(1L)
+                .online(false)
+                .metadata(Collections.singletonMap(
+                        WellKnownPresenceMetadata.LOGOUT_REASON, WellKnownPresenceMetadata.LOGOUT_REASON_DISCONNECT))
                 .build();
 
         assertNotEquals(plain, disconnect);
@@ -129,8 +144,8 @@ class CharacterPresenceEventTest {
                 .eventId(id())
                 .charId(1L)
                 .online(false)
-                .metadata(Collections.singletonMap(WellKnownPresenceMetadata.LOGOUT_REASON,
-                        WellKnownPresenceMetadata.LOGOUT_REASON_DISCONNECT))
+                .metadata(Collections.singletonMap(
+                        WellKnownPresenceMetadata.LOGOUT_REASON, WellKnownPresenceMetadata.LOGOUT_REASON_DISCONNECT))
                 .build();
 
         String s = event.toString();

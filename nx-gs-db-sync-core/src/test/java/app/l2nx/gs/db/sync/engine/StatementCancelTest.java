@@ -1,12 +1,11 @@
 package app.l2nx.gs.db.sync.engine;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.*;
 
 import java.sql.SQLException;
 import java.sql.Statement;
-
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
 
 class StatementCancelTest {
 

@@ -6,7 +6,6 @@ import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import app.l2nx.gs.runtime.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.runtime.sync.engine.publish.TopicResolver;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -34,11 +33,12 @@ public final class RuntimeSyncEngine {
     private final List<EntityTickLoop> loops = new ArrayList<EntityTickLoop>();
     private volatile ScheduledExecutorService scheduler;
 
-    public RuntimeSyncEngine(List<? extends RuntimeEntityMapping<?>> mappings,
-                             TopicResolver topicResolver,
-                             SyncEventPublisher publisher,
-                             EntityStatsTracker statsTracker,
-                             EngineConfig config) {
+    public RuntimeSyncEngine(
+            List<? extends RuntimeEntityMapping<?>> mappings,
+            TopicResolver topicResolver,
+            SyncEventPublisher publisher,
+            EntityStatsTracker statsTracker,
+            EngineConfig config) {
         this.mappings = new ArrayList<RuntimeEntityMapping<?>>(mappings);
         this.topicResolver = topicResolver;
         this.publisher = publisher;
@@ -49,21 +49,22 @@ public final class RuntimeSyncEngine {
     public void start() {
         validateMappings(mappings);
         int workers = config.workers(mappings.size());
-        ScheduledThreadPoolExecutor pool = new ScheduledThreadPoolExecutor(workers,
-                DaemonThreadFactory.counted("nx-runtime-sync-pool-", log));
+        ScheduledThreadPoolExecutor pool =
+                new ScheduledThreadPoolExecutor(workers, DaemonThreadFactory.counted("nx-runtime-sync-pool-", log));
         pool.setRemoveOnCancelPolicy(true);
         this.scheduler = pool;
 
         for (RuntimeEntityMapping<?> mapping : mappings) {
-            EntityTickLoop loop = new EntityTickLoop(mapping, topicResolver, publisher,
-                    statsTracker, config, scheduler);
+            EntityTickLoop loop =
+                    new EntityTickLoop(mapping, topicResolver, publisher, statsTracker, config, scheduler);
             loops.add(loop);
             loop.start();
-            log.info("runtime-sync entity '{}' tick loop started ({}s interval)",
-                    mapping.entityName(), config.tickIntervalSeconds());
+            log.info(
+                    "runtime-sync entity '{}' tick loop started ({}s interval)",
+                    mapping.entityName(),
+                    config.tickIntervalSeconds());
         }
-        log.info("runtime-sync engine started: {} entities, workers={}",
-                mappings.size(), workers);
+        log.info("runtime-sync engine started: {} entities, workers={}", mappings.size(), workers);
     }
 
     public void stop() {
@@ -101,10 +102,8 @@ public final class RuntimeSyncEngine {
             }
             if (!seen.add(name)) {
                 throw new IllegalStateException(
-                        "Duplicate RuntimeEntityMapping.entityName '" + name
-                                + "' — refusing to start runtime-sync");
+                        "Duplicate RuntimeEntityMapping.entityName '" + name + "' — refusing to start runtime-sync");
             }
         }
     }
-
 }

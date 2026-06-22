@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.commands.sync;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Success payload of {@link ResyncRowsCommand}. Carries the invalidation
@@ -26,8 +25,7 @@ public final class ResyncRowsResult {
     public ResyncRowsResult(@Nullable Map<String, Integer> invalidatedByEntity) {
         this.invalidatedByEntity = invalidatedByEntity == null
                 ? Collections.<String, Integer>emptyMap()
-                : Collections.unmodifiableMap(
-                new LinkedHashMap<String, Integer>(invalidatedByEntity));
+                : Collections.unmodifiableMap(new LinkedHashMap<String, Integer>(invalidatedByEntity));
     }
 
     /**
@@ -40,8 +38,7 @@ public final class ResyncRowsResult {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .invalidatedByEntity(invalidatedByEntity);
+        return new Builder().invalidatedByEntity(invalidatedByEntity);
     }
 
     public static Builder builder() {

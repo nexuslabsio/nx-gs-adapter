@@ -1,5 +1,7 @@
 package app.l2nx.gs.runtime.sync;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
@@ -7,13 +9,10 @@ import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
 import app.l2nx.gs.adapter.api.spi.RuntimeRow;
 import app.l2nx.gs.adapter.api.spi.RuntimeStateProvider;
 import app.l2nx.gs.runtime.sync.engine.publish.KafkaSender;
-import org.junit.jupiter.api.Test;
-
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.Test;
 
 class RuntimeSyncModuleTest {
 
@@ -46,7 +45,8 @@ class RuntimeSyncModuleTest {
     void onConnect_shouldDisable_whenRuntimeNamespaceEmpty() {
         RuntimeSyncModule module = build(emptyProviders());
 
-        module.onConnect(ctx(SyncTopics.builder().db(Collections.singletonMap("clan", "x")).build()));
+        module.onConnect(ctx(
+                SyncTopics.builder().db(Collections.singletonMap("clan", "x")).build()));
 
         assertEquals(RuntimeSyncModule.STATE_DISABLED, module.stateForTesting());
     }
@@ -160,8 +160,11 @@ class RuntimeSyncModuleTest {
 
     private static ConnectContext ctx(SyncTopics syncTopics) {
         return ConnectContext.builder()
-                .tenantId(UUID.randomUUID()).tenantSlug("acme")
-                .serverId(UUID.randomUUID()).serverSlug("primary").serverName("Acme Primary")
+                .tenantId(UUID.randomUUID())
+                .tenantSlug("acme")
+                .serverId(UUID.randomUUID())
+                .serverSlug("primary")
+                .serverName("Acme Primary")
                 .adapterVersion("0.1.0")
                 .syncTopics(syncTopics)
                 .build();

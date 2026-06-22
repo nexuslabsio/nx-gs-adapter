@@ -5,7 +5,6 @@ import app.l2nx.gs.kafka.*;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;
-
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -20,11 +19,12 @@ public final class DefaultKafkaFactory implements KafkaFactory {
     private static final NxLog log = NxLogFactory.getLogger(DefaultKafkaFactory.class);
 
     @Override
-    public KafkaState build(String brokers,
-                            String clientId,
-                            Map<String, Object> properties,
-                            Map<String, byte[]> staticHeaders,
-                            Consumer<KafkaState> stateChangeListener) {
+    public KafkaState build(
+            String brokers,
+            String clientId,
+            Map<String, Object> properties,
+            Map<String, byte[]> staticHeaders,
+            Consumer<KafkaState> stateChangeListener) {
         shutdownExistingIfAlive();
 
         // Build the producer Gson here (not in nx-gs-kafka's NxGsonAdapters) so the
@@ -57,8 +57,7 @@ public final class DefaultKafkaFactory implements KafkaFactory {
             return;
         }
         if (existing.state() != KafkaState.CLOSED) {
-            log.info("Existing NxKafka singleton in state {} — shutting down before re-init",
-                    existing.state());
+            log.info("Existing NxKafka singleton in state {} — shutting down before re-init", existing.state());
             try {
                 existing.shutdown();
             } catch (Throwable t) {

@@ -1,16 +1,15 @@
 package app.l2nx.gs.adapter.core.modules;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
 import app.l2nx.gs.adapter.api.spi.AdapterModule;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
-import org.junit.jupiter.api.Test;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ModuleRegistryTest {
 
@@ -32,8 +31,9 @@ class ModuleRegistryTest {
 
         registry.connect(ctx);
 
-        assertEquals(Arrays.asList("a-first.onConnect", "z-second.onConnect",
-                "a-first.start", "z-second.start"), Recorder.events);
+        assertEquals(
+                Arrays.asList("a-first.onConnect", "z-second.onConnect", "a-first.start", "z-second.start"),
+                Recorder.events);
     }
 
     @Test
@@ -59,8 +59,9 @@ class ModuleRegistryTest {
 
         registry.shutdown();
 
-        assertEquals(Arrays.asList("z-second.stop", "a-first.stop",
-                "z-second.onDisconnect", "a-first.onDisconnect"), Recorder.events);
+        assertEquals(
+                Arrays.asList("z-second.stop", "a-first.stop", "z-second.onDisconnect", "a-first.onDisconnect"),
+                Recorder.events);
     }
 
     @Test
@@ -106,8 +107,11 @@ class ModuleRegistryTest {
     @Test
     void currentStatuses_shouldForwardModuleReport_whenHealthy() {
         ModuleStatus reported = ModuleStatus.builder()
-                .name("db-sync").state("ACTIVE")
-                .stats(ModuleStatus.Stats.builder().pool(new PoolStats(1, 3, 4, null)).build())
+                .name("db-sync")
+                .state("ACTIVE")
+                .stats(ModuleStatus.Stats.builder()
+                        .pool(new PoolStats(1, 3, 4, null))
+                        .build())
                 .build();
         FixedStatusModule mod = new FixedStatusModule("db-sync", reported);
         ModuleRegistry registry = new ModuleRegistry();
@@ -128,8 +132,12 @@ class ModuleRegistryTest {
 
         List<AdapterModule> sorted = registry.modules();
 
-        assertEquals(Arrays.asList("a", "b", "c"),
-                Arrays.asList(sorted.get(0).name(), sorted.get(1).name(), sorted.get(2).name()));
+        assertEquals(
+                Arrays.asList("a", "b", "c"),
+                Arrays.asList(
+                        sorted.get(0).name(),
+                        sorted.get(1).name(),
+                        sorted.get(2).name()));
     }
 
     private static final class Recorder {

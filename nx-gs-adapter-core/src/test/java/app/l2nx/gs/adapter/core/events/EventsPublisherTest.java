@@ -1,15 +1,12 @@
 package app.l2nx.gs.adapter.core.events;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.ops.EventsStats;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.commons.UUIDv7;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.header.Header;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
@@ -18,8 +15,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Header;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 class EventsPublisherTest {
 
@@ -34,7 +33,8 @@ class EventsPublisherTest {
 
     @Test
     void enqueue_shouldDispatchToSender_throughDaemonThread() throws InterruptedException {
-        ConcurrentLinkedQueue<ProducerRecord<byte[], Object>> sent = new ConcurrentLinkedQueue<ProducerRecord<byte[], Object>>();
+        ConcurrentLinkedQueue<ProducerRecord<byte[], Object>> sent =
+                new ConcurrentLinkedQueue<ProducerRecord<byte[], Object>>();
         CountDownLatch latch = new CountDownLatch(1);
         EventsPublisher.Sender sender = (record, callback) -> {
             sent.add(record);
@@ -43,7 +43,8 @@ class EventsPublisherTest {
         };
 
         Map<String, String> topics = Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase");
-        publisher = new EventsPublisher(topics, sender, cfg(100, EventsPublisher.DropPolicy.OLDEST, 500L), new EventTypeRegistry());
+        publisher = new EventsPublisher(
+                topics, sender, cfg(100, EventsPublisher.DropPolicy.OLDEST, 500L), new EventTypeRegistry());
         publisher.start();
 
         PremiumPurchaseEvent event = PremiumPurchaseEvent.builder()
@@ -77,8 +78,11 @@ class EventsPublisherTest {
     @Test
     void enqueue_shouldDropOldest_whenQueueIsFull() {
         // Use a non-started publisher to inspect raw queue / counter behavior.
-        publisher = new EventsPublisher(Collections.emptyMap(),
-                noopSender(), cfg(2, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
+        publisher = new EventsPublisher(
+                Collections.emptyMap(),
+                noopSender(),
+                cfg(2, EventsPublisher.DropPolicy.OLDEST, 0L),
+                new EventTypeRegistry());
         EventTypeBinding binding = new EventTypeRegistry().lookup(PremiumPurchaseEvent.class);
 
         publisher.enqueue(envelope(1L, binding));
@@ -91,8 +95,7 @@ class EventsPublisherTest {
     }
 
     @Test
-    void enqueue_shouldEvictOldestEnvelope_inDropOldestMode_verifyingOrder()
-            throws InterruptedException {
+    void enqueue_shouldEvictOldestEnvelope_inDropOldestMode_verifyingOrder() throws InterruptedException {
         // Capacity 2, three enqueues ordered 1→2→3. After eviction the daemon
         // should drain envelopes 2 and 3 in that order; envelope 1 is gone.
         ConcurrentLinkedQueue<Long> drained = new ConcurrentLinkedQueue<Long>();
@@ -127,8 +130,11 @@ class EventsPublisherTest {
 
     @Test
     void enqueue_shouldDropNewest_whenPolicyIsNewest() {
-        publisher = new EventsPublisher(Collections.emptyMap(),
-                noopSender(), cfg(1, EventsPublisher.DropPolicy.NEWEST, 0L), new EventTypeRegistry());
+        publisher = new EventsPublisher(
+                Collections.emptyMap(),
+                noopSender(),
+                cfg(1, EventsPublisher.DropPolicy.NEWEST, 0L),
+                new EventTypeRegistry());
         EventTypeBinding binding = new EventTypeRegistry().lookup(PremiumPurchaseEvent.class);
 
         publisher.enqueue(envelope(1L, binding));
@@ -140,8 +146,11 @@ class EventsPublisherTest {
 
     @Test
     void enqueue_shouldNoOp_forNullEnvelope() {
-        publisher = new EventsPublisher(Collections.emptyMap(),
-                noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
+        publisher = new EventsPublisher(
+                Collections.emptyMap(),
+                noopSender(),
+                cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L),
+                new EventTypeRegistry());
 
         publisher.enqueue(null);
 
@@ -152,8 +161,11 @@ class EventsPublisherTest {
     @Test
     void doSend_shouldDrop_whenFamilyTopicMissing() throws InterruptedException {
         // No topic for "premiumpurchase" → enqueued envelopes drop on the daemon thread.
-        publisher = new EventsPublisher(Collections.emptyMap(),
-                noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 100L), new EventTypeRegistry());
+        publisher = new EventsPublisher(
+                Collections.emptyMap(),
+                noopSender(),
+                cfg(5, EventsPublisher.DropPolicy.OLDEST, 100L),
+                new EventTypeRegistry());
         publisher.start();
 
         EventTypeBinding binding = new EventTypeRegistry().lookup(PremiumPurchaseEvent.class);
@@ -171,15 +183,20 @@ class EventsPublisherTest {
 
     @Test
     void currentStatus_shouldReportDisabledFamilies_whenTopicMissing() {
-        publisher = new EventsPublisher(Collections.emptyMap(),
-                noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
+        publisher = new EventsPublisher(
+                Collections.emptyMap(),
+                noopSender(),
+                cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L),
+                new EventTypeRegistry());
 
         ModuleStatus status = publisher.currentStatus();
 
         assertEquals("events", status.getName());
         EventsStats stats = status.getStats().getEvents().orElseThrow(() -> new AssertionError("missing events stats"));
         List<String> disabled = stats.getDisabledFamilies();
-        assertTrue(disabled.contains("premiumpurchase"), "expected 'premiumpurchase' in disabled-families, got " + disabled);
+        assertTrue(
+                disabled.contains("premiumpurchase"),
+                "expected 'premiumpurchase' in disabled-families, got " + disabled);
     }
 
     @Test
@@ -196,9 +213,9 @@ class EventsPublisherTest {
         topics.put("account", "acme.ls.events.account");
         topics.put("gameevents", "acme.gs.events.gameevents");
         topics.put("castle", "acme.gs.events.castle");
-        topics.put("rating", "acme.gs.events.rating");
         topics.put("sync", "acme.gs.events.sync");
-        publisher = new EventsPublisher(topics, noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
+        publisher = new EventsPublisher(
+                topics, noopSender(), cfg(5, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
 
         ModuleStatus status = publisher.currentStatus();
 
@@ -208,10 +225,16 @@ class EventsPublisherTest {
 
     @Test
     void currentStatus_shouldExposeQueueCapacityAndDepth() {
-        publisher = new EventsPublisher(Collections.emptyMap(),
-                noopSender(), cfg(7, EventsPublisher.DropPolicy.OLDEST, 0L), new EventTypeRegistry());
+        publisher = new EventsPublisher(
+                Collections.emptyMap(),
+                noopSender(),
+                cfg(7, EventsPublisher.DropPolicy.OLDEST, 0L),
+                new EventTypeRegistry());
 
-        EventsStats stats = publisher.currentStatus().getStats().getEvents()
+        EventsStats stats = publisher
+                .currentStatus()
+                .getStats()
+                .getEvents()
                 .orElseThrow(() -> new AssertionError("missing events stats"));
         assertEquals(7, stats.getQueueCapacity());
         assertEquals(0, stats.getQueueDepth());
@@ -230,8 +253,8 @@ class EventsPublisherTest {
         Map<String, String> topics = Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase");
         EventTypeRegistry registry = new EventTypeRegistry();
         // Non-started publisher — flush() drains synchronously on the calling thread.
-        publisher = new EventsPublisher(topics, sender, flusher,
-                cfg(10, EventsPublisher.DropPolicy.NEWEST, 0L), registry);
+        publisher =
+                new EventsPublisher(topics, sender, flusher, cfg(10, EventsPublisher.DropPolicy.NEWEST, 0L), registry);
         EventTypeBinding binding = registry.lookup(PremiumPurchaseEvent.class);
         publisher.enqueue(envelope(1L, binding));
         publisher.enqueue(envelope(2L, binding));
@@ -247,8 +270,11 @@ class EventsPublisherTest {
     @Test
     void flush_shouldReturnTrueAndFlush_whenQueueEmpty() {
         java.util.concurrent.atomic.AtomicInteger flushes = new java.util.concurrent.atomic.AtomicInteger();
-        publisher = new EventsPublisher(Collections.emptyMap(), noopSender(),
-                flushes::incrementAndGet, cfg(10, EventsPublisher.DropPolicy.NEWEST, 0L),
+        publisher = new EventsPublisher(
+                Collections.emptyMap(),
+                noopSender(),
+                flushes::incrementAndGet,
+                cfg(10, EventsPublisher.DropPolicy.NEWEST, 0L),
                 new EventTypeRegistry());
 
         assertTrue(publisher.flush(1000L));

@@ -1,13 +1,12 @@
 package app.l2nx.gs.adapter.core.commands;
 
-import app.l2nx.gs.adapter.api.spi.HostExecutorTimeoutException;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.spi.HostExecutorTimeoutException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class HostExecutorImplTest {
 
@@ -52,9 +51,7 @@ class HostExecutorImplTest {
     void sync_unregistered_shouldThrowIllegalStateException() {
         HostExecutorImpl host = new HostExecutorImpl(null, TEST_SYNC_TIMEOUT_MS);
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> host.sync(() -> {
-                }));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> host.sync(() -> {}));
         assertTrue(ex.getMessage().contains("HostExecutor not registered"));
     }
 
@@ -62,15 +59,15 @@ class HostExecutorImplTest {
     void async_unregistered_shouldThrowIllegalStateException() {
         HostExecutorImpl host = new HostExecutorImpl(null, TEST_SYNC_TIMEOUT_MS);
 
-        assertThrows(IllegalStateException.class, () -> host.async(() -> {
-        }));
+        assertThrows(IllegalStateException.class, () -> host.async(() -> {}));
     }
 
     @Test
     void sync_taskThrowingRuntimeException_shouldPropagate() {
         HostExecutorImpl host = new HostExecutorImpl(IMMEDIATE_EXECUTOR, TEST_SYNC_TIMEOUT_MS);
 
-        RuntimeException ex = assertThrows(RuntimeException.class,
+        RuntimeException ex = assertThrows(
+                RuntimeException.class,
                 () -> host.sync(() -> {
                     throw new IllegalStateException("boom");
                 }));
@@ -84,26 +81,25 @@ class HostExecutorImplTest {
         };
         HostExecutorImpl host = new HostExecutorImpl(rejecting, TEST_SYNC_TIMEOUT_MS);
 
-        assertThrows(java.util.concurrent.RejectedExecutionException.class,
-                () -> host.sync(() -> {
-                }));
+        assertThrows(java.util.concurrent.RejectedExecutionException.class, () -> host.sync(() -> {}));
     }
 
     @Test
     void sync_executorNeverCompletes_shouldThrowTimeoutException() {
         // Deliberately never executes the task
-        Executor blackHole = task -> { /* drop on the floor */ };
+        Executor blackHole = task -> {
+            /* drop on the floor */
+        };
         HostExecutorImpl host = new HostExecutorImpl(blackHole, TEST_SYNC_TIMEOUT_MS);
 
         long t0 = System.currentTimeMillis();
-        HostExecutorTimeoutException ex = assertThrows(HostExecutorTimeoutException.class,
-                () -> host.sync(() -> {
-                }));
+        HostExecutorTimeoutException ex = assertThrows(HostExecutorTimeoutException.class, () -> host.sync(() -> {}));
         long elapsed = System.currentTimeMillis() - t0;
 
         assertEquals(TEST_SYNC_TIMEOUT_MS, ex.getTimeoutMs());
         // elapsed should be ~TEST_SYNC_TIMEOUT_MS — allow slack for slow CI but bound the upper end
-        assertTrue(elapsed >= TEST_SYNC_TIMEOUT_MS,
+        assertTrue(
+                elapsed >= TEST_SYNC_TIMEOUT_MS,
                 "expected await to last >= " + TEST_SYNC_TIMEOUT_MS + "ms, got " + elapsed);
     }
 
@@ -113,8 +109,7 @@ class HostExecutorImplTest {
         Executor capturing = captured::set;
         HostExecutorImpl host = new HostExecutorImpl(capturing, TEST_SYNC_TIMEOUT_MS);
 
-        host.async(() -> {
-        });
+        host.async(() -> {});
 
         assertNotNull(captured.get());
     }

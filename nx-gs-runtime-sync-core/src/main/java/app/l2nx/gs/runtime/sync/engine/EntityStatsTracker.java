@@ -3,7 +3,6 @@ package app.l2nx.gs.runtime.sync.engine;
 import app.l2nx.gs.adapter.api.kafka.ops.ChangesSummary;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,8 +27,7 @@ public final class EntityStatsTracker {
     private final AtomicInteger orderCursor = new AtomicInteger(0);
 
     public void recordCycleResult(String entityName, CycleResult cycle) {
-        AtomicInteger counter = errorCounters.computeIfAbsent(entityName,
-                k -> new AtomicInteger(0));
+        AtomicInteger counter = errorCounters.computeIfAbsent(entityName, k -> new AtomicInteger(0));
         int errors;
         if (cycle.state() == EntityState.DEGRADED) {
             errors = counter.incrementAndGet();
@@ -37,10 +35,8 @@ public final class EntityStatsTracker {
             counter.set(0);
             errors = 0;
         }
-        failedAcks.computeIfAbsent(entityName, k -> new AtomicLong(0L))
-                .set(cycle.failedAcks());
-        timedOutAcks.computeIfAbsent(entityName, k -> new AtomicLong(0L))
-                .set(cycle.timedOutAcks());
+        failedAcks.computeIfAbsent(entityName, k -> new AtomicLong(0L)).set(cycle.failedAcks());
+        timedOutAcks.computeIfAbsent(entityName, k -> new AtomicLong(0L)).set(cycle.timedOutAcks());
         EntityStats stats = EntityStats.builder()
                 .name(entityName)
                 .state(cycle.state())
@@ -62,8 +58,7 @@ public final class EntityStatsTracker {
         if (latest.isEmpty()) {
             return Collections.emptyList();
         }
-        List<Map.Entry<String, Integer>> ordered =
-                new ArrayList<Map.Entry<String, Integer>>(entityOrder.entrySet());
+        List<Map.Entry<String, Integer>> ordered = new ArrayList<Map.Entry<String, Integer>>(entityOrder.entrySet());
         ordered.sort((a, b) -> Integer.compare(a.getValue(), b.getValue()));
         List<EntityStats> result = new ArrayList<EntityStats>(ordered.size());
         for (Map.Entry<String, Integer> e : ordered) {

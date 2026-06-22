@@ -1,7 +1,18 @@
 package app.l2nx.gs.kafka.integration;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -21,18 +32,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
  * Simulates Spring Kafka ReplyingKafkaTemplate protocol:
  * sends a request with kafka_replyTopic + kafka_correlationId headers,
@@ -46,9 +45,7 @@ class ReplyIntegrationTest {
     private static final String REPLY_TOPIC = "test.replies";
 
     @Container
-    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer(
-            "confluentinc/cp-kafka:7.7.0"
-    );
+    static final ConfluentKafkaContainer KAFKA = new ConfluentKafkaContainer("confluentinc/cp-kafka:7.7.0");
 
     @AfterEach
     void tearDown() {
@@ -73,12 +70,7 @@ class ReplyIntegrationTest {
         UUID correlationUuid = UUID.randomUUID();
         byte[] correlationBytes = uuidToBytes(correlationUuid);
 
-        sendRequestWithReplyHeaders(
-                REQUEST_TOPIC,
-                "{\"playerId\":\"player42\"}",
-                REPLY_TOPIC,
-                correlationBytes
-        );
+        sendRequestWithReplyHeaders(REQUEST_TOPIC, "{\"playerId\":\"player42\"}", REPLY_TOPIC, correlationBytes);
 
         // Wait for handler to process
         assertTrue(handlerCalled.await(10, TimeUnit.SECONDS), "Handler was not called");
@@ -130,15 +122,13 @@ class ReplyIntegrationTest {
                 .build();
     }
 
-    private void sendRequestWithReplyHeaders(String topic, String json,
-                                             String replyTopic, byte[] correlationId) {
+    private void sendRequestWithReplyHeaders(String topic, String json, String replyTopic, byte[] correlationId) {
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
 
         try (KafkaProducer<String, byte[]> producer =
-                     new KafkaProducer<>(props, new StringSerializer(), new ByteArraySerializer())) {
-            ProducerRecord<String, byte[]> record =
-                    new ProducerRecord<>(topic, json.getBytes(StandardCharsets.UTF_8));
+                new KafkaProducer<>(props, new StringSerializer(), new ByteArraySerializer())) {
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, json.getBytes(StandardCharsets.UTF_8));
             record.headers().add("kafka_replyTopic", replyTopic.getBytes(StandardCharsets.UTF_8));
             record.headers().add("kafka_correlationId", correlationId);
             producer.send(record);
@@ -151,7 +141,7 @@ class ReplyIntegrationTest {
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
 
         try (KafkaProducer<String, byte[]> producer =
-                     new KafkaProducer<>(props, new StringSerializer(), new ByteArraySerializer())) {
+                new KafkaProducer<>(props, new StringSerializer(), new ByteArraySerializer())) {
             producer.send(new ProducerRecord<>(topic, json.getBytes(StandardCharsets.UTF_8)));
             producer.flush();
         }
@@ -164,7 +154,7 @@ class ReplyIntegrationTest {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
         try (KafkaConsumer<String, byte[]> consumer =
-                     new KafkaConsumer<>(props, new StringDeserializer(), new ByteArrayDeserializer())) {
+                new KafkaConsumer<>(props, new StringDeserializer(), new ByteArrayDeserializer())) {
             consumer.subscribe(Collections.singletonList(topic));
             ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofSeconds(10));
             if (records.isEmpty()) {

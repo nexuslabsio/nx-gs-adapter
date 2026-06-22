@@ -1,9 +1,9 @@
 package app.l2nx.gs.adapter.api.domain.character.clazz;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import org.junit.jupiter.api.Test;
 
 class CharacterClassTest {
 

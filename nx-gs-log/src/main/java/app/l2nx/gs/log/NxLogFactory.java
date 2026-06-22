@@ -15,7 +15,8 @@ public final class NxLogFactory {
             // Check if LoggerFactory resolves to a real provider (not NOPLoggerFactory)
             try {
                 Class<?> factoryClass = Class.forName("org.slf4j.LoggerFactory");
-                Object loggerFactory = factoryClass.getMethod("getILoggerFactory").invoke(null);
+                Object loggerFactory =
+                        factoryClass.getMethod("getILoggerFactory").invoke(null);
                 available = !loggerFactory.getClass().getName().equals("org.slf4j.helpers.NOPLoggerFactory");
             } catch (Exception ignored) {
                 // SLF4J not on classpath at all, or no provider — use console fallback
@@ -24,8 +25,7 @@ public final class NxLogFactory {
         SLF4J_AVAILABLE = available;
     }
 
-    private NxLogFactory() {
-    }
+    private NxLogFactory() {}
 
     public static NxLog getLogger(Class<?> clazz) {
         if (SLF4J_AVAILABLE) {

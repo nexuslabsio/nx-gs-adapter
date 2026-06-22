@@ -1,11 +1,10 @@
 package app.l2nx.gs.gd.sync;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class GameDataSyncConfigTest {
 
@@ -79,8 +78,7 @@ class GameDataSyncConfigTest {
         Map<String, String> sys = new HashMap<String, String>();
         sys.put(GameDataSyncConfig.KEY_RESYNC_INTERVAL_HOURS, "3");
 
-        java.util.function.Function<String, String> chain =
-                GameDataSyncConfig.fileFirstChain(fileProps, sys::get);
+        java.util.function.Function<String, String> chain = GameDataSyncConfig.fileFirstChain(fileProps, sys::get);
 
         assertEquals("12", chain.apply(GameDataSyncConfig.KEY_RESYNC_INTERVAL_HOURS));
     }

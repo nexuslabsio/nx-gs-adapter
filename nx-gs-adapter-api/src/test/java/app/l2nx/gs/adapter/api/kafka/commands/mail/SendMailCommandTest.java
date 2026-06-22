@@ -1,12 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
-import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import java.util.Arrays;
 import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class SendMailCommandTest {
 
@@ -31,15 +30,15 @@ class SendMailCommandTest {
 
     @Test
     void constructor_shouldRejectNullCharId() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new SendMailCommand(null, "a", "t", "b", null));
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class, () -> new SendMailCommand(null, "a", "t", "b", null));
         assertTrue(ex.getMessage().contains("charId"));
     }
 
     @Test
     void constructor_shouldRejectNullTitle() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new SendMailCommand(1L, "a", null, "b", null));
+        IllegalArgumentException ex =
+                assertThrows(IllegalArgumentException.class, () -> new SendMailCommand(1L, "a", null, "b", null));
         assertTrue(ex.getMessage().contains("title"));
     }
 
@@ -68,19 +67,18 @@ class SendMailCommandTest {
     void getItems_shouldBeUnmodifiable() {
         MailItem item = MailItem.builder().itemTemplateId(57L).build();
         SendMailCommand cmd = SendMailCommand.builder()
-                .charId(1L).title("t")
+                .charId(1L)
+                .title("t")
                 .items(Collections.singletonList(item))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> cmd.getItems().add(item));
+        assertThrows(UnsupportedOperationException.class, () -> cmd.getItems().add(item));
     }
 
     @Test
     void constructor_shouldDefensivelyCopyItems() {
         MailItem item = MailItem.builder().itemTemplateId(57L).build();
-        java.util.List<MailItem> mutable = new java.util.ArrayList<MailItem>(
-                Collections.singletonList(item));
+        java.util.List<MailItem> mutable = new java.util.ArrayList<MailItem>(Collections.singletonList(item));
 
         SendMailCommand cmd = new SendMailCommand(1L, "a", "t", "b", mutable);
         mutable.add(MailItem.builder().itemTemplateId(58L).build());
@@ -91,7 +89,10 @@ class SendMailCommandTest {
     @Test
     void toBuilder_shouldRoundtrip() {
         SendMailCommand original = SendMailCommand.builder()
-                .charId(42L).author("admin").title("Reward").body("body")
+                .charId(42L)
+                .author("admin")
+                .title("Reward")
+                .body("body")
                 .items(Arrays.asList(
                         MailItem.builder().itemTemplateId(57L).count(1L).build(),
                         MailItem.builder().itemTemplateId(58L).count(2L).build()))
@@ -120,19 +121,27 @@ class SendMailCommandTest {
 
     @Test
     void equals_shouldDistinguishOnAuthor() {
-        SendMailCommand a = SendMailCommand.builder().charId(1L).title("t").author("x").build();
-        SendMailCommand b = SendMailCommand.builder().charId(1L).title("t").author("y").build();
+        SendMailCommand a =
+                SendMailCommand.builder().charId(1L).title("t").author("x").build();
+        SendMailCommand b =
+                SendMailCommand.builder().charId(1L).title("t").author("y").build();
 
         assertNotEquals(a, b);
     }
 
     @Test
     void equals_shouldDistinguishOnItems() {
-        SendMailCommand a = SendMailCommand.builder().charId(1L).title("t")
-                .items(Collections.singletonList(MailItem.builder().itemTemplateId(57L).build()))
+        SendMailCommand a = SendMailCommand.builder()
+                .charId(1L)
+                .title("t")
+                .items(Collections.singletonList(
+                        MailItem.builder().itemTemplateId(57L).build()))
                 .build();
-        SendMailCommand b = SendMailCommand.builder().charId(1L).title("t")
-                .items(Collections.singletonList(MailItem.builder().itemTemplateId(58L).build()))
+        SendMailCommand b = SendMailCommand.builder()
+                .charId(1L)
+                .title("t")
+                .items(Collections.singletonList(
+                        MailItem.builder().itemTemplateId(58L).build()))
                 .build();
 
         assertNotEquals(a, b);
@@ -141,9 +150,17 @@ class SendMailCommandTest {
     @Test
     void hashCode_shouldMatchEquals() {
         SendMailCommand a = SendMailCommand.builder()
-                .charId(1L).author("x").title("t").body("b").build();
+                .charId(1L)
+                .author("x")
+                .title("t")
+                .body("b")
+                .build();
         SendMailCommand b = SendMailCommand.builder()
-                .charId(1L).author("x").title("t").body("b").build();
+                .charId(1L)
+                .author("x")
+                .title("t")
+                .body("b")
+                .build();
 
         assertEquals(a.hashCode(), b.hashCode());
     }
@@ -151,7 +168,11 @@ class SendMailCommandTest {
     @Test
     void toString_shouldExposeAllFields() {
         SendMailCommand cmd = SendMailCommand.builder()
-                .charId(42L).author("admin").title("Reward").body("body").build();
+                .charId(42L)
+                .author("admin")
+                .title("Reward")
+                .body("body")
+                .build();
 
         String s = cmd.toString();
 

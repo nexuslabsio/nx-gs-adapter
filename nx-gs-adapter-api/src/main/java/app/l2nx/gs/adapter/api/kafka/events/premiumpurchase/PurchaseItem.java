@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.*;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One item-grant line of a {@link PremiumPurchaseEvent}. Carries which item
@@ -25,10 +24,7 @@ public final class PurchaseItem {
     private final @Nullable Map<String, String> params;
     private final List<Payment> payments;
 
-    public PurchaseItem(long itemId,
-                        long qty,
-                        @Nullable Map<String, String> params,
-                        @Nullable List<Payment> payments) {
+    public PurchaseItem(long itemId, long qty, @Nullable Map<String, String> params, @Nullable List<Payment> payments) {
         this.itemId = itemId;
         this.qty = qty;
         this.params = freezeMap(params);
@@ -109,8 +105,7 @@ public final class PurchaseItem {
 
     @Override
     public String toString() {
-        return "PurchaseItem[itemId=" + itemId + ", qty=" + qty
-                + ", params=" + params + ", payments=" + payments + "]";
+        return "PurchaseItem[itemId=" + itemId + ", qty=" + qty + ", params=" + params + ", payments=" + payments + "]";
     }
 
     public static final class Builder {

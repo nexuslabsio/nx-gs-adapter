@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.armorsettemplate;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build-agnostic armor-set wire DTO — the common L2 denominator for a single set, carried
@@ -29,16 +28,15 @@ public final class ArmorSetTemplate {
     private final @Nullable List<ArmorSetItem> items;
     private final @Nullable List<ArmorSetSkill> skills;
 
-    public ArmorSetTemplate(int id,
-                            @Nullable ArmorSetStatBonus statBonus,
-                            @Nullable List<ArmorSetItem> items,
-                            @Nullable List<ArmorSetSkill> skills) {
+    public ArmorSetTemplate(
+            int id,
+            @Nullable ArmorSetStatBonus statBonus,
+            @Nullable List<ArmorSetItem> items,
+            @Nullable List<ArmorSetSkill> skills) {
         this.id = id;
         this.statBonus = statBonus;
-        this.items = items == null ? null
-                : Collections.unmodifiableList(new ArrayList<ArmorSetItem>(items));
-        this.skills = skills == null ? null
-                : Collections.unmodifiableList(new ArrayList<ArmorSetSkill>(skills));
+        this.items = items == null ? null : Collections.unmodifiableList(new ArrayList<ArmorSetItem>(items));
+        this.skills = skills == null ? null : Collections.unmodifiableList(new ArrayList<ArmorSetSkill>(skills));
     }
 
     public int getId() {
@@ -68,11 +66,7 @@ public final class ArmorSetTemplate {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .id(id)
-                .statBonus(statBonus)
-                .items(items)
-                .skills(skills);
+        return new Builder().id(id).statBonus(statBonus).items(items).skills(skills);
     }
 
     public static Builder builder() {

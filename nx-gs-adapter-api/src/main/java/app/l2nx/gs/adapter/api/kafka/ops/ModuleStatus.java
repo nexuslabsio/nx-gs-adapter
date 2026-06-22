@@ -126,12 +126,10 @@ public final class ModuleStatus {
             this(pool, entities, events, null);
         }
 
-        public Stats(PoolStats pool, List<EntityStats> entities, EventsStats events,
-                     CommandsStats commands) {
+        public Stats(PoolStats pool, List<EntityStats> entities, EventsStats events, CommandsStats commands) {
             this.pool = pool;
-            this.entities = entities == null
-                    ? null
-                    : Collections.unmodifiableList(new ArrayList<EntityStats>(entities));
+            this.entities =
+                    entities == null ? null : Collections.unmodifiableList(new ArrayList<EntityStats>(entities));
             this.events = events;
             this.commands = commands;
         }
@@ -182,8 +180,8 @@ public final class ModuleStatus {
 
         @Override
         public String toString() {
-            return "Stats[pool=" + pool + ", entities=" + entities
-                    + ", events=" + events + ", commands=" + commands + "]";
+            return "Stats[pool=" + pool + ", entities=" + entities + ", events=" + events + ", commands=" + commands
+                    + "]";
         }
 
         public static final class Builder {

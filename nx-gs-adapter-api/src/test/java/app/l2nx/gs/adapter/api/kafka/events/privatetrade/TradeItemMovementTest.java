@@ -1,14 +1,13 @@
 package app.l2nx.gs.adapter.api.kafka.events.privatetrade;
 
-import app.l2nx.gs.adapter.api.domain.Attribute;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.domain.Attribute;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class TradeItemMovementTest {
 
@@ -16,7 +15,8 @@ class TradeItemMovementTest {
     void getAttributes_shouldReturnEmptyMap_whenBuilderOmits() {
         TradeItemMovement line = TradeItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(1L).newItemId(2L)
+                .itemId(1L)
+                .newItemId(2L)
                 .count(1L)
                 .build();
 
@@ -27,7 +27,8 @@ class TradeItemMovementTest {
     void getAttributes_shouldReturnEmptyMap_whenBuilderPassesNull() {
         TradeItemMovement line = TradeItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(1L).newItemId(2L)
+                .itemId(1L)
+                .newItemId(2L)
                 .count(1L)
                 .attributes(null)
                 .build();
@@ -42,13 +43,14 @@ class TradeItemMovementTest {
 
         TradeItemMovement line = TradeItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(1L).newItemId(2L)
+                .itemId(1L)
+                .newItemId(2L)
                 .count(1L)
                 .attributes(source)
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> line.getAttributes().put(Attribute.WATER, 150));
+        assertThrows(
+                UnsupportedOperationException.class, () -> line.getAttributes().put(Attribute.WATER, 150));
     }
 
     @Test
@@ -58,7 +60,8 @@ class TradeItemMovementTest {
 
         TradeItemMovement line = TradeItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(1L).newItemId(2L)
+                .itemId(1L)
+                .newItemId(2L)
                 .count(1L)
                 .attributes(source)
                 .build();
@@ -73,7 +76,8 @@ class TradeItemMovementTest {
     void enchantLevel_shouldDefaultToNull_signalingNotApplicable() {
         TradeItemMovement line = TradeItemMovement.builder()
                 .itemTemplateId(57L)
-                .itemId(1L).newItemId(2L)
+                .itemId(1L)
+                .newItemId(2L)
                 .count(1L)
                 .build();
 
@@ -84,7 +88,8 @@ class TradeItemMovementTest {
     void enchantLevel_shouldRoundtripExplicitZero() {
         TradeItemMovement line = TradeItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(1L).newItemId(2L)
+                .itemId(1L)
+                .newItemId(2L)
                 .count(1L)
                 .enchantLevel(0)
                 .build();
@@ -96,7 +101,8 @@ class TradeItemMovementTest {
     void getNewItemId_shouldRoundtripDistinctFromItemId() {
         TradeItemMovement line = TradeItemMovement.builder()
                 .itemTemplateId(57L)
-                .itemId(11L).newItemId(22L)
+                .itemId(11L)
+                .newItemId(22L)
                 .count(1L)
                 .build();
 
@@ -111,7 +117,8 @@ class TradeItemMovementTest {
 
         TradeItemMovement original = TradeItemMovement.builder()
                 .itemTemplateId(6611L)
-                .itemId(11L).newItemId(22L)
+                .itemId(11L)
+                .newItemId(22L)
                 .count(5L)
                 .enchantLevel(16)
                 .attributes(attrs)
@@ -125,11 +132,17 @@ class TradeItemMovementTest {
     @Test
     void equals_shouldDistinguishAttributes() {
         TradeItemMovement a = TradeItemMovement.builder()
-                .itemTemplateId(57L).itemId(1L).newItemId(1L).count(1L)
+                .itemTemplateId(57L)
+                .itemId(1L)
+                .newItemId(1L)
+                .count(1L)
                 .attributes(Collections.singletonMap(Attribute.FIRE, 300))
                 .build();
         TradeItemMovement b = TradeItemMovement.builder()
-                .itemTemplateId(57L).itemId(1L).newItemId(1L).count(1L)
+                .itemTemplateId(57L)
+                .itemId(1L)
+                .newItemId(1L)
+                .count(1L)
                 .attributes(Collections.singletonMap(Attribute.WATER, 300))
                 .build();
 

@@ -1,21 +1,18 @@
 package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
-import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import java.time.Instant;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class OlympiadMatchResultEventTest {
 
     @Test
     void getClanId_shouldBeNullable() {
-        OlympiadMatchResultEvent event = newBuilder()
-                .clanId(null)
-                .opponentClanId(null)
-                .build();
+        OlympiadMatchResultEvent event =
+                newBuilder().clanId(null).opponentClanId(null).build();
 
         assertNull(event.getClanId());
         assertNull(event.getOpponentClanId());
@@ -43,13 +40,20 @@ class OlympiadMatchResultEventTest {
                 .matchId(UUID.randomUUID())
                 .olympiadCycle(7)
                 .gameType(OlympiadGameType.CLASSED)
-                .charId(268437521L).classId(88).clazz(CharacterClass.DUELIST).clanId(101L)
-                .opponentCharId(268437522L).opponentClassId(92).opponentClazz(CharacterClass.SAGITTARIUS)
+                .charId(268437521L)
+                .classId(88)
+                .clazz(CharacterClass.DUELIST)
+                .clanId(101L)
+                .opponentCharId(268437522L)
+                .opponentClassId(92)
+                .opponentClazz(CharacterClass.SAGITTARIUS)
                 .opponentClanId(102L)
                 .result(OlympiadMatchResult.WIN)
                 .reason(OlympiadMatchReason.NORMAL)
-                .pointsBefore(40).pointsAfter(43)
-                .damageDealt(12_500).opponentDamageDealt(9_400)
+                .pointsBefore(40)
+                .pointsAfter(43)
+                .damageDealt(12_500)
+                .opponentDamageDealt(9_400)
                 .fightStartedAt(Instant.parse("2026-06-01T12:00:00Z"))
                 .fightDurationSec(178L)
                 .build();
@@ -87,8 +91,10 @@ class OlympiadMatchResultEventTest {
     @Test
     void equals_shouldDistinguishReason() {
         OlympiadMatchResultEvent.Builder base = newBuilder();
-        OlympiadMatchResultEvent normal = base.reason(OlympiadMatchReason.NORMAL).build();
-        OlympiadMatchResultEvent dc = base.reason(OlympiadMatchReason.OPPONENT_DISCONNECTED).build();
+        OlympiadMatchResultEvent normal =
+                base.reason(OlympiadMatchReason.NORMAL).build();
+        OlympiadMatchResultEvent dc =
+                base.reason(OlympiadMatchReason.OPPONENT_DISCONNECTED).build();
 
         assertNotEquals(normal, dc);
     }
@@ -103,8 +109,10 @@ class OlympiadMatchResultEventTest {
 
     @Test
     void equals_shouldDistinguishPointsAfter() {
-        OlympiadMatchResultEvent a = newBuilder().pointsBefore(40).pointsAfter(43).build();
-        OlympiadMatchResultEvent b = newBuilder().pointsBefore(40).pointsAfter(44).build();
+        OlympiadMatchResultEvent a =
+                newBuilder().pointsBefore(40).pointsAfter(43).build();
+        OlympiadMatchResultEvent b =
+                newBuilder().pointsBefore(40).pointsAfter(44).build();
 
         assertNotEquals(a, b);
     }
@@ -112,8 +120,10 @@ class OlympiadMatchResultEventTest {
     @Test
     void equals_shouldDistinguishMatchId() {
         UUID eventId = UUID.randomUUID();
-        OlympiadMatchResultEvent a = newBuilder().eventId(eventId).matchId(UUID.randomUUID()).build();
-        OlympiadMatchResultEvent b = newBuilder().eventId(eventId).matchId(UUID.randomUUID()).build();
+        OlympiadMatchResultEvent a =
+                newBuilder().eventId(eventId).matchId(UUID.randomUUID()).build();
+        OlympiadMatchResultEvent b =
+                newBuilder().eventId(eventId).matchId(UUID.randomUUID()).build();
 
         assertNotEquals(a, b);
     }
@@ -138,12 +148,18 @@ class OlympiadMatchResultEventTest {
                 .matchId(UUID.randomUUID())
                 .olympiadCycle(7)
                 .gameType(OlympiadGameType.CLASSED)
-                .charId(268437521L).classId(88).clanId(101L)
-                .opponentCharId(268437522L).opponentClassId(92).opponentClanId(102L)
+                .charId(268437521L)
+                .classId(88)
+                .clanId(101L)
+                .opponentCharId(268437522L)
+                .opponentClassId(92)
+                .opponentClanId(102L)
                 .result(OlympiadMatchResult.WIN)
                 .reason(OlympiadMatchReason.NORMAL)
-                .pointsBefore(40).pointsAfter(43)
-                .damageDealt(12_500).opponentDamageDealt(9_400)
+                .pointsBefore(40)
+                .pointsAfter(43)
+                .damageDealt(12_500)
+                .opponentDamageDealt(9_400)
                 .fightStartedAt(Instant.parse("2026-06-01T12:00:00Z"))
                 .fightDurationSec(178L);
     }

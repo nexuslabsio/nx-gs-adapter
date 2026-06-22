@@ -1,26 +1,21 @@
 package app.l2nx.gs.adapter.core.commands;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import app.l2nx.gs.adapter.api.spi.CommandHandler;
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class CommandTypeRegistryTest {
 
-    static final class FakeCommandA implements NxCommand<Void> {
-    }
+    static final class FakeCommandA implements NxCommand<Void> {}
 
-    static final class FakeCommandB implements NxCommand<Void> {
-    }
+    static final class FakeCommandB implements NxCommand<Void> {}
 
-    private static final CommandHandler<FakeCommandA, Void> NOOP_HANDLER_A =
-            (cmd, ctx) -> CommandResult.<Void>ok();
-    private static final CommandHandler<FakeCommandB, Void> NOOP_HANDLER_B =
-            (cmd, ctx) -> CommandResult.<Void>ok();
+    private static final CommandHandler<FakeCommandA, Void> NOOP_HANDLER_A = (cmd, ctx) -> CommandResult.<Void>ok();
+    private static final CommandHandler<FakeCommandB, Void> NOOP_HANDLER_B = (cmd, ctx) -> CommandResult.<Void>ok();
 
     @Test
     void register_firstCall_shouldReturnFalse() {
@@ -104,7 +99,8 @@ class CommandTypeRegistryTest {
         CommandTypeBinding binding = registry.lookup("FakeCommandA");
 
         assertNotNull(binding);
-        assertArrayEquals("FakeCommandAResult".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        assertArrayEquals(
+                "FakeCommandAResult".getBytes(java.nio.charset.StandardCharsets.UTF_8),
                 binding.replyMessageTypeBytes());
     }
 }

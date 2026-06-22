@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class SyncEventTest {
 
@@ -42,12 +42,16 @@ class SyncEventTest {
     @Test
     void equals_shouldRespectGenericPayload() {
         SyncEvent<Payload> a = SyncEvent.<Payload>builder()
-                .entityName("clan").pk(1L).op("CREATED")
+                .entityName("clan")
+                .pk(1L)
+                .op("CREATED")
                 .payload(new Payload("Hellbound", 80))
                 .timestampEpochMs(TS)
                 .build();
         SyncEvent<Payload> b = SyncEvent.<Payload>builder()
-                .entityName("clan").pk(1L).op("CREATED")
+                .entityName("clan")
+                .pk(1L)
+                .op("CREATED")
                 .payload(new Payload("Hellbound", 81))
                 .timestampEpochMs(TS)
                 .build();
@@ -58,7 +62,9 @@ class SyncEventTest {
     @Test
     void toBuilder_shouldRoundtrip() {
         SyncEvent<Payload> original = SyncEvent.<Payload>builder()
-                .entityName("clan").pk(1L).op("CREATED")
+                .entityName("clan")
+                .pk(1L)
+                .op("CREATED")
                 .payload(new Payload("X", 1))
                 .timestampEpochMs(TS)
                 .build();

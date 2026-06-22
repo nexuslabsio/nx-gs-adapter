@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.events.mail;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Instant;
 import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class MailSentEventTest {
 
@@ -93,7 +92,8 @@ class MailSentEventTest {
                 .attachments(Collections.singletonList(stub()))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
+        assertThrows(
+                UnsupportedOperationException.class,
                 () -> event.getAttachments().add(stub()));
     }
 
@@ -138,12 +138,24 @@ class MailSentEventTest {
     @Test
     void equals_shouldDistinguishCodAmount() {
         UUID id = UUID.randomUUID();
-        MailSentEvent a = MailSentEvent.builder().eventId(id).mailId(1L)
-                .senderCharId(0L).receiverCharId(2L).subject("s")
-                .expiresAt(Instant.EPOCH).codAmount(0L).build();
-        MailSentEvent b = MailSentEvent.builder().eventId(id).mailId(1L)
-                .senderCharId(0L).receiverCharId(2L).subject("s")
-                .expiresAt(Instant.EPOCH).codAmount(100L).build();
+        MailSentEvent a = MailSentEvent.builder()
+                .eventId(id)
+                .mailId(1L)
+                .senderCharId(0L)
+                .receiverCharId(2L)
+                .subject("s")
+                .expiresAt(Instant.EPOCH)
+                .codAmount(0L)
+                .build();
+        MailSentEvent b = MailSentEvent.builder()
+                .eventId(id)
+                .mailId(1L)
+                .senderCharId(0L)
+                .receiverCharId(2L)
+                .subject("s")
+                .expiresAt(Instant.EPOCH)
+                .codAmount(100L)
+                .build();
 
         assertNotEquals(a, b);
     }
@@ -152,9 +164,13 @@ class MailSentEventTest {
     void toString_shouldRenderMailIdAndParties() {
         UUID id = UUID.fromString("018f5fa3-1e3d-7000-8000-000000000000");
         MailSentEvent event = MailSentEvent.builder()
-                .eventId(id).mailId(99L)
-                .senderCharId(11L).receiverCharId(22L)
-                .subject("s").expiresAt(Instant.EPOCH).build();
+                .eventId(id)
+                .mailId(99L)
+                .senderCharId(11L)
+                .receiverCharId(22L)
+                .subject("s")
+                .expiresAt(Instant.EPOCH)
+                .build();
 
         String s = event.toString();
         assertTrue(s.contains("mailId=99"));
@@ -164,7 +180,10 @@ class MailSentEventTest {
 
     private static MailItemMovement stub() {
         return MailItemMovement.builder()
-                .itemTemplateId(57L).itemId(1L).newItemId(1L).count(1L)
+                .itemTemplateId(57L)
+                .itemId(1L)
+                .newItemId(1L)
+                .count(1L)
                 .build();
     }
 }

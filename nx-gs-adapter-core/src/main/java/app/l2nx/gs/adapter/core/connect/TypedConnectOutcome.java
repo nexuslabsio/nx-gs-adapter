@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.core.connect;
 
-import org.jspecify.annotations.Nullable;
-
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Outcome of one {@link HostConnectFlow#connect()} attempt. Parameterized on
@@ -31,10 +30,8 @@ public final class TypedConnectOutcome<R> {
     private final @Nullable ErrorEnvelope error;
     private final @Nullable IOException ioException;
 
-    private TypedConnectOutcome(int statusCode,
-                                @Nullable R response,
-                                @Nullable ErrorEnvelope error,
-                                @Nullable IOException ioException) {
+    private TypedConnectOutcome(
+            int statusCode, @Nullable R response, @Nullable ErrorEnvelope error, @Nullable IOException ioException) {
         this.statusCode = statusCode;
         this.response = response;
         this.error = error;

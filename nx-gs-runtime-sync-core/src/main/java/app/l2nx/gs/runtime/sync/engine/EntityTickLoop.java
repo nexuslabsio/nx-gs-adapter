@@ -9,12 +9,11 @@ import app.l2nx.gs.runtime.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.runtime.sync.engine.publish.TopicResolver;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import org.apache.kafka.clients.producer.RecordMetadata;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.kafka.clients.producer.RecordMetadata;
 
 /**
  * One tick loop per declared runtime entity. Dispatched onto a shared scheduler
@@ -59,12 +58,13 @@ public final class EntityTickLoop {
     private volatile ScheduledFuture<?> future;
 
     @SuppressWarnings("unchecked")
-    public EntityTickLoop(RuntimeEntityMapping<?> mapping,
-                          TopicResolver topicResolver,
-                          SyncEventPublisher publisher,
-                          EntityStatsTracker statsTracker,
-                          EngineConfig config,
-                          ScheduledExecutorService scheduler) {
+    public EntityTickLoop(
+            RuntimeEntityMapping<?> mapping,
+            TopicResolver topicResolver,
+            SyncEventPublisher publisher,
+            EntityStatsTracker statsTracker,
+            EngineConfig config,
+            ScheduledExecutorService scheduler) {
         this.mapping = (RuntimeEntityMapping<Object>) mapping;
         this.entityName = mapping.entityName();
         this.topicResolver = topicResolver;
@@ -81,10 +81,8 @@ public final class EntityTickLoop {
         }
         Runnable tick = SafeRunnable.wrap(this::guardedTick, log);
         // First tick fires after one interval — keep boot quiet, then settle into cadence.
-        future = scheduler.scheduleWithFixedDelay(tick,
-                config.tickIntervalSeconds(),
-                config.tickIntervalSeconds(),
-                TimeUnit.SECONDS);
+        future = scheduler.scheduleWithFixedDelay(
+                tick, config.tickIntervalSeconds(), config.tickIntervalSeconds(), TimeUnit.SECONDS);
     }
 
     public void stop() {
@@ -101,7 +99,8 @@ public final class EntityTickLoop {
             return;
         }
         if (!ticking.compareAndSet(false, true)) {
-            log.warn("entity '{}' tick still running — skipping scheduled tick (consider raising tick-interval)",
+            log.warn(
+                    "entity '{}' tick still running — skipping scheduled tick (consider raising tick-interval)",
                     entityName);
             return;
         }
@@ -117,8 +116,7 @@ public final class EntityTickLoop {
         String topic = topicResolver.resolveTopic(entityName);
         if (topic == null) {
             log.warn("no runtime topic for entity '{}', skipping tick", entityName);
-            statsTracker.recordCycleResult(entityName,
-                    CycleResult.degraded(System.currentTimeMillis() - start));
+            statsTracker.recordCycleResult(entityName, CycleResult.degraded(System.currentTimeMillis() - start));
             return;
         }
 
@@ -128,10 +126,12 @@ public final class EntityTickLoop {
         try {
             rows = mapping.snapshot();
         } catch (Throwable t) {
-            log.error("entity '{}' snapshot threw {}: {}",
-                    entityName, t.getClass().getName(), t.getMessage());
-            statsTracker.recordCycleResult(entityName,
-                    CycleResult.degraded(System.currentTimeMillis() - start));
+            log.error(
+                    "entity '{}' snapshot threw {}: {}",
+                    entityName,
+                    t.getClass().getName(),
+                    t.getMessage());
+            statsTracker.recordCycleResult(entityName, CycleResult.degraded(System.currentTimeMillis() - start));
             return;
         }
         if (rows == null) {
@@ -147,18 +147,23 @@ public final class EntityTickLoop {
                 try {
                     hash = mapping.hash(dto);
                 } catch (Throwable t) {
-                    log.warn("entity '{}' hash(pk={}) threw {} — skipping row",
-                            entityName, pk, t.getClass().getName());
+                    log.warn(
+                            "entity '{}' hash(pk={}) threw {} — skipping row",
+                            entityName,
+                            pk,
+                            t.getClass().getName());
                     continue;
                 }
                 currentSnapshot.put(pk, hash);
                 dtosByPk.put(pk, dto);
             }
         } catch (Throwable iterFailure) {
-            log.warn("entity '{}' snapshot iteration failed: {}", entityName,
-                    iterFailure.getClass().getName(), iterFailure);
-            statsTracker.recordCycleResult(entityName,
-                    CycleResult.degraded(System.currentTimeMillis() - start));
+            log.warn(
+                    "entity '{}' snapshot iteration failed: {}",
+                    entityName,
+                    iterFailure.getClass().getName(),
+                    iterFailure);
+            statsTracker.recordCycleResult(entityName, CycleResult.degraded(System.currentTimeMillis() - start));
             return;
         }
 
@@ -188,8 +193,7 @@ public final class EntityTickLoop {
                 nextPrev.put(pk, currentHash);
                 continue;
             }
-            CompletableFuture<RecordMetadata> f = publisher.publish(
-                    mapping, op, pk, dtosByPk.get(pk), topic);
+            CompletableFuture<RecordMetadata> f = publisher.publish(mapping, op, pk, dtosByPk.get(pk), topic);
             inFlight.put(pk, f);
         }
 
@@ -216,14 +220,15 @@ public final class EntityTickLoop {
      * publishes carry the previous hash forward so replay happens next tick
      * (at-least-once contract).
      */
-    private long[] walkInFlight(Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
-                                Long2LongMap prev,
-                                Long2LongMap nextPrev,
-                                Long2LongMap currentSnapshot) {
+    private long[] walkInFlight(
+            Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
+            Long2LongMap prev,
+            Long2LongMap nextPrev,
+            Long2LongMap currentSnapshot) {
         long failedAcks = 0L;
         long timedOutAcks = 0L;
         if (inFlight.isEmpty()) {
-            return new long[]{0L, 0L};
+            return new long[] {0L, 0L};
         }
 
         // Pass 1: drain already-done — no blocking, just classify.
@@ -249,8 +254,7 @@ public final class EntityTickLoop {
 
         // Pass 2: deadline-bounded wait for the rest.
         if (!pending.isEmpty()) {
-            long deadlineNanos = System.nanoTime()
-                    + TimeUnit.SECONDS.toNanos(config.publishFlushSeconds());
+            long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(config.publishFlushSeconds());
             ObjectIterator<Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>>> pendIt =
                     pending.long2ObjectEntrySet().iterator();
             while (pendIt.hasNext()) {
@@ -280,14 +284,16 @@ public final class EntityTickLoop {
             }
         }
         if (failedAcks > 0L) {
-            log.warn("entity '{}' {} publish failures — replay next tick",
-                    entityName, failedAcks);
+            log.warn("entity '{}' {} publish failures — replay next tick", entityName, failedAcks);
         }
         if (timedOutAcks > 0L) {
-            log.warn("entity '{}' {} publishes still pending past flush deadline ({}s) — replay next tick",
-                    entityName, timedOutAcks, config.publishFlushSeconds());
+            log.warn(
+                    "entity '{}' {} publishes still pending past flush deadline ({}s) — replay next tick",
+                    entityName,
+                    timedOutAcks,
+                    config.publishFlushSeconds());
         }
-        return new long[]{failedAcks, timedOutAcks};
+        return new long[] {failedAcks, timedOutAcks};
     }
 
     private static void carryPrev(Long2LongMap prev, Long2LongMap nextPrev, long pk) {
@@ -298,9 +304,8 @@ public final class EntityTickLoop {
     }
 
     private static Long2LongOpenHashMap newHashMap(int initialCapacity) {
-        Long2LongOpenHashMap map = initialCapacity > 0
-                ? new Long2LongOpenHashMap(initialCapacity)
-                : new Long2LongOpenHashMap();
+        Long2LongOpenHashMap map =
+                initialCapacity > 0 ? new Long2LongOpenHashMap(initialCapacity) : new Long2LongOpenHashMap();
         map.defaultReturnValue(MISSING_HASH);
         return map;
     }

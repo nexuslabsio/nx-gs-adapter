@@ -4,7 +4,6 @@ import app.l2nx.gs.adapter.core.commands.CommandsConfig;
 import app.l2nx.gs.adapter.core.events.EventsConfig;
 import app.l2nx.gs.adapter.core.events.EventsPublisher;
 import app.l2nx.gs.adapter.core.lifecycle.AdapterVersion;
-
 import java.io.IOException;
 import java.io.Reader;
 import java.net.URI;
@@ -77,7 +76,8 @@ public final class ConfigResolver {
     private final Properties fileProps;
 
     public ConfigResolver() {
-        this(System::getProperty,
+        this(
+                System::getProperty,
                 () -> new LinkedHashSet<String>(System.getProperties().stringPropertyNames()),
                 loadFileProperties(System::getProperty));
     }
@@ -86,9 +86,7 @@ public final class ConfigResolver {
         this(sysprops, Collections::emptySet, fileProps);
     }
 
-    ConfigResolver(Function<String, String> sysprops,
-                   Supplier<Set<String>> syspropNames,
-                   Properties fileProps) {
+    ConfigResolver(Function<String, String> sysprops, Supplier<Set<String>> syspropNames, Properties fileProps) {
         this.sysprops = sysprops;
         this.syspropNames = syspropNames;
         this.fileProps = fileProps;
@@ -104,8 +102,16 @@ public final class ConfigResolver {
         Map<String, Object> kafkaProducerOverrides = resolveKafkaProducerOverrides();
         EventsConfig events = resolveEventsConfig();
         CommandsConfig commands = resolveCommandsConfig();
-        return new AdapterConfig(serverKey, platformUrl, adapterVersion, enabled,
-                ioWorkers, kafkaProducerOverrides, events, commands, hostType);
+        return new AdapterConfig(
+                serverKey,
+                platformUrl,
+                adapterVersion,
+                enabled,
+                ioWorkers,
+                kafkaProducerOverrides,
+                events,
+                commands,
+                hostType);
     }
 
     /**
@@ -122,9 +128,8 @@ public final class ConfigResolver {
         }
         String value = raw.get().trim().toLowerCase(Locale.ROOT);
         if (!HOST_TYPE_GS.equals(value) && !HOST_TYPE_LS.equals(value)) {
-            throw new IllegalStateException(
-                    "Invalid value for '" + KEY_HOST_TYPE + "': '" + raw.get()
-                            + "' (expected '" + HOST_TYPE_GS + "' or '" + HOST_TYPE_LS + "')");
+            throw new IllegalStateException("Invalid value for '" + KEY_HOST_TYPE + "': '" + raw.get() + "' (expected '"
+                    + HOST_TYPE_GS + "' or '" + HOST_TYPE_LS + "')");
         }
         return value;
     }
@@ -133,8 +138,7 @@ public final class ConfigResolver {
         int value = resolveInt(KEY_IO_WORKERS, AdapterConfig.defaultIoWorkers());
         if (value < 1) {
             throw new IllegalStateException(
-                    "Invalid value for '" + KEY_IO_WORKERS + "': "
-                            + value + " (expected positive integer)");
+                    "Invalid value for '" + KEY_IO_WORKERS + "': " + value + " (expected positive integer)");
         }
         return value;
     }
@@ -142,54 +146,46 @@ public final class ConfigResolver {
     public EventsConfig resolveEventsConfig() {
         int queueCapacity = resolveInt(KEY_EVENTS_QUEUE_CAPACITY, EventsConfig.DEFAULT_QUEUE_CAPACITY);
         if (queueCapacity < 1) {
-            throw new IllegalStateException(
-                    "Invalid value for '" + KEY_EVENTS_QUEUE_CAPACITY + "': "
-                            + queueCapacity + " (expected positive integer)");
+            throw new IllegalStateException("Invalid value for '" + KEY_EVENTS_QUEUE_CAPACITY + "': " + queueCapacity
+                    + " (expected positive integer)");
         }
-        EventsPublisher.DropPolicy dropPolicy = resolveDropPolicy(
-                KEY_EVENTS_DROP_POLICY, EventsConfig.DEFAULT_DROP_POLICY);
-        long shutdownDrainMs = resolveLong(KEY_EVENTS_SHUTDOWN_DRAIN_MS,
-                EventsConfig.DEFAULT_SHUTDOWN_DRAIN_MS);
+        EventsPublisher.DropPolicy dropPolicy =
+                resolveDropPolicy(KEY_EVENTS_DROP_POLICY, EventsConfig.DEFAULT_DROP_POLICY);
+        long shutdownDrainMs = resolveLong(KEY_EVENTS_SHUTDOWN_DRAIN_MS, EventsConfig.DEFAULT_SHUTDOWN_DRAIN_MS);
         if (shutdownDrainMs < 0) {
-            throw new IllegalStateException(
-                    "Invalid value for '" + KEY_EVENTS_SHUTDOWN_DRAIN_MS + "': "
-                            + shutdownDrainMs + " (expected non-negative)");
+            throw new IllegalStateException("Invalid value for '" + KEY_EVENTS_SHUTDOWN_DRAIN_MS + "': "
+                    + shutdownDrainMs + " (expected non-negative)");
         }
         return new EventsConfig(queueCapacity, dropPolicy, shutdownDrainMs);
     }
 
     public CommandsConfig resolveCommandsConfig() {
-        long pollTimeoutMs = resolveLong(KEY_COMMANDS_POLL_TIMEOUT_MS,
-                CommandsConfig.DEFAULT_POLL_TIMEOUT_MS);
+        long pollTimeoutMs = resolveLong(KEY_COMMANDS_POLL_TIMEOUT_MS, CommandsConfig.DEFAULT_POLL_TIMEOUT_MS);
         if (pollTimeoutMs < 1) {
-            throw new IllegalStateException(
-                    "Invalid value for '" + KEY_COMMANDS_POLL_TIMEOUT_MS + "': "
-                            + pollTimeoutMs + " (expected positive integer)");
+            throw new IllegalStateException("Invalid value for '" + KEY_COMMANDS_POLL_TIMEOUT_MS + "': " + pollTimeoutMs
+                    + " (expected positive integer)");
         }
-        long shutdownTimeoutMs = resolveLong(KEY_COMMANDS_SHUTDOWN_TIMEOUT_MS,
-                CommandsConfig.DEFAULT_SHUTDOWN_TIMEOUT_MS);
+        long shutdownTimeoutMs =
+                resolveLong(KEY_COMMANDS_SHUTDOWN_TIMEOUT_MS, CommandsConfig.DEFAULT_SHUTDOWN_TIMEOUT_MS);
         if (shutdownTimeoutMs < 0) {
-            throw new IllegalStateException(
-                    "Invalid value for '" + KEY_COMMANDS_SHUTDOWN_TIMEOUT_MS + "': "
-                            + shutdownTimeoutMs + " (expected non-negative)");
+            throw new IllegalStateException("Invalid value for '" + KEY_COMMANDS_SHUTDOWN_TIMEOUT_MS + "': "
+                    + shutdownTimeoutMs + " (expected non-negative)");
         }
-        long hostSyncTimeoutMs = resolveLong(KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS,
-                CommandsConfig.DEFAULT_HOST_SYNC_TIMEOUT_MS);
+        long hostSyncTimeoutMs =
+                resolveLong(KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS, CommandsConfig.DEFAULT_HOST_SYNC_TIMEOUT_MS);
         if (hostSyncTimeoutMs < 1) {
-            throw new IllegalStateException(
-                    "Invalid value for '" + KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS + "': "
-                            + hostSyncTimeoutMs + " (expected positive integer)");
+            throw new IllegalStateException("Invalid value for '" + KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS + "': "
+                    + hostSyncTimeoutMs + " (expected positive integer)");
         }
-        long replyFlushTimeoutMs = resolveLong(KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS,
-                CommandsConfig.DEFAULT_REPLY_FLUSH_TIMEOUT_MS);
+        long replyFlushTimeoutMs =
+                resolveLong(KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS, CommandsConfig.DEFAULT_REPLY_FLUSH_TIMEOUT_MS);
         if (replyFlushTimeoutMs < 0) {
-            throw new IllegalStateException(
-                    "Invalid value for '" + KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS + "': "
-                            + replyFlushTimeoutMs + " (expected non-negative; 0 disables flush)");
+            throw new IllegalStateException("Invalid value for '" + KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS + "': "
+                    + replyFlushTimeoutMs + " (expected non-negative; 0 disables flush)");
         }
         Map<String, Object> kafkaOverrides = resolveCommandsKafkaOverrides();
-        return new CommandsConfig(pollTimeoutMs, shutdownTimeoutMs, hostSyncTimeoutMs,
-                replyFlushTimeoutMs, kafkaOverrides);
+        return new CommandsConfig(
+                pollTimeoutMs, shutdownTimeoutMs, hostSyncTimeoutMs, replyFlushTimeoutMs, kafkaOverrides);
     }
 
     private Map<String, Object> resolveCommandsKafkaOverrides() {
@@ -233,8 +229,7 @@ public final class ConfigResolver {
         try {
             return Integer.parseInt(raw.get());
         } catch (NumberFormatException e) {
-            throw new IllegalStateException(
-                    "Invalid integer value for '" + key + "': '" + raw.get() + "'", e);
+            throw new IllegalStateException("Invalid integer value for '" + key + "': '" + raw.get() + "'", e);
         }
     }
 
@@ -246,13 +241,11 @@ public final class ConfigResolver {
         try {
             return Long.parseLong(raw.get());
         } catch (NumberFormatException e) {
-            throw new IllegalStateException(
-                    "Invalid long value for '" + key + "': '" + raw.get() + "'", e);
+            throw new IllegalStateException("Invalid long value for '" + key + "': '" + raw.get() + "'", e);
         }
     }
 
-    private EventsPublisher.DropPolicy resolveDropPolicy(String key,
-                                                         EventsPublisher.DropPolicy defaultValue) {
+    private EventsPublisher.DropPolicy resolveDropPolicy(String key, EventsPublisher.DropPolicy defaultValue) {
         Optional<String> raw = resolveString(key);
         if (!raw.isPresent()) {
             return defaultValue;
@@ -263,7 +256,8 @@ public final class ConfigResolver {
         } catch (IllegalArgumentException e) {
             throw new IllegalStateException(
                     "Invalid drop-policy value for '" + key + "': '" + value
-                            + "' (expected 'oldest' or 'newest', case-insensitive)", e);
+                            + "' (expected 'oldest' or 'newest', case-insensitive)",
+                    e);
         }
     }
 
@@ -299,9 +293,8 @@ public final class ConfigResolver {
         if ("false".equalsIgnoreCase(value)) {
             return false;
         }
-        throw new IllegalStateException(
-                "Invalid boolean value for '" + key + "': '" + value
-                        + "' (expected 'true' or 'false', case-insensitive)");
+        throw new IllegalStateException("Invalid boolean value for '" + key + "': '" + value
+                + "' (expected 'true' or 'false', case-insensitive)");
     }
 
     public String resolveServerKey() {
@@ -325,18 +318,16 @@ public final class ConfigResolver {
         String otherKey = isGs ? KEY_LS_KEY : KEY_SERVER_KEY;
         boolean otherPresent = resolveString(otherKey).isPresent();
         if (otherPresent) {
-            throw new IllegalStateException(
-                    "Conflicting server-key configuration for host-type='" + hostType
-                            + "': '" + otherKey + "' must not be set when '"
-                            + KEY_HOST_TYPE + "=" + hostType + "'. Provide '" + expectedKey
-                            + "' only.");
+            throw new IllegalStateException("Conflicting server-key configuration for host-type='" + hostType
+                    + "': '" + otherKey + "' must not be set when '"
+                    + KEY_HOST_TYPE + "=" + hostType + "'. Provide '" + expectedKey
+                    + "' only.");
         }
         String value = resolveString(expectedKey).orElseThrow(() -> missingValueException(expectedKey));
         if (!value.startsWith(SERVER_KEY_PREFIX) || value.length() != SERVER_KEY_LENGTH) {
-            throw new IllegalStateException(
-                    "Invalid server-key format for '" + expectedKey + "': expected prefix '"
-                            + SERVER_KEY_PREFIX + "' and total length " + SERVER_KEY_LENGTH
-                            + " (got length " + value.length() + ")");
+            throw new IllegalStateException("Invalid server-key format for '" + expectedKey + "': expected prefix '"
+                    + SERVER_KEY_PREFIX + "' and total length " + SERVER_KEY_LENGTH
+                    + " (got length " + value.length() + ")");
         }
         return value;
     }
@@ -351,18 +342,15 @@ public final class ConfigResolver {
                     "Invalid '" + KEY_PLATFORM_URL + "' value '" + raw + "': " + e.getMessage(), e);
         }
         if (!"https".equalsIgnoreCase(uri.getScheme())) {
-            throw new IllegalStateException(
-                    "Invalid '" + KEY_PLATFORM_URL + "' value '" + raw
-                            + "': scheme must be https (server-key would travel in plaintext otherwise)");
+            throw new IllegalStateException("Invalid '" + KEY_PLATFORM_URL + "' value '" + raw
+                    + "': scheme must be https (server-key would travel in plaintext otherwise)");
         }
         if (uri.getHost() == null || uri.getHost().isEmpty()) {
-            throw new IllegalStateException(
-                    "Invalid '" + KEY_PLATFORM_URL + "' value '" + raw + "': missing host");
+            throw new IllegalStateException("Invalid '" + KEY_PLATFORM_URL + "' value '" + raw + "': missing host");
         }
         if (uri.getRawQuery() != null || uri.getRawFragment() != null) {
-            throw new IllegalStateException(
-                    "Invalid '" + KEY_PLATFORM_URL + "' value '" + raw
-                            + "': must not contain a query string or fragment");
+            throw new IllegalStateException("Invalid '" + KEY_PLATFORM_URL + "' value '" + raw
+                    + "': must not contain a query string or fragment");
         }
         // Normalize: drop trailing slash so callers can append paths without ambiguity.
         return raw.endsWith("/") ? raw.substring(0, raw.length() - 1) : raw;
@@ -377,13 +365,12 @@ public final class ConfigResolver {
     }
 
     private static IllegalStateException missingValueException(String key) {
-        return new IllegalStateException(
-                "Missing required configuration '" + key + "'. Provide it via one of: "
-                        + "(1) properties file with key " + key + "=<value> "
-                        + "(path from -D" + CONFIG_FILE_KEY + "=<path>, "
-                        + "or '" + DEFAULT_FILE_NAME + "' in the JVM working directory "
-                        + "when -D" + CONFIG_FILE_KEY + " is not set), "
-                        + "(2) JVM system property -D" + key + "=<value> as fallback");
+        return new IllegalStateException("Missing required configuration '" + key + "'. Provide it via one of: "
+                + "(1) properties file with key " + key + "=<value> "
+                + "(path from -D" + CONFIG_FILE_KEY + "=<path>, "
+                + "or '" + DEFAULT_FILE_NAME + "' in the JVM working directory "
+                + "when -D" + CONFIG_FILE_KEY + " is not set), "
+                + "(2) JVM system property -D" + key + "=<value> as fallback");
     }
 
     private static boolean isPresent(String value) {
@@ -406,8 +393,7 @@ public final class ConfigResolver {
             try {
                 resolved = Paths.get(trimmed);
             } catch (InvalidPathException e) {
-                throw new IllegalStateException(
-                        explicitErrorPrefix(trimmed) + ": invalid path: " + e.getMessage(), e);
+                throw new IllegalStateException(explicitErrorPrefix(trimmed) + ": invalid path: " + e.getMessage(), e);
             }
             return loadFromPath(resolved, /* required = */ true);
         }
@@ -421,18 +407,17 @@ public final class ConfigResolver {
             return props;
         } catch (NoSuchFileException e) {
             if (required) {
-                throw new IllegalStateException(
-                        errorPrefix(required, filePath) + ": file does not exist", e);
+                throw new IllegalStateException(errorPrefix(required, filePath) + ": file does not exist", e);
             }
             return props;
         } catch (IOException e) {
-            throw new IllegalStateException(
-                    errorPrefix(required, filePath) + ": " + e.getMessage(), e);
+            throw new IllegalStateException(errorPrefix(required, filePath) + ": " + e.getMessage(), e);
         }
     }
 
     private static String errorPrefix(boolean required, Path filePath) {
-        return required ? explicitErrorPrefix(filePath.toString())
+        return required
+                ? explicitErrorPrefix(filePath.toString())
                 : "Unable to read default config file '" + filePath + "'";
     }
 

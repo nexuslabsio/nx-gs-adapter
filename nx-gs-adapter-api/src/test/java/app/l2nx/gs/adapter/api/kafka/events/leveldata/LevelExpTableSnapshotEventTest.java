@@ -1,10 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.leveldata;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class LevelExpTableSnapshotEventTest {
 
@@ -18,14 +17,15 @@ class LevelExpTableSnapshotEventTest {
 
     @Test
     void constructor_shouldRejectNullEventId() {
-        assertThrows(NullPointerException.class, () -> LevelExpTableSnapshotEvent.builder().build());
+        assertThrows(
+                NullPointerException.class,
+                () -> LevelExpTableSnapshotEvent.builder().build());
     }
 
     @Test
     void getLevels_shouldReturnEmptyList_whenBuilderOmits() {
-        LevelExpTableSnapshotEvent event = LevelExpTableSnapshotEvent.builder()
-                .eventId(id())
-                .build();
+        LevelExpTableSnapshotEvent event =
+                LevelExpTableSnapshotEvent.builder().eventId(id()).build();
 
         assertTrue(event.getLevels().isEmpty());
         assertNull(event.getMetadata());
@@ -38,8 +38,8 @@ class LevelExpTableSnapshotEventTest {
                 .levels(new ArrayList<>(Collections.singletonList(entry(1, 0L))))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getLevels().add(entry(2, 68L)));
+        assertThrows(
+                UnsupportedOperationException.class, () -> event.getLevels().add(entry(2, 68L)));
     }
 
     @Test
@@ -64,8 +64,8 @@ class LevelExpTableSnapshotEventTest {
                 .metadata(Collections.singletonMap("source", "experiencedata"))
                 .build();
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> event.getMetadata().put("k", "v"));
+        assertThrows(
+                UnsupportedOperationException.class, () -> event.getMetadata().put("k", "v"));
     }
 
     @Test
@@ -83,7 +83,8 @@ class LevelExpTableSnapshotEventTest {
 
     @Test
     void equals_shouldDistinguishLevels() {
-        LevelExpTableSnapshotEvent empty = LevelExpTableSnapshotEvent.builder().eventId(id()).build();
+        LevelExpTableSnapshotEvent empty =
+                LevelExpTableSnapshotEvent.builder().eventId(id()).build();
         LevelExpTableSnapshotEvent withLevel = LevelExpTableSnapshotEvent.builder()
                 .eventId(id())
                 .levels(Collections.singletonList(entry(1, 0L)))

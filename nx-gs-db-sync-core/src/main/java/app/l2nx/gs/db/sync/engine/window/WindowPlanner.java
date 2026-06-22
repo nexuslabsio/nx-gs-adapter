@@ -3,7 +3,6 @@ package app.l2nx.gs.db.sync.engine.window;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.PrimarySource;
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -21,21 +20,22 @@ import java.util.OptionalLong;
  */
 public final class WindowPlanner {
 
-    public List<Window> plan(EntityMapping<?> mapping,
-                             Connection conn,
-                             SnapshotStore snapshot,
-                             int rowsPerWindow,
-                             int queryTimeoutSeconds) throws SQLException {
+    public List<Window> plan(
+            EntityMapping<?> mapping,
+            Connection conn,
+            SnapshotStore snapshot,
+            int rowsPerWindow,
+            int queryTimeoutSeconds)
+            throws SQLException {
         if (rowsPerWindow <= 0) {
-            throw new IllegalArgumentException(
-                    "rowsPerWindow must be > 0, was " + rowsPerWindow);
+            throw new IllegalArgumentException("rowsPerWindow must be > 0, was " + rowsPerWindow);
         }
         PrimarySource<?> primary = mapping.primary();
         OptionalLong minDb = OptionalLong.empty();
         OptionalLong maxDb = OptionalLong.empty();
 
-        String sql = "SELECT MIN(" + primary.pkColumn() + "), MAX(" + primary.pkColumn() + ") "
-                + "FROM " + primary.tableName();
+        String sql = "SELECT MIN(" + primary.pkColumn() + "), MAX(" + primary.pkColumn() + ") " + "FROM "
+                + primary.tableName();
         try (Statement st = conn.createStatement()) {
             st.setQueryTimeout(queryTimeoutSeconds);
             try (ResultSet rs = st.executeQuery(sql)) {
@@ -106,10 +106,9 @@ public final class WindowPlanner {
             }
             windows.add(new Window(cursor, end));
             if (windows.size() > MAX_WINDOWS_PER_PLAN) {
-                throw new IllegalStateException(
-                        "WindowPlanner produced > " + MAX_WINDOWS_PER_PLAN
-                                + " windows for [" + minPk + ", " + maxPk + "] with rowsPerWindow="
-                                + rowsPerWindow + " — check PK range and rows-per-window config");
+                throw new IllegalStateException("WindowPlanner produced > " + MAX_WINDOWS_PER_PLAN
+                        + " windows for [" + minPk + ", " + maxPk + "] with rowsPerWindow="
+                        + rowsPerWindow + " — check PK range and rows-per-window config");
             }
             if (end == maxPk) {
                 break;

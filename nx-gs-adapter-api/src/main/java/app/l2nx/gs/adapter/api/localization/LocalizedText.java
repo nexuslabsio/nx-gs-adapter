@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.localization;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Multilingual text value — a locale-keyed map of translated strings. Mirrors the

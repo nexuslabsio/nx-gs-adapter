@@ -1,8 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One per-item failure entry in {@link SendMailPayload#getItemErrors()}.
@@ -42,9 +41,7 @@ public final class ItemDeliveryError {
     private final @Nullable Long count;
     private final String reason;
 
-    public ItemDeliveryError(@Nullable Long itemTemplateId,
-                             @Nullable Long count,
-                             @Nullable String reason) {
+    public ItemDeliveryError(@Nullable Long itemTemplateId, @Nullable Long count, @Nullable String reason) {
         this.itemTemplateId = itemTemplateId;
         this.count = count;
         this.reason = reason == null ? "" : reason;
@@ -102,9 +99,7 @@ public final class ItemDeliveryError {
 
     @Override
     public String toString() {
-        return "ItemDeliveryError[itemTemplateId=" + itemTemplateId
-                + ", count=" + count
-                + ", reason=" + reason + "]";
+        return "ItemDeliveryError[itemTemplateId=" + itemTemplateId + ", count=" + count + ", reason=" + reason + "]";
     }
 
     public static final class Builder {

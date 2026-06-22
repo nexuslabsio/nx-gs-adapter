@@ -1,7 +1,6 @@
 package app.l2nx.gs.db.sync.engine.persist;
 
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
-
 import java.io.Closeable;
 
 /**

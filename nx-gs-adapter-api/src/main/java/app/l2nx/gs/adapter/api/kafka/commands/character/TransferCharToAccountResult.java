@@ -16,9 +16,7 @@ public final class TransferCharToAccountResult {
     private final String newAccountName;
     private final boolean wasLoggedOut;
 
-    public TransferCharToAccountResult(Long charId,
-                                       String newAccountName,
-                                       boolean wasLoggedOut) {
+    public TransferCharToAccountResult(Long charId, String newAccountName, boolean wasLoggedOut) {
         if (charId == null) {
             throw new IllegalArgumentException("charId is required");
         }
@@ -48,10 +46,7 @@ public final class TransferCharToAccountResult {
     }
 
     public Builder toBuilder() {
-        return new Builder()
-                .charId(charId)
-                .newAccountName(newAccountName)
-                .wasLoggedOut(wasLoggedOut);
+        return new Builder().charId(charId).newAccountName(newAccountName).wasLoggedOut(wasLoggedOut);
     }
 
     public static Builder builder() {

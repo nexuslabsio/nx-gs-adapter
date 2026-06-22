@@ -1,11 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.ops;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Heartbeat slot reporting health of the built-in {@code events} module —
@@ -26,12 +25,13 @@ public final class EventsStats {
     private final long failedTotal;
     private final @Nullable List<String> disabledFamilies;
 
-    public EventsStats(int queueDepth,
-                       int queueCapacity,
-                       long publishedTotal,
-                       long droppedTotal,
-                       long failedTotal,
-                       @Nullable List<String> disabledFamilies) {
+    public EventsStats(
+            int queueDepth,
+            int queueCapacity,
+            long publishedTotal,
+            long droppedTotal,
+            long failedTotal,
+            @Nullable List<String> disabledFamilies) {
         this.queueDepth = queueDepth;
         this.queueCapacity = queueCapacity;
         this.publishedTotal = publishedTotal;
@@ -122,8 +122,7 @@ public final class EventsStats {
 
     @Override
     public int hashCode() {
-        return Objects.hash(queueDepth, queueCapacity, publishedTotal, droppedTotal,
-                failedTotal, disabledFamilies);
+        return Objects.hash(queueDepth, queueCapacity, publishedTotal, droppedTotal, failedTotal, disabledFamilies);
     }
 
     @Override
@@ -175,8 +174,8 @@ public final class EventsStats {
         }
 
         public EventsStats build() {
-            return new EventsStats(queueDepth, queueCapacity, publishedTotal,
-                    droppedTotal, failedTotal, disabledFamilies);
+            return new EventsStats(
+                    queueDepth, queueCapacity, publishedTotal, droppedTotal, failedTotal, disabledFamilies);
         }
     }
 }
