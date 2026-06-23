@@ -82,10 +82,12 @@ class CharacterPresenceEventTest {
         Map<String, String> metadata = new LinkedHashMap<String, String>();
         metadata.put(WellKnownPresenceMetadata.LOGOUT_REASON, WellKnownPresenceMetadata.LOGOUT_REASON_DISCONNECT);
 
+        UUID sessionId = UUID.fromString("018f5fa3-1e3d-7000-8000-0000000000aa");
         CharacterPresenceEvent original = CharacterPresenceEvent.builder()
                 .eventId(id())
                 .charId(42L)
                 .online(false)
+                .sessionId(sessionId)
                 .accountName("acc")
                 .ip("1.2.3.4")
                 .hwid("HW")
@@ -95,11 +97,41 @@ class CharacterPresenceEventTest {
         CharacterPresenceEvent copy = original.toBuilder().build();
         assertEquals(original, copy);
         assertNotSame(original, copy);
+        assertEquals(sessionId, copy.getSessionId());
         assertEquals("acc", copy.getAccountName());
         assertEquals("1.2.3.4", copy.getIp());
         assertEquals("HW", copy.getHwid());
         assertFalse(copy.isOnline());
         assertEquals(42L, copy.getCharId());
+    }
+
+    @Test
+    void getSessionId_shouldReturnNull_whenBuilderOmits() {
+        CharacterPresenceEvent event = CharacterPresenceEvent.builder()
+                .eventId(id())
+                .charId(1L)
+                .online(true)
+                .build();
+
+        assertNull(event.getSessionId());
+    }
+
+    @Test
+    void equals_shouldDistinguishSessionId() {
+        UUID id = id();
+        CharacterPresenceEvent withoutSession = CharacterPresenceEvent.builder()
+                .eventId(id)
+                .charId(1L)
+                .online(true)
+                .build();
+        CharacterPresenceEvent withSession = CharacterPresenceEvent.builder()
+                .eventId(id)
+                .charId(1L)
+                .online(true)
+                .sessionId(UUID.fromString("018f5fa3-1e3d-7000-8000-0000000000bb"))
+                .build();
+
+        assertNotEquals(withoutSession, withSession);
     }
 
     @Test

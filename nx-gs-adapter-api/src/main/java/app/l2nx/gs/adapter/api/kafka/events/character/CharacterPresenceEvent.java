@@ -30,6 +30,12 @@ import org.jspecify.annotations.Nullable;
  *   occurrence order.</li>
  *   <li>{@link #isOnline() online} — REQUIRED. {@code true} = login,
  *   {@code false} = logout.</li>
+ *   <li>{@link #getSessionId() sessionId} — optional wire correlation key for
+ *   a login/logout pair. A login fact and its matching logout fact carry the
+ *   SAME {@code sessionId}; the host mints a FRESH unique {@code sessionId} per
+ *   login-session. {@code null} on builds that do not emit it — the platform
+ *   then cannot correlate the logout and leaves the session's logout time
+ *   unset.</li>
  *   <li>{@link #getAccountName() accountName} — optional; login account
  *   owning this character at the moment of the event.</li>
  *   <li>{@link #getIp() ip} — optional client IP captured at the event.</li>
@@ -50,6 +56,7 @@ public final class CharacterPresenceEvent {
     private final UUID eventId;
     private final long charId;
     private final boolean online;
+    private final @Nullable UUID sessionId;
     private final @Nullable String accountName;
     private final @Nullable String ip;
     private final @Nullable String hwid;
@@ -59,6 +66,7 @@ public final class CharacterPresenceEvent {
             UUID eventId,
             long charId,
             boolean online,
+            @Nullable UUID sessionId,
             @Nullable String accountName,
             @Nullable String ip,
             @Nullable String hwid,
@@ -66,6 +74,7 @@ public final class CharacterPresenceEvent {
         this.eventId = Objects.requireNonNull(eventId, "CharacterPresenceEvent.eventId is required");
         this.charId = charId;
         this.online = online;
+        this.sessionId = sessionId;
         this.accountName = accountName;
         this.ip = ip;
         this.hwid = hwid;
@@ -83,6 +92,10 @@ public final class CharacterPresenceEvent {
 
     public boolean isOnline() {
         return online;
+    }
+
+    public @Nullable UUID getSessionId() {
+        return sessionId;
     }
 
     public @Nullable String getAccountName() {
@@ -106,6 +119,7 @@ public final class CharacterPresenceEvent {
                 .eventId(eventId)
                 .charId(charId)
                 .online(online)
+                .sessionId(sessionId)
                 .accountName(accountName)
                 .ip(ip)
                 .hwid(hwid)
@@ -124,6 +138,7 @@ public final class CharacterPresenceEvent {
         return charId == that.charId
                 && online == that.online
                 && eventId.equals(that.eventId)
+                && Objects.equals(sessionId, that.sessionId)
                 && Objects.equals(accountName, that.accountName)
                 && Objects.equals(ip, that.ip)
                 && Objects.equals(hwid, that.hwid)
@@ -132,7 +147,7 @@ public final class CharacterPresenceEvent {
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, charId, online, accountName, ip, hwid, metadata);
+        return Objects.hash(eventId, charId, online, sessionId, accountName, ip, hwid, metadata);
     }
 
     @Override
@@ -140,6 +155,7 @@ public final class CharacterPresenceEvent {
         return "CharacterPresenceEvent[eventId=" + eventId
                 + ", charId=" + charId
                 + ", online=" + online
+                + ", sessionId=" + sessionId
                 + ", accountName=" + accountName
                 + ", ip=" + ip
                 + ", hwid=" + hwid
@@ -150,6 +166,7 @@ public final class CharacterPresenceEvent {
         private @Nullable UUID eventId;
         private long charId;
         private boolean online;
+        private @Nullable UUID sessionId;
         private @Nullable String accountName;
         private @Nullable String ip;
         private @Nullable String hwid;
@@ -167,6 +184,11 @@ public final class CharacterPresenceEvent {
 
         public Builder online(boolean online) {
             this.online = online;
+            return this;
+        }
+
+        public Builder sessionId(@Nullable UUID sessionId) {
+            this.sessionId = sessionId;
             return this;
         }
 
@@ -191,7 +213,7 @@ public final class CharacterPresenceEvent {
         }
 
         public CharacterPresenceEvent build() {
-            return new CharacterPresenceEvent(eventId, charId, online, accountName, ip, hwid, metadata);
+            return new CharacterPresenceEvent(eventId, charId, online, sessionId, accountName, ip, hwid, metadata);
         }
     }
 }
