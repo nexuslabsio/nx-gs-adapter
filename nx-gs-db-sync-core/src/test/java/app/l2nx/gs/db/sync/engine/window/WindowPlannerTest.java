@@ -8,12 +8,18 @@ import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
 import app.l2nx.gs.db.sync.engine.TestMappings;
+import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 class WindowPlannerTest {
@@ -195,6 +201,70 @@ class WindowPlannerTest {
         Throwable t =
                 assertThrowsOrNull(() -> WindowPlanner.divideRange(0L, WindowPlanner.MAX_WINDOWS_PER_PLAN + 100L, 1));
         assertNotNull(t, "expected IllegalStateException at cap");
+    }
+
+    @Nested
+    class PlanTargeted {
+
+        @Test
+        void planTargeted_shouldReturnEmpty_whenPkSetNullOrEmpty() {
+            assertTrue(
+                    new WindowPlanner().planTargeted(clanMapping(), null, null).isEmpty());
+            assertTrue(new WindowPlanner()
+                    .planTargeted(clanMapping(), null, new LongOpenHashSet())
+                    .isEmpty());
+        }
+
+        @Test
+        void planTargeted_shouldProduceSingleInListWindow_whenWithinOneChunk() {
+            List<Window> windows = new WindowPlanner().planTargeted(clanMapping(), null, pks(7L, 3L, 99L));
+
+            assertEquals(1, windows.size());
+            Window w = windows.get(0);
+            assertTrue(w.targeted(), "targeted window must carry an IN-list");
+            assertEquals(3, w.pks().size());
+            assertEquals(new HashSet<Long>(Arrays.asList(3L, 7L, 99L)), toBoxedSet(w.pks()));
+            // from/to set to min/max so snapshot bucketing can still locate it.
+            assertEquals(3L, w.fromPk());
+            assertEquals(99L, w.toPk());
+        }
+
+        @Test
+        void planTargeted_shouldChunkAtTargetedChunkSize_whenSetExceedsOneChunk() {
+            LongOpenHashSet set = new LongOpenHashSet();
+            for (long pk = 1L; pk <= WindowPlanner.TARGETED_CHUNK_SIZE + 50L; pk++) {
+                set.add(pk);
+            }
+
+            List<Window> windows = new WindowPlanner().planTargeted(clanMapping(), null, set);
+
+            assertEquals(2, windows.size(), "501..550 spills into a second chunk");
+            assertEquals(WindowPlanner.TARGETED_CHUNK_SIZE, windows.get(0).pks().size());
+            assertEquals(50, windows.get(1).pks().size());
+            // Every targeted PK appears in exactly one window — no loss, no dup.
+            Set<Long> union = new HashSet<Long>();
+            for (Window w : windows) {
+                assertTrue(w.targeted());
+                union.addAll(toBoxedSet(w.pks()));
+            }
+            assertEquals(set.size(), union.size());
+        }
+    }
+
+    private static LongSet pks(long... values) {
+        LongOpenHashSet set = new LongOpenHashSet();
+        for (long v : values) {
+            set.add(v);
+        }
+        return set;
+    }
+
+    private static Set<Long> toBoxedSet(LongList list) {
+        Set<Long> out = new HashSet<Long>();
+        for (int i = 0; i < list.size(); i++) {
+            out.add(list.getLong(i));
+        }
+        return out;
     }
 
     private static Connection mockMinMax(long min, long max) throws SQLException {

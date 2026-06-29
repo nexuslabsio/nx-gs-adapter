@@ -12,6 +12,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Per-entity force-resync bookkeeping for {@link CdcEngine}: thread-safe
@@ -107,11 +108,20 @@ final class ResyncCoordinator {
      * snapshot. Cycle thread only — runs at the top of the guarded cycle,
      * BEFORE the task plans windows, so inserted sentinels extend the
      * snapshot's PK envelope and are scanned this cycle.
+     *
+     * <p>Returns a {@link DrainResult} describing the drain so the engine can
+     * decide whether the cycle qualifies for the targeted fast-path:
+     * {@code targetedOnly} is true when something was drained and NO whole-entity
+     * {@code all} request was pending; {@code targetedPks} is then the union of
+     * the drained tracked + no-event PKs (the bounded set to hash via
+     * {@code IN(...)}). When {@code all} was drained, {@code targetedOnly} is
+     * false and {@code targetedPks} is irrelevant (full scan required).
+     * {@link DrainResult#EMPTY} when nothing was pending.</p>
      */
-    void drainAndInvalidate(String entityName, SnapshotStore snapshot) {
+    DrainResult drainAndInvalidate(String entityName, SnapshotStore snapshot) {
         Pending pending = pendingByEntity.get(entityName);
         if (pending == null) {
-            return;
+            return DrainResult.EMPTY;
         }
         boolean all;
         LongOpenHashSet pks;
@@ -119,7 +129,7 @@ final class ResyncCoordinator {
         List<UUID> drainedIds;
         synchronized (pending) {
             if (pending.resyncIds.isEmpty() && pending.noEventPks.isEmpty()) {
-                return;
+                return DrainResult.EMPTY;
             }
             all = pending.all;
             pks = pending.pks.isEmpty() ? null : new LongOpenHashSet(pending.pks);
@@ -161,15 +171,53 @@ final class ResyncCoordinator {
                     noEventPks.size(),
                     entityName);
         }
-        if (drainedIds.isEmpty()) {
-            return;
-        }
-        Instant cycleStartedAt = Instant.now();
-        List<InFlight> inFlight = inFlightOf(entityName);
-        for (UUID resyncId : drainedIds) {
-            if (!containsId(inFlight, resyncId)) {
-                inFlight.add(new InFlight(resyncId, cycleStartedAt));
+        if (!drainedIds.isEmpty()) {
+            Instant cycleStartedAt = Instant.now();
+            List<InFlight> inFlight = inFlightOf(entityName);
+            for (UUID resyncId : drainedIds) {
+                if (!containsId(inFlight, resyncId)) {
+                    inFlight.add(new InFlight(resyncId, cycleStartedAt));
+                }
             }
+        }
+        if (all) {
+            return DrainResult.EMPTY;
+        }
+        // Union of drained tracked + no-event PKs — the bounded set a targeted
+        // fast-path cycle hashes via IN(...). Empty union → null (no fast-path).
+        LongOpenHashSet union = new LongOpenHashSet();
+        if (pks != null) {
+            union.addAll(pks);
+        }
+        if (noEventPks != null) {
+            union.addAll(noEventPks);
+        }
+        return new DrainResult(union.isEmpty() ? null : union);
+    }
+
+    /**
+     * Outcome of a {@link #drainAndInvalidate} call, surfaced to the engine so a
+     * triggered cycle can take the per-PK targeted fast-path. {@code targetedOnly}
+     * is true only when something was drained and no whole-entity {@code all}
+     * request was pending; {@code targetedPks} then holds the bounded PK set.
+     */
+    static final class DrainResult {
+        static final DrainResult EMPTY = new DrainResult(null);
+
+        @Nullable
+        private final LongSet targetedPks;
+
+        DrainResult(@Nullable LongSet targetedPks) {
+            this.targetedPks = targetedPks;
+        }
+
+        boolean targetedOnly() {
+            return targetedPks != null;
+        }
+
+        @Nullable
+        LongSet targetedPks() {
+            return targetedPks;
         }
     }
 

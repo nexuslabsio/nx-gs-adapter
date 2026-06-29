@@ -3,6 +3,10 @@ package app.l2nx.gs.db.sync.engine.window;
 import app.l2nx.gs.adapter.api.spi.EntityMapping;
 import app.l2nx.gs.adapter.api.spi.PrimarySource;
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
+import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -62,6 +66,41 @@ public final class WindowPlanner {
         }
         return divideRange(minEnv.getAsLong(), maxEnv.getAsLong(), rowsPerWindow);
     }
+
+    /**
+     * Plans targeted {@code IN}-list windows for the force-resync fast-path: no
+     * MIN/MAX range scan, just the explicitly-invalidated PKs chunked into
+     * windows of {@link #TARGETED_CHUNK_SIZE} so each Phase-1 query stays a
+     * bounded {@code WHERE pk IN (...)}. Returns an empty list for a null/empty
+     * set (the cycle then does nothing). The {@code conn} parameter is accepted
+     * for signature symmetry with {@link #plan} (no DB round-trip needed here).
+     */
+    public List<Window> planTargeted(EntityMapping<?> mapping, Connection conn, LongSet targetedPks) {
+        if (targetedPks == null || targetedPks.isEmpty()) {
+            return Collections.emptyList();
+        }
+        LongList all = Phase2Fetcher.toList(targetedPks);
+        List<Window> windows = new ArrayList<Window>();
+        int total = all.size();
+        int from = 0;
+        while (from < total) {
+            int to = Math.min(from + TARGETED_CHUNK_SIZE, total);
+            LongArrayList chunk = new LongArrayList(to - from);
+            for (int i = from; i < to; i++) {
+                chunk.add(all.getLong(i));
+            }
+            windows.add(Window.ofPks(chunk));
+            from = to;
+        }
+        return windows;
+    }
+
+    /**
+     * Chunk width of a targeted {@code IN}-list window — reuses the cascade
+     * resolution chunk size so the per-PK fast-path issues the same bounded
+     * {@code IN(...)} cardinality as cascade fan-out.
+     */
+    public static final int TARGETED_CHUNK_SIZE = 500;
 
     private static OptionalLong unionMin(OptionalLong a, OptionalLong b) {
         if (!a.isPresent()) return b;

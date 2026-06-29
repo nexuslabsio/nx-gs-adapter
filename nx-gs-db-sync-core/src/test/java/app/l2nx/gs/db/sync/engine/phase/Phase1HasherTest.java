@@ -9,13 +9,16 @@ import app.l2nx.gs.adapter.api.spi.PrimarySource;
 import app.l2nx.gs.db.sync.engine.JdbcDialect;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.sql.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentCaptor;
 
 class Phase1HasherTest {
 
@@ -190,6 +193,107 @@ class Phase1HasherTest {
                 new Phase1Hasher().hashPrimary(conn, new Window(0L, 100L), primary, 5, 10_000, JdbcDialect.OTHER);
 
         assertEquals((int) crc32Unsigned, result.get(42L), "CRC32 narrowing must preserve all 32 bits");
+    }
+
+    @Nested
+    class TargetedInList {
+
+        @Test
+        void buildPrimaryInSql_shouldEmitInListWithOnePlaceholderPerPk() {
+            PrimarySource<?> primary = stubPrimary("clan_data", "clan_id", Arrays.asList("clan_name", "clan_level"));
+
+            String sql = Phase1Hasher.buildPrimaryInSql(primary, 3);
+
+            assertEquals(
+                    "SELECT clan_id, CRC32(CONCAT_WS(',', clan_name, clan_level)) "
+                            + "FROM clan_data WHERE clan_id IN (?, ?, ?)",
+                    sql);
+        }
+
+        @Test
+        void buildChildInSql_shouldEmitInListGroupedByFk() {
+            ChildSource<?> child = stubChild("clan_skills", "clan_id", Arrays.asList("skill_id", "skill_level"));
+
+            String sql = Phase1Hasher.buildChildInSql(child, 2);
+
+            assertEquals(
+                    "SELECT clan_id, BIT_XOR(CRC32(CONCAT_WS(',', skill_id, skill_level))) "
+                            + "FROM clan_skills WHERE clan_id IN (?, ?) "
+                            + "GROUP BY clan_id",
+                    sql);
+        }
+
+        @Test
+        void hashPrimary_shouldBindOnePlaceholderPerTargetedPk_andNotUseBetween() throws SQLException {
+            PrimarySource<?> primary = stubPrimary("clan_data", "clan_id", Arrays.asList("clan_name", "clan_level"));
+            Connection conn = mock(Connection.class);
+            PreparedStatement ps = mock(PreparedStatement.class);
+            ResultSet rs = mock(ResultSet.class);
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            when(conn.prepareStatement(sqlCaptor.capture())).thenReturn(ps);
+            when(ps.executeQuery()).thenReturn(rs);
+            when(rs.next()).thenReturn(true, false);
+            when(rs.getLong(1)).thenReturn(42L);
+            when(rs.getLong(2)).thenReturn(777L);
+
+            Window targeted = Window.ofPks(new LongArrayList(Arrays.asList(42L, 43L, 44L)));
+            Long2IntMap result = new Phase1Hasher().hashPrimary(conn, targeted, primary, 5, 10_000, JdbcDialect.OTHER);
+
+            assertTrue(sqlCaptor.getValue().contains("IN (?, ?, ?)"), "targeted hash must use an IN-list");
+            assertFalse(sqlCaptor.getValue().contains("BETWEEN"), "targeted hash must NOT range-scan");
+            verify(ps).setLong(1, 42L);
+            verify(ps).setLong(2, 43L);
+            verify(ps).setLong(3, 44L);
+            assertEquals(1, result.size());
+            assertEquals(777, result.get(42L));
+        }
+
+        @Test
+        void hashChild_shouldScopeByFkInList_overTargetedParentPks() throws SQLException {
+            ChildSource<?> child = stubChild("clan_skills", "clan_id", Arrays.asList("skill_id", "skill_level"));
+            Connection conn = mock(Connection.class);
+            PreparedStatement ps = mock(PreparedStatement.class);
+            ResultSet rs = mock(ResultSet.class);
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            when(conn.prepareStatement(sqlCaptor.capture())).thenReturn(ps);
+            when(ps.executeQuery()).thenReturn(rs);
+            when(rs.next()).thenReturn(true, false);
+            when(rs.getLong(1)).thenReturn(1L);
+            when(rs.getLong(2)).thenReturn(0xAAAAL);
+
+            Window targeted = Window.ofPks(new LongArrayList(Arrays.asList(1L, 2L)));
+            Long2IntMap result = new Phase1Hasher().hashChild(conn, targeted, child, 5, 10_000, JdbcDialect.OTHER);
+
+            assertTrue(sqlCaptor.getValue().contains("clan_id IN (?, ?)"), "child hash scoped by fk IN-list");
+            assertTrue(sqlCaptor.getValue().contains("GROUP BY clan_id"));
+            verify(ps).setLong(1, 1L);
+            verify(ps).setLong(2, 2L);
+            assertEquals(0xAAAA, result.get(1L));
+        }
+
+        @ParameterizedTest
+        @CsvSource({"MYSQL", "MARIADB", "POSTGRES", "OTHER"})
+        void hashPrimary_shouldUsePlainFetchSize_forBoundedInList_acrossDialects(JdbcDialect dialect)
+                throws SQLException {
+            PrimarySource<?> primary = stubPrimary("clan_data", "clan_id", Arrays.asList("clan_name", "clan_level"));
+            Connection conn = mock(Connection.class);
+            PreparedStatement ps = mock(PreparedStatement.class);
+            ResultSet rs = mock(ResultSet.class);
+
+            when(conn.prepareStatement(anyString())).thenReturn(ps);
+            when(ps.executeQuery()).thenReturn(rs);
+            when(rs.next()).thenReturn(false);
+
+            Window targeted = Window.ofPks(new LongArrayList(Arrays.asList(42L, 43L)));
+            new Phase1Hasher().hashPrimary(conn, targeted, primary, 5, 10_000, dialect);
+
+            // Bounded fast-path never uses the MySQL Integer.MIN_VALUE streaming
+            // sentinel — a plain positive fetch size for every dialect.
+            verify(ps).setFetchSize(10_000);
+            verify(ps, never()).setFetchSize(Integer.MIN_VALUE);
+        }
     }
 
     private static PrimarySource<Object> stubPrimary(String table, String pk, List<String> hashed) {

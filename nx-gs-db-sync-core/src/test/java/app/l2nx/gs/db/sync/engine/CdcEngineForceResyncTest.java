@@ -181,12 +181,16 @@ class CdcEngineForceResyncTest {
     @Test
     void runGuardedCycle_shouldRecordDegradedResultAndKeepTicking_whenGarbagePkExplodesWindowPlanning() {
         snapshot.putCrc("clan", PK, 100);
+        // A garbage PK already in the snapshot inflates its envelope to
+        // [1, Long.MAX_VALUE / 2]. A WHOLE-entity resync runs the full range
+        // scan over that envelope, so WindowPlanner's plan-size cap throws.
+        // (A per-PK resync would take the targeted IN-list fast-path and never
+        // inflate the envelope — Fix ①.)
+        snapshot.putCrc("clan", Long.MAX_VALUE / 2, 200);
         engine = buildEngine();
         engine.start();
 
-        // Sentinel insert at an absurd PK inflates the snapshot envelope to
-        // [1, Long.MAX_VALUE / 2] — WindowPlanner's plan-size cap throws.
-        assertTrue(engine.requestForceResync(RESYNC_ID, "clan", pks(Long.MAX_VALUE / 2)));
+        assertTrue(engine.requestForceResync(RESYNC_ID, "clan"));
 
         await(() -> entityState("clan") == EntityState.DEGRADED);
         assertTrue(published.isEmpty(), "an exploded cycle must not emit completion");

@@ -71,8 +71,24 @@ public final class EntitySyncTask {
     }
 
     public CycleResult runCycle() {
+        return runCycle(null);
+    }
+
+    /**
+     * Runs one cycle. When {@code targetedPks} is non-null and non-empty the
+     * cycle takes the force-resync fast-path: Phase-1 plans targeted
+     * {@code IN}-list windows over only those PKs (primary scoped by
+     * {@code pk IN (...)}, children by {@code fk IN (...)}) instead of a
+     * full-table range scan. The diff / Phase-2 / publish / snapshot-advance
+     * logic is identical — ghost PKs (in {@code targetedPks} but with no live
+     * row) still fall out as DELETE because the IN-list returns no row and the
+     * perturbed snapshot entry has no scan match. A null/empty set is the
+     * full-scan path (scheduled tick / whole-entity resync).
+     */
+    public CycleResult runCycle(@Nullable LongSet targetedPks) {
         long started = System.currentTimeMillis();
         String entity = mapping.entityName();
+        boolean targeted = targetedPks != null && !targetedPks.isEmpty();
 
         String topic = topicResolver.resolveTopic(entity);
         if (topic == null) {
@@ -111,10 +127,15 @@ public final class EntitySyncTask {
                 log.info("Entity {} JDBC dialect detected: {}", entity, detected);
             }
 
-            List<Window> windows =
-                    planner.plan(mapping, conn, snapshot, config.rowsPerWindow(), config.queryTimeoutSeconds());
-
-            Long2ObjectOpenHashMap<LongSet> snapshotBuckets = snapshot.bucketByWindows(entity, windows);
+            List<Window> windows;
+            Long2ObjectOpenHashMap<LongSet> snapshotBuckets;
+            if (targeted) {
+                windows = planner.planTargeted(mapping, conn, targetedPks);
+                snapshotBuckets = snapshot.bucketByTargetedWindows(entity, windows);
+            } else {
+                windows = planner.plan(mapping, conn, snapshot, config.rowsPerWindow(), config.queryTimeoutSeconds());
+                snapshotBuckets = snapshot.bucketByWindows(entity, windows);
+            }
 
             for (int wIdx = 0; wIdx < windows.size(); wIdx++) {
                 Window window = windows.get(wIdx);

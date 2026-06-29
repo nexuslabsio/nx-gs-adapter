@@ -126,7 +126,10 @@ public final class CdcEngine {
             final String entity = mapping.entityName();
             final EntitySlot slot = new EntitySlot(task);
             slotsByEntity.put(entity, slot);
-            Runnable tick = SafeRunnable.wrap(() -> runGuardedCycle(entity, slot), log);
+            // Scheduled tick: triggered=false → never takes the targeted fast-path,
+            // so it full-scans and catches external deletes/changes the resync set
+            // does not know about.
+            Runnable tick = SafeRunnable.wrap(() -> runGuardedCycle(entity, slot, false), log);
 
             ScheduledFuture<?> handle = pool.scheduleWithFixedDelay(
                     tick, config.tickIntervalSeconds(), config.tickIntervalSeconds(), TimeUnit.SECONDS);
@@ -180,7 +183,7 @@ public final class CdcEngine {
         // sees this and re-submits — the request is never silently dropped.
         slot.pendingImmediate.set(true);
         try {
-            pool.execute(SafeRunnable.wrap(() -> runGuardedCycle(entityName, slot), log));
+            pool.execute(SafeRunnable.wrap(() -> runGuardedCycle(entityName, slot, true), log));
         } catch (Throwable t) {
             log.warn(
                     "CdcEngine.triggerEntityNow({}) submit failed: {}",
@@ -279,7 +282,7 @@ public final class CdcEngine {
         return true;
     }
 
-    private void runGuardedCycle(String entity, EntitySlot slot) {
+    private void runGuardedCycle(String entity, EntitySlot slot, boolean triggered) {
         AtomicBoolean ticking = slot.ticking;
         if (!ticking.compareAndSet(false, true)) {
             // Lost the CAS — a cycle is already running. Do NOT clear
@@ -298,12 +301,17 @@ public final class CdcEngine {
             // Drain BEFORE runCycle: the planner must see invalidation sentinels
             // in the snapshot's PK envelope, otherwise out-of-range sentinel
             // DELETEDs would slip to the next cycle.
-            resyncCoordinator.drainAndInvalidate(entity, snapshot);
+            ResyncCoordinator.DrainResult drain = resyncCoordinator.drainAndInvalidate(entity, snapshot);
+            // Targeted fast-path: only a triggered (out-of-band) run whose drain
+            // was targeted-only with a non-empty PK set hashes just those PKs via
+            // IN(...). A scheduled tick always full-scans (must catch external
+            // deletes the resync set doesn't know about).
+            LongSet targetedPks = (triggered && drain.targetedOnly()) ? drain.targetedPks() : null;
             EntitySyncTask task = slot.task;
             long cycleStartedMs = System.currentTimeMillis();
             CycleResult result;
             try {
-                result = task.runCycle();
+                result = task.runCycle(targetedPks);
             } catch (RuntimeException cycleFailure) {
                 // E.g. WindowPlanner's plan-size cap after a garbage PK inflated
                 // the snapshot envelope. Record a degraded result so the heartbeat
@@ -421,6 +429,37 @@ public final class CdcEngine {
 
     public List<EntityMapping<?>> mappings() {
         return mappings;
+    }
+
+    /**
+     * Test seam — runs the REAL scheduled tick path
+     * ({@code runGuardedCycle(entity, slot, false)}) for one entity on the
+     * shared pool and blocks until it finishes. Unlike
+     * {@link #tickOnceSynchronously()} (which calls {@code task.runCycle()}
+     * directly), this exercises the engine's triggered=false routing so a test
+     * can assert a scheduled tick ignores any pending targeted resync set and
+     * full-scans.
+     */
+    Future<?> runScheduledTickNow(String entityName) {
+        EntitySlot slot = slotsByEntity.get(entityName);
+        if (slot == null) {
+            throw new IllegalArgumentException("unknown entity " + entityName);
+        }
+        ScheduledThreadPoolExecutor pool = scheduler;
+        if (pool == null) {
+            throw new IllegalStateException("CdcEngine scheduler not available");
+        }
+        return pool.submit(() -> runGuardedCycle(entityName, slot, false));
+    }
+
+    /**
+     * Test seam — enqueues a no-event per-PK resync directly onto the
+     * coordinator WITHOUT submitting an immediate (triggered) cycle, so the
+     * pending targeted set survives to the next scheduled tick. Lets a test
+     * verify the scheduled path ignores it.
+     */
+    void enqueueNoEventPksWithoutTrigger(String entityName, LongSet pks) {
+        resyncCoordinator.enqueueNoEventPks(entityName, pks);
     }
 
     /**

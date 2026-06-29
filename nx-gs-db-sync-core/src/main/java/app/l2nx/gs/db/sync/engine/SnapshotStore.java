@@ -171,6 +171,35 @@ public final class SnapshotStore {
         return buckets;
     }
 
+    /**
+     * Bucketing for the targeted force-resync fast-path. Each window carries an
+     * explicit PK {@code IN}-list; the previous-keys bucket for window {@code i}
+     * is exactly that window's PKs that are currently present in the snapshot
+     * (a ghost PK whose drain-inserted sentinel lives in the snapshot is
+     * included, so a missing live row diffs to DELETE). Bounds the lookup to the
+     * targeted PKs — no O(N) full-keys scan.
+     */
+    public Long2ObjectOpenHashMap<LongSet> bucketByTargetedWindows(String entityName, List<Window> windows) {
+        Long2ObjectOpenHashMap<LongSet> buckets = new Long2ObjectOpenHashMap<LongSet>(windows.size());
+        Long2IntOpenHashMap map = byEntity.get(entityName);
+        for (int i = 0; i < windows.size(); i++) {
+            LongOpenHashSet bucket = new LongOpenHashSet();
+            buckets.put(i, bucket);
+            Window window = windows.get(i);
+            LongList pks = window.pks();
+            if (map == null || map.isEmpty() || pks == null) {
+                continue;
+            }
+            for (int j = 0; j < pks.size(); j++) {
+                long pk = pks.getLong(j);
+                if (map.containsKey(pk)) {
+                    bucket.add(pk);
+                }
+            }
+        }
+        return buckets;
+    }
+
     private static int findWindow(List<Window> windows, long pk) {
         int lo = 0;
         int hi = windows.size() - 1;
