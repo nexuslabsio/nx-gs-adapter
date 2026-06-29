@@ -5,6 +5,7 @@ import app.l2nx.gs.adapter.api.kafka.events.castle.CastleSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.castle.SiegeFinishedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterDeathEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
+import app.l2nx.gs.adapter.api.kafka.events.chat.ChatMessageEvent;
 import app.l2nx.gs.adapter.api.kafka.events.gameevents.GameEventSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.leveldata.LevelExpTableSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.*;
@@ -142,6 +143,12 @@ final class EventTypeRegistry {
                 "olympiad",
                 evt -> LongBytes.bigEndian(((HeroGrantedEvent) evt).getCharId()));
         register(map, families, ResyncCompletedEvent.class, "sync", evt -> null);
+        register(
+                map,
+                families,
+                ChatMessageEvent.class,
+                "chat",
+                evt -> LongBytes.bigEndian(((ChatMessageEvent) evt).getCharId()));
         register(
                 map,
                 families,
