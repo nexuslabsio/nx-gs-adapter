@@ -10,6 +10,7 @@ import app.l2nx.gs.runtime.sync.engine.publish.TopicResolver;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -136,7 +137,7 @@ public final class EntityTickLoop {
         }
         if (rows == null) {
             log.warn("entity '{}' snapshot returned null — treating as empty", entityName);
-            rows = java.util.Collections.emptyList();
+            rows = Collections.emptyList();
         }
         try {
             for (RuntimeRow<Object> row : rows) {

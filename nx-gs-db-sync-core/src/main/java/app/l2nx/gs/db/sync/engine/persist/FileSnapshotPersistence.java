@@ -10,6 +10,7 @@ import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -149,7 +150,7 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file.toFile())))) {
             byte[] magic = new byte[MAGIC.length];
             in.readFully(magic);
-            if (!java.util.Arrays.equals(magic, MAGIC)) {
+            if (!Arrays.equals(magic, MAGIC)) {
                 log.warn("FileSnapshotPersistence.load: '{}' bad magic — skipping", file.getFileName());
                 return -1;
             }

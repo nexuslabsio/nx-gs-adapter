@@ -32,7 +32,7 @@ public final class GameDataSnapshotPublisher {
 
     private static final NxLog log = NxLogFactory.getLogger(GameDataSnapshotPublisher.class);
 
-    private static final String MESSAGE_TYPE = "GameDataSyncEvent";
+    private static final String MESSAGE_TYPE = GameDataSyncEvent.class.getSimpleName();
 
     // gd op vocabulary — mirrors db-sync's SyncEventPublisher.OP_* string constants
     // (op rides the wire as a String, not a JVM enum).

@@ -16,6 +16,7 @@ import app.l2nx.gs.adapter.api.kafka.sync.gd.recipetemplate.RecipeTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.skill.Skill;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.soulcrystaltemplate.SoulCrystalTemplate;
 import app.l2nx.gs.adapter.api.spi.*;
+import app.l2nx.gs.commons.concurrent.DaemonThreadFactory;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.kafka.KafkaException;
 import app.l2nx.gs.kafka.NxKafka;
@@ -282,14 +283,8 @@ public final class GameDataSyncModule implements AdapterModule {
             return;
         }
         final int hours = config.resyncIntervalHours();
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(r, "nx-gd-sync-resync");
-                t.setDaemon(true);
-                return t;
-            }
-        });
+        ScheduledExecutorService scheduler =
+                Executors.newSingleThreadScheduledExecutor(DaemonThreadFactory.named("nx-gd-sync-resync", log));
         Runnable tick = SafeRunnable.wrap(() -> runAllSnapshots(ctx, pub), log);
         scheduler.scheduleWithFixedDelay(tick, hours, hours, TimeUnit.HOURS);
         this.resyncScheduler = scheduler;
