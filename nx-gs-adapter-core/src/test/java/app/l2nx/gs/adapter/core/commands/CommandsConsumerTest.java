@@ -9,7 +9,7 @@ import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import app.l2nx.gs.adapter.api.spi.CommandHandler;
 import app.l2nx.gs.adapter.api.spi.HostExecutorTimeoutException;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
-import com.google.gson.Gson;
+import app.l2nx.gs.adapter.core.kafka.AdapterGson;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -89,7 +89,7 @@ class CommandsConsumerTest {
                 registry,
                 mockConsumer,
                 sender,
-                new Gson(),
+                AdapterGson.create(),
                 CommandsConfig.defaults());
     }
 

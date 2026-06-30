@@ -6,11 +6,11 @@ import app.l2nx.gs.adapter.api.spi.HostExecutor;
 import app.l2nx.gs.adapter.api.spi.NxCommands;
 import app.l2nx.gs.adapter.api.spi.NxEvents;
 import app.l2nx.gs.adapter.api.spi.NxSync;
+import app.l2nx.gs.adapter.core.kafka.AdapterGson;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -194,7 +194,7 @@ public final class CommandsBootstrap {
         Consumer<byte[], byte[]> kafkaConsumer = new KafkaConsumer<byte[], byte[]>(
                 consumerProps, new ByteArrayDeserializer(), new ByteArrayDeserializer());
 
-        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+        Gson gson = AdapterGson.create();
         HostExecutor hostExec = new HostExecutorImpl(hostExecutor, effectiveConfig.getHostSyncTimeoutMs());
 
         CommandsConsumer consumer = new CommandsConsumer(
