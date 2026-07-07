@@ -61,6 +61,7 @@ public enum Stat {
     RANDOM_DAMAGE,
     SOULSHOT_COUNT,
     SPIRITSHOT_COUNT,
+    MAGIC_WEAPON,
 
     // Special / non-combat (items only)
     AUTOLOOT,
