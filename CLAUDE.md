@@ -276,6 +276,7 @@ Per-module independent versioning via slash-namespaced git tags:
 - `core/vX.Y.Z` → publish `nx-gs-adapter-core`
 - `db-sync/vX.Y.Z` → publish `nx-gs-db-sync-core`
 - `runtime-sync/vX.Y.Z` → publish `nx-gs-runtime-sync-core`
+- `gd-sync/vX.Y.Z` → publish `nx-gs-gd-sync-core`
 - future: `db-l2j/vX.Y.Z`, `dp-l2j/vX.Y.Z`, `runtime-l2j/vX.Y.Z`, ...
 
 Each module's `build.gradle.kts` declares
