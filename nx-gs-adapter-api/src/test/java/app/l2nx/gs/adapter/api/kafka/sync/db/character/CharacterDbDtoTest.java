@@ -152,7 +152,7 @@ class CharacterDbDtoTest {
         CharacterDbDto fromBuilder = CharacterDbDto.builder().id(1L).name("X").build();
         CharacterDbDto fromCtor = new CharacterDbDto(
                 1L, "X", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -196,6 +196,7 @@ class CharacterDbDtoTest {
                 Boolean.TRUE,
                 Boolean.TRUE,
                 1500,
+                98_765L,
                 "7",
                 cooldowns,
                 locks);

@@ -75,6 +75,7 @@ public final class CharacterDbDto {
     private final @Nullable Boolean hero;
     private final @Nullable Boolean expBlocked;
     private final @Nullable Integer gearScore;
+    private final @Nullable Long fame;
     private final @Nullable String accessLevel;
     private final @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns;
     private final @Nullable List<CharacterLockDbDto> locks;
@@ -102,6 +103,7 @@ public final class CharacterDbDto {
             @Nullable Boolean hero,
             @Nullable Boolean expBlocked,
             @Nullable Integer gearScore,
+            @Nullable Long fame,
             @Nullable String accessLevel,
             @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns,
             @Nullable List<CharacterLockDbDto> locks) {
@@ -127,6 +129,7 @@ public final class CharacterDbDto {
         this.hero = hero;
         this.expBlocked = expBlocked;
         this.gearScore = gearScore;
+        this.fame = fame;
         this.accessLevel = accessLevel;
         this.instanceCooldowns = instanceCooldowns == null ? null : Collections.unmodifiableList(instanceCooldowns);
         this.locks = locks == null ? null : Collections.unmodifiableList(locks);
@@ -341,6 +344,13 @@ public final class CharacterDbDto {
     }
 
     /**
+     * Character fame (reputation) points; null when the source build reports none.
+     */
+    public @Nullable Long getFame() {
+        return fame;
+    }
+
+    /**
      * Opaque GM/access level; numeric text on int-based builds (e.g. "7"), role
      * name on string-role builds; null when not surfaced.
      */
@@ -395,6 +405,7 @@ public final class CharacterDbDto {
                 .hero(hero)
                 .expBlocked(expBlocked)
                 .gearScore(gearScore)
+                .fame(fame)
                 .accessLevel(accessLevel)
                 .instanceCooldowns(instanceCooldowns)
                 .locks(locks);
@@ -431,6 +442,7 @@ public final class CharacterDbDto {
                 && Objects.equals(hero, that.hero)
                 && Objects.equals(expBlocked, that.expBlocked)
                 && Objects.equals(gearScore, that.gearScore)
+                && Objects.equals(fame, that.fame)
                 && Objects.equals(accessLevel, that.accessLevel)
                 && Objects.equals(instanceCooldowns, that.instanceCooldowns)
                 && Objects.equals(locks, that.locks);
@@ -461,6 +473,7 @@ public final class CharacterDbDto {
                 hero,
                 expBlocked,
                 gearScore,
+                fame,
                 accessLevel,
                 instanceCooldowns,
                 locks);
@@ -490,6 +503,7 @@ public final class CharacterDbDto {
                 + ", hero=" + hero
                 + ", expBlocked=" + expBlocked
                 + ", gearScore=" + gearScore
+                + ", fame=" + fame
                 + ", accessLevel=" + accessLevel
                 + ", instanceCooldowns=" + instanceCooldowns
                 + ", locks=" + locks + "]";
@@ -518,6 +532,7 @@ public final class CharacterDbDto {
         private @Nullable Boolean hero;
         private @Nullable Boolean expBlocked;
         private @Nullable Integer gearScore;
+        private @Nullable Long fame;
         private @Nullable String accessLevel;
         private @Nullable List<CharacterInstanceCooldownDbDto> instanceCooldowns;
         private @Nullable List<CharacterLockDbDto> locks;
@@ -632,6 +647,11 @@ public final class CharacterDbDto {
             return this;
         }
 
+        public Builder fame(@Nullable Long fame) {
+            this.fame = fame;
+            return this;
+        }
+
         public Builder accessLevel(@Nullable String accessLevel) {
             this.accessLevel = accessLevel;
             return this;
@@ -671,6 +691,7 @@ public final class CharacterDbDto {
                     hero,
                     expBlocked,
                     gearScore,
+                    fame,
                     accessLevel,
                     instanceCooldowns,
                     locks);

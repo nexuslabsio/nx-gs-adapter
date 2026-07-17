@@ -30,7 +30,9 @@ by the L2NX game-server adapter and its consumers. Published as
   three from generic L2J columns — see
   `docs/features/character-core-extension/`; plus optional `gearScore: Integer`
   — the active-class gear score, a snapshot at last character store, `null` when
-  the build computes no gear score; plus optional `accessLevel: String` — opaque
+  the build computes no gear score; plus optional `fame: Long` — character fame
+  (reputation) points, `null` when the source build reports none; plus optional
+  `accessLevel: String` — opaque
   GM/access level, numeric text on int-based builds (`"7"`) or role name on
   string-role builds, `null` when not surfaced; plus optional
   `locks: List<CharacterLockDbDto>` — one entry per active character lock
