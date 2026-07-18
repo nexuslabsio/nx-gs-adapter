@@ -43,7 +43,8 @@ by the L2NX game-server adapter and its consumers. Published as
   as decoded PNG bytes — schema providers do the source-format → PNG
   conversion in `mapEntity`), `alliance` (`AllianceDbDto{allyId, allyName,
   icon: byte[]}` — same icon convention as clan), `item` (`ItemDbDto`,
-  `ItemAttributeDbDto`), `rating`
+  `ItemAttributeDbDto` elementals, `ItemAugmentationDbDto` per-instance augment
+  option-ids — `ItemDbDto.augmentation` null when not augmented), `rating`
   (`kafka.sync.db.rating.RatingDbDto{ratingType, season?, charId, points,
   metadata?}` + `WellKnownRatingTypes` — `lower_snake_case` open-string rating
   types, first `fishing`; one unified topic carries every rating kind
