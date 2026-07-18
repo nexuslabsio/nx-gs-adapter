@@ -16,6 +16,8 @@ class ItemDbDtoTest {
         List<ItemAttributeDbDto> attrs = Arrays.asList(
                 ItemAttributeDbDto.builder().type(Attribute.FIRE).value(150).build(),
                 ItemAttributeDbDto.builder().type(Attribute.WATER).value(60).build());
+        ItemAugmentationDbDto augmentation =
+                ItemAugmentationDbDto.builder().option1Id(1000).option2Id(2000).build();
 
         ItemDbDto item = ItemDbDto.builder()
                 .id(98765L)
@@ -25,6 +27,7 @@ class ItemDbDtoTest {
                 .enchantLevel(16)
                 .location(ItemLocation.EQUIP)
                 .attributes(attrs)
+                .augmentation(augmentation)
                 .build();
 
         assertEquals(98765L, item.getId());
@@ -34,6 +37,7 @@ class ItemDbDtoTest {
         assertEquals(Integer.valueOf(16), item.getEnchantLevel());
         assertEquals(ItemLocation.EQUIP, item.getLocation());
         assertEquals(attrs, item.getAttributes());
+        assertEquals(augmentation, item.getAugmentation());
     }
 
     @Test
@@ -47,6 +51,7 @@ class ItemDbDtoTest {
         assertNull(item.getEnchantLevel());
         assertNull(item.getLocation());
         assertNull(item.getAttributes());
+        assertNull(item.getAugmentation());
     }
 
     @Test
@@ -75,7 +80,7 @@ class ItemDbDtoTest {
     @Test
     void builder_andConstructor_shouldProduceEqualObjects_whenAllOptionalNull() {
         ItemDbDto fromBuilder = ItemDbDto.builder().id(1L).build();
-        ItemDbDto fromCtor = new ItemDbDto(1L, null, null, null, null, null, null);
+        ItemDbDto fromCtor = new ItemDbDto(1L, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -85,8 +90,32 @@ class ItemDbDtoTest {
     void toBuilder_shouldRoundtrip() {
         List<ItemAttributeDbDto> attrs = Collections.singletonList(
                 ItemAttributeDbDto.builder().type(Attribute.HOLY).value(120).build());
-        ItemDbDto original = new ItemDbDto(1L, 7L, 2L, 5L, 10, ItemLocation.INVENTORY, attrs);
+        ItemAugmentationDbDto augmentation =
+                ItemAugmentationDbDto.builder().option1Id(1000).option2Id(2000).build();
+        ItemDbDto original = new ItemDbDto(1L, 7L, 2L, 5L, 10, ItemLocation.INVENTORY, attrs, augmentation);
 
         assertEquals(original, original.toBuilder().build());
+    }
+
+    @Test
+    void augmentation_shouldBeNull_whenTenantDoesNotSyncIt() {
+        ItemDbDto item = ItemDbDto.builder().id(1L).build();
+
+        assertNull(item.getAugmentation());
+    }
+
+    @Test
+    void equals_shouldDiffer_whenAugmentationDiffers() {
+        ItemDbDto withAugmentation = ItemDbDto.builder()
+                .id(1L)
+                .augmentation(ItemAugmentationDbDto.builder()
+                        .option1Id(1000)
+                        .option2Id(2000)
+                        .build())
+                .build();
+        ItemDbDto withoutAugmentation = ItemDbDto.builder().id(1L).build();
+
+        assertNotEquals(withAugmentation, withoutAugmentation);
+        assertNotEquals(withAugmentation.hashCode(), withoutAugmentation.hashCode());
     }
 }

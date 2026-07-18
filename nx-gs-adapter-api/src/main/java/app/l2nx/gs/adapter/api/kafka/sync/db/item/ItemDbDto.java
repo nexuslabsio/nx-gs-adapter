@@ -41,6 +41,7 @@ public final class ItemDbDto {
     private final @Nullable Integer enchantLevel;
     private final @Nullable ItemLocation location;
     private final @Nullable List<ItemAttributeDbDto> attributes;
+    private final @Nullable ItemAugmentationDbDto augmentation;
 
     public ItemDbDto(
             long id,
@@ -49,7 +50,8 @@ public final class ItemDbDto {
             @Nullable Long count,
             @Nullable Integer enchantLevel,
             @Nullable ItemLocation location,
-            @Nullable List<ItemAttributeDbDto> attributes) {
+            @Nullable List<ItemAttributeDbDto> attributes,
+            @Nullable ItemAugmentationDbDto augmentation) {
         this.id = id;
         this.itemTemplateId = itemTemplateId;
         this.ownerId = ownerId;
@@ -57,6 +59,7 @@ public final class ItemDbDto {
         this.enchantLevel = enchantLevel;
         this.location = location;
         this.attributes = attributes == null ? null : Collections.unmodifiableList(attributes);
+        this.augmentation = augmentation;
     }
 
     /**
@@ -116,6 +119,15 @@ public final class ItemDbDto {
         return attributes;
     }
 
+    /**
+     * Per-instance augmentation (life-stone options). {@code null} = the
+     * item is not augmented, OR the tenant does not sync augmentation (no
+     * {@code ChildSource} declared).
+     */
+    public @Nullable ItemAugmentationDbDto getAugmentation() {
+        return augmentation;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .id(id)
@@ -124,7 +136,8 @@ public final class ItemDbDto {
                 .count(count)
                 .enchantLevel(enchantLevel)
                 .location(location)
-                .attributes(attributes);
+                .attributes(attributes)
+                .augmentation(augmentation);
     }
 
     public static Builder builder() {
@@ -142,12 +155,13 @@ public final class ItemDbDto {
                 && Objects.equals(count, that.count)
                 && Objects.equals(enchantLevel, that.enchantLevel)
                 && location == that.location
-                && Objects.equals(attributes, that.attributes);
+                && Objects.equals(attributes, that.attributes)
+                && Objects.equals(augmentation, that.augmentation);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, itemTemplateId, ownerId, count, enchantLevel, location, attributes);
+        return Objects.hash(id, itemTemplateId, ownerId, count, enchantLevel, location, attributes, augmentation);
     }
 
     @Override
@@ -158,7 +172,8 @@ public final class ItemDbDto {
                 + ", count=" + count
                 + ", enchantLevel=" + enchantLevel
                 + ", location=" + location
-                + ", attributes=" + attributes + "]";
+                + ", attributes=" + attributes
+                + ", augmentation=" + augmentation + "]";
     }
 
     public static final class Builder {
@@ -169,6 +184,7 @@ public final class ItemDbDto {
         private @Nullable Integer enchantLevel;
         private @Nullable ItemLocation location;
         private @Nullable List<ItemAttributeDbDto> attributes;
+        private @Nullable ItemAugmentationDbDto augmentation;
 
         public Builder id(long id) {
             this.id = id;
@@ -205,8 +221,13 @@ public final class ItemDbDto {
             return this;
         }
 
+        public Builder augmentation(@Nullable ItemAugmentationDbDto augmentation) {
+            this.augmentation = augmentation;
+            return this;
+        }
+
         public ItemDbDto build() {
-            return new ItemDbDto(id, itemTemplateId, ownerId, count, enchantLevel, location, attributes);
+            return new ItemDbDto(id, itemTemplateId, ownerId, count, enchantLevel, location, attributes, augmentation);
         }
     }
 }
