@@ -28,7 +28,7 @@ by the L2NX game-server adapter and its consumers. Published as
   `CharacterLockDbDto`; CharacterDbDto carries optional `accountName`,
   `nobless`, `scheduledDeletionAt` on top of the identity / progression set, all
   three from generic L2J columns — see
-  `docs/features/character-core-extension/`; plus optional `gearScore: Integer`
+  `docs/specs/013-character-core-extension/`; plus optional `gearScore: Integer`
   — the active-class gear score, a snapshot at last character store, `null` when
   the build computes no gear score; plus optional `fame: Long` — character fame
   (reputation) points, `null` when the source build reports none; plus optional

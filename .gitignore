@@ -38,3 +38,6 @@ out/
 ### Claude Code ###
 .claude/settings.local.json
 
+
+# Plans are not committed (writing-plans output)
+.plan/

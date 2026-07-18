@@ -14,8 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 adapter. The adapter embeds into the JVM of a game-server core (L2J / Lucera / Essence and forks),
 connects to the L2NX platform via outbound HTTPS, and synchronizes data via Kafka.
 
-Architecture is documented per-feature under `docs/features/<feature-name>/spec.md` +
-`tech.md` as features land.
+Architecture is documented per-feature under `docs/specs/NNN-<feature-name>/spec.md` (+
+`tech.md`) as features land — a spec-only feature is a flat `docs/specs/NNN-<feature-name>.md`
+instead. `NNN` is a zero-padded sequential id; the index lives in `docs/CLAUDE.md`.
 
 ## Modules
 
@@ -166,7 +167,7 @@ Architecture is documented per-feature under `docs/features/<feature-name>/spec.
   where rows deleted from the host DB while the adapter was offline were
   never observed by the next cycle (diff against empty snapshot
   misclassified everything as CREATE). **Force resync**
-  (`docs/features/force-resync/spec.md`): `DbSyncModule` registers
+  (`docs/specs/021-force-resync.md`): `DbSyncModule` registers
   `ResyncEntitiesCommand` / `ResyncRowsCommand` handlers in `onConnect`
   (engine down → `UNAVAILABLE`; unknown entity / empty / >1000 pks →
   `VALIDATION_FAILED`); requests enqueue snapshot-hash invalidation on
@@ -344,5 +345,6 @@ publish target; CI uses `signingKey`/`signingPassword` Gradle properties (GPG) a
 
 ## Docs
 
-- `docs/features/<feature-name>/spec.md` + `tech.md` — per-feature design, populated by the
-  `/specl-take` skill
+- `docs/specs/NNN-<feature-name>/spec.md` (+ `tech.md`) — per-feature design, or a flat
+  `docs/specs/NNN-<feature-name>.md` for a spec-only feature; populated by the `spec-authoring`
+  skill. Index of all specs: `docs/CLAUDE.md`
