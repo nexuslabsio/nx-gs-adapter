@@ -50,6 +50,9 @@ public final class PrivateStoreOfferHasher {
             h = Fnv1a64.mix(h, r.count);
             h = Fnv1a64.mix(h, r.unitPrice);
             h = Fnv1a64.mix(h, r.currencyItemId);
+            // Must be hashed: a SELL<->PACKAGE_SELL re-seat with identical
+            // items/prices otherwise produces the same hash and never republishes.
+            h = Fnv1a64.mix(h, r.packaged);
         }
         return h;
     }

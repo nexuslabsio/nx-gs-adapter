@@ -20,6 +20,7 @@ public final class Offer {
     private final long count;
     private final long unitPrice;
     private final long currencyItemId;
+    private final @Nullable Boolean packaged;
 
     public Offer(
             long traderId,
@@ -27,13 +28,15 @@ public final class Offer {
             @Nullable Map<Attribute, Integer> attributes,
             long count,
             long unitPrice,
-            long currencyItemId) {
+            long currencyItemId,
+            @Nullable Boolean packaged) {
         this.traderId = traderId;
         this.enchantLevel = enchantLevel;
         this.attributes = freezeMap(attributes);
         this.count = count;
         this.unitPrice = unitPrice;
         this.currencyItemId = currencyItemId;
+        this.packaged = packaged;
     }
 
     /**
@@ -70,6 +73,15 @@ public final class Offer {
         return currencyItemId;
     }
 
+    /**
+     * {@code true} when this offer belongs to a PACKAGE_SELL store — the per-item price is
+     * nominal, the real price is the bundle total. {@code null} when the host did not report
+     * this (legacy); treat as {@code false}.
+     */
+    public @Nullable Boolean getPackaged() {
+        return packaged;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .traderId(traderId)
@@ -77,7 +89,8 @@ public final class Offer {
                 .attributes(attributes)
                 .count(count)
                 .unitPrice(unitPrice)
-                .currencyItemId(currencyItemId);
+                .currencyItemId(currencyItemId)
+                .packaged(packaged);
     }
 
     public static Builder builder() {
@@ -101,12 +114,13 @@ public final class Offer {
                 && unitPrice == that.unitPrice
                 && currencyItemId == that.currencyItemId
                 && Objects.equals(enchantLevel, that.enchantLevel)
-                && Objects.equals(attributes, that.attributes);
+                && Objects.equals(attributes, that.attributes)
+                && Objects.equals(packaged, that.packaged);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(traderId, enchantLevel, attributes, count, unitPrice, currencyItemId);
+        return Objects.hash(traderId, enchantLevel, attributes, count, unitPrice, currencyItemId, packaged);
     }
 
     @Override
@@ -116,7 +130,8 @@ public final class Offer {
                 + ", attributes=" + attributes
                 + ", count=" + count
                 + ", unitPrice=" + unitPrice
-                + ", currencyItemId=" + currencyItemId + "]";
+                + ", currencyItemId=" + currencyItemId
+                + ", packaged=" + packaged + "]";
     }
 
     public static final class Builder {
@@ -126,6 +141,7 @@ public final class Offer {
         private long count;
         private long unitPrice;
         private long currencyItemId;
+        private @Nullable Boolean packaged;
 
         public Builder traderId(long traderId) {
             this.traderId = traderId;
@@ -157,8 +173,13 @@ public final class Offer {
             return this;
         }
 
+        public Builder packaged(@Nullable Boolean packaged) {
+            this.packaged = packaged;
+            return this;
+        }
+
         public Offer build() {
-            return new Offer(traderId, enchantLevel, attributes, count, unitPrice, currencyItemId);
+            return new Offer(traderId, enchantLevel, attributes, count, unitPrice, currencyItemId, packaged);
         }
     }
 }

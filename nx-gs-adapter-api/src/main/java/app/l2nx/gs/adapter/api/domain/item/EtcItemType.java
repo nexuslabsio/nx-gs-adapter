@@ -24,12 +24,14 @@ public enum EtcItemType {
     CROP,
     DYE,
     ELIXIR,
+    ENSOUL_STONE,
     HARVEST,
     HERB,
     LOTTO,
     LURE,
     MATERIAL,
     MATURE_CROP,
+    MONEY,
     NONE,
     PET_COLLAR,
     POTION,
@@ -46,5 +48,6 @@ public enum EtcItemType {
     SEED,
     SEED_2,
     SHOT,
+    SPELLBOOK,
     TICKET_OF_LORD
 }

@@ -39,9 +39,9 @@ import org.jspecify.annotations.Nullable;
  * open-string vocabulary fields ({@code material}, {@code grade}, {@code defaultAction},
  * {@code useHandler}) draw from a platform-canonical vocabulary in {@code UPPER_SNAKE_CASE}.</p>
  *
- * <p>Phase 1 is sourced from the host's already-parsed in-memory templates only —
- * client-patch fields (description, additional name, colour, panel icon, and the
- * patch-only permission flags) are a later slice and intentionally absent here.</p>
+ * <p>TODO: add client-patch fields (description, additional name, colour, panel icon,
+ * patch-only permission flags) — these come from client data files, not the host's
+ * in-memory templates, which is all this DTO currently sources.</p>
  */
 public final class ItemTemplate {
 
@@ -60,6 +60,7 @@ public final class ItemTemplate {
     private final @Nullable Boolean stackable;
     private final @Nullable Boolean questItem;
     private final @Nullable Boolean petUsable;
+    private final @Nullable Boolean consumable;
     private final @Nullable String defaultAction;
     private final @Nullable String useHandler;
     private final @Nullable Integer duration;
@@ -87,6 +88,7 @@ public final class ItemTemplate {
             @Nullable Boolean stackable,
             @Nullable Boolean questItem,
             @Nullable Boolean petUsable,
+            @Nullable Boolean consumable,
             @Nullable String defaultAction,
             @Nullable String useHandler,
             @Nullable Integer duration,
@@ -112,6 +114,7 @@ public final class ItemTemplate {
         this.stackable = stackable;
         this.questItem = questItem;
         this.petUsable = petUsable;
+        this.consumable = consumable;
         this.defaultAction = defaultAction;
         this.useHandler = useHandler;
         this.duration = duration;
@@ -180,11 +183,16 @@ public final class ItemTemplate {
         return questItem;
     }
 
-    /**
-     * Whether a pet / summon can use this item.
-     */
     public @Nullable Boolean getPetUsable() {
         return petUsable;
+    }
+
+    /**
+     * Whether the item is consumed (count decremented / stack removed) on use.
+     * {@code null} when the build does not surface this.
+     */
+    public @Nullable Boolean getConsumable() {
+        return consumable;
     }
 
     /**
@@ -277,6 +285,7 @@ public final class ItemTemplate {
                 .stackable(stackable)
                 .questItem(questItem)
                 .petUsable(petUsable)
+                .consumable(consumable)
                 .defaultAction(defaultAction)
                 .useHandler(useHandler)
                 .duration(duration)
@@ -313,6 +322,7 @@ public final class ItemTemplate {
                 && Objects.equals(stackable, that.stackable)
                 && Objects.equals(questItem, that.questItem)
                 && Objects.equals(petUsable, that.petUsable)
+                && Objects.equals(consumable, that.consumable)
                 && Objects.equals(defaultAction, that.defaultAction)
                 && Objects.equals(useHandler, that.useHandler)
                 && Objects.equals(duration, that.duration)
@@ -343,6 +353,7 @@ public final class ItemTemplate {
                 stackable,
                 questItem,
                 petUsable,
+                consumable,
                 defaultAction,
                 useHandler,
                 duration,
@@ -376,6 +387,7 @@ public final class ItemTemplate {
         private @Nullable Boolean stackable;
         private @Nullable Boolean questItem;
         private @Nullable Boolean petUsable;
+        private @Nullable Boolean consumable;
         private @Nullable String defaultAction;
         private @Nullable String useHandler;
         private @Nullable Integer duration;
@@ -462,6 +474,11 @@ public final class ItemTemplate {
             return this;
         }
 
+        public Builder consumable(@Nullable Boolean consumable) {
+            this.consumable = consumable;
+            return this;
+        }
+
         public Builder defaultAction(@Nullable String defaultAction) {
             this.defaultAction = defaultAction;
             return this;
@@ -529,6 +546,7 @@ public final class ItemTemplate {
                     stackable,
                     questItem,
                     petUsable,
+                    consumable,
                     defaultAction,
                     useHandler,
                     duration,

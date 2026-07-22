@@ -153,13 +153,19 @@ class PrivateStoreOfferHasherTest {
     }
 
     @Test
+    void hash_shouldChange_whenPackagedChanges() {
+        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L, false)));
+        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L, true)));
+
+        assertNotEquals(h1, h2);
+    }
+
+    @Test
     void hash_shouldYieldSentinel_forEmptyOfferList() {
         long h = PrivateStoreOfferHasher.hash(Collections.emptyList());
 
-        // Stable across invocations.
         assertEquals(h, PrivateStoreOfferHasher.hash(Collections.emptyList()));
 
-        // Distinct from any non-empty hash.
         long oneOffer = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
         assertNotEquals(h, oneOffer);
     }
@@ -184,6 +190,17 @@ class PrivateStoreOfferHasherTest {
             long count,
             long unitPrice,
             long currencyItemId) {
-        return new OfferRow(traderId, enchantLevel, attrs, count, unitPrice, currencyItemId);
+        return row(traderId, enchantLevel, attrs, count, unitPrice, currencyItemId, false);
+    }
+
+    private static OfferRow row(
+            long traderId,
+            Integer enchantLevel,
+            Map<Attribute, Integer> attrs,
+            long count,
+            long unitPrice,
+            long currencyItemId,
+            boolean packaged) {
+        return new OfferRow(traderId, enchantLevel, attrs, count, unitPrice, currencyItemId, packaged);
     }
 }
