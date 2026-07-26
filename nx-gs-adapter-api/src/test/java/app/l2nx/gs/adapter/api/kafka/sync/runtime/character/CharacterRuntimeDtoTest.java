@@ -75,7 +75,13 @@ class CharacterRuntimeDtoTest {
                 Boolean.TRUE,
                 "attack",
                 4_500_000_000L,
-                Collections.singletonList(fishing()));
+                Collections.singletonList(fishing()),
+                80,
+                100,
+                12,
+                50,
+                45000,
+                60000);
 
         assertEquals(original, original.toBuilder().build());
     }
@@ -165,7 +171,8 @@ class CharacterRuntimeDtoTest {
     void builder_andConstructor_shouldProduceEqualObjects_whenAllOptionalNull() {
         CharacterRuntimeDto fromBuilder = CharacterRuntimeDto.builder().id(7L).build();
         CharacterRuntimeDto fromCtor = new CharacterRuntimeDto(
-                7L, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+                7L, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -182,5 +189,73 @@ class CharacterRuntimeDtoTest {
 
         CharacterRuntimeDto noExp = CharacterRuntimeDto.builder().id(1L).build();
         assertNotEquals(withExp, noExp);
+    }
+
+    @Test
+    void builder_shouldRoundtripInventoryCapacityFields() {
+        CharacterRuntimeDto dto = CharacterRuntimeDto.builder()
+                .id(1L)
+                .curInventorySlots(80)
+                .maxInventorySlots(100)
+                .curQuestInventorySlots(12)
+                .maxQuestInventorySlots(50)
+                .curWeight(45000)
+                .maxWeight(60000)
+                .build();
+
+        assertEquals(Integer.valueOf(80), dto.getCurInventorySlots());
+        assertEquals(Integer.valueOf(100), dto.getMaxInventorySlots());
+        assertEquals(Integer.valueOf(12), dto.getCurQuestInventorySlots());
+        assertEquals(Integer.valueOf(50), dto.getMaxQuestInventorySlots());
+        assertEquals(Integer.valueOf(45000), dto.getCurWeight());
+        assertEquals(Integer.valueOf(60000), dto.getMaxWeight());
+        assertEquals(dto, dto.toBuilder().build());
+    }
+
+    @Test
+    void inventoryCapacityFields_shouldDefaultToNull() {
+        CharacterRuntimeDto dto = CharacterRuntimeDto.builder().id(123L).build();
+
+        assertNull(dto.getCurInventorySlots());
+        assertNull(dto.getMaxInventorySlots());
+        assertNull(dto.getCurQuestInventorySlots());
+        assertNull(dto.getMaxQuestInventorySlots());
+        assertNull(dto.getCurWeight());
+        assertNull(dto.getMaxWeight());
+    }
+
+    /**
+     * The DTO carries no binder annotations, so consumers bind it through implicit
+     * constructor-parameter names — which only resolves while exactly one constructor is visible.
+     * A second one (e.g. a back-compat overload when the wire grows) makes creator detection
+     * ambiguous and every consumer silently fails to deserialize the whole channel.
+     */
+    @Test
+    void class_shouldExposeExactlyOneConstructor() {
+        assertEquals(1, CharacterRuntimeDto.class.getDeclaredConstructors().length);
+    }
+
+    @Test
+    void equalsAndHashCode_shouldDifferWhenInventoryCapacityFieldDiffers() {
+        CharacterRuntimeDto base = CharacterRuntimeDto.builder()
+                .id(1L)
+                .curInventorySlots(80)
+                .maxInventorySlots(100)
+                .curQuestInventorySlots(12)
+                .maxQuestInventorySlots(50)
+                .curWeight(45000)
+                .maxWeight(60000)
+                .build();
+
+        assertNotEquals(base, base.toBuilder().curInventorySlots(81).build());
+        assertNotEquals(base, base.toBuilder().maxInventorySlots(101).build());
+        assertNotEquals(base, base.toBuilder().curQuestInventorySlots(13).build());
+        assertNotEquals(base, base.toBuilder().maxQuestInventorySlots(51).build());
+        assertNotEquals(base, base.toBuilder().curWeight(45001).build());
+        assertNotEquals(base, base.toBuilder().maxWeight(60001).build());
+
+        CharacterRuntimeDto sameValues = base.toBuilder().build();
+        assertEquals(base, sameValues);
+        assertEquals(base.hashCode(), sameValues.hashCode());
     }
 }

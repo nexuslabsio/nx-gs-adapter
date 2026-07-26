@@ -60,6 +60,15 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  * Both are {@code null} on offline tombstones and on hosts that do not populate
  * them.</p>
+ *
+ * <p>Inventory capacity ({@link #getCurInventorySlots() curInventorySlots} /
+ * {@link #getMaxInventorySlots() maxInventorySlots}, their quest-inventory
+ * counterparts, and {@link #getCurWeight() curWeight} / {@link #getMaxWeight()
+ * maxWeight}) rides this runtime channel rather than the {@code CharacterDbDto}
+ * CDC stream because the cap itself is stat-derived (race / access level /
+ * bonuses / purchased expansions) and cannot be read off a persistent character
+ * row. As with the other runtime-only fields, consumers keep the last-known
+ * values after logout — offline tombstones carry {@code null} for all six.</p>
  */
 public final class CharacterRuntimeDto {
 
@@ -79,10 +88,23 @@ public final class CharacterRuntimeDto {
     private final @Nullable String aiStatus;
     private final @Nullable Long exp;
     private final @Nullable List<CustomActivity> customActivities;
+    private final @Nullable Integer curInventorySlots;
+    private final @Nullable Integer maxInventorySlots;
+    private final @Nullable Integer curQuestInventorySlots;
+    private final @Nullable Integer maxQuestInventorySlots;
+    private final @Nullable Integer curWeight;
+    private final @Nullable Integer maxWeight;
 
     /**
      * Canonical constructor. Prefer {@link #builder()} — positional construction
-     * of 16 mostly-nullable fields is error-prone.
+     * of 22 mostly-nullable fields is error-prone.
+     *
+     * <p>MUST remain the only non-default constructor on this class. The DTO
+     * carries no binder annotations and relies on implicit constructor-parameter
+     * names (this module compiles with {@code -parameters}); a second
+     * constructor — even a back-compat overload — makes creator detection
+     * ambiguous, and consumers then fail to deserialize the whole channel. Grow
+     * the wire by appending parameters here, never by overloading.</p>
      */
     public CharacterRuntimeDto(
             long id,
@@ -100,7 +122,13 @@ public final class CharacterRuntimeDto {
             @Nullable Boolean online,
             @Nullable String aiStatus,
             @Nullable Long exp,
-            @Nullable List<CustomActivity> customActivities) {
+            @Nullable List<CustomActivity> customActivities,
+            @Nullable Integer curInventorySlots,
+            @Nullable Integer maxInventorySlots,
+            @Nullable Integer curQuestInventorySlots,
+            @Nullable Integer maxQuestInventorySlots,
+            @Nullable Integer curWeight,
+            @Nullable Integer maxWeight) {
         this.id = id;
         this.curHp = curHp;
         this.maxHp = maxHp;
@@ -119,6 +147,12 @@ public final class CharacterRuntimeDto {
         this.customActivities = customActivities == null
                 ? null
                 : Collections.unmodifiableList(new ArrayList<CustomActivity>(customActivities));
+        this.curInventorySlots = curInventorySlots;
+        this.maxInventorySlots = maxInventorySlots;
+        this.curQuestInventorySlots = curQuestInventorySlots;
+        this.maxQuestInventorySlots = maxQuestInventorySlots;
+        this.curWeight = curWeight;
+        this.maxWeight = maxWeight;
     }
 
     /**
@@ -216,6 +250,65 @@ public final class CharacterRuntimeDto {
     }
 
     /**
+     * Occupied regular inventory slots — one slot per item stack (a stack of
+     * N items still counts as 1), equipped items included. Quest items are
+     * NOT counted here — they occupy a separate quest inventory with its own
+     * cap (see {@link #getCurQuestInventorySlots() curQuestInventorySlots}).
+     * {@code null} when the host does not report it and on offline
+     * tombstones.
+     */
+    public @Nullable Integer getCurInventorySlots() {
+        return curInventorySlots;
+    }
+
+    /**
+     * Regular inventory slot cap for this character. Varies per character
+     * (race / access level / stat bonuses / purchased expansions), so it is
+     * per-character runtime state rather than a server constant. {@code null}
+     * when the host does not report it and on offline tombstones.
+     */
+    public @Nullable Integer getMaxInventorySlots() {
+        return maxInventorySlots;
+    }
+
+    /**
+     * Occupied quest inventory slots — quest items only, tracked separately
+     * from the regular inventory. {@code null} when the host does not report
+     * it and on offline tombstones.
+     */
+    public @Nullable Integer getCurQuestInventorySlots() {
+        return curQuestInventorySlots;
+    }
+
+    /**
+     * Quest inventory slot cap. {@code null} when the host does not report it
+     * and on offline tombstones.
+     */
+    public @Nullable Integer getMaxQuestInventorySlots() {
+        return maxQuestInventorySlots;
+    }
+
+    /**
+     * Current carried weight — the sum of {@code itemWeight * count} across
+     * the whole inventory (regular items, equipped items, and quest items),
+     * minus any build-specific weight-penalty reduction. {@code null} when
+     * the host does not report it and on offline tombstones.
+     */
+    public @Nullable Integer getCurWeight() {
+        return curWeight;
+    }
+
+    /**
+     * Carry-weight cap for this character, derived from stats / bonuses and
+     * therefore per-character runtime state rather than a server constant.
+     * {@code null} when the host does not report it and on offline
+     * tombstones.
+     */
+    public @Nullable Integer getMaxWeight() {
+        return maxWeight;
+    }
+
+    /**
      * Build-specific sustained activities — the high-level "what the player is
      * occupied with" signals that live outside the engine AI state machine
      * (e.g. fishing, reading a book, autofarming). A <b>list</b> of structured
@@ -264,7 +357,13 @@ public final class CharacterRuntimeDto {
                 .online(online)
                 .aiStatus(aiStatus)
                 .exp(exp)
-                .customActivities(customActivities);
+                .customActivities(customActivities)
+                .curInventorySlots(curInventorySlots)
+                .maxInventorySlots(maxInventorySlots)
+                .curQuestInventorySlots(curQuestInventorySlots)
+                .maxQuestInventorySlots(maxQuestInventorySlots)
+                .curWeight(curWeight)
+                .maxWeight(maxWeight);
     }
 
     public static Builder builder() {
@@ -291,7 +390,13 @@ public final class CharacterRuntimeDto {
                 && Objects.equals(online, that.online)
                 && Objects.equals(aiStatus, that.aiStatus)
                 && Objects.equals(exp, that.exp)
-                && Objects.equals(customActivities, that.customActivities);
+                && Objects.equals(customActivities, that.customActivities)
+                && Objects.equals(curInventorySlots, that.curInventorySlots)
+                && Objects.equals(maxInventorySlots, that.maxInventorySlots)
+                && Objects.equals(curQuestInventorySlots, that.curQuestInventorySlots)
+                && Objects.equals(maxQuestInventorySlots, that.maxQuestInventorySlots)
+                && Objects.equals(curWeight, that.curWeight)
+                && Objects.equals(maxWeight, that.maxWeight);
     }
 
     @Override
@@ -312,7 +417,13 @@ public final class CharacterRuntimeDto {
                 online,
                 aiStatus,
                 exp,
-                customActivities);
+                customActivities,
+                curInventorySlots,
+                maxInventorySlots,
+                curQuestInventorySlots,
+                maxQuestInventorySlots,
+                curWeight,
+                maxWeight);
     }
 
     @Override
@@ -326,7 +437,11 @@ public final class CharacterRuntimeDto {
                 + ", online=" + online
                 + ", aiStatus=" + aiStatus
                 + ", exp=" + exp
-                + ", customActivities=" + customActivities + "]";
+                + ", customActivities=" + customActivities
+                + ", curInventorySlots=" + curInventorySlots + ", maxInventorySlots=" + maxInventorySlots
+                + ", curQuestInventorySlots=" + curQuestInventorySlots
+                + ", maxQuestInventorySlots=" + maxQuestInventorySlots
+                + ", curWeight=" + curWeight + ", maxWeight=" + maxWeight + "]";
     }
 
     public static final class Builder {
@@ -346,6 +461,12 @@ public final class CharacterRuntimeDto {
         private @Nullable String aiStatus;
         private @Nullable Long exp;
         private @Nullable List<CustomActivity> customActivities;
+        private @Nullable Integer curInventorySlots;
+        private @Nullable Integer maxInventorySlots;
+        private @Nullable Integer curQuestInventorySlots;
+        private @Nullable Integer maxQuestInventorySlots;
+        private @Nullable Integer curWeight;
+        private @Nullable Integer maxWeight;
 
         public Builder id(long id) {
             this.id = id;
@@ -441,6 +562,60 @@ public final class CharacterRuntimeDto {
             return this;
         }
 
+        /**
+         * Occupied regular inventory slots (quest items excluded). {@code null}
+         * when not reported.
+         */
+        public Builder curInventorySlots(@Nullable Integer curInventorySlots) {
+            this.curInventorySlots = curInventorySlots;
+            return this;
+        }
+
+        /**
+         * Regular inventory slot cap — per-character runtime state (varies by
+         * race / access level / bonuses / expansions). {@code null} when not
+         * reported.
+         */
+        public Builder maxInventorySlots(@Nullable Integer maxInventorySlots) {
+            this.maxInventorySlots = maxInventorySlots;
+            return this;
+        }
+
+        /**
+         * Occupied quest inventory slots. {@code null} when not reported.
+         */
+        public Builder curQuestInventorySlots(@Nullable Integer curQuestInventorySlots) {
+            this.curQuestInventorySlots = curQuestInventorySlots;
+            return this;
+        }
+
+        /**
+         * Quest inventory slot cap. {@code null} when not reported.
+         */
+        public Builder maxQuestInventorySlots(@Nullable Integer maxQuestInventorySlots) {
+            this.maxQuestInventorySlots = maxQuestInventorySlots;
+            return this;
+        }
+
+        /**
+         * Current carried weight — sum of {@code itemWeight * count} across
+         * regular, equipped, and quest items, minus any weight-penalty
+         * reduction. {@code null} when not reported.
+         */
+        public Builder curWeight(@Nullable Integer curWeight) {
+            this.curWeight = curWeight;
+            return this;
+        }
+
+        /**
+         * Carry-weight cap — per-character runtime state derived from stats /
+         * bonuses. {@code null} when not reported.
+         */
+        public Builder maxWeight(@Nullable Integer maxWeight) {
+            this.maxWeight = maxWeight;
+            return this;
+        }
+
         public CharacterRuntimeDto build() {
             return new CharacterRuntimeDto(
                     id,
@@ -458,7 +633,13 @@ public final class CharacterRuntimeDto {
                     online,
                     aiStatus,
                     exp,
-                    customActivities);
+                    customActivities,
+                    curInventorySlots,
+                    maxInventorySlots,
+                    curQuestInventorySlots,
+                    maxQuestInventorySlots,
+                    curWeight,
+                    maxWeight);
         }
     }
 }

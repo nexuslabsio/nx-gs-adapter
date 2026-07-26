@@ -33,3 +33,4 @@ Any spec change (new spec, rename, added feature) updates this table in the same
 | 025 | chat-events                       | 2026-06-29 | [spec](specs/025-chat-events.md)                       |
 | 026 | item-augmentation-sync            | 2026-07-18 | [spec](specs/026-item-augmentation-sync.md)            |
 | 027 | etctype-consumable-market-signals | 2026-07-22 | [spec](specs/027-etctype-consumable-market-signals.md) |
+| 028 | character-inventory-capacity      | 2026-07-26 | [spec](specs/028-character-inventory-capacity.md)      |

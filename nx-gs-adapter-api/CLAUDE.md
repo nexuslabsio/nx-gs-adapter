@@ -42,11 +42,11 @@ by the L2NX game-server adapter and its consumers. Published as
   `ClanSkillDbDto`; ClanDbDto carries optional `icon: byte[]` for the clan crest
   as decoded PNG bytes — schema providers do the source-format → PNG
   conversion in `mapEntity`), `alliance` (`AllianceDbDto{allyId, allyName,
-  icon: byte[]}` — same icon convention as clan), `item` (`ItemDbDto`,
+icon: byte[]}` — same icon convention as clan), `item` (`ItemDbDto`,
   `ItemAttributeDbDto` elementals, `ItemAugmentationDbDto` per-instance augment
   option-ids — `ItemDbDto.augmentation` null when not augmented), `rating`
   (`kafka.sync.db.rating.RatingDbDto{ratingType, season?, charId, points,
-  metadata?}` + `WellKnownRatingTypes` — `lower_snake_case` open-string rating
+metadata?}` + `WellKnownRatingTypes` — `lower_snake_case` open-string rating
   types, first `fishing`; one unified topic carries every rating kind
   discriminated by `ratingType`, rank is NOT on the wire — consumers window it at
   read time). CharacterRuntimeDto (`kafka.sync.runtime.character`)
@@ -59,6 +59,15 @@ by the L2NX game-server adapter and its consumers. Published as
   channel; `null` on cores that don't expose it and on offline tombstones.
   Consumers combine it with the per-server level→exp table (see
   `events.leveldata` below) to compute "% progress within the current level".
+  It also carries six optional inventory-capacity fields — `curInventorySlots` /
+  `maxInventorySlots` (regular inventory slot count/cap, quest items excluded),
+  `curQuestInventorySlots` / `maxQuestInventorySlots` (quest inventory slot
+  count/cap) and `curWeight` / `maxWeight` (carried weight/cap across regular +
+  equipped + quest items) — all `null` when the host does not report them and on
+  offline tombstones. This DTO must keep exactly ONE constructor: it binds
+  through implicit constructor-parameter names, so adding an overload (even a
+  back-compat one) makes creator detection ambiguous and consumers stop
+  deserializing the whole channel.
 - `app.l2nx.gs.adapter.api.kafka.sync.gd.<entity>` — per-entity wire DTOs for the
   gd-sync (static game-data) stream, payload of `GameDataSyncEvent<T>`. Gear-score
   additions (build-agnostic; `null` when the build computes no gear score):
@@ -68,15 +77,15 @@ by the L2NX game-server adapter and its consumers. Published as
   `WEAPON` / `NONWEAPON` / `SPECIAL`; build-defined, null when absent), a reference
   into the ruleset's `ENCHANT_PROFILE` group (rule `key` == this value), not an
   inline table; `skill.Skill` carries optional `gearScoreContributions:
-  List<GearScoreContribution>` where `GearScoreContribution{kind, value, classIds?}`
+List<GearScoreContribution>` where `GearScoreContribution{kind, value, classIds?}`
   has `kind` in `UPPER_SNAKE` (`OWNED` / `PER_LEVEL` / `ENCHANT`) and `classIds`
   null = all classes. New singleton entity `gearscore` —
   `GearScoreRuleset{enabled, groups: List<GearScoreRuleGroup>}`,
   `GearScoreRuleGroup{category (UPPER_SNAKE: LEVEL | ATTRIBUTE | AUGMENT |
-  ENCHANT_PROFILE | SET_BONUS | AURA | ACHIEVEMENT | SKILL), label: LocalizedText,
-  description?, rules: List<GearScoreRule>}`, `GearScoreRule{key, label?, value?,
-  unit? (UPPER_SNAKE: PER_POINT | PERCENT | FLAT | PER_LEVEL | PER_STEP), cap?,
-  scaling?: List<GearScoreScalingStep>}`, `GearScoreScalingStep{from, to?, value}`.
+ENCHANT_PROFILE | SET_BONUS | AURA | ACHIEVEMENT | SKILL), label: LocalizedText,
+description?, rules: List<GearScoreRule>}`, `GearScoreRule{key, label?, value?,
+unit? (UPPER_SNAKE: PER_POINT | PERCENT | FLAT | PER_LEVEL | PER_STEP), cap?,
+scaling?: List<GearScoreScalingStep>}`, `GearScoreScalingStep{from, to?, value}`.
   The wiki renders the ruleset groups as tables; per-entity values
   (`ItemTemplate.gearScore`, `Skill.gearScoreContributions`) are the live numbers.
 - `app.l2nx.gs.adapter.api.kafka.events.<family>` — outbound discrete-fact event
@@ -89,141 +98,141 @@ by the L2NX game-server adapter and its consumers. Published as
   Adding a new event type means appending one `register(...)` call there —
   the SPI surface stays one method regardless of how many families ship.
   Shipped families:
-    - `events.premiumpurchase` — `PremiumPurchaseEvent` (final) +
-      `PurchaseItem` / `PurchaseService` / `Payment` + `WellKnownServices`
-      constants. Single-event family; per-fact, host-pushed via
-      `NxEvents.publish(...)`. Partition key: `characterId`.
-    - `events.serveronline` — `ServerOnlineSnapshotEvent` (final, UUIDv7
-      `eventId` + open `Map<String, Long> buckets`) +
-      `WellKnownServerOnlineBuckets` lower_snake_case constants split into
-      required (`total` — full character presence, `unique` — distinct
-      active humans by host-defined identity tuple) and optional canonical
-      (`offline_trade`, `fishing`); hosts MAY publish arbitrary
-      non-canonical keys. Periodic snapshots, host-pushed via
-      `NxEvents.publish(...)` on a host-managed cadence. Partition key:
-      `null` (round-robin). Multi-event family — also carries the discrete
-      server-lifecycle facts `ServerStartedEvent` (UUIDv7 `eventId` + open
-      `metadata`; canonical keys `gm_only` / `auto_restart` via
-      `WellKnownServerStartMetadata`) and `ServerStoppingEvent` (UUIDv7 `eventId`
-        + open `metadata`; same keys — graceful-shutdown signal, no stop-reason on
-          the wire), dispatched by `Nx-Message-Type`. The host always reports both
-          keys; the platform mutes its "server is up" / "server is stopping"
-          notification on a GM-only run (operator tests) or an automatic scheduled
-          restart (`auto_restart=true` — the host tags its daily maintenance restart
-          and keeps emitting the fact so the platform still persists it). Both
-          lifecycle facts use partition key `null`.
-    - `events.character` — `CharacterPresenceEvent` (one event per login /
-      logout, distinguished by the `online: boolean` field — `true`=login,
-      `false`=logout). Carries UUIDv7 `eventId`
-      (REQUIRED, derive `occurredAt`), `charId` (REQUIRED),
-      `online` (REQUIRED), optional `accountName` / `ip` / `hwid`.
-      Partitioned by `charId` so per-character presence history lands in
-      one partition in occurrence order. One of three sources feeding
-      `gs_characters.online` on the platform (others: CDC
-      `CharacterDbDto.online`, runtime `CharacterRuntimeDto.online`);
-      timestamp-based last-writer-wins on the consumer. Multi-event family
-      — also carries `CharacterDeathEvent` (UUIDv7 `eventId` + `charId`
-      partition key + open `metadata`), dispatched by `Nx-Message-Type`.
-      Killer info rides `metadata` (`WellKnownDeathMetadata`): `killer_type`
-      (a `WellKnownKillerTypes` value — `monster` / `player` / `boss` /
-      `self`), `killer_id` (the killer's char object-id for `player`, NPC
-      template-id for `monster` / `boss`), and `farm_mode` (a `WellKnownFarmModes`
-      value — `autofarm` / `auto_macro` — classifying the unattended mode); the
-      platform resolves the killer name from the id, no name on the wire. bohpts
-      emits a death event only when the dying character was unattended — on
-      autofarm or on an auto-macro (legacy-bot "your unattended character died"
-      signal); no location on the wire. This family ALSO carries
-      `LevelExpTableSnapshotEvent` (Java package `events.leveldata`; see below) —
-      the per-server level→exp table, dispatched by `Nx-Message-Type` on this same
-      topic rather than a dedicated one.
-    - `events.privatestore` — `PrivateStorePurchaseEvent` (closed-deal facts)
-        + `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
-          `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
-          `WellKnownElements` constants. Multi-event family (no abstract base);
-          both subtypes ride one topic, host-pushed via `NxEvents.publish(...)`
-          with the concrete subtype. Partition keys: snapshot → `itemId`,
-          purchase → `null` (round-robin, no single natural per-entity key).
-    - `events.raid` — `RaidKillEvent` (final) + `RaidActor` /
-      `RaidDropItem` sub-DTOs + `RaidBossKind` enum (`RAID` /
-      `EPIC` / `INSTANCE_BOSS`). Multi-event family (kill fact +
-      boss-respawn snapshot, see below); one `RaidKillEvent` per
-      `Attackable.isRaid() && !isRaidMinion()` death. Carries UUIDv7
-      `eventId` (REQUIRED, derive `occurredAt`), `bossNpcId` (REQUIRED,
-      partition key as 8-byte big-endian), `bossKind` (REQUIRED), boss
-      identity (incl. `bossName` until an NPC CDC stream exists), two
-      `@Nullable RaidActor` refs (`lastHit` — final-blow character;
-      `dropOwner` — L2 `mainDamageDealer` with group-first semantics:
-      `partyId` / `commandChannelId` are canonical, `charId` is the
-      unstable representative for narrative only), `participants`
-      (`List<RaidActor>` — damage breakdown from aggro list), `drops`.
-      `RaidActor` carries `charId` + affiliation ids + `damageDealt`;
-      char / clan names are NOT included — platform joins on the
-      character / clan CDC streams. Party / CC identities are
-      `@Nullable UUID` (UUIDv7 minted by the host on group construction,
-      stable across leader changes within the same group instance, reset
-      on disband / restart). Topic retention 3h (platform default for
-      event topics; long-term persistence is consumer-side).
-      Second message type in this family: `BossRespawnSnapshotEvent`
-      (final, UUIDv7 `eventId` + `List<BossRespawnEntry> bosses` +
-      `WellKnownBossStatuses` constants). Periodic FULL snapshot of every
-      tracked raid boss (grand / epic + open-world), host-pushed via
-      `NxEvents.publish(...)` on the same `raid` topic (dispatched by
-      `Nx-Message-Type`). Each `BossRespawnEntry` carries `npcId` (REQUIRED —
-      platform resolves the boss name from this id; names are NOT on the wire),
-      `level?`, `kind` (reuses `RaidBossKind` — only `RAID` / `EPIC`
-      emitted), `status` (REQUIRED, open string; canonical
-      `alive` / `in_combat` / `dead` via `WellKnownBossStatuses`),
-      `nextRespawnAt?` (`Instant`, set when dead + known), and an open
-      `metadata` map. Partition key: `null` (round-robin; `RaidKillEvent`
-      keeps its `bossNpcId` key — per-type keys like `privatestore`). Platform
-      keeps last-known per server (mark-and-sweep) and counts the respawn down
-      locally.
-    - `events.gameevents` — `GameEventSnapshotEvent` (final, UUIDv7
-      `eventId` + `List<GameEventEntry> events`) + `WellKnownGameEventMetadata`
-      constants. Single-event family; periodic FULL snapshot of every
-      configured recurring event (TvT and others), host-pushed via
-      `NxEvents.publish(...)`. Each `GameEventEntry` carries `code`
-      (REQUIRED, stable build-agnostic id), `name?`, `enabled` (REQUIRED),
-      `status?` (open lifecycle phase — `WellKnownGameEventStatuses`:
-      `waiting` / `registration` / `in_progress` mapped from the engine state
-      machine; replaced the former boolean `running`), `nextStartAt?` (`Instant`),
-      and an open `metadata` map whose canonical keys today are `event_kind=tvt`
-      and `event_kind=solo_boss` (`WellKnownGameEventMetadata`). Partition key:
-      `null` (round-robin).
-      Build-agnostic — TvT is one mapping, not a contract assumption.
-    - `events.castle` — `CastleSnapshotEvent` (final, UUIDv7 `eventId` +
-      `List<CastleSnapshotEntry> castles`) + `SiegeFinishedEvent` (final) +
-      `WellKnownSiegeOutcomes` constants. Multi-event family (snapshot +
-      discrete fact, like `raid`); both ride one `castle` topic, dispatched
-      by `Nx-Message-Type`. `CastleSnapshotEvent` is a periodic FULL snapshot
-      of every castle — each `CastleSnapshotEntry` carries `castleId`
-      (REQUIRED), `name?`, `ownerClanId?` (host maps no-owner sentinel → null),
-      `nextSiegeAt?` (`Instant`), `registrationEndsAt?` / `siegeEndsAt?`
-      (`Instant`, next siege's registration-close and end, derived host-side from
-      the castle template), open `metadata`. Partition key: `null`
-      (round-robin). `SiegeFinishedEvent` is one per ended siege: `eventId`
-      (UUIDv7, REQUIRED), `castleId` (REQUIRED, partition key 8-byte BE),
-      `castleName?`, `siegeStartedAt?`, `outcome` (REQUIRED, open string;
-      canonical `captured` / `defended` / `draw` via `WellKnownSiegeOutcomes`),
-      `winnerClanId?` (post-siege holder; null on draw),
-      `attackerClanIds` / `defenderClanIds` (registered clans), open `metadata`.
-      Build-agnostic — outcome is an open string, not a contract assumption.
-    - `events.leveldata` — `LevelExpTableSnapshotEvent` (final, UUIDv7 `eventId`
-        + `List<LevelExpEntry> levels` + optional open `Map<String,String>
-      metadata`) + `LevelExpEntry` (`int level` + `long requiredExp` — the
-          absolute / cumulative exp required to be at that level). The Java package
-          is `events.leveldata`, but the event RIDES the `character` family/topic
-          (`<tenant>.gs.events.character`), dispatched by `Nx-Message-Type` — the
-          level table is synced once on server start / datapack reload, not worth its
-          own topic/consumer/group. Periodic FULL
-          snapshot of the server's level→required-exp progression table, host-pushed
-          via `NxEvents.publish(...)` (bohpts emits it on server startup + datapack
-          reload, reading L2J `ExperienceData`). Mirrors `BossRespawnSnapshotEvent`
-          exactly (hand-written immutable + builder + getters, Gson-friendly,
-          JSpecify `@Nullable`). Partition key: `null` (round-robin); platform
-          scope-replaces per `(server)` keeping the newest snapshot. Combined with
-          `CharacterRuntimeDto.exp` to compute "% progress within current level":
-          `pct = (exp - requiredExp[level]) / (requiredExp[level + 1] - requiredExp[level])`.
+  - `events.premiumpurchase` — `PremiumPurchaseEvent` (final) +
+    `PurchaseItem` / `PurchaseService` / `Payment` + `WellKnownServices`
+    constants. Single-event family; per-fact, host-pushed via
+    `NxEvents.publish(...)`. Partition key: `characterId`.
+  - `events.serveronline` — `ServerOnlineSnapshotEvent` (final, UUIDv7
+    `eventId` + open `Map<String, Long> buckets`) +
+    `WellKnownServerOnlineBuckets` lower_snake_case constants split into
+    required (`total` — full character presence, `unique` — distinct
+    active humans by host-defined identity tuple) and optional canonical
+    (`offline_trade`, `fishing`); hosts MAY publish arbitrary
+    non-canonical keys. Periodic snapshots, host-pushed via
+    `NxEvents.publish(...)` on a host-managed cadence. Partition key:
+    `null` (round-robin). Multi-event family — also carries the discrete
+    server-lifecycle facts `ServerStartedEvent` (UUIDv7 `eventId` + open
+    `metadata`; canonical keys `gm_only` / `auto_restart` via
+    `WellKnownServerStartMetadata`) and `ServerStoppingEvent` (UUIDv7 `eventId`
+    - open `metadata`; same keys — graceful-shutdown signal, no stop-reason on
+      the wire), dispatched by `Nx-Message-Type`. The host always reports both
+      keys; the platform mutes its "server is up" / "server is stopping"
+      notification on a GM-only run (operator tests) or an automatic scheduled
+      restart (`auto_restart=true` — the host tags its daily maintenance restart
+      and keeps emitting the fact so the platform still persists it). Both
+      lifecycle facts use partition key `null`.
+  - `events.character` — `CharacterPresenceEvent` (one event per login /
+    logout, distinguished by the `online: boolean` field — `true`=login,
+    `false`=logout). Carries UUIDv7 `eventId`
+    (REQUIRED, derive `occurredAt`), `charId` (REQUIRED),
+    `online` (REQUIRED), optional `accountName` / `ip` / `hwid`.
+    Partitioned by `charId` so per-character presence history lands in
+    one partition in occurrence order. One of three sources feeding
+    `gs_characters.online` on the platform (others: CDC
+    `CharacterDbDto.online`, runtime `CharacterRuntimeDto.online`);
+    timestamp-based last-writer-wins on the consumer. Multi-event family
+    — also carries `CharacterDeathEvent` (UUIDv7 `eventId` + `charId`
+    partition key + open `metadata`), dispatched by `Nx-Message-Type`.
+    Killer info rides `metadata` (`WellKnownDeathMetadata`): `killer_type`
+    (a `WellKnownKillerTypes` value — `monster` / `player` / `boss` /
+    `self`), `killer_id` (the killer's char object-id for `player`, NPC
+    template-id for `monster` / `boss`), and `farm_mode` (a `WellKnownFarmModes`
+    value — `autofarm` / `auto_macro` — classifying the unattended mode); the
+    platform resolves the killer name from the id, no name on the wire. bohpts
+    emits a death event only when the dying character was unattended — on
+    autofarm or on an auto-macro (legacy-bot "your unattended character died"
+    signal); no location on the wire. This family ALSO carries
+    `LevelExpTableSnapshotEvent` (Java package `events.leveldata`; see below) —
+    the per-server level→exp table, dispatched by `Nx-Message-Type` on this same
+    topic rather than a dedicated one.
+  - `events.privatestore` — `PrivateStorePurchaseEvent` (closed-deal facts)
+    - `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
+      `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
+      `WellKnownElements` constants. Multi-event family (no abstract base);
+      both subtypes ride one topic, host-pushed via `NxEvents.publish(...)`
+      with the concrete subtype. Partition keys: snapshot → `itemId`,
+      purchase → `null` (round-robin, no single natural per-entity key).
+  - `events.raid` — `RaidKillEvent` (final) + `RaidActor` /
+    `RaidDropItem` sub-DTOs + `RaidBossKind` enum (`RAID` /
+    `EPIC` / `INSTANCE_BOSS`). Multi-event family (kill fact +
+    boss-respawn snapshot, see below); one `RaidKillEvent` per
+    `Attackable.isRaid() && !isRaidMinion()` death. Carries UUIDv7
+    `eventId` (REQUIRED, derive `occurredAt`), `bossNpcId` (REQUIRED,
+    partition key as 8-byte big-endian), `bossKind` (REQUIRED), boss
+    identity (incl. `bossName` until an NPC CDC stream exists), two
+    `@Nullable RaidActor` refs (`lastHit` — final-blow character;
+    `dropOwner` — L2 `mainDamageDealer` with group-first semantics:
+    `partyId` / `commandChannelId` are canonical, `charId` is the
+    unstable representative for narrative only), `participants`
+    (`List<RaidActor>` — damage breakdown from aggro list), `drops`.
+    `RaidActor` carries `charId` + affiliation ids + `damageDealt`;
+    char / clan names are NOT included — platform joins on the
+    character / clan CDC streams. Party / CC identities are
+    `@Nullable UUID` (UUIDv7 minted by the host on group construction,
+    stable across leader changes within the same group instance, reset
+    on disband / restart). Topic retention 3h (platform default for
+    event topics; long-term persistence is consumer-side).
+    Second message type in this family: `BossRespawnSnapshotEvent`
+    (final, UUIDv7 `eventId` + `List<BossRespawnEntry> bosses` +
+    `WellKnownBossStatuses` constants). Periodic FULL snapshot of every
+    tracked raid boss (grand / epic + open-world), host-pushed via
+    `NxEvents.publish(...)` on the same `raid` topic (dispatched by
+    `Nx-Message-Type`). Each `BossRespawnEntry` carries `npcId` (REQUIRED —
+    platform resolves the boss name from this id; names are NOT on the wire),
+    `level?`, `kind` (reuses `RaidBossKind` — only `RAID` / `EPIC`
+    emitted), `status` (REQUIRED, open string; canonical
+    `alive` / `in_combat` / `dead` via `WellKnownBossStatuses`),
+    `nextRespawnAt?` (`Instant`, set when dead + known), and an open
+    `metadata` map. Partition key: `null` (round-robin; `RaidKillEvent`
+    keeps its `bossNpcId` key — per-type keys like `privatestore`). Platform
+    keeps last-known per server (mark-and-sweep) and counts the respawn down
+    locally.
+  - `events.gameevents` — `GameEventSnapshotEvent` (final, UUIDv7
+    `eventId` + `List<GameEventEntry> events`) + `WellKnownGameEventMetadata`
+    constants. Single-event family; periodic FULL snapshot of every
+    configured recurring event (TvT and others), host-pushed via
+    `NxEvents.publish(...)`. Each `GameEventEntry` carries `code`
+    (REQUIRED, stable build-agnostic id), `name?`, `enabled` (REQUIRED),
+    `status?` (open lifecycle phase — `WellKnownGameEventStatuses`:
+    `waiting` / `registration` / `in_progress` mapped from the engine state
+    machine; replaced the former boolean `running`), `nextStartAt?` (`Instant`),
+    and an open `metadata` map whose canonical keys today are `event_kind=tvt`
+    and `event_kind=solo_boss` (`WellKnownGameEventMetadata`). Partition key:
+    `null` (round-robin).
+    Build-agnostic — TvT is one mapping, not a contract assumption.
+  - `events.castle` — `CastleSnapshotEvent` (final, UUIDv7 `eventId` +
+    `List<CastleSnapshotEntry> castles`) + `SiegeFinishedEvent` (final) +
+    `WellKnownSiegeOutcomes` constants. Multi-event family (snapshot +
+    discrete fact, like `raid`); both ride one `castle` topic, dispatched
+    by `Nx-Message-Type`. `CastleSnapshotEvent` is a periodic FULL snapshot
+    of every castle — each `CastleSnapshotEntry` carries `castleId`
+    (REQUIRED), `name?`, `ownerClanId?` (host maps no-owner sentinel → null),
+    `nextSiegeAt?` (`Instant`), `registrationEndsAt?` / `siegeEndsAt?`
+    (`Instant`, next siege's registration-close and end, derived host-side from
+    the castle template), open `metadata`. Partition key: `null`
+    (round-robin). `SiegeFinishedEvent` is one per ended siege: `eventId`
+    (UUIDv7, REQUIRED), `castleId` (REQUIRED, partition key 8-byte BE),
+    `castleName?`, `siegeStartedAt?`, `outcome` (REQUIRED, open string;
+    canonical `captured` / `defended` / `draw` via `WellKnownSiegeOutcomes`),
+    `winnerClanId?` (post-siege holder; null on draw),
+    `attackerClanIds` / `defenderClanIds` (registered clans), open `metadata`.
+    Build-agnostic — outcome is an open string, not a contract assumption.
+  - `events.leveldata` — `LevelExpTableSnapshotEvent` (final, UUIDv7 `eventId`
+    - `List<LevelExpEntry> levels` + optional open `Map<String,String>
+metadata`) + `LevelExpEntry` (`int level` + `long requiredExp` — the
+      absolute / cumulative exp required to be at that level). The Java package
+      is `events.leveldata`, but the event RIDES the `character` family/topic
+      (`<tenant>.gs.events.character`), dispatched by `Nx-Message-Type` — the
+      level table is synced once on server start / datapack reload, not worth its
+      own topic/consumer/group. Periodic FULL
+      snapshot of the server's level→required-exp progression table, host-pushed
+      via `NxEvents.publish(...)` (bohpts emits it on server startup + datapack
+      reload, reading L2J `ExperienceData`). Mirrors `BossRespawnSnapshotEvent`
+      exactly (hand-written immutable + builder + getters, Gson-friendly,
+      JSpecify `@Nullable`). Partition key: `null` (round-robin); platform
+      scope-replaces per `(server)` keeping the newest snapshot. Combined with
+      `CharacterRuntimeDto.exp` to compute "% progress within current level":
+      `pct = (exp - requiredExp[level]) / (requiredExp[level + 1] - requiredExp[level])`.
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:
