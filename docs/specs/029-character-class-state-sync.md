@@ -171,13 +171,25 @@ handle it locally.
 
 Runtime channel: purely additive, every new field nullable.
 
-db-sync channel: the JSON field `subclasses` becomes `classes`, so during the window between the
-platform deploy and the schema-provider deploy a new platform sees no roster from an old adapter. Not
-harmful — the platform ingestor skips the child-replace when the list is absent, so existing rows are
-preserved rather than deleted, and the force-resync that closes the rollout repopulates everything.
+db-sync channel: the JSON field `subclasses` becomes `classes`. The platform is deployed **before** the
+schema provider, so in that window it receives events in the old shape and would see no roster at all.
+Hence the transition release is additive rather than a swap:
 
-Adapter-api takes a minor version bump. Deploy ordering is in the nx-gameservers spec: platform first,
-then adapter-api to Maven Central, then bohpts-core, then force-resync.
+- `CharacterDbDto` carries **both** `getClasses()` and a `@Deprecated getSubclasses()`, and
+  `CharacterSubclassDbDto` stays in place (deprecated). Dropping the old field in the same release would
+  make the new platform blind to the old adapter's payload for the whole window.
+- Deprecation Javadoc states the removal gate explicitly: the field goes once every schema provider
+  emits `classes` (for bohpts, the morning game-server restart that ships the new adapter).
+- The platform mirrors this with a legacy ingest branch that reconstructs the roster from
+  `baseClassId` + flat `level` + `subclasses` — see the nx-gameservers spec, section «Совместимость и
+  cutover».
+
+**Follow-up release (not this one):** remove `getSubclasses()` and `CharacterSubclassDbDto` from
+adapter-api once the cutover is done. That one IS breaking and takes its own version bump.
+
+The transition release itself is a minor version bump — every change in it is additive. Deploy ordering
+is in the nx-gameservers spec: platform, then nx-telegram, then adapter-api to Maven Central, then
+bohpts-core, then force-resync.
 
 ## Tests
 
