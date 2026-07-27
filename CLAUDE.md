@@ -92,46 +92,46 @@ instead. `NNN` is a zero-padded sequential id; the index lives in `docs/CLAUDE.m
   — used by adapter-core's events publisher for outbound family dispatch.
 - `:nx-gs-adapter-core` — runtime: config resolution, POST `/connect`, heartbeat, ServiceLoader-based
   module discovery, lifecycle. Hosts the built-in `NxEvents` capability — bounded-queue
-    + daemon-thread fan-out (`events.EventsPublisher`, `events.NxEventsImpl`,
-      `events.EventTypeRegistry` — one `register(...)` entry per concrete event
-      type, including the `sync` family for db-sync's `ResyncCompletedEvent`,
-      partition key `null`) reading per-family topic addressing from
-      `ConnectResponse.messagingTopics.events`. Default `drop-policy` is `newest`
-      (drop incoming on overflow — preserves queue order). `oldest` (evict head)
-      remains an option but over-counts `dropped-total` under multi-producer
-      contention because the displaced envelope is counted on the eviction path
-      even when concurrent enqueuers race for the same slot. Heartbeat surfaces an
-      `events` module slot (`queue-depth`, `published-total`, `dropped-total`,
-      `failed-total`, `disabled-families`) via `ModuleStatus.Stats.events`. The
-      `NxEvents` façade handed out via `ConnectContext.events()` survives reconnect
-      — an `AtomicReference` inside the façade is swapped to the live publisher on
-      every reconnect cycle, so host modules cache the reference once at `start()`
-      and never re-acquire. Also hosts the built-in `NxCommands` capability —
-      single Kafka consumer + dispatch table (`commands.CommandsConsumer`,
-      `commands.NxCommandsImpl`, `commands.CommandTypeRegistry`) reading inbound
-      topic from `MessagingTopics.commandsTopic` and publishing replies to
-      `MessagingTopics.commandsRepliesTopic` via the existing producer. Manual
-      offset commit per batch; handler `RuntimeException` auto-wraps as
-      `INTERNAL_ERROR` reply. The `NxCommands` façade follows the same
-      survive-reconnect pattern (AtomicReference swap on reconnect). Heartbeat
-      surfaces a `commands` module slot (`consumed-total` / `handled-total` /
-      `unsupported-total` / `validation-failed-total` / `internal-errors-total` /
-      `replies-published-total` / `replies-failed-total` / `commit-failures-total`
-      / `registered-types`) via `ModuleStatus.Stats.commands`. Host registers its
-      game-thread `Executor` via static `NxAdapter.hostExecutor(Executor)` BEFORE
-      `start()`; the adapter wraps it as `HostExecutor` for handler-side
-      `ctx.host().sync(...)` / `.async(...)` hops. The adapter also owns a shared
-      IO pool (`nx-io-N` daemon threads, sized by `l2nx.io.workers`, default
-      `max(2, cores/2)`) surfaced via `ConnectContext.io()` and
-      `CommandContext.io()` — handlers doing JDBC/HTTP MUST hop here. Connect-flow
-      retry uses ±25% jitter on the configured interval to avoid thundering-herd
-      reconnect on platform recovery. Heartbeat start/stop is `synchronized` so
-      reconnect concurrent with shutdown cannot leave a scheduler running. Engine
-      configs under `l2nx.events.*` (queue-capacity / drop-policy /
-      shutdown-drain-timeout-ms) and `l2nx.commands.*` (poll-timeout-ms /
-      shutdown-timeout-ms / kafka.<prop>); both file-first source chain. Depends
-      on `:nx-gs-adapter-api` + `:nx-gs-kafka` + `:nx-gs-commons` + `gson`.
-      Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
+  - daemon-thread fan-out (`events.EventsPublisher`, `events.NxEventsImpl`,
+    `events.EventTypeRegistry` — one `register(...)` entry per concrete event
+    type, including the `sync` family for db-sync's `ResyncCompletedEvent`,
+    partition key `null`) reading per-family topic addressing from
+    `ConnectResponse.messagingTopics.events`. Default `drop-policy` is `newest`
+    (drop incoming on overflow — preserves queue order). `oldest` (evict head)
+    remains an option but over-counts `dropped-total` under multi-producer
+    contention because the displaced envelope is counted on the eviction path
+    even when concurrent enqueuers race for the same slot. Heartbeat surfaces an
+    `events` module slot (`queue-depth`, `published-total`, `dropped-total`,
+    `failed-total`, `disabled-families`) via `ModuleStatus.Stats.events`. The
+    `NxEvents` façade handed out via `ConnectContext.events()` survives reconnect
+    — an `AtomicReference` inside the façade is swapped to the live publisher on
+    every reconnect cycle, so host modules cache the reference once at `start()`
+    and never re-acquire. Also hosts the built-in `NxCommands` capability —
+    single Kafka consumer + dispatch table (`commands.CommandsConsumer`,
+    `commands.NxCommandsImpl`, `commands.CommandTypeRegistry`) reading inbound
+    topic from `MessagingTopics.commandsTopic` and publishing replies to
+    `MessagingTopics.commandsRepliesTopic` via the existing producer. Manual
+    offset commit per batch; handler `RuntimeException` auto-wraps as
+    `INTERNAL_ERROR` reply. The `NxCommands` façade follows the same
+    survive-reconnect pattern (AtomicReference swap on reconnect). Heartbeat
+    surfaces a `commands` module slot (`consumed-total` / `handled-total` /
+    `unsupported-total` / `validation-failed-total` / `internal-errors-total` /
+    `replies-published-total` / `replies-failed-total` / `commit-failures-total`
+    / `registered-types`) via `ModuleStatus.Stats.commands`. Host registers its
+    game-thread `Executor` via static `NxAdapter.hostExecutor(Executor)` BEFORE
+    `start()`; the adapter wraps it as `HostExecutor` for handler-side
+    `ctx.host().sync(...)` / `.async(...)` hops. The adapter also owns a shared
+    IO pool (`nx-io-N` daemon threads, sized by `l2nx.io.workers`, default
+    `max(2, cores/2)`) surfaced via `ConnectContext.io()` and
+    `CommandContext.io()` — handlers doing JDBC/HTTP MUST hop here. Connect-flow
+    retry uses ±25% jitter on the configured interval to avoid thundering-herd
+    reconnect on platform recovery. Heartbeat start/stop is `synchronized` so
+    reconnect concurrent with shutdown cannot leave a scheduler running. Engine
+    configs under `l2nx.events.*` (queue-capacity / drop-policy /
+    shutdown-drain-timeout-ms) and `l2nx.commands.*` (poll-timeout-ms /
+    shutdown-timeout-ms / kafka.<prop>); both file-first source chain. Depends
+    on `:nx-gs-adapter-api` + `:nx-gs-kafka` + `:nx-gs-commons` + `gson`.
+    Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
 - `:nx-gs-db-sync-core` — DB-sync `AdapterModule` shipped to Maven Central. Owns the
   CRC32 two-phase CDC engine (shared bounded pool — `l2nx.cdc-engine.workers` daemon
   threads, default `max(2, min(entities, cores/2))` — replaces the legacy
@@ -188,7 +188,7 @@ instead. `NNN` is a zero-padded sequential id; the index lives in `docs/CLAUDE.m
 - `:nx-gs-runtime-sync-core` — Runtime-sync `AdapterModule` shipped to Maven Central.
   Owns the in-memory snapshot+diff engine (shared bounded pool —
   `l2nx.runtime-sync.workers` daemon threads, default `max(2, min(entities,
-  cores/2))` — replaces the legacy thread-per-entity model; FNV-1a 64-bit hashing
+cores/2))` — replaces the legacy thread-per-entity model; FNV-1a 64-bit hashing
   in Java, replay-on-failed-publish per the at-least-once contract) and resolves
   the Tier-2 `RuntimeStateProvider` SPI for in-memory game-server stores. Reads
   per-entity topics from `ctx.syncTopics().runtime()`. No tombstone on logout —
@@ -207,7 +207,7 @@ instead. `NNN` is a zero-padded sequential id; the index lives in `docs/CLAUDE.m
 Adapter-owned threads (all daemon — never block JVM exit):
 
 | Thread name              | Count        | Purpose                                               |
-|--------------------------|--------------|-------------------------------------------------------|
+| ------------------------ | ------------ | ----------------------------------------------------- |
 | `nx-adapter-connect`     | 1            | `POST /connect` + reconnect retries (±25% jitter)     |
 | `nx-adapter-heartbeat`   | 1            | Periodic heartbeat POSTs                              |
 | `nx-gs-kafka-shutdown`   | 1            | JVM shutdown hook                                     |
@@ -226,25 +226,25 @@ Pool sizing keys: `l2nx.io.workers`, `l2nx.cdc-engine.workers`,
 ## Constraints
 
 - **Maximally tenant- and build-agnostic — model generic L2 game concepts, not one core's logic.** The
-  contracts (Kafka / REST DTOs, SPI types, enums) describe *what* a value means in generic Lineage 2
-  terms; they never encode *how* a specific host / core decides it. Classification, detection cascades,
+  contracts (Kafka / REST DTOs, SPI types, enums) describe _what_ a value means in generic Lineage 2
+  terms; they never encode _how_ a specific host / core decides it. Classification, detection cascades,
   and build-specific rules belong to the integration (host) code — the adapter ships only the shared
   vocabulary + its generic semantics. Example: `RaidBossKind` defines `RAID` / `EPIC` / `INSTANCE_BOSS`
   and what each means; the host decides which value a given boss gets — never bake division names,
   `instanceof` / engine-API detection (`getReflection()`, `isRaid()`), or other core-specific logic into
   adapter Javadoc / spec. Generalizes the proprietary-schema rule (Distribution & licensing) from
-  table/column names to *logic*: we focus on L2 game logic, not a specific core's implementation.
+  table/column names to _logic_: we focus on L2 game logic, not a specific core's implementation.
 - **Java 8 source + target** — host JVMs span Java 8 to 25+. No `var`, no `Stream.toList()`, no
   records, no `Map.of`, no text blocks, no switch expressions, no pattern matching. Stream API +
   lambda + Optional + `try-with-resources` are fine.
 - **No Spring** — adapter loads into a host JVM that may have its own classpath; Spring would clash.
 - **Minimum dependencies** — only what is justified:
-    - `nx-gs-adapter-api` (contracts)
-    - `nx-gs-kafka` (Kafka facade)
-    - `gson` (JSON for `/connect`)
-    - `slf4j-api` (compileOnly — never imported directly; use the local logging facade)
-    - JDK `HttpURLConnection` for HTTP (no OkHttp / Apache HttpClient)
-    - JDK `java.util.Properties` for config (no SnakeYAML)
+  - `nx-gs-adapter-api` (contracts)
+  - `nx-gs-kafka` (Kafka facade)
+  - `gson` (JSON for `/connect`)
+  - `slf4j-api` (compileOnly — never imported directly; use the local logging facade)
+  - JDK `HttpURLConnection` for HTTP (no OkHttp / Apache HttpClient)
+  - JDK `java.util.Properties` for config (no SnakeYAML)
 - **Never block game-server threads** — connect / heartbeat / sync run on dedicated daemon threads.
   Any uncaught exception must be caught and logged, never propagated to the host JVM.
 - **No reflection-heavy DI** — wiring is plain `new`. Constructor injection only.
@@ -292,6 +292,29 @@ Local builds default to the per-module fallback (no `local-SNAPSHOT`). Maven Cen
 publish target; CI uses `signingKey`/`signingPassword` Gradle properties (GPG) and
 `CENTRAL_TOKEN` for the Sonatype Central Portal upload.
 
+### Breaking wire changes go out in two releases, via `@Deprecated`
+
+Renaming or removing anything on the wire (a DTO field, a getter, a whole DTO, an enum constant) is
+**never** a single release. It is always:
+
+1. **Additive release.** Add the new shape. Keep the old one alongside it, marked `@Deprecated`, with
+   Javadoc naming the replacement AND the concrete event that gates removal ("removed once every
+   schema provider emits `classes` — for bohpts, the morning game-server restart"). Consumers migrate
+   to the new shape and keep a fallback to the old one.
+2. **Removal release.** Delete the deprecated members once that gate has actually fired. This one is
+   breaking and takes its own version bump.
+
+The reason is deploy ordering, not politeness: the platform is always deployed **before** the schema
+providers that feed it (nx-gameservers, then adapter-api to Maven Central, then the tenant fork). So
+there is always a window in which a new consumer reads events emitted by an old producer. A one-shot
+rename makes the new consumer blind to that traffic for the whole window — silently, since an unknown
+JSON field just deserializes to `null`. Maven Central propagation (~15-30 min) and game-server restart
+schedules make the window hours-to-days wide, not seconds.
+
+Add the migration note to the release's spec (`docs/specs/`), with both gates spelled out — the
+deprecation gate and the drop gate are usually different events and cannot be cleared in one pass.
+Reference: `docs/specs/029-character-class-state-sync.md` (`subclasses` → `classes`).
+
 ## Commands
 
 ```bash
@@ -331,7 +354,7 @@ publish target; CI uses `signingKey`/`signingPassword` Gradle properties (GPG) a
 
 ## Comments
 
-- **Comment only the non-obvious — *why*, not *what*.** A legitimate comment explains a non-obvious
+- **Comment only the non-obvious — _why_, not _what_.** A legitimate comment explains a non-obvious
   approach, edge case, workaround, constraint, invariant, reason for a choice, units, or
   null-semantics. Code that is clear from names and signatures gets no comment.
 - **No comments that restate the code.** Junk like `// inject mapper`, `// loop over rows`,
