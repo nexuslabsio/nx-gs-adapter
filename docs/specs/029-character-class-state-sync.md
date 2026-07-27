@@ -1,4 +1,4 @@
-# 029 — character class state sync (exp/sp per class, active class on runtime)
+# 029 — character class state sync (per-class roster, active class on runtime)
 
 **Date:** 2026-07-27
 **Status:** design (not implemented)
@@ -11,23 +11,101 @@
 
 ## Problem
 
-The wire carries a character's class state only partially. `CharacterDbDto` surfaces `level` (base
-class) and a `subclasses` list of `(classId, level)`; neither `exp` nor `sp` is modeled for any class.
-`CharacterRuntimeDto` carries `exp` but no class identity, so a consumer receiving it cannot tell which
-class that experience belongs to — it silently belongs to the **active** class, which may be a subclass.
+The wire carries a character's class state only partially, and asymmetrically.
 
-Platform consumers therefore cannot answer "what is the level and experience of the class this character
-is currently playing", and they cannot show a per-class roster at all.
+`CharacterDbDto` surfaces `level` (base class) flat on the character, plus a `subclasses` list of
+`(classId, level)`. Neither `exp` nor `sp` is modeled for any class. `CharacterRuntimeDto` carries `exp`
+but no class identity, so a consumer receiving it cannot tell which class that experience belongs to —
+it silently belongs to the **active** class, which may be a subclass.
 
-Source data is complete — the gap is purely in what the adapter reads and puts on the wire:
+Two consequences:
+
+- A consumer cannot answer "what is the level and experience of the class this character is currently
+  playing", and cannot show a per-class roster at all.
+- The main class and the subclasses arrive in different shapes, so assembling a uniform roster is left
+  to every consumer — and the assembly rule is build-specific (see below), which is exactly the kind of
+  fork knowledge the wire exists to absorb.
+
+Source data is complete — the gap is in what the adapter reads and how it shapes it:
 
 - `characters.level` / `.exp` / `.sp` — base class (`getStat().getBaseLevel/BaseExp/BaseSp`).
 - `characters.classid` — active class; `characters.base_class` — base class.
 - `character_subclasses (charId, class_id, exp, sp, level, class_index)` — one row per subclass.
 
+## Wire shape: one roster, not "base + subclasses"
+
+`CharacterSubclassDbDto` is replaced by `CharacterClassDbDto`, and `CharacterDbDto.getSubclasses()` by
+`getClasses()` returning the **full** roster including the main class:
+
+```java
+public final class CharacterClassDbDto {
+    private final CharacterClass classId;        // NOT NULL on the wire
+    private final CharacterClassKind kind;       // NOT NULL on the wire — MAIN | SUB
+    private final @Nullable Integer level;
+    private final @Nullable Long exp;
+    private final @Nullable Long sp;
+}
+```
+
+```java
+// CharacterDbDto
+- @Nullable List<CharacterSubclassDbDto> getSubclasses()
++ @Nullable List<CharacterClassDbDto>    getClasses()
+```
+
+`EntityMapping.mapEntity` already receives both the primary row and the child rows, so the schema
+provider assembles the roster itself: the `MAIN` entry from `characters.{base_class, level, exp, sp}`,
+the `SUB` entries from `character_subclasses`.
+
+**Why the roster and not flat base fields + a subclass list:**
+
+- **Fork normalization belongs to the adapter.** Classic L2J keeps only subclasses in
+  `character_subclasses` (`class_index > 0`), but forks exist that also store the base class there as
+  `class_index = 0`. Under the flat-plus-list shape such a fork emits the main class twice — once flat,
+  once in the list — and every consumer has to de-duplicate it. Under the roster shape the provider
+  collapses it and the wire stays build-agnostic.
+- **Dual class extends by enum value, not by contract change.** A later chronicle's dual class is
+  another `CharacterClassKind`; the provider decides how its source represents it, and no consumer is
+  touched.
+- The platform table becomes a 1:1 mirror of the wire — the ingestor writes what arrived instead of
+  re-deriving a roster.
+
+`exp` / `sp` are **not** added flat on `CharacterDbDto` — they exist only inside roster entries, so no
+new redundancy is introduced. The pre-existing flat `level` (base class, hashed) stays as-is: it is
+consumed today and breaking it buys nothing. It overlaps with the `MAIN` roster entry's `level` by
+construction.
+
+`active` is deliberately **not** on the roster entry. The active class is already unambiguously given by
+`CharacterDbDto.classId`; a second representation would be a second source of truth that can disagree
+with the first.
+
+`class_index` stays unread — the platform addresses a class by its `CharacterClass` token, not by the
+engine's slot index.
+
+### New enum
+
+```java
+package app.l2nx.gs.adapter.api.domain.character.clazz;
+
+/**
+ * Which class slot a character's class occupies — the single {@code MAIN} class every
+ * character has, versus an additional {@code SUB} class. Schema providers normalize
+ * their build's storage (base class on the character row, subclasses in a side table,
+ * or a side table that also holds the base row) into this enum.
+ */
+public enum CharacterClassKind {
+    MAIN,
+    SUB
+}
+```
+
+Sits next to `CharacterClass` / `CharacterClassTier` / `CharacterClassType`. Note the existing
+`CharacterClassType` is the unrelated FIGHTER/MYSTIC division (carried by the game-data `ClassTemplate`
+wire) — hence the distinct name.
+
 ## db-sync: exp/sp as unhashed ride-alongs
 
-Add `exp` and `sp` to the DTOs and read them in `mapRow`, **without touching `hashedColumns()`**:
+`exp` and `sp` are read in `mapRow` on both sources **without touching `hashedColumns()`**:
 
 | source                                | new columns read in `mapRow` | added to hash |
 | ------------------------------------- | ---------------------------- | ------------- |
@@ -48,36 +126,12 @@ column regardless of whether it participates in the Phase 1 CRC. Two consequence
 Adding `exp` to the hash is not an option: it ticks on every kill, which is exactly the per-tick UPDATE
 storm the adapter avoids by not modeling volatile columns.
 
-`class_index` stays unread — the platform addresses a class by its `CharacterClass` token, not by the
-engine's slot index.
-
-### Wire changes
-
-`CharacterSubclassDbDto` — additive, two nullable getters:
-
-```java
-@Nullable Long getExp();   // subclass experience, source `exp`
-@Nullable Long getSp();    // subclass SP, source `sp`
-```
-
-`CharacterDbDto` — additive, two nullable getters carrying the **base class** figures:
-
-```java
-@Nullable Long getExp();   // base-class experience, source `characters.exp`
-@Nullable Long getSp();    // base-class SP, source `characters.sp`
-```
-
-Both are `Long` on the wire even where a build stores `INT` — forks with BIGINT `sp` exist, and widening
-the wire type later would be the breaking change.
-
-Javadoc on all four getters must state (a) which class the figure belongs to and (b) that the value is
-an unhashed ride-along whose freshness is bounded by the source's store cadence — otherwise the next
-reader will assume it is CDC-fresh and re-derive the wrong conclusion.
-
-The class-level Javadoc of `CharacterSubclassDbDto` currently says `exp`/`sp` are "intentionally not
-modeled — they tick on every kill and would generate an UPDATE storm per cycle". That paragraph is
-replaced: the columns are modeled but deliberately kept out of the hash, which is what actually
-prevents the storm.
+Javadoc on `CharacterClassDbDto.getExp()` / `.getSp()` must state that the value is an unhashed
+ride-along whose freshness is bounded by the source's store cadence — otherwise the next reader assumes
+it is CDC-fresh and re-derives the wrong conclusion. The current `CharacterSubclassDbDto` class-level
+Javadoc says `exp`/`sp` are "intentionally not modeled — they tick on every kill and would generate an
+UPDATE storm per cycle"; that paragraph is replaced, since the columns are now modeled but deliberately
+kept out of the hash, which is what actually prevents the storm.
 
 ## runtime-sync: active class identity
 
@@ -95,31 +149,43 @@ stated explicitly instead of left implicit.
 Hashing `classId` / `level` / `sp` costs nothing: `exp` is already in the tick hash and changes far more
 often than any of them, so no additional tick is generated in practice.
 
-With `classId` on the wire the platform can route a runtime tick to the right per-class row instead of
+With `classId` on the wire the platform routes a runtime tick to the right per-class row instead of
 guessing from the last db-sync snapshot, which is what makes a class switch visible immediately.
 
 ## Schema provider (bohpts-core)
 
 - `CharacterPrimarySource.mapRow` — read `exp` / `sp` (`JdbcNulls.nullableLong`); `HASHED` unchanged.
 - `CharacterSubclassesChildSource.mapRow` — read `exp` / `sp`; `HASHED` stays `("class_id", "level")`.
-- `CharacterMapping.mapEntity` — pass both through to the builders.
+- `CharacterMapping.mapEntity` — assemble the roster: `MAIN` entry from the primary row's
+  `base_class` / `level` / `exp` / `sp`, one `SUB` entry per `character_subclasses` row. A character
+  whose `base_class` does not resolve to a canonical `CharacterClass` gets no `MAIN` entry (same
+  drop-with-WARN rule that already applies to subclass rows).
 - `CharacterRuntimeMapping.toDto` — add `classId` (via `BohptsCharacterClasses.fromClassId`), `level`,
   `sp`; `hash(...)` mixes the three new fields.
 
-A subclass row whose `class_id` does not resolve to a canonical `CharacterClass` is still dropped before
-assembly — unchanged.
+bohpts stores only subclasses in `character_subclasses`, so no de-duplication against the `MAIN` entry
+is needed there — but the roster contract is what lets a future tenant that stores `class_index = 0`
+handle it locally.
 
 ## Compatibility
 
-Purely additive on both channels: every new field is nullable, and an older platform consumer ignores
-them. An older adapter against a newer platform simply leaves the new columns NULL. Adapter-api takes a
-minor version bump; no coordinated cutover is required beyond the deploy ordering in the nx-gameservers
-spec (platform first, then adapter-api to Maven Central, then bohpts-core, then force-resync).
+Runtime channel: purely additive, every new field nullable.
+
+db-sync channel: the JSON field `subclasses` becomes `classes`, so during the window between the
+platform deploy and the schema-provider deploy a new platform sees no roster from an old adapter. Not
+harmful — the platform ingestor skips the child-replace when the list is absent, so existing rows are
+preserved rather than deleted, and the force-resync that closes the rollout repopulates everything.
+
+Adapter-api takes a minor version bump. Deploy ordering is in the nx-gameservers spec: platform first,
+then adapter-api to Maven Central, then bohpts-core, then force-resync.
 
 ## Tests
 
-- `CharacterDbDtoTest` / `CharacterSubclassDbDtoTest` — new fields round-trip through builder /
-  `toBuilder` / `equals` / `hashCode` / `toString`.
-- `CharacterRuntimeDto` test — same, plus `hash(...)` changes when `classId` / `level` / `sp` change.
-- Schema-provider tests — `mapRow` reads the new columns; `hashedColumns()` is unchanged (regression
-  guard: adding a column there silently invalidates every tenant's snapshot).
+- `CharacterDbDtoTest` — `classes` round-trips through builder / `toBuilder` / `equals` / `hashCode` /
+  `toString`; the list stays unmodifiable.
+- `CharacterClassDbDtoTest` (renamed from `CharacterSubclassDbDtoTest`) — same, plus `kind` is required.
+- `CharacterRuntimeDto` test — new fields round-trip; `hash(...)` changes when `classId` / `level` / `sp`
+  change.
+- Schema-provider tests — the assembled roster carries exactly one `MAIN` entry plus one entry per
+  subclass row; `hashedColumns()` is unchanged on both sources (regression guard: adding a column there
+  silently invalidates every tenant's snapshot).
