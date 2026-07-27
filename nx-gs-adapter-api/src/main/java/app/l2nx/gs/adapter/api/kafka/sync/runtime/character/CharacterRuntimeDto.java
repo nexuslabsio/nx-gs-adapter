@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -86,7 +87,10 @@ public final class CharacterRuntimeDto {
     private final @Nullable Integer z;
     private final @Nullable Boolean online;
     private final @Nullable String aiStatus;
+    private final @Nullable CharacterClass classId;
+    private final @Nullable Integer level;
     private final @Nullable Long exp;
+    private final @Nullable Long sp;
     private final @Nullable List<CustomActivity> customActivities;
     private final @Nullable Integer curInventorySlots;
     private final @Nullable Integer maxInventorySlots;
@@ -121,7 +125,10 @@ public final class CharacterRuntimeDto {
             @Nullable Integer z,
             @Nullable Boolean online,
             @Nullable String aiStatus,
+            @Nullable CharacterClass classId,
+            @Nullable Integer level,
             @Nullable Long exp,
+            @Nullable Long sp,
             @Nullable List<CustomActivity> customActivities,
             @Nullable Integer curInventorySlots,
             @Nullable Integer maxInventorySlots,
@@ -143,7 +150,10 @@ public final class CharacterRuntimeDto {
         this.z = z;
         this.online = online;
         this.aiStatus = aiStatus;
+        this.classId = classId;
+        this.level = level;
         this.exp = exp;
+        this.sp = sp;
         this.customActivities = customActivities == null
                 ? null
                 : Collections.unmodifiableList(new ArrayList<CustomActivity>(customActivities));
@@ -236,8 +246,39 @@ public final class CharacterRuntimeDto {
     }
 
     /**
-     * Character's current raw experience points — the absolute EXP total the
-     * character has accumulated, NOT a within-level delta. Volatile runtime
+     * The class the character is currently playing — a subclass whenever one
+     * is active, the main class otherwise. Identifies which class
+     * {@link #getLevel()}, {@link #getExp()} and {@link #getSp()} describe, so
+     * a consumer can route the tick to the right per-class row instead of
+     * inferring it from the coarser CDC snapshot. {@code null} when the source
+     * ID falls outside {@link CharacterClass}'s canonical set and on offline
+     * tombstones.
+     */
+    public @Nullable CharacterClass getClassId() {
+        return classId;
+    }
+
+    /**
+     * Level of the class named by {@link #getClassId()} — NOT the main class's
+     * level when a subclass is active. {@code null} on offline tombstones.
+     */
+    public @Nullable Integer getLevel() {
+        return level;
+    }
+
+    /**
+     * SP of the class named by {@link #getClassId()}. Volatile runtime state,
+     * same channel rationale as {@link #getExp()}. {@code null} on cores that
+     * do not expose SP and on offline tombstones.
+     */
+    public @Nullable Long getSp() {
+        return sp;
+    }
+
+    /**
+     * Raw experience points of the class named by {@link #getClassId()} — the
+     * absolute EXP total accumulated on that class, NOT a within-level delta
+     * and NOT the main class's EXP when a subclass is active. Volatile runtime
      * state (climbs with every kill / quest), which is why it rides the runtime
      * sync channel rather than the coarser CDC stream. {@code null} on cores
      * that do not expose the character's EXP and on offline tombstones. A
@@ -356,7 +397,10 @@ public final class CharacterRuntimeDto {
                 .z(z)
                 .online(online)
                 .aiStatus(aiStatus)
+                .classId(classId)
+                .level(level)
                 .exp(exp)
+                .sp(sp)
                 .customActivities(customActivities)
                 .curInventorySlots(curInventorySlots)
                 .maxInventorySlots(maxInventorySlots)
@@ -389,7 +433,10 @@ public final class CharacterRuntimeDto {
                 && Objects.equals(z, that.z)
                 && Objects.equals(online, that.online)
                 && Objects.equals(aiStatus, that.aiStatus)
+                && classId == that.classId
+                && Objects.equals(level, that.level)
                 && Objects.equals(exp, that.exp)
+                && Objects.equals(sp, that.sp)
                 && Objects.equals(customActivities, that.customActivities)
                 && Objects.equals(curInventorySlots, that.curInventorySlots)
                 && Objects.equals(maxInventorySlots, that.maxInventorySlots)
@@ -416,7 +463,10 @@ public final class CharacterRuntimeDto {
                 z,
                 online,
                 aiStatus,
+                classId,
+                level,
                 exp,
+                sp,
                 customActivities,
                 curInventorySlots,
                 maxInventorySlots,
@@ -436,7 +486,10 @@ public final class CharacterRuntimeDto {
                 + ", x=" + x + ", y=" + y + ", z=" + z
                 + ", online=" + online
                 + ", aiStatus=" + aiStatus
+                + ", classId=" + classId
+                + ", level=" + level
                 + ", exp=" + exp
+                + ", sp=" + sp
                 + ", customActivities=" + customActivities
                 + ", curInventorySlots=" + curInventorySlots + ", maxInventorySlots=" + maxInventorySlots
                 + ", curQuestInventorySlots=" + curQuestInventorySlots
@@ -459,7 +512,10 @@ public final class CharacterRuntimeDto {
         private @Nullable Integer z;
         private @Nullable Boolean online;
         private @Nullable String aiStatus;
+        private @Nullable CharacterClass classId;
+        private @Nullable Integer level;
         private @Nullable Long exp;
+        private @Nullable Long sp;
         private @Nullable List<CustomActivity> customActivities;
         private @Nullable Integer curInventorySlots;
         private @Nullable Integer maxInventorySlots;
@@ -543,11 +599,39 @@ public final class CharacterRuntimeDto {
         }
 
         /**
-         * Character's current raw (absolute) experience total. {@code null} when
-         * the host does not expose it or on offline tombstones.
+         * Character's current raw (absolute) experience total, on the class named
+         * by {@link #classId(CharacterClass)}. {@code null} when the host does not
+         * expose it or on offline tombstones.
          */
         public Builder exp(@Nullable Long exp) {
             this.exp = exp;
+            return this;
+        }
+
+        /**
+         * The class the character is currently playing — names which class
+         * {@link #level(Integer)}, {@link #exp(Long)} and {@link #sp(Long)}
+         * describe. {@code null} on offline tombstones.
+         */
+        public Builder classId(@Nullable CharacterClass classId) {
+            this.classId = classId;
+            return this;
+        }
+
+        /**
+         * Level of the currently played class. {@code null} on offline tombstones.
+         */
+        public Builder level(@Nullable Integer level) {
+            this.level = level;
+            return this;
+        }
+
+        /**
+         * SP of the currently played class. {@code null} when the host does not
+         * expose it or on offline tombstones.
+         */
+        public Builder sp(@Nullable Long sp) {
+            this.sp = sp;
             return this;
         }
 
@@ -632,7 +716,10 @@ public final class CharacterRuntimeDto {
                     z,
                     online,
                     aiStatus,
+                    classId,
+                    level,
                     exp,
+                    sp,
                     customActivities,
                     curInventorySlots,
                     maxInventorySlots,

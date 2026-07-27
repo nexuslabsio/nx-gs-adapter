@@ -24,7 +24,8 @@ by the L2NX game-server adapter and its consumers. Published as
   (`HeartbeatEvent`, `NxHeaders`)
 - `app.l2nx.gs.adapter.api.kafka.sync.db.<entity>` — per-entity wire DTOs for
   the db-sync stream. Shipped entities: `character` (`CharacterDbDto`,
-  `CharacterSubclassDbDto`, `CharacterInstanceCooldownDbDto`,
+  `CharacterClassDbDto`, `CharacterSubclassDbDto` (deprecated),
+  `CharacterInstanceCooldownDbDto`,
   `CharacterLockDbDto`; CharacterDbDto carries optional `accountName`,
   `nobless`, `scheduledDeletionAt` on top of the identity / progression set, all
   three from generic L2J columns — see
@@ -37,7 +38,19 @@ by the L2NX game-server adapter and its consumers. Published as
   string-role builds, `null` when not surfaced; plus optional
   `locks: List<CharacterLockDbDto>` — one entry per active character lock
   (`lockType` ∈ `WellKnownCharacterLockTypes` = IP / HWID / ITEM, `lockValue?`),
-  derived from build-specific `character_variables`, `null` when not synced),
+  derived from build-specific `character_variables`, `null` when not synced;
+  plus `classes: List<CharacterClassDbDto>` — the character's FULL class roster,
+  one entry per class with `{classId, kind, level?, exp?, sp?}` where `kind` is
+  `CharacterClassKind` = MAIN | SUB (exactly one MAIN). The schema provider
+  assembles it, so a build that stores the main class in the subclass table
+  under index 0 is normalized away and never reaches consumers. `exp` / `sp` are
+  UNHASHED ride-alongs: read in `mapRow` but deliberately absent from
+  `hashedColumns()`, because they tick on every kill — so they never trigger a
+  sync event and are only ever as fresh as the source's last full store. Which
+  class is being played is NOT a flag on the entry — it is `CharacterDbDto.classId`.
+  The older `subclasses: List<CharacterSubclassDbDto>` is `@Deprecated` and still
+  populated for ONE release so a platform deployed ahead of the schema providers
+  can read old events; it goes away once every provider emits `classes`),
   `clan` (`ClanDbDto` +
   `ClanSkillDbDto`; ClanDbDto carries optional `icon: byte[]` for the clan crest
   as decoded PNG bytes — schema providers do the source-format → PNG
@@ -54,9 +67,14 @@ metadata?}` + `WellKnownRatingTypes` — `lower_snake_case` open-string rating
   `null`/omitted = ONLINE (byte-budget default), explicit `false` = one-shot
   OFFLINE tombstone, explicit `true` allowed but redundant. Consumers MUST
   treat omitted / `null` as `true` for back-compat. CharacterRuntimeDto also
-  carries an optional `exp: Long` — the character's current raw (absolute,
-  cumulative) experience total. Volatile runtime state, so it rides the runtime
-  channel; `null` on cores that don't expose it and on offline tombstones.
+  carries an optional `exp: Long` — the current raw (absolute, cumulative)
+  experience total OF THE ACTIVE CLASS. Volatile runtime state, so it rides the
+  runtime channel; `null` on cores that don't expose it and on offline tombstones.
+  Which class it belongs to is named by the sibling optional `classId:
+CharacterClass` (the class currently being played — a subclass whenever one is
+  active, NOT `baseClassId`), alongside optional `level: Integer` and `sp: Long`
+  for that same class. Consumers route a tick to the right per-class row by
+  `classId` instead of inferring it from the coarser CDC snapshot.
   Consumers combine it with the per-server level→exp table (see
   `events.leveldata` below) to compute "% progress within the current level".
   It also carries six optional inventory-capacity fields — `curInventorySlots` /

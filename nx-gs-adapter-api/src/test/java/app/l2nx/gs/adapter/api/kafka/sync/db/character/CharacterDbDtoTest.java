@@ -6,12 +6,16 @@ import app.l2nx.gs.adapter.api.domain.character.CharacterPrivateStore;
 import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
 import app.l2nx.gs.adapter.api.domain.character.CharacterSex;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClassKind;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
+// Covers both the deprecated `subclasses` and its `classes` replacement — they coexist
+// on the wire for one release.
+@SuppressWarnings("deprecation")
 class CharacterDbDtoTest {
 
     @Test
@@ -136,6 +140,63 @@ class CharacterDbDtoTest {
     }
 
     @Test
+    void classes_shouldBeNull_whenTenantDoesNotSyncThem() {
+        CharacterDbDto ch = CharacterDbDto.builder().id(1L).name("X").build();
+
+        assertNull(ch.getClasses());
+    }
+
+    @Test
+    void classes_shouldCarryWholeRoster_includingMainClass() {
+        CharacterDbDto ch = CharacterDbDto.builder()
+                .id(1L)
+                .name("X")
+                .classId(CharacterClass.SOULTAKER)
+                .baseClassId(CharacterClass.HUMAN_FIGHTER)
+                .classes(Arrays.asList(
+                        CharacterClassDbDto.builder()
+                                .classId(CharacterClass.HUMAN_FIGHTER)
+                                .kind(CharacterClassKind.MAIN)
+                                .level(85)
+                                .exp(9_000L)
+                                .sp(70L)
+                                .build(),
+                        CharacterClassDbDto.builder()
+                                .classId(CharacterClass.SOULTAKER)
+                                .kind(CharacterClassKind.SUB)
+                                .level(76)
+                                .build()))
+                .build();
+
+        assertNotNull(ch.getClasses());
+        assertEquals(2, ch.getClasses().size());
+        assertEquals(CharacterClassKind.MAIN, ch.getClasses().get(0).getKind());
+        assertEquals(CharacterClassKind.SUB, ch.getClasses().get(1).getKind());
+        // The played class rides classId, never a flag on the roster entry.
+        assertEquals(CharacterClass.SOULTAKER, ch.getClassId());
+    }
+
+    @Test
+    void classesAndSubclasses_shouldCoexist_duringTheDeprecationWindow() {
+        CharacterDbDto ch = CharacterDbDto.builder()
+                .id(1L)
+                .name("X")
+                .subclasses(Collections.singletonList(CharacterSubclassDbDto.builder()
+                        .classId(CharacterClass.SOULTAKER)
+                        .level(76)
+                        .build()))
+                .classes(Collections.singletonList(CharacterClassDbDto.builder()
+                        .classId(CharacterClass.SOULTAKER)
+                        .kind(CharacterClassKind.SUB)
+                        .level(76)
+                        .build()))
+                .build();
+
+        assertNotNull(ch.getSubclasses());
+        assertNotNull(ch.getClasses());
+    }
+
+    @Test
     void subclasses_shouldBeEmptyList_whenTenantSyncsButCharHasNone() {
         CharacterDbDto ch = CharacterDbDto.builder()
                 .id(1L)
@@ -152,7 +213,7 @@ class CharacterDbDtoTest {
         CharacterDbDto fromBuilder = CharacterDbDto.builder().id(1L).name("X").build();
         CharacterDbDto fromCtor = new CharacterDbDto(
                 1L, "X", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -164,6 +225,19 @@ class CharacterDbDtoTest {
                 .classId(CharacterClass.SOULTAKER)
                 .level(76)
                 .build());
+        List<CharacterClassDbDto> classes = Arrays.asList(
+                CharacterClassDbDto.builder()
+                        .classId(CharacterClass.HUMAN_FIGHTER)
+                        .kind(CharacterClassKind.MAIN)
+                        .level(10)
+                        .exp(1234L)
+                        .sp(56L)
+                        .build(),
+                CharacterClassDbDto.builder()
+                        .classId(CharacterClass.SOULTAKER)
+                        .kind(CharacterClassKind.SUB)
+                        .level(76)
+                        .build());
         List<CharacterInstanceCooldownDbDto> cooldowns =
                 Collections.singletonList(CharacterInstanceCooldownDbDto.builder()
                         .instanceId(42)
@@ -184,6 +258,7 @@ class CharacterDbDtoTest {
                 CharacterClass.HUMAN_FIGHTER,
                 CharacterClass.HUMAN_FIGHTER,
                 subs,
+                classes,
                 CharacterPrivateStore.CRAFT,
                 null,
                 0,

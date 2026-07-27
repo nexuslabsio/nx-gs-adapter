@@ -43,13 +43,19 @@ import org.jspecify.annotations.Nullable;
  * {@code CharacterPresenceEvent}s, reconciled by platform-side consumers.</p>
  *
  * <p>Tick-frequency volatile state ({@code curHp}/{@code curMp}/{@code x}/
- * {@code y}/{@code z}/{@code exp}/{@code lastAccess} and similar) is
+ * {@code y}/{@code z}/{@code lastAccess} and similar) is
  * intentionally not modeled — including such fields in a poll-based CDC hash
  * would cause an UPDATE storm for every online character on every cycle;
  * real-time state belongs on a separate event channel. Accumulated
  * {@link #getOnlineTimeSeconds() online time} is the exception: the source
  * column advances only when the row is persisted (logout + periodic
  * autosave), not at tick frequency, so it is CDC-tolerable.</p>
+ *
+ * <p>Experience and SP are a second, narrower exception: they ARE surfaced —
+ * per class, inside {@link #getClasses()} — but only as unhashed ride-alongs,
+ * so they never trigger a sync event and are never fresher than the source's
+ * last full store. Live figures for the class being played ride the runtime
+ * channel instead.</p>
  */
 public final class CharacterDbDto {
 
@@ -62,7 +68,11 @@ public final class CharacterDbDto {
     private final @Nullable CharacterRace race;
     private final @Nullable CharacterClass classId;
     private final @Nullable CharacterClass baseClassId;
+
+    @Deprecated
     private final @Nullable List<CharacterSubclassDbDto> subclasses;
+
+    private final @Nullable List<CharacterClassDbDto> classes;
     private final @Nullable CharacterPrivateStore privateStore;
     private final @Nullable Long clanId;
     private final @Nullable Integer pvpCounter;
@@ -91,6 +101,7 @@ public final class CharacterDbDto {
             @Nullable CharacterClass classId,
             @Nullable CharacterClass baseClassId,
             @Nullable List<CharacterSubclassDbDto> subclasses,
+            @Nullable List<CharacterClassDbDto> classes,
             @Nullable CharacterPrivateStore privateStore,
             @Nullable Long clanId,
             @Nullable Integer pvpCounter,
@@ -117,6 +128,7 @@ public final class CharacterDbDto {
         this.classId = classId;
         this.baseClassId = baseClassId;
         this.subclasses = subclasses == null ? null : Collections.unmodifiableList(subclasses);
+        this.classes = classes == null ? null : Collections.unmodifiableList(classes);
         this.privateStore = privateStore;
         this.clanId = clanId;
         this.pvpCounter = pvpCounter;
@@ -214,9 +226,41 @@ public final class CharacterDbDto {
      * {@code null} when the tenant does not sync subclasses (no
      * {@code ChildSource} declared); empty list when the tenant syncs
      * subclasses but the character has none.
+     *
+     * @deprecated superseded by {@link #getClasses()}, which carries the
+     *     whole roster (main class included) plus {@code exp} / {@code sp}.
+     *     Kept alive for one release so a platform deployed ahead of the
+     *     schema providers can still read events emitted by an older
+     *     adapter — an unknown JSON field would otherwise deserialize to
+     *     {@code null} silently, blinding the new consumer for the whole
+     *     rollout window. Removed once every schema provider emits
+     *     {@code classes} — for bohpts, the morning game-server restart
+     *     that ships the new adapter. Consumers read {@link #getClasses()}
+     *     first and fall back to this only while both are in flight.
      */
+    @Deprecated
     public @Nullable List<CharacterSubclassDbDto> getSubclasses() {
         return subclasses;
+    }
+
+    /**
+     * The character's full class roster — exactly one
+     * {@link app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClassKind#MAIN}
+     * entry plus one {@code SUB} entry per subclass, ordered as the schema
+     * provider's {@code mapEntity} produced them (no platform-side ordering
+     * contract).
+     *
+     * <p>Assembled by the schema provider so that fork-specific storage —
+     * main class on the character row versus a side table that also holds
+     * it — never reaches consumers. Which entry is currently being played
+     * is given by {@link #getClassId()}, not by a flag on the entry.</p>
+     *
+     * <p>{@code null} when the tenant does not sync classes at all; empty
+     * list when it syncs them but the character resolved to no canonical
+     * class.</p>
+     */
+    public @Nullable List<CharacterClassDbDto> getClasses() {
+        return classes;
     }
 
     /**
@@ -393,6 +437,7 @@ public final class CharacterDbDto {
                 .classId(classId)
                 .baseClassId(baseClassId)
                 .subclasses(subclasses)
+                .classes(classes)
                 .privateStore(privateStore)
                 .clanId(clanId)
                 .pvpCounter(pvpCounter)
@@ -430,6 +475,7 @@ public final class CharacterDbDto {
                 && classId == that.classId
                 && baseClassId == that.baseClassId
                 && Objects.equals(subclasses, that.subclasses)
+                && Objects.equals(classes, that.classes)
                 && privateStore == that.privateStore
                 && Objects.equals(clanId, that.clanId)
                 && Objects.equals(pvpCounter, that.pvpCounter)
@@ -461,6 +507,7 @@ public final class CharacterDbDto {
                 classId,
                 baseClassId,
                 subclasses,
+                classes,
                 privateStore,
                 clanId,
                 pvpCounter,
@@ -491,6 +538,7 @@ public final class CharacterDbDto {
                 + ", classId=" + classId
                 + ", baseClassId=" + baseClassId
                 + ", subclasses=" + subclasses
+                + ", classes=" + classes
                 + ", privateStore=" + privateStore
                 + ", clanId=" + clanId
                 + ", pvpCounter=" + pvpCounter
@@ -520,6 +568,7 @@ public final class CharacterDbDto {
         private @Nullable CharacterClass classId;
         private @Nullable CharacterClass baseClassId;
         private @Nullable List<CharacterSubclassDbDto> subclasses;
+        private @Nullable List<CharacterClassDbDto> classes;
         private @Nullable CharacterPrivateStore privateStore;
         private @Nullable Long clanId;
         private @Nullable Integer pvpCounter;
@@ -582,8 +631,17 @@ public final class CharacterDbDto {
             return this;
         }
 
+        /**
+         * @deprecated see {@link CharacterDbDto#getSubclasses()}.
+         */
+        @Deprecated
         public Builder subclasses(@Nullable List<CharacterSubclassDbDto> subclasses) {
             this.subclasses = subclasses;
+            return this;
+        }
+
+        public Builder classes(@Nullable List<CharacterClassDbDto> classes) {
+            this.classes = classes;
             return this;
         }
 
@@ -679,6 +737,7 @@ public final class CharacterDbDto {
                     classId,
                     baseClassId,
                     subclasses,
+                    classes,
                     privateStore,
                     clanId,
                     pvpCounter,

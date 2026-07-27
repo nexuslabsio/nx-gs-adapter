@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import org.junit.jupiter.api.Test;
 
+// Exercises the deprecated DTO on purpose — it stays on the wire until every schema
+// provider emits `classes`, so its guarantees still need a regression gate.
+@SuppressWarnings("deprecation")
 class CharacterSubclassDbDtoTest {
 
     @Test

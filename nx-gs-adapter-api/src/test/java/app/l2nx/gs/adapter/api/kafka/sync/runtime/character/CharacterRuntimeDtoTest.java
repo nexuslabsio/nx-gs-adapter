@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -74,7 +75,10 @@ class CharacterRuntimeDtoTest {
                 -700,
                 Boolean.TRUE,
                 "attack",
+                CharacterClass.SOULTAKER,
+                76,
                 4_500_000_000L,
+                12_345L,
                 Collections.singletonList(fishing()),
                 80,
                 100,
@@ -172,10 +176,32 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto fromBuilder = CharacterRuntimeDto.builder().id(7L).build();
         CharacterRuntimeDto fromCtor = new CharacterRuntimeDto(
                 7L, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
+    }
+
+    @Test
+    void activeClassFields_shouldBeNullByDefaultAndRoundtrip() {
+        CharacterRuntimeDto empty = CharacterRuntimeDto.builder().id(1L).build();
+        assertNull(empty.getClassId());
+        assertNull(empty.getLevel());
+        assertNull(empty.getSp());
+
+        CharacterRuntimeDto dto = CharacterRuntimeDto.builder()
+                .id(1L)
+                .classId(CharacterClass.SOULTAKER)
+                .level(76)
+                .exp(4_500_000_000L)
+                .sp(12_345L)
+                .build();
+
+        assertEquals(CharacterClass.SOULTAKER, dto.getClassId());
+        assertEquals(Integer.valueOf(76), dto.getLevel());
+        assertEquals(Long.valueOf(12_345L), dto.getSp());
+        assertEquals(dto, dto.toBuilder().build());
+        assertNotEquals(dto, empty);
     }
 
     @Test

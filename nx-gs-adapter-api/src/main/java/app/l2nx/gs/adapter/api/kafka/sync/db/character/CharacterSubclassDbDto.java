@@ -18,7 +18,16 @@ import java.util.Objects;
  * {@link CharacterClass}'s canonical set are dropped by the schema
  * provider before assembly — every row that reaches the wire has a
  * non-null {@code classId}.</p>
+ *
+ * @deprecated superseded by {@link CharacterClassDbDto}, which covers the
+ *     character's whole class roster (main class included) and carries
+ *     {@code exp} / {@code sp}. Kept alive for one release so a platform
+ *     deployed ahead of the schema providers can still read events emitted
+ *     by an older adapter. Removed once every schema provider emits
+ *     {@link CharacterDbDto#getClasses()} — for bohpts, the morning
+ *     game-server restart that ships the new adapter.
  */
+@Deprecated
 public final class CharacterSubclassDbDto {
 
     private final CharacterClass classId;
