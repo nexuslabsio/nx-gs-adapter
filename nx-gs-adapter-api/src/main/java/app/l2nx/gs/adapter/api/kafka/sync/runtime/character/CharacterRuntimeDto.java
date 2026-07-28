@@ -192,6 +192,46 @@ public final class CharacterRuntimeDto {
         return id;
     }
 
+    /**
+     * Whether this row carries observed state, as opposed to being the one-shot offline tombstone a
+     * producer emits when a character leaves the world — that row is {@code id} plus
+     * {@code online=false} and nothing else.
+     *
+     * <p>Deliberately NOT the same question as {@link #getOnline() online}: a core that keeps
+     * abandoned private stores running reports those characters with real vitals and an
+     * {@link WellKnownActivities#OFFLINE_TRADE} activity while {@code online} is {@code false}. A
+     * consumer that gates persistence on presence would drop those rows on the floor.
+     *
+     * <p>Lives here rather than in a consumer because it enumerates this class's own fields:
+     * whoever adds a volatile field to the wire sees the predicate in the same file and extends it.
+     * A field forgotten here turns an ordinary tick into a tombstone for every consumer at once.
+     */
+    public boolean carriesState() {
+        return curHp != null
+                || maxHp != null
+                || curMp != null
+                || maxMp != null
+                || curCp != null
+                || maxCp != null
+                || curVit != null
+                || maxVit != null
+                || x != null
+                || y != null
+                || z != null
+                || aiStatus != null
+                || classId != null
+                || level != null
+                || exp != null
+                || sp != null
+                || getActivities() != null
+                || curInventorySlots != null
+                || maxInventorySlots != null
+                || curQuestInventorySlots != null
+                || maxQuestInventorySlots != null
+                || curWeight != null
+                || maxWeight != null;
+    }
+
     public @Nullable Integer getCurHp() {
         return curHp;
     }

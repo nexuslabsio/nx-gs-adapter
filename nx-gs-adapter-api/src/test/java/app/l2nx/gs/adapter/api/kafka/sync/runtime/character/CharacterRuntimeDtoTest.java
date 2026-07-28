@@ -7,7 +7,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class CharacterRuntimeDtoTest {
 
@@ -177,6 +181,109 @@ class CharacterRuntimeDtoTest {
                 Collections.singletonList(fishing()));
 
         assertEquals(Collections.singletonList(autofarming), dto.getActivities());
+    }
+
+    @Test
+    void carriesState_shouldBeFalse_forTheOfflineTombstone() {
+        CharacterRuntimeDto tombstone =
+                CharacterRuntimeDto.builder().id(42L).online(Boolean.FALSE).build();
+
+        assertFalse(tombstone.carriesState());
+    }
+
+    @Test
+    void carriesState_shouldBeTrue_forAnOfflineTraderTick() {
+        // Not online, yet real observed state — the case a presence-based gate would drop.
+        CharacterRuntimeDto trader = CharacterRuntimeDto.builder()
+                .id(42L)
+                .online(Boolean.FALSE)
+                .curHp(3000)
+                .activities(Collections.singletonList(Activity.builder()
+                        .type(WellKnownActivities.OFFLINE_TRADE)
+                        .build()))
+                .build();
+
+        assertTrue(trader.carriesState());
+    }
+
+    @ParameterizedTest(name = "{0} alone marks the row as state-bearing")
+    @MethodSource("singleFieldRows")
+    void carriesState_shouldBeTrue_whenAnySingleObservableFieldIsSet(String field, CharacterRuntimeDto dto) {
+        // Pins the field set: a volatile field added to the wire but forgotten in carriesState()
+        // would silently turn an ordinary tick into a tombstone.
+        assertTrue(dto.carriesState(), field);
+    }
+
+    static Stream<Arguments> singleFieldRows() {
+        return Stream.of(
+                Arguments.of(
+                        "curHp", CharacterRuntimeDto.builder().id(1L).curHp(1).build()),
+                Arguments.of(
+                        "maxHp", CharacterRuntimeDto.builder().id(1L).maxHp(1).build()),
+                Arguments.of(
+                        "curMp", CharacterRuntimeDto.builder().id(1L).curMp(1).build()),
+                Arguments.of(
+                        "maxMp", CharacterRuntimeDto.builder().id(1L).maxMp(1).build()),
+                Arguments.of(
+                        "curCp", CharacterRuntimeDto.builder().id(1L).curCp(1).build()),
+                Arguments.of(
+                        "maxCp", CharacterRuntimeDto.builder().id(1L).maxCp(1).build()),
+                Arguments.of(
+                        "curVit", CharacterRuntimeDto.builder().id(1L).curVit(1).build()),
+                Arguments.of(
+                        "maxVit", CharacterRuntimeDto.builder().id(1L).maxVit(1).build()),
+                Arguments.of("x", CharacterRuntimeDto.builder().id(1L).x(1).build()),
+                Arguments.of("y", CharacterRuntimeDto.builder().id(1L).y(1).build()),
+                Arguments.of("z", CharacterRuntimeDto.builder().id(1L).z(1).build()),
+                Arguments.of(
+                        "aiStatus",
+                        CharacterRuntimeDto.builder().id(1L).aiStatus("idle").build()),
+                Arguments.of(
+                        "classId",
+                        CharacterRuntimeDto.builder()
+                                .id(1L)
+                                .classId(CharacterClass.DUELIST)
+                                .build()),
+                Arguments.of(
+                        "level", CharacterRuntimeDto.builder().id(1L).level(1).build()),
+                Arguments.of("exp", CharacterRuntimeDto.builder().id(1L).exp(1L).build()),
+                Arguments.of("sp", CharacterRuntimeDto.builder().id(1L).sp(1L).build()),
+                Arguments.of(
+                        "activities",
+                        CharacterRuntimeDto.builder()
+                                .id(1L)
+                                .activities(Collections.singletonList(fishing()))
+                                .build()),
+                Arguments.of(
+                        "curInventorySlots",
+                        CharacterRuntimeDto.builder()
+                                .id(1L)
+                                .curInventorySlots(1)
+                                .build()),
+                Arguments.of(
+                        "maxInventorySlots",
+                        CharacterRuntimeDto.builder()
+                                .id(1L)
+                                .maxInventorySlots(1)
+                                .build()),
+                Arguments.of(
+                        "curQuestInventorySlots",
+                        CharacterRuntimeDto.builder()
+                                .id(1L)
+                                .curQuestInventorySlots(1)
+                                .build()),
+                Arguments.of(
+                        "maxQuestInventorySlots",
+                        CharacterRuntimeDto.builder()
+                                .id(1L)
+                                .maxQuestInventorySlots(1)
+                                .build()),
+                Arguments.of(
+                        "curWeight",
+                        CharacterRuntimeDto.builder().id(1L).curWeight(1).build()),
+                Arguments.of(
+                        "maxWeight",
+                        CharacterRuntimeDto.builder().id(1L).maxWeight(1).build()));
     }
 
     @Test
