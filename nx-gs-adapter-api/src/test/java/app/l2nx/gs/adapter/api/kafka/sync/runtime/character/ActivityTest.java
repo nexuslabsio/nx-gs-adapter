@@ -28,8 +28,7 @@ class ActivityTest {
     void metadata_shouldBeDefensivelyCopiedAndUnmodifiable() {
         Map<String, String> meta = new LinkedHashMap<>();
         meta.put("elapsed_seconds", "10");
-        Activity activity =
-                Activity.builder().type("fishing").metadata(meta).build();
+        Activity activity = Activity.builder().type("fishing").metadata(meta).build();
 
         // Mutating the source map after build must not leak into the DTO.
         meta.put("elapsed_seconds", "999");
