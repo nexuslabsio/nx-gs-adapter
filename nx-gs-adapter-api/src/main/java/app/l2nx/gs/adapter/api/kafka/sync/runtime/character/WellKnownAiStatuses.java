@@ -16,9 +16,9 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  * it). Adding a new constant here is a non-breaking minor-version change in
  * {@code nx-gs-adapter-api}.</p>
  *
- * <p>Independent of {@link WellKnownCustomActivities customActivities} — the two
+ * <p>Independent of {@link WellKnownActivities activities} — the two
  * fields are orthogonal. A fishing character, for example, is typically
- * {@link #IDLE} on the AI axis while {@code customActivities} carries a fishing
+ * {@link #IDLE} on the AI axis while {@code activities} carries a fishing
  * entry. No
  * precedence between the two is implied by the wire contract; consumers decide
  * how (or whether) to combine them.</p>

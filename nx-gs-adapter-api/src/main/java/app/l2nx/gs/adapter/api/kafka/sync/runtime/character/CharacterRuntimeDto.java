@@ -42,15 +42,15 @@ import org.jspecify.annotations.Nullable;
  * cadence is too coarse to surface presence reactively.</p>
  *
  * <p>Activity signals ({@link #getAiStatus() aiStatus},
- * {@link #getCustomActivities() customActivities}) describe "what the character
+ * {@link #getActivities() activities}) describe "what the character
  * is doing" for dashboard / presence consumers. They are <b>independent</b> —
  * no precedence between them is implied by the wire:
  * <ul>
  *   <li>{@code aiStatus} — engine-native control intention (canonical values in
  *   {@link WellKnownAiStatuses}). Transient: flips with movement / combat much
  *   like {@code x}/{@code y}/{@code z}.</li>
- *   <li>{@code customActivities} — build-specific sustained activities as a
- *   <b>list</b> of structured {@link CustomActivity} entries ({@code type} +
+ *   <li>{@code activities} — build-specific sustained activities as a
+ *   <b>list</b> of structured {@link Activity} entries ({@code type} +
  *   open {@code metadata}; e.g. fishing with elapsed-time / penalty-tier
  *   metadata, or autofarming with remaining-time metadata). A character can be
  *   in several at once (e.g. autofarming while fishing), so the wire carries
@@ -59,8 +59,12 @@ import org.jspecify.annotations.Nullable;
  *   entry is open: hosts emit their own type / metadata keys and consumers
  *   tolerate unknown values.</li>
  * </ul>
- * Both are {@code null} on offline tombstones and on hosts that do not populate
- * them.</p>
+ * {@code aiStatus} is {@code null} on offline tombstones and on hosts that do
+ * not populate it. {@code activities} is likewise {@code null} on tombstones,
+ * but NOT on an offline trader: a core that keeps abandoned stores running in
+ * the world reports those characters as regular ticks with
+ * {@code online = false} and an {@link WellKnownActivities#OFFLINE_TRADE}
+ * activity, so "not online" and "carries no data" are distinct states.</p>
  *
  * <p>Inventory capacity ({@link #getCurInventorySlots() curInventorySlots} /
  * {@link #getMaxInventorySlots() maxInventorySlots}, their quest-inventory
@@ -91,7 +95,18 @@ public final class CharacterRuntimeDto {
     private final @Nullable Integer level;
     private final @Nullable Long exp;
     private final @Nullable Long sp;
-    private final @Nullable List<CustomActivity> customActivities;
+    private final @Nullable List<Activity> activities;
+
+    /**
+     * Pre-rename wire name of {@link #activities}, bound so a host that has not
+     * been restarted onto this release keeps deserializing. Read only through
+     * {@link #getActivities()}.
+     *
+     * @deprecated TODO remove once every schema provider emits {@code activities}.
+     */
+    @Deprecated
+    private final @Nullable List<Activity> customActivities;
+
     private final @Nullable Integer curInventorySlots;
     private final @Nullable Integer maxInventorySlots;
     private final @Nullable Integer curQuestInventorySlots;
@@ -129,13 +144,14 @@ public final class CharacterRuntimeDto {
             @Nullable Integer level,
             @Nullable Long exp,
             @Nullable Long sp,
-            @Nullable List<CustomActivity> customActivities,
+            @Nullable List<Activity> activities,
             @Nullable Integer curInventorySlots,
             @Nullable Integer maxInventorySlots,
             @Nullable Integer curQuestInventorySlots,
             @Nullable Integer maxQuestInventorySlots,
             @Nullable Integer curWeight,
-            @Nullable Integer maxWeight) {
+            @Nullable Integer maxWeight,
+            @Nullable List<Activity> customActivities) {
         this.id = id;
         this.curHp = curHp;
         this.maxHp = maxHp;
@@ -154,15 +170,18 @@ public final class CharacterRuntimeDto {
         this.level = level;
         this.exp = exp;
         this.sp = sp;
-        this.customActivities = customActivities == null
-                ? null
-                : Collections.unmodifiableList(new ArrayList<CustomActivity>(customActivities));
+        this.activities = copy(activities);
         this.curInventorySlots = curInventorySlots;
         this.maxInventorySlots = maxInventorySlots;
         this.curQuestInventorySlots = curQuestInventorySlots;
         this.maxQuestInventorySlots = maxQuestInventorySlots;
         this.curWeight = curWeight;
         this.maxWeight = maxWeight;
+        this.customActivities = copy(customActivities);
+    }
+
+    private static @Nullable List<Activity> copy(@Nullable List<Activity> activities) {
+        return activities == null ? null : Collections.unmodifiableList(new ArrayList<Activity>(activities));
     }
 
     /**
@@ -239,7 +258,7 @@ public final class CharacterRuntimeDto {
      * string; canonical lower_snake_case values in {@link WellKnownAiStatuses}.
      * {@code null} when the host does not report it or on offline tombstones.
      * Transient by nature — flips with movement / combat. Independent of
-     * {@link #getCustomActivities() customActivities}.
+     * {@link #getActivities() activities}.
      */
     public @Nullable String getAiStatus() {
         return aiStatus;
@@ -352,21 +371,26 @@ public final class CharacterRuntimeDto {
     /**
      * Build-specific sustained activities — the high-level "what the player is
      * occupied with" signals that live outside the engine AI state machine
-     * (e.g. fishing, reading a book, autofarming). A <b>list</b> of structured
-     * {@link CustomActivity} entries because a character can be in several at
+     * (e.g. fishing, trading, autofarming). A <b>list</b> of structured
+     * {@link Activity} entries because a character can be in several at
      * once (e.g. autofarming while fishing). Each entry carries a required
      * {@code type} discriminator (canonical values in
-     * {@link WellKnownCustomActivities}) plus an open {@code metadata} map for
+     * {@link WellKnownActivities}) plus an open {@code metadata} map for
      * activity-specific extras (canonical keys in
-     * {@link WellKnownCustomActivityMetadata}). The set varies per core, so the
+     * {@link WellKnownActivityMetadata}). The set varies per core, so the
      * envelope stays agnostic — hosts emit their own type / keys and consumers
      * tolerate unknowns. {@code null} when the character is in no special
      * activity, the host does not report it, or on offline tombstones; when
      * non-null the returned list is unmodifiable. Independent of
      * {@link #getAiStatus() aiStatus} — no precedence between the two.
+     *
+     * <p>Falls back to the pre-rename {@code customActivities} wire name so a
+     * host still running an older release keeps being understood. Consumers MUST
+     * read activities through this getter and never the deprecated field.</p>
      */
-    public @Nullable List<CustomActivity> getCustomActivities() {
-        return customActivities;
+    @SuppressWarnings("deprecation")
+    public @Nullable List<Activity> getActivities() {
+        return activities != null ? activities : customActivities;
     }
 
     /**
@@ -401,7 +425,9 @@ public final class CharacterRuntimeDto {
                 .level(level)
                 .exp(exp)
                 .sp(sp)
-                .customActivities(customActivities)
+                // Normalizes onto the new wire name: a DTO deserialized from an
+                // old host round-trips out as `activities`.
+                .activities(getActivities())
                 .curInventorySlots(curInventorySlots)
                 .maxInventorySlots(maxInventorySlots)
                 .curQuestInventorySlots(curQuestInventorySlots)
@@ -437,7 +463,9 @@ public final class CharacterRuntimeDto {
                 && Objects.equals(level, that.level)
                 && Objects.equals(exp, that.exp)
                 && Objects.equals(sp, that.sp)
-                && Objects.equals(customActivities, that.customActivities)
+                // Resolved, not raw: the same activities under the old and the new
+                // wire name are the same value.
+                && Objects.equals(getActivities(), that.getActivities())
                 && Objects.equals(curInventorySlots, that.curInventorySlots)
                 && Objects.equals(maxInventorySlots, that.maxInventorySlots)
                 && Objects.equals(curQuestInventorySlots, that.curQuestInventorySlots)
@@ -467,7 +495,7 @@ public final class CharacterRuntimeDto {
                 level,
                 exp,
                 sp,
-                customActivities,
+                getActivities(),
                 curInventorySlots,
                 maxInventorySlots,
                 curQuestInventorySlots,
@@ -490,7 +518,7 @@ public final class CharacterRuntimeDto {
                 + ", level=" + level
                 + ", exp=" + exp
                 + ", sp=" + sp
-                + ", customActivities=" + customActivities
+                + ", activities=" + getActivities()
                 + ", curInventorySlots=" + curInventorySlots + ", maxInventorySlots=" + maxInventorySlots
                 + ", curQuestInventorySlots=" + curQuestInventorySlots
                 + ", maxQuestInventorySlots=" + maxQuestInventorySlots
@@ -516,7 +544,7 @@ public final class CharacterRuntimeDto {
         private @Nullable Integer level;
         private @Nullable Long exp;
         private @Nullable Long sp;
-        private @Nullable List<CustomActivity> customActivities;
+        private @Nullable List<Activity> activities;
         private @Nullable Integer curInventorySlots;
         private @Nullable Integer maxInventorySlots;
         private @Nullable Integer curQuestInventorySlots;
@@ -637,12 +665,12 @@ public final class CharacterRuntimeDto {
 
         /**
          * Build-specific sustained activities — a list of structured
-         * {@link CustomActivity} entries ({@code type} + open {@code metadata}).
+         * {@link Activity} entries ({@code type} + open {@code metadata}).
          * {@code null} when the character is in no special activity. Defensively
          * copied on {@link #build()}.
          */
-        public Builder customActivities(@Nullable List<CustomActivity> customActivities) {
-            this.customActivities = customActivities;
+        public Builder activities(@Nullable List<Activity> activities) {
+            this.activities = activities;
             return this;
         }
 
@@ -720,13 +748,16 @@ public final class CharacterRuntimeDto {
                     level,
                     exp,
                     sp,
-                    customActivities,
+                    activities,
                     curInventorySlots,
                     maxInventorySlots,
                     curQuestInventorySlots,
                     maxQuestInventorySlots,
                     curWeight,
-                    maxWeight);
+                    maxWeight,
+                    // Producers only ever emit the new wire name; the deprecated
+                    // slot exists purely so inbound old-host JSON still binds.
+                    null);
         }
     }
 }

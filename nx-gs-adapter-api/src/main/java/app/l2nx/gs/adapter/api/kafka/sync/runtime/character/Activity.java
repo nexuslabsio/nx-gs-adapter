@@ -7,21 +7,21 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One entry of {@link CharacterRuntimeDto#getCustomActivities()} — a
+ * One entry of {@link CharacterRuntimeDto#getActivities()} — a
  * build-specific, high-level "what the player is occupied with" signal that lives
- * outside the engine AI state machine (e.g. fishing, reading a book, autofarming).
+ * outside the engine AI state machine (e.g. fishing, trading, autofarming).
  *
  * <p>Deliberately a thin, build-agnostic envelope:
  * <ul>
  *   <li>{@link #getType() type} — REQUIRED discriminator. Canonical values in
- *   {@link WellKnownCustomActivities} ({@code fishing} / {@code reading} / …);
+ *   {@link WellKnownActivities} ({@code fishing} / {@code trade} / …);
  *   open, so a host MAY emit its own activity key without an API release.</li>
  *   <li>{@link #getMetadata() metadata} — optional open {@code String→String}
  *   map of activity-specific extras, mirroring the {@code metadata} maps on the
  *   discrete event DTOs ({@code BossRespawnEntry}, {@code CharacterPresenceEvent},
  *   {@code GameEventEntry}). Canonical keys in
- *   {@link WellKnownCustomActivityMetadata} (e.g. {@code elapsed_seconds},
- *   {@code penalty_multiplier}); values are stringified (the platform stores the
+ *   {@link WellKnownActivityMetadata} (e.g. {@code elapsed_seconds},
+ *   {@code store_type}); values are stringified (the platform stores the
  *   whole object as JSON and the dashboard parses what it needs). Hosts MAY add
  *   arbitrary keys; consumers ignore keys they do not understand.</li>
  * </ul>
@@ -30,18 +30,18 @@ import org.jspecify.annotations.Nullable;
  * {@code elapsed_seconds}) — everything beyond {@code type} is the open
  * {@code metadata} map. This keeps the wire and the platform's JSONB storage
  * agnostic to which core ships which activity. A {@code null} / empty
- * {@code customActivities} on {@link CharacterRuntimeDto} means "no special
+ * {@code activities} on {@link CharacterRuntimeDto} means "no special
  * activity".</p>
  *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor parameter
  * names so Gson / Jackson can deserialize without {@code @JsonProperty}.</p>
  */
-public final class CustomActivity {
+public final class Activity {
 
     private final String type;
     private final @Nullable Map<String, String> metadata;
 
-    public CustomActivity(String type, @Nullable Map<String, String> metadata) {
+    public Activity(String type, @Nullable Map<String, String> metadata) {
         this.type = type;
         this.metadata =
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
@@ -49,7 +49,7 @@ public final class CustomActivity {
 
     /**
      * Activity discriminator — canonical values in
-     * {@link WellKnownCustomActivities}. REQUIRED.
+     * {@link WellKnownActivities}. REQUIRED.
      */
     public String getType() {
         return type;
@@ -58,7 +58,7 @@ public final class CustomActivity {
     /**
      * Open {@code String→String} map of activity-specific metadata, or
      * {@code null} when absent. Canonical keys in
-     * {@link WellKnownCustomActivityMetadata}. When non-null the returned map
+     * {@link WellKnownActivityMetadata}. When non-null the returned map
      * is unmodifiable and preserves insertion order.
      */
     public @Nullable Map<String, String> getMetadata() {
@@ -76,8 +76,8 @@ public final class CustomActivity {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof CustomActivity)) return false;
-        CustomActivity that = (CustomActivity) o;
+        if (!(o instanceof Activity)) return false;
+        Activity that = (Activity) o;
         return Objects.equals(type, that.type) && Objects.equals(metadata, that.metadata);
     }
 
@@ -88,7 +88,7 @@ public final class CustomActivity {
 
     @Override
     public String toString() {
-        return "CustomActivity[type=" + type + ", metadata=" + metadata + "]";
+        return "Activity[type=" + type + ", metadata=" + metadata + "]";
     }
 
     public static final class Builder {
@@ -105,8 +105,8 @@ public final class CustomActivity {
             return this;
         }
 
-        public CustomActivity build() {
-            return new CustomActivity(type, metadata);
+        public Activity build() {
+            return new Activity(type, metadata);
         }
     }
 }

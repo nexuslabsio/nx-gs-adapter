@@ -267,7 +267,18 @@ public final class CharacterDbDto {
      * Active private-store mode. {@code null} when the character has no
      * store open (or only a transient menu-pending state), or when the
      * tenant does not surface this datum.
+     *
+     * @deprecated a private store is volatile in-memory state, so the CDC
+     *     channel can only ever see whatever a build happens to persist —
+     *     which on most cores is nothing, or a stale leftover no code clears.
+     *     Trading now rides the runtime channel as
+     *     {@link app.l2nx.gs.adapter.api.kafka.sync.runtime.character.WellKnownActivities#TRADE}
+     *     / {@code OFFLINE_TRADE} with a {@code store_type} metadata key.
+     *     Schema providers must stop populating this field; it is removed once
+     *     they all have. {@link CharacterPrivateStore} itself stays — it is the
+     *     vocabulary for that metadata value.
      */
+    @Deprecated
     public @Nullable CharacterPrivateStore getPrivateStore() {
         return privateStore;
     }

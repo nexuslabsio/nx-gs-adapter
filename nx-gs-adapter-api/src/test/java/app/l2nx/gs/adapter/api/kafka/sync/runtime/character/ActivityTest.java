@@ -6,16 +6,16 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-class CustomActivityTest {
+class ActivityTest {
 
     @Test
     void builder_shouldCarryTypeAndMetadata() {
         Map<String, String> meta = new LinkedHashMap<>();
-        meta.put(WellKnownCustomActivityMetadata.ELAPSED_SECONDS, "1820");
-        meta.put(WellKnownCustomActivityMetadata.PENALTY_TIER, WellKnownCustomActivityMetadata.TIER_1);
+        meta.put(WellKnownActivityMetadata.ELAPSED_SECONDS, "1820");
+        meta.put(WellKnownActivityMetadata.PENALTY_TIER, WellKnownActivityMetadata.TIER_1);
 
-        CustomActivity activity = CustomActivity.builder()
-                .type(WellKnownCustomActivities.FISHING)
+        Activity activity = Activity.builder()
+                .type(WellKnownActivities.FISHING)
                 .metadata(meta)
                 .build();
 
@@ -28,8 +28,8 @@ class CustomActivityTest {
     void metadata_shouldBeDefensivelyCopiedAndUnmodifiable() {
         Map<String, String> meta = new LinkedHashMap<>();
         meta.put("elapsed_seconds", "10");
-        CustomActivity activity =
-                CustomActivity.builder().type("fishing").metadata(meta).build();
+        Activity activity =
+                Activity.builder().type("fishing").metadata(meta).build();
 
         // Mutating the source map after build must not leak into the DTO.
         meta.put("elapsed_seconds", "999");
@@ -42,22 +42,22 @@ class CustomActivityTest {
 
     @Test
     void metadata_shouldBeNullable() {
-        CustomActivity activity = CustomActivity.builder().type("reading").build();
+        Activity activity = Activity.builder().type("reading").build();
         assertEquals("reading", activity.getType());
         assertNull(activity.getMetadata());
     }
 
     @Test
     void equalsHashCode_shouldReflectTypeAndMetadata() {
-        CustomActivity a = CustomActivity.builder()
+        Activity a = Activity.builder()
                 .type("fishing")
                 .metadata(java.util.Collections.singletonMap("elapsed_seconds", "5"))
                 .build();
-        CustomActivity b = CustomActivity.builder()
+        Activity b = Activity.builder()
                 .type("fishing")
                 .metadata(java.util.Collections.singletonMap("elapsed_seconds", "5"))
                 .build();
-        CustomActivity c = CustomActivity.builder()
+        Activity c = Activity.builder()
                 .type("fishing")
                 .metadata(java.util.Collections.singletonMap("elapsed_seconds", "6"))
                 .build();
@@ -69,7 +69,7 @@ class CustomActivityTest {
 
     @Test
     void toBuilder_shouldRoundtrip() {
-        CustomActivity original = CustomActivity.builder()
+        Activity original = Activity.builder()
                 .type("fishing")
                 .metadata(java.util.Collections.singletonMap("penalty_multiplier", "0.5"))
                 .build();

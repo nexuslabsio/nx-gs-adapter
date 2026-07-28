@@ -1,14 +1,14 @@
 package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 /**
- * Canonical {@code type} discriminator values for {@link CustomActivity#getType()}
- * (one entry of {@link CharacterRuntimeDto#getCustomActivities()}). The
- * custom activity is a <b>build-specific</b>, high-level "what the player is
+ * Canonical {@code type} discriminator values for {@link Activity#getType()}
+ * (one entry of {@link CharacterRuntimeDto#getActivities()}). The
+ * activity is a <b>build-specific</b>, high-level "what the player is
  * occupied with" signal that lives outside the engine AI state machine —
  * sustained activities a particular core implements on its own state and timers
  * rather than through {@code CtrlIntention}. Activity-specific extras (elapsed
- * time, penalty tier, …) ride the {@code metadata} map — see
- * {@link WellKnownCustomActivityMetadata}.
+ * time, store mode, …) ride the {@code metadata} map — see
+ * {@link WellKnownActivityMetadata}.
  *
  * <p>The classic example is fishing: it is a self-contained mini-engine on most
  * cores (its own immobilize + tick loop, no AI intention), and some servers do
@@ -17,7 +17,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  * the {@code type} is an <b>open string</b> with the widest possible host
  * freedom: a host emits whatever lower_snake_case activity key its core supports,
  * and consumers map known values to a label / icon while falling back to the raw
- * string for unknowns. A {@code null} / empty {@code customActivities} means "no
+ * string for unknowns. A {@code null} / empty {@code activities} means "no
  * special activity".</p>
  *
  * <p>The constants below are merely the activities seen often enough to be worth
@@ -35,16 +35,19 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
  *     cores that ship it in place of, or alongside, fishing).</li>
  *     <li>{@link #AUTOFARMING} — the character is auto-farming (server-side
  *     bot/auto-hunt). Time-limited builds ride a {@code seconds_remaining}
- *     metadata key — see {@link WellKnownCustomActivityMetadata}.</li>
- *     <li>{@link #AUTO_MACRO} — the character is leveling on a server-managed
+ *     metadata key — see {@link WellKnownActivityMetadata}.</li>
+ *     <li>{@link #AUTOMACRO} — the character is leveling on a server-managed
  *     auto-macro (official cycle-macro session, distinct from {@link #AUTOFARMING}).
  *     Carries {@code elapsed_seconds} and, on quota-limited builds,
- *     {@code seconds_remaining} — see {@link WellKnownCustomActivityMetadata}.</li>
+ *     {@code seconds_remaining} — see {@link WellKnownActivityMetadata}.</li>
+ *     <li>{@link #TRADE} / {@link #OFFLINE_TRADE} — the character is running a
+ *     private store, with the client attached / detached respectively. Both carry
+ *     {@code store_type}.</li>
  * </ul>
  */
-public final class WellKnownCustomActivities {
+public final class WellKnownActivities {
 
-    private WellKnownCustomActivities() {}
+    private WellKnownActivities() {}
 
     /**
      * The character is fishing.
@@ -59,7 +62,7 @@ public final class WellKnownCustomActivities {
     /**
      * The character is auto-farming (server-side auto-hunt). On time-limited
      * builds the remaining auto-farm time rides the
-     * {@link WellKnownCustomActivityMetadata#SECONDS_REMAINING} metadata key
+     * {@link WellKnownActivityMetadata#SECONDS_REMAINING} metadata key
      * (absent when the farm is unlimited / free).
      */
     public static final String AUTOFARMING = "autofarming";
@@ -68,9 +71,25 @@ public final class WellKnownCustomActivities {
      * The character is leveling on a server-managed auto-macro (official
      * cycle-macro session) — distinct from {@link #AUTOFARMING}, which is the
      * server-side auto-hunt bot. On quota-limited builds the remaining macro
-     * time rides {@link WellKnownCustomActivityMetadata#SECONDS_REMAINING}
+     * time rides {@link WellKnownActivityMetadata#SECONDS_REMAINING}
      * (absent when the macro is unlimited); elapsed time rides
-     * {@link WellKnownCustomActivityMetadata#ELAPSED_SECONDS}.
+     * {@link WellKnownActivityMetadata#ELAPSED_SECONDS}.
      */
-    public static final String AUTO_MACRO = "auto_macro";
+    public static final String AUTOMACRO = "automacro";
+
+    /**
+     * The character is running a private store with the client still attached.
+     * The store mode rides {@link WellKnownActivityMetadata#STORE_TYPE}.
+     */
+    public static final String TRADE = "trade";
+
+    /**
+     * The character is running a private store with the client detached — the
+     * offline-trade mode most cores ship, where the character object stays in
+     * the world and keeps trading after the player disconnects. Presence is
+     * reported separately ({@code online = false}); this activity says what the
+     * abandoned character is doing, not whether the player is there. The store
+     * mode rides {@link WellKnownActivityMetadata#STORE_TYPE}.
+     */
+    public static final String OFFLINE_TRADE = "offline_trade";
 }
