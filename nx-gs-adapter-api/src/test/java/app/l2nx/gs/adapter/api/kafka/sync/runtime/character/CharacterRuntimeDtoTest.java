@@ -89,8 +89,7 @@ class CharacterRuntimeDtoTest {
                 12,
                 50,
                 45000,
-                60000,
-                null);
+                60000);
 
         assertEquals(original, original.toBuilder().build());
     }
@@ -108,79 +107,6 @@ class CharacterRuntimeDtoTest {
         assertEquals(Collections.singletonList(activity), dto.getActivities());
         assertEquals("fishing", dto.getActivities().get(0).getType());
         assertEquals("1820", dto.getActivities().get(0).getMetadata().get(WellKnownActivityMetadata.ELAPSED_SECONDS));
-    }
-
-    @Test
-    @SuppressWarnings("deprecation")
-    void getActivities_shouldFallBackToLegacyWireName_whenHostStillEmitsCustomActivities() {
-        Activity activity = fishing();
-        // Positional construction mirrors what a name-binding deserializer does with
-        // JSON from a host that has not been restarted onto the renamed contract.
-        CharacterRuntimeDto dto = new CharacterRuntimeDto(
-                42L,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                Collections.singletonList(activity));
-
-        assertEquals(Collections.singletonList(activity), dto.getActivities());
-    }
-
-    @Test
-    @SuppressWarnings("deprecation")
-    void getActivities_shouldPreferNewWireName_whenBothArePresent() {
-        Activity autofarming =
-                Activity.builder().type(WellKnownActivities.AUTOFARMING).build();
-        CharacterRuntimeDto dto = new CharacterRuntimeDto(
-                42L,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                Collections.singletonList(autofarming),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                Collections.singletonList(fishing()));
-
-        assertEquals(Collections.singletonList(autofarming), dto.getActivities());
     }
 
     @Test
@@ -354,7 +280,7 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto fromBuilder = CharacterRuntimeDto.builder().id(7L).build();
         CharacterRuntimeDto fromCtor = new CharacterRuntimeDto(
                 7L, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());

@@ -24,8 +24,7 @@ by the L2NX game-server adapter and its consumers. Published as
   (`HeartbeatEvent`, `NxHeaders`)
 - `app.l2nx.gs.adapter.api.kafka.sync.db.<entity>` — per-entity wire DTOs for
   the db-sync stream. Shipped entities: `character` (`CharacterDbDto`,
-  `CharacterClassDbDto`, `CharacterSubclassDbDto` (deprecated),
-  `CharacterInstanceCooldownDbDto`,
+  `CharacterClassDbDto`, `CharacterInstanceCooldownDbDto`,
   `CharacterLockDbDto`; CharacterDbDto carries optional `accountName`,
   `nobless`, `scheduledDeletionAt` on top of the identity / progression set, all
   three from generic L2J columns — see
@@ -48,9 +47,8 @@ by the L2NX game-server adapter and its consumers. Published as
   `hashedColumns()`, because they tick on every kill — so they never trigger a
   sync event and are only ever as fresh as the source's last full store. Which
   class is being played is NOT a flag on the entry — it is `CharacterDbDto.classId`.
-  The older `subclasses: List<CharacterSubclassDbDto>` is `@Deprecated` and still
-  populated for ONE release so a platform deployed ahead of the schema providers
-  can read old events; it goes away once every provider emits `classes`),
+  `classes` is the only class shape on the wire — the older `subclasses` field
+  was removed once every schema provider had migrated to `classes`),
   `clan` (`ClanDbDto` +
   `ClanSkillDbDto`; ClanDbDto carries optional `icon: byte[]` for the clan crest
   as decoded PNG bytes — schema providers do the source-format → PNG

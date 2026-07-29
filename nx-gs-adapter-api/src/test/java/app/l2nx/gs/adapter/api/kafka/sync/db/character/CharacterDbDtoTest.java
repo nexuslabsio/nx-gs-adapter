@@ -2,7 +2,6 @@ package app.l2nx.gs.adapter.api.kafka.sync.db.character;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import app.l2nx.gs.adapter.api.domain.character.CharacterPrivateStore;
 import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
 import app.l2nx.gs.adapter.api.domain.character.CharacterSex;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
@@ -13,22 +12,10 @@ import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-// Covers both the deprecated `subclasses` and its `classes` replacement — they coexist
-// on the wire for one release.
-@SuppressWarnings("deprecation")
 class CharacterDbDtoTest {
 
     @Test
     void builder_shouldMapEachFieldToConstructorPosition() {
-        List<CharacterSubclassDbDto> subs = Arrays.asList(
-                CharacterSubclassDbDto.builder()
-                        .classId(CharacterClass.SOULTAKER)
-                        .level(76)
-                        .build(),
-                CharacterSubclassDbDto.builder()
-                        .classId(CharacterClass.HIEROPHANT)
-                        .level(80)
-                        .build());
         Instant deleteAt = Instant.parse("2026-06-01T12:00:00Z");
 
         CharacterDbDto ch = CharacterDbDto.builder()
@@ -41,8 +28,6 @@ class CharacterDbDtoTest {
                 .race(CharacterRace.ELF)
                 .classId(CharacterClass.EVA_SAINT)
                 .baseClassId(CharacterClass.ELDER)
-                .subclasses(subs)
-                .privateStore(CharacterPrivateStore.SELL)
                 .clanId(909L)
                 .pvpCounter(1200)
                 .pkCounter(7)
@@ -64,8 +49,6 @@ class CharacterDbDtoTest {
         assertEquals(CharacterRace.ELF, ch.getRace());
         assertEquals(CharacterClass.EVA_SAINT, ch.getClassId());
         assertEquals(CharacterClass.ELDER, ch.getBaseClassId());
-        assertEquals(subs, ch.getSubclasses());
-        assertEquals(CharacterPrivateStore.SELL, ch.getPrivateStore());
         assertEquals(Long.valueOf(909L), ch.getClanId());
         assertEquals(Integer.valueOf(1200), ch.getPvpCounter());
         assertEquals(Integer.valueOf(7), ch.getPkCounter());
@@ -91,8 +74,6 @@ class CharacterDbDtoTest {
         assertNull(ch.getRace());
         assertNull(ch.getClassId());
         assertNull(ch.getBaseClassId());
-        assertNull(ch.getSubclasses());
-        assertNull(ch.getPrivateStore());
         assertNull(ch.getClanId());
         assertNull(ch.getPvpCounter());
         assertNull(ch.getPkCounter());
@@ -133,13 +114,6 @@ class CharacterDbDtoTest {
     }
 
     @Test
-    void subclasses_shouldBeNull_whenTenantDoesNotSyncThem() {
-        CharacterDbDto ch = CharacterDbDto.builder().id(1L).name("X").build();
-
-        assertNull(ch.getSubclasses());
-    }
-
-    @Test
     void classes_shouldBeNull_whenTenantDoesNotSyncThem() {
         CharacterDbDto ch = CharacterDbDto.builder().id(1L).name("X").build();
 
@@ -177,43 +151,11 @@ class CharacterDbDtoTest {
     }
 
     @Test
-    void classesAndSubclasses_shouldCoexist_duringTheDeprecationWindow() {
-        CharacterDbDto ch = CharacterDbDto.builder()
-                .id(1L)
-                .name("X")
-                .subclasses(Collections.singletonList(CharacterSubclassDbDto.builder()
-                        .classId(CharacterClass.SOULTAKER)
-                        .level(76)
-                        .build()))
-                .classes(Collections.singletonList(CharacterClassDbDto.builder()
-                        .classId(CharacterClass.SOULTAKER)
-                        .kind(CharacterClassKind.SUB)
-                        .level(76)
-                        .build()))
-                .build();
-
-        assertNotNull(ch.getSubclasses());
-        assertNotNull(ch.getClasses());
-    }
-
-    @Test
-    void subclasses_shouldBeEmptyList_whenTenantSyncsButCharHasNone() {
-        CharacterDbDto ch = CharacterDbDto.builder()
-                .id(1L)
-                .name("X")
-                .subclasses(Collections.emptyList())
-                .build();
-
-        assertNotNull(ch.getSubclasses());
-        assertTrue(ch.getSubclasses().isEmpty());
-    }
-
-    @Test
     void builder_andConstructor_shouldProduceEqualObjects_whenAllOptionalNull() {
         CharacterDbDto fromBuilder = CharacterDbDto.builder().id(1L).name("X").build();
         CharacterDbDto fromCtor = new CharacterDbDto(
                 1L, "X", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -221,10 +163,6 @@ class CharacterDbDtoTest {
 
     @Test
     void toBuilder_shouldRoundtrip() {
-        List<CharacterSubclassDbDto> subs = Collections.singletonList(CharacterSubclassDbDto.builder()
-                .classId(CharacterClass.SOULTAKER)
-                .level(76)
-                .build());
         List<CharacterClassDbDto> classes = Arrays.asList(
                 CharacterClassDbDto.builder()
                         .classId(CharacterClass.HUMAN_FIGHTER)
@@ -257,9 +195,7 @@ class CharacterDbDtoTest {
                 CharacterRace.HUMAN,
                 CharacterClass.HUMAN_FIGHTER,
                 CharacterClass.HUMAN_FIGHTER,
-                subs,
                 classes,
-                CharacterPrivateStore.CRAFT,
                 null,
                 0,
                 0,

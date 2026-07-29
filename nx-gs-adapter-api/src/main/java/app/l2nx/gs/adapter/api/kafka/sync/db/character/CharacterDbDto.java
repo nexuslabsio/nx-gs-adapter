@@ -1,6 +1,5 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.character;
 
-import app.l2nx.gs.adapter.api.domain.character.CharacterPrivateStore;
 import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
 import app.l2nx.gs.adapter.api.domain.character.CharacterSex;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
@@ -68,12 +67,7 @@ public final class CharacterDbDto {
     private final @Nullable CharacterRace race;
     private final @Nullable CharacterClass classId;
     private final @Nullable CharacterClass baseClassId;
-
-    @Deprecated
-    private final @Nullable List<CharacterSubclassDbDto> subclasses;
-
     private final @Nullable List<CharacterClassDbDto> classes;
-    private final @Nullable CharacterPrivateStore privateStore;
     private final @Nullable Long clanId;
     private final @Nullable Integer pvpCounter;
     private final @Nullable Integer pkCounter;
@@ -100,9 +94,7 @@ public final class CharacterDbDto {
             @Nullable CharacterRace race,
             @Nullable CharacterClass classId,
             @Nullable CharacterClass baseClassId,
-            @Nullable List<CharacterSubclassDbDto> subclasses,
             @Nullable List<CharacterClassDbDto> classes,
-            @Nullable CharacterPrivateStore privateStore,
             @Nullable Long clanId,
             @Nullable Integer pvpCounter,
             @Nullable Integer pkCounter,
@@ -127,9 +119,7 @@ public final class CharacterDbDto {
         this.race = race;
         this.classId = classId;
         this.baseClassId = baseClassId;
-        this.subclasses = subclasses == null ? null : Collections.unmodifiableList(subclasses);
         this.classes = classes == null ? null : Collections.unmodifiableList(classes);
-        this.privateStore = privateStore;
         this.clanId = clanId;
         this.pvpCounter = pvpCounter;
         this.pkCounter = pkCounter;
@@ -221,29 +211,6 @@ public final class CharacterDbDto {
     }
 
     /**
-     * Character subclasses, ordered as the schema provider's
-     * {@code mapEntity} produced them (no platform-side ordering contract).
-     * {@code null} when the tenant does not sync subclasses (no
-     * {@code ChildSource} declared); empty list when the tenant syncs
-     * subclasses but the character has none.
-     *
-     * @deprecated superseded by {@link #getClasses()}, which carries the
-     *     whole roster (main class included) plus {@code exp} / {@code sp}.
-     *     Kept alive for one release so a platform deployed ahead of the
-     *     schema providers can still read events emitted by an older
-     *     adapter — an unknown JSON field would otherwise deserialize to
-     *     {@code null} silently, blinding the new consumer for the whole
-     *     rollout window. Removed once every schema provider emits
-     *     {@code classes} — for bohpts, the morning game-server restart
-     *     that ships the new adapter. Consumers read {@link #getClasses()}
-     *     first and fall back to this only while both are in flight.
-     */
-    @Deprecated
-    public @Nullable List<CharacterSubclassDbDto> getSubclasses() {
-        return subclasses;
-    }
-
-    /**
      * The character's full class roster — exactly one
      * {@link app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClassKind#MAIN}
      * entry plus one {@code SUB} entry per subclass, ordered as the schema
@@ -261,26 +228,6 @@ public final class CharacterDbDto {
      */
     public @Nullable List<CharacterClassDbDto> getClasses() {
         return classes;
-    }
-
-    /**
-     * Active private-store mode. {@code null} when the character has no
-     * store open (or only a transient menu-pending state), or when the
-     * tenant does not surface this datum.
-     *
-     * @deprecated a private store is volatile in-memory state, so the CDC
-     *     channel can only ever see whatever a build happens to persist —
-     *     which on most cores is nothing, or a stale leftover no code clears.
-     *     Trading now rides the runtime channel as
-     *     {@link app.l2nx.gs.adapter.api.kafka.sync.runtime.character.WellKnownActivities#TRADE}
-     *     / {@code OFFLINE_TRADE} with a {@code store_type} metadata key.
-     *     Schema providers must stop populating this field; it is removed once
-     *     they all have. {@link CharacterPrivateStore} itself stays — it is the
-     *     vocabulary for that metadata value.
-     */
-    @Deprecated
-    public @Nullable CharacterPrivateStore getPrivateStore() {
-        return privateStore;
     }
 
     /**
@@ -447,9 +394,7 @@ public final class CharacterDbDto {
                 .race(race)
                 .classId(classId)
                 .baseClassId(baseClassId)
-                .subclasses(subclasses)
                 .classes(classes)
-                .privateStore(privateStore)
                 .clanId(clanId)
                 .pvpCounter(pvpCounter)
                 .pkCounter(pkCounter)
@@ -485,9 +430,7 @@ public final class CharacterDbDto {
                 && race == that.race
                 && classId == that.classId
                 && baseClassId == that.baseClassId
-                && Objects.equals(subclasses, that.subclasses)
                 && Objects.equals(classes, that.classes)
-                && privateStore == that.privateStore
                 && Objects.equals(clanId, that.clanId)
                 && Objects.equals(pvpCounter, that.pvpCounter)
                 && Objects.equals(pkCounter, that.pkCounter)
@@ -517,9 +460,7 @@ public final class CharacterDbDto {
                 race,
                 classId,
                 baseClassId,
-                subclasses,
                 classes,
-                privateStore,
                 clanId,
                 pvpCounter,
                 pkCounter,
@@ -548,9 +489,7 @@ public final class CharacterDbDto {
                 + ", race=" + race
                 + ", classId=" + classId
                 + ", baseClassId=" + baseClassId
-                + ", subclasses=" + subclasses
                 + ", classes=" + classes
-                + ", privateStore=" + privateStore
                 + ", clanId=" + clanId
                 + ", pvpCounter=" + pvpCounter
                 + ", pkCounter=" + pkCounter
@@ -578,9 +517,7 @@ public final class CharacterDbDto {
         private @Nullable CharacterRace race;
         private @Nullable CharacterClass classId;
         private @Nullable CharacterClass baseClassId;
-        private @Nullable List<CharacterSubclassDbDto> subclasses;
         private @Nullable List<CharacterClassDbDto> classes;
-        private @Nullable CharacterPrivateStore privateStore;
         private @Nullable Long clanId;
         private @Nullable Integer pvpCounter;
         private @Nullable Integer pkCounter;
@@ -642,22 +579,8 @@ public final class CharacterDbDto {
             return this;
         }
 
-        /**
-         * @deprecated see {@link CharacterDbDto#getSubclasses()}.
-         */
-        @Deprecated
-        public Builder subclasses(@Nullable List<CharacterSubclassDbDto> subclasses) {
-            this.subclasses = subclasses;
-            return this;
-        }
-
         public Builder classes(@Nullable List<CharacterClassDbDto> classes) {
             this.classes = classes;
-            return this;
-        }
-
-        public Builder privateStore(@Nullable CharacterPrivateStore privateStore) {
-            this.privateStore = privateStore;
             return this;
         }
 
@@ -747,9 +670,7 @@ public final class CharacterDbDto {
                     race,
                     classId,
                     baseClassId,
-                    subclasses,
                     classes,
-                    privateStore,
                     clanId,
                     pvpCounter,
                     pkCounter,

@@ -96,17 +96,6 @@ public final class CharacterRuntimeDto {
     private final @Nullable Long exp;
     private final @Nullable Long sp;
     private final @Nullable List<Activity> activities;
-
-    /**
-     * Pre-rename wire name of {@link #activities}, bound so a host that has not
-     * been restarted onto this release keeps deserializing. Read only through
-     * {@link #getActivities()}.
-     *
-     * @deprecated TODO remove once every schema provider emits {@code activities}.
-     */
-    @Deprecated
-    private final @Nullable List<Activity> customActivities;
-
     private final @Nullable Integer curInventorySlots;
     private final @Nullable Integer maxInventorySlots;
     private final @Nullable Integer curQuestInventorySlots;
@@ -116,7 +105,7 @@ public final class CharacterRuntimeDto {
 
     /**
      * Canonical constructor. Prefer {@link #builder()} — positional construction
-     * of 22 mostly-nullable fields is error-prone.
+     * of 24 mostly-nullable fields is error-prone.
      *
      * <p>MUST remain the only non-default constructor on this class. The DTO
      * carries no binder annotations and relies on implicit constructor-parameter
@@ -150,8 +139,7 @@ public final class CharacterRuntimeDto {
             @Nullable Integer curQuestInventorySlots,
             @Nullable Integer maxQuestInventorySlots,
             @Nullable Integer curWeight,
-            @Nullable Integer maxWeight,
-            @Nullable List<Activity> customActivities) {
+            @Nullable Integer maxWeight) {
         this.id = id;
         this.curHp = curHp;
         this.maxHp = maxHp;
@@ -177,7 +165,6 @@ public final class CharacterRuntimeDto {
         this.maxQuestInventorySlots = maxQuestInventorySlots;
         this.curWeight = curWeight;
         this.maxWeight = maxWeight;
-        this.customActivities = copy(customActivities);
     }
 
     private static @Nullable List<Activity> copy(@Nullable List<Activity> activities) {
@@ -223,7 +210,7 @@ public final class CharacterRuntimeDto {
                 || level != null
                 || exp != null
                 || sp != null
-                || getActivities() != null
+                || activities != null
                 || curInventorySlots != null
                 || maxInventorySlots != null
                 || curQuestInventorySlots != null
@@ -423,14 +410,9 @@ public final class CharacterRuntimeDto {
      * activity, the host does not report it, or on offline tombstones; when
      * non-null the returned list is unmodifiable. Independent of
      * {@link #getAiStatus() aiStatus} — no precedence between the two.
-     *
-     * <p>Falls back to the pre-rename {@code customActivities} wire name so a
-     * host still running an older release keeps being understood. Consumers MUST
-     * read activities through this getter and never the deprecated field.</p>
      */
-    @SuppressWarnings("deprecation")
     public @Nullable List<Activity> getActivities() {
-        return activities != null ? activities : customActivities;
+        return activities;
     }
 
     /**
@@ -465,9 +447,7 @@ public final class CharacterRuntimeDto {
                 .level(level)
                 .exp(exp)
                 .sp(sp)
-                // Normalizes onto the new wire name: a DTO deserialized from an
-                // old host round-trips out as `activities`.
-                .activities(getActivities())
+                .activities(activities)
                 .curInventorySlots(curInventorySlots)
                 .maxInventorySlots(maxInventorySlots)
                 .curQuestInventorySlots(curQuestInventorySlots)
@@ -503,9 +483,7 @@ public final class CharacterRuntimeDto {
                 && Objects.equals(level, that.level)
                 && Objects.equals(exp, that.exp)
                 && Objects.equals(sp, that.sp)
-                // Resolved, not raw: the same activities under the old and the new
-                // wire name are the same value.
-                && Objects.equals(getActivities(), that.getActivities())
+                && Objects.equals(activities, that.activities)
                 && Objects.equals(curInventorySlots, that.curInventorySlots)
                 && Objects.equals(maxInventorySlots, that.maxInventorySlots)
                 && Objects.equals(curQuestInventorySlots, that.curQuestInventorySlots)
@@ -535,7 +513,7 @@ public final class CharacterRuntimeDto {
                 level,
                 exp,
                 sp,
-                getActivities(),
+                activities,
                 curInventorySlots,
                 maxInventorySlots,
                 curQuestInventorySlots,
@@ -558,7 +536,7 @@ public final class CharacterRuntimeDto {
                 + ", level=" + level
                 + ", exp=" + exp
                 + ", sp=" + sp
-                + ", activities=" + getActivities()
+                + ", activities=" + activities
                 + ", curInventorySlots=" + curInventorySlots + ", maxInventorySlots=" + maxInventorySlots
                 + ", curQuestInventorySlots=" + curQuestInventorySlots
                 + ", maxQuestInventorySlots=" + maxQuestInventorySlots
@@ -794,10 +772,7 @@ public final class CharacterRuntimeDto {
                     curQuestInventorySlots,
                     maxQuestInventorySlots,
                     curWeight,
-                    maxWeight,
-                    // Producers only ever emit the new wire name; the deprecated
-                    // slot exists purely so inbound old-host JSON still binds.
-                    null);
+                    maxWeight);
         }
     }
 }
