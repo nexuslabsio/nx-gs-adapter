@@ -43,18 +43,27 @@ instead. `NNN` is a zero-padded sequential id; the index lives in `docs/CLAUDE.m
   for closed deals + `PrivateStoreSnapshotEvent` for per-`(itemId, side)`
   order book, with `TradeLine` / `Offer` line types, `PrivateStoreSide`
   enum, and `WellKnownElements` constants — no abstract base; one publish
-  method per concrete subtype on `NxEvents`). The inbound-commands marker
+  method per concrete subtype on `NxEvents`). `WellKnownPrivateStoreMetadata`
+  (keys for `PrivateStorePurchaseEvent.metadata`) gained `SOURCE` (`SOURCE_IN_GAME` /
+  `SOURCE_REMOTE`, how the deal was initiated), `TAX_ADENA` (buyer-side surcharge burned
+  on the deal), and `TAX_PERCENT` (the rate it was computed at) for remote buy-now
+  purchases (spec 065). The inbound-commands marker
   `kafka.commands.NxCommand<R>` + reply envelope `kafka.commands.CommandResult<R>`
   with structured `kafka.commands.ErrorCode` enum (`NOT_FOUND` / `INVALID_STATE` /
   `FORBIDDEN` / `RATE_LIMITED` / `UNAVAILABLE` / `VALIDATION_FAILED` /
   `INTERNAL_ERROR` / `UNSUPPORTED_COMMAND`). Concrete command DTOs ship under
   `kafka.commands.<group>.*` (group = code-org bucket: `character` / `item` /
-  `mail` / `account` / `sync`); shipped today: `commands.item.DeleteItemCommand`
+  `mail` / `account` / `sync` / `privatestore`); shipped today: `commands.item.DeleteItemCommand`
   (`NxCommand<DeleteItemResult>`) and `commands.mail.SendMailCommand`
   (`NxCommand<SendMailResult>` carrying `Long charId` + `String author?` +
   `String title` + `String body?` + `List<MailItem>` attachments;
   `SendMailResult` carries `List<Long> createdMailIds` + `List<ItemDeliveryError>`
-  partial-failure entries on the success envelope), plus the force-resync pair
+  partial-failure entries on the success envelope), plus
+  `commands.privatestore.BuyFromPrivateStoreCommand` (`NxCommand<BuyFromPrivateStoreResult>`
+  carrying `buyerCharId` / `sellerCharId` / `List<BuyLine>` lines / `tax` whole-percent
+  surcharge) with its `BuyLine` / `BuyFromPrivateStoreResult` / `BoughtLine` quartet — a
+  platform-issued remote buy-now against another character's private store (spec 065 in
+  `nx-gameservers`), plus the force-resync pair
   `commands.sync.ResyncEntitiesCommand` (`UUID resyncId` + `entities?`, null/empty
   = all db-sync entities; ack = `acceptedEntities`) and
   `commands.sync.ResyncRowsCommand` (`resyncId` + `entityName` + `pks` capped at

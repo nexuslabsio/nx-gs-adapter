@@ -168,6 +168,11 @@ scaling?: List<GearScoreScalingStep>}`, `GearScoreScalingStep{from, to?, value}`
       both subtypes ride one topic, host-pushed via `NxEvents.publish(...)`
       with the concrete subtype. Partition keys: snapshot → `itemId`,
       purchase → `null` (round-robin, no single natural per-entity key).
+      `WellKnownPrivateStoreMetadata` keys for `PrivateStorePurchaseEvent.metadata`:
+      `STORE_OWNER_ADENA` (recipient's post-deal balance), `SOURCE` (`SOURCE_IN_GAME` /
+      `SOURCE_REMOTE` — how the deal was initiated), `TAX_ADENA` (buyer-side surcharge
+      burned, not credited to the seller) and `TAX_PERCENT` (the rate it was computed
+      at) — the last three added for remote buy-now purchases (spec 065).
   - `events.raid` — `RaidKillEvent` (final) + `RaidActor` /
     `RaidDropItem` sub-DTOs + `RaidBossKind` enum (`RAID` /
     `EPIC` / `INSTANCE_BOSS`). Multi-event family (kill fact +
@@ -252,8 +257,16 @@ metadata`) + `LevelExpEntry` (`int level` + `long requiredExp` — the
 - `app.l2nx.gs.adapter.api.kafka.commands` — inbound command marker `NxCommand`,
   reply envelope `CommandResult<R>`, structured `ErrorCode` enum. Concrete
   command DTOs ship under `kafka.commands.<group>.*` (group = code-org bucket:
-  `character` / `item` / `mail` / `account` / `sync`); the topic remains single,
-  the package split is for Javadoc / IDE discovery only. The `sync` group hosts
+  `character` / `item` / `mail` / `account` / `sync` / `privatestore`); the topic
+  remains single, the package split is for Javadoc / IDE discovery only. The
+  `privatestore` group hosts `BuyFromPrivateStoreCommand` (`NxCommand<BuyFromPrivateStoreResult>`
+  — `int buyerCharId`, `int sellerCharId`, `List<BuyLine> lines`, `int tax` whole-percent
+  buyer-side surcharge) + `BuyLine` (`itemTemplateId`, `enchantLevel?`, `attributes?`,
+  `count`, `unitPriceAdena` — the fields a client echoes back from the `MarketOfferDto`
+  it saw) + `BuyFromPrivateStoreResult` (`itemsTotalAdena`, `taxAdena`, `paidTotalAdena`,
+  `List<BoughtLine> bought`, `storeClosed`) + `BoughtLine`: a platform-issued remote
+  buy-now against another character's private store, the tax burned rather than
+  credited to the seller (spec 065 in `nx-gameservers`). The `sync` group hosts
   the force-resync pair `ResyncEntitiesCommand` / `ResyncRowsCommand` (pks cap
   `MAX_PKS=1000`, optional `cascade`); their completion signal
   `events.sync.ResyncCompletedEvent` (UUIDv7 `eventId` + `resyncId` +
