@@ -23,7 +23,11 @@ public final class PrivateStoreOfferHasher {
         if (c != 0) return c;
         c = Long.compare(a.count, b.count);
         if (c != 0) return c;
-        return Long.compare(a.currencyItemId, b.currencyItemId);
+        c = Long.compare(a.currencyItemId, b.currencyItemId);
+        if (c != 0) return c;
+        // Total tie-breaker: itemId is unique per instance, so equal rows are
+        // impossible past this point (spec 065 §2.1).
+        return Long.compare(a.itemId, b.itemId);
     };
 
     private static int compareNullableIntegers(@Nullable Integer a, @Nullable Integer b) {
@@ -44,6 +48,11 @@ public final class PrivateStoreOfferHasher {
         long h = Fnv1a64.start();
         h = Fnv1a64.mix(h, sorted.size());
         for (OfferRow r : sorted) {
+            // Must be hashed: a sold-then-relisted twin (same template/enchant/
+            // price, different instance) would otherwise produce an identical
+            // hash and never republish, leaving the projection with a dead
+            // objId (spec 065 §2.1).
+            h = Fnv1a64.mix(h, r.itemId);
             h = Fnv1a64.mix(h, r.traderId);
             h = mixNullableInteger(h, r.enchantLevel);
             h = mixAttributes(h, r.attributes);

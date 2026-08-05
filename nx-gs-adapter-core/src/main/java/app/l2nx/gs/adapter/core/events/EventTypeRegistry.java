@@ -60,12 +60,14 @@ final class EventTypeRegistry {
         register(map, families, ServerStoppingEvent.class, "serveronline", evt -> null);
         register(map, families, GameEventSnapshotEvent.class, "gameevents", evt -> null);
         register(map, families, PrivateStorePurchaseEvent.class, "privatestore", evt -> null);
-        register(
-                map,
-                families,
-                PrivateStoreSnapshotEvent.class,
-                "privatestore",
-                evt -> LongBytes.bigEndian(((PrivateStoreSnapshotEvent) evt).getItemId()));
+        register(map, families, PrivateStoreSnapshotEvent.class, "privatestore", evt -> {
+            PrivateStoreSnapshotEvent e = (PrivateStoreSnapshotEvent) evt;
+            // itemTemplateId is the new name; fall back to the deprecated itemId while
+            // producers still on the old adapter emit only the latter (same value).
+            Long tpl = e.getItemTemplateId();
+            long templateId = tpl != null ? tpl : e.getItemId();
+            return LongBytes.bigEndian(templateId);
+        });
         register(
                 map,
                 families,

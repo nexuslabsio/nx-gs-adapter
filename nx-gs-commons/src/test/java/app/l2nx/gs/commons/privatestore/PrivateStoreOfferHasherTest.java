@@ -161,6 +161,20 @@ class PrivateStoreOfferHasherTest {
     }
 
     @Test
+    void hash_shouldChange_whenItemIdChanges() {
+        // Sold-then-relisted twin: same trader/enchant/attrs/count/price/currency,
+        // different instance objId — must still change the hash (spec 065 §2.1),
+        // otherwise the projection keeps a dead objId forever.
+        OfferRow a = new OfferRow(100L, 1L, 0, null, 1L, 100L, 57L, false);
+        OfferRow b = new OfferRow(200L, 1L, 0, null, 1L, 100L, 57L, false);
+
+        long h1 = PrivateStoreOfferHasher.hash(Collections.singletonList(a));
+        long h2 = PrivateStoreOfferHasher.hash(Collections.singletonList(b));
+
+        assertNotEquals(h1, h2);
+    }
+
+    @Test
     void hash_shouldYieldSentinel_forEmptyOfferList() {
         long h = PrivateStoreOfferHasher.hash(Collections.emptyList());
 
@@ -201,6 +215,6 @@ class PrivateStoreOfferHasherTest {
             long unitPrice,
             long currencyItemId,
             boolean packaged) {
-        return new OfferRow(traderId, enchantLevel, attrs, count, unitPrice, currencyItemId, packaged);
+        return new OfferRow(1L, traderId, enchantLevel, attrs, count, unitPrice, currencyItemId, packaged);
     }
 }

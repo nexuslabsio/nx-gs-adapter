@@ -11,6 +11,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class OfferRow {
 
+    public final long itemId;
     public final long traderId;
     public final @Nullable Integer enchantLevel;
     public final @Nullable Map<Attribute, Integer> attributes;
@@ -20,6 +21,7 @@ public final class OfferRow {
     public final boolean packaged;
 
     public OfferRow(
+            long itemId,
             long traderId,
             @Nullable Integer enchantLevel,
             @Nullable Map<Attribute, Integer> attributes,
@@ -27,6 +29,7 @@ public final class OfferRow {
             long unitPrice,
             long currencyItemId,
             boolean packaged) {
+        this.itemId = itemId;
         this.traderId = traderId;
         this.enchantLevel = enchantLevel;
         this.attributes = attributes;
