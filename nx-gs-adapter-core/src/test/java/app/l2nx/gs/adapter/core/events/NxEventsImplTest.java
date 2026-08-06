@@ -215,7 +215,7 @@ class NxEventsImplTest {
         NxEventsImpl events = new NxEventsImpl(publisher, registry);
         PrivateStoreSnapshotEvent event = PrivateStoreSnapshotEvent.builder()
                 .eventId(UUIDv7.generate())
-                .itemId(0xCAFEBABEL)
+                .itemTemplateId(0xCAFEBABEL)
                 .side(PrivateStoreSide.ASK)
                 .build();
 

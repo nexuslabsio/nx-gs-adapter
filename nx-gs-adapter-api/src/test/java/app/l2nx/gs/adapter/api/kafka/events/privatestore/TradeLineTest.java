@@ -13,10 +13,10 @@ class TradeLineTest {
     @Test
     void getAttributes_shouldReturnEmptyMap_whenBuilderOmits() {
         TradeLine line = TradeLine.builder()
-                .itemId(1234L)
+                .itemTemplateId(1234L)
                 .count(5L)
                 .unitPrice(100_000L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertTrue(line.getAttributes().isEmpty());
@@ -25,11 +25,11 @@ class TradeLineTest {
     @Test
     void getAttributes_shouldReturnEmptyMap_whenBuilderPassesNull() {
         TradeLine line = TradeLine.builder()
-                .itemId(1234L)
+                .itemTemplateId(1234L)
                 .attributes(null)
                 .count(5L)
                 .unitPrice(100_000L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertTrue(line.getAttributes().isEmpty());
@@ -41,11 +41,11 @@ class TradeLineTest {
         source.put(Attribute.FIRE, 300);
 
         TradeLine line = TradeLine.builder()
-                .itemId(1234L)
+                .itemTemplateId(1234L)
                 .attributes(source)
                 .count(1L)
                 .unitPrice(1L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertThrows(
@@ -58,11 +58,11 @@ class TradeLineTest {
         source.put(Attribute.FIRE, 300);
 
         TradeLine line = TradeLine.builder()
-                .itemId(1234L)
+                .itemTemplateId(1234L)
                 .attributes(source)
                 .count(1L)
                 .unitPrice(1L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         source.put(Attribute.WATER, 150);
@@ -74,10 +74,10 @@ class TradeLineTest {
     @Test
     void enchantLevel_shouldDefaultToNull_signalingNotApplicable() {
         TradeLine line = TradeLine.builder()
-                .itemId(1234L)
+                .itemTemplateId(1234L)
                 .count(1L)
                 .unitPrice(1L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertNull(line.getEnchantLevel());
@@ -86,11 +86,11 @@ class TradeLineTest {
     @Test
     void enchantLevel_shouldRoundtripExplicitZero() {
         TradeLine line = TradeLine.builder()
-                .itemId(1234L)
+                .itemTemplateId(1234L)
                 .enchantLevel(0)
                 .count(1L)
                 .unitPrice(1L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertEquals(Integer.valueOf(0), line.getEnchantLevel());
@@ -103,12 +103,12 @@ class TradeLineTest {
         attrs.put(Attribute.HOLY, 150);
 
         TradeLine original = TradeLine.builder()
-                .itemId(6364L)
+                .itemTemplateId(6364L)
                 .enchantLevel(Integer.valueOf(16))
                 .attributes(attrs)
                 .count(1L)
                 .unitPrice(1_500_000_000L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         TradeLine copy = original.toBuilder().build();
@@ -119,16 +119,16 @@ class TradeLineTest {
     @Test
     void equals_shouldDistinguishUnitPrice() {
         TradeLine a = TradeLine.builder()
-                .itemId(1L)
+                .itemTemplateId(1L)
                 .count(1L)
                 .unitPrice(100L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
         TradeLine b = TradeLine.builder()
-                .itemId(1L)
+                .itemTemplateId(1L)
                 .count(1L)
                 .unitPrice(101L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertNotEquals(a, b);
@@ -137,17 +137,17 @@ class TradeLineTest {
     @Test
     void equals_shouldDistinguishAttributes() {
         TradeLine a = TradeLine.builder()
-                .itemId(1L)
+                .itemTemplateId(1L)
                 .count(1L)
                 .unitPrice(1L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .attributes(java.util.Collections.singletonMap(Attribute.FIRE, 300))
                 .build();
         TradeLine b = TradeLine.builder()
-                .itemId(1L)
+                .itemTemplateId(1L)
                 .count(1L)
                 .unitPrice(1L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .attributes(java.util.Collections.singletonMap(Attribute.WATER, 300))
                 .build();
 

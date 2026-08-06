@@ -147,10 +147,10 @@ class PrivateStorePurchaseEventTest {
 
     private static TradeLine stubLine(long itemId, long unitPrice) {
         return TradeLine.builder()
-                .itemId(itemId)
+                .itemTemplateId(itemId)
                 .count(1L)
                 .unitPrice(unitPrice)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
     }
 }

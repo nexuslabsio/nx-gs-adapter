@@ -17,7 +17,7 @@ class OfferTest {
                 .traderId(42L)
                 .count(1L)
                 .unitPrice(100L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertTrue(offer.getAttributes().isEmpty());
@@ -30,7 +30,7 @@ class OfferTest {
                 .attributes(null)
                 .count(1L)
                 .unitPrice(100L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertTrue(offer.getAttributes().isEmpty());
@@ -46,7 +46,7 @@ class OfferTest {
                 .attributes(source)
                 .count(1L)
                 .unitPrice(100L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertThrows(
@@ -63,7 +63,7 @@ class OfferTest {
                 .attributes(source)
                 .count(1L)
                 .unitPrice(100L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         source.put(Attribute.WATER, 150);
@@ -83,7 +83,7 @@ class OfferTest {
                 .attributes(attrs)
                 .count(2L)
                 .unitPrice(50_000_000L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         Offer copy = original.toBuilder().build();
@@ -97,13 +97,13 @@ class OfferTest {
                 .traderId(1L)
                 .count(1L)
                 .unitPrice(100L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
         Offer b = Offer.builder()
                 .traderId(2L)
                 .count(1L)
                 .unitPrice(100L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .build();
 
         assertNotEquals(a, b);
@@ -115,14 +115,14 @@ class OfferTest {
                 .traderId(1L)
                 .count(1L)
                 .unitPrice(100L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .attributes(Collections.singletonMap(Attribute.FIRE, 300))
                 .build();
         Offer b = Offer.builder()
                 .traderId(1L)
                 .count(1L)
                 .unitPrice(100L)
-                .currencyItemId(57L)
+                .currencyItemTemplateId(57L)
                 .attributes(Collections.singletonMap(Attribute.FIRE, 301))
                 .build();
 

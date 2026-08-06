@@ -40,7 +40,7 @@ instead. `NNN` is a zero-padded sequential id; the index lives in `docs/CLAUDE.m
   canonical `offline_trade` / `fishing`; hosts MAY publish arbitrary
   non-canonical keys; cadence host-managed);
   `events.privatestore` (multi-event family: `PrivateStorePurchaseEvent`
-  for closed deals + `PrivateStoreSnapshotEvent` for per-`(itemId, side)`
+  for closed deals + `PrivateStoreSnapshotEvent` for per-`(itemTemplateId, side)`
   order book, with `TradeLine` / `Offer` line types, `PrivateStoreSide`
   enum, and `WellKnownElements` constants — no abstract base; one publish
   method per concrete subtype on `NxEvents`). `WellKnownPrivateStoreMetadata`

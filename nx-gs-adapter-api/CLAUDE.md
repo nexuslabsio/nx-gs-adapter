@@ -162,11 +162,11 @@ scaling?: List<GearScoreScalingStep>}`, `GearScoreScalingStep{from, to?, value}`
     the per-server level→exp table, dispatched by `Nx-Message-Type` on this same
     topic rather than a dedicated one.
   - `events.privatestore` — `PrivateStorePurchaseEvent` (closed-deal facts)
-    - `PrivateStoreSnapshotEvent` (per-`(itemId, side)` order book) +
+    - `PrivateStoreSnapshotEvent` (per-`(itemTemplateId, side)` order book) +
       `TradeLine` / `Offer` line types + `PrivateStoreSide` enum +
       `WellKnownElements` constants. Multi-event family (no abstract base);
       both subtypes ride one topic, host-pushed via `NxEvents.publish(...)`
-      with the concrete subtype. Partition keys: snapshot → `itemId`,
+      with the concrete subtype. Partition keys: snapshot → `itemTemplateId`,
       purchase → `null` (round-robin, no single natural per-entity key).
       `WellKnownPrivateStoreMetadata` keys for `PrivateStorePurchaseEvent.metadata`:
       `STORE_OWNER_ADENA` (recipient's post-deal balance), `SOURCE` (`SOURCE_IN_GAME` /

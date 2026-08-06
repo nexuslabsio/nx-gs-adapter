@@ -149,7 +149,7 @@ class EventTypeRegistryTest {
         EventTypeBinding binding = new EventTypeRegistry().lookup(PrivateStoreSnapshotEvent.class);
         PrivateStoreSnapshotEvent event = PrivateStoreSnapshotEvent.builder()
                 .eventId(UUIDv7.generate())
-                .itemId(0xDEADBEEFL)
+                .itemTemplateId(0xDEADBEEFL)
                 .side(PrivateStoreSide.ASK)
                 .build();
 

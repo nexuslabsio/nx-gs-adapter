@@ -11,13 +11,6 @@ import org.jspecify.annotations.Nullable;
  * One open position in a player's private store at snapshot tick.
  * {@code (itemTemplateId, side)} is on the parent {@link PrivateStoreSnapshotEvent};
  * per-offer fields describe trader / modifiers / quantity / price.
- *
- * <p><b>Rename in flight (spec 065 §2.2, release N of 2).</b> {@code currencyItemId}
- * is a TEMPLATE reference and is being renamed to {@code currencyItemTemplateId}.
- * Both fields ride the wire this release — producers set both to the same
- * value, consumers should read {@code currencyItemTemplateId} with a fallback
- * to {@code currencyItemId}. {@code currencyItemId} is removed once every
- * producer emits {@code currencyItemTemplateId} (release N+1).</p>
  */
 public final class Offer {
 
@@ -27,7 +20,6 @@ public final class Offer {
     private final @Nullable Map<Attribute, Integer> attributes;
     private final long count;
     private final long unitPrice;
-    private final long currencyItemId;
     private final @Nullable Long currencyItemTemplateId;
     private final @Nullable Boolean packaged;
 
@@ -38,7 +30,6 @@ public final class Offer {
             @Nullable Map<Attribute, Integer> attributes,
             long count,
             long unitPrice,
-            long currencyItemId,
             @Nullable Long currencyItemTemplateId,
             @Nullable Boolean packaged) {
         this.itemId = itemId;
@@ -47,7 +38,6 @@ public final class Offer {
         this.attributes = freezeMap(attributes);
         this.count = count;
         this.unitPrice = unitPrice;
-        this.currencyItemId = currencyItemId;
         this.currencyItemTemplateId = currencyItemTemplateId;
         this.packaged = packaged;
     }
@@ -91,20 +81,8 @@ public final class Offer {
     }
 
     /**
-     * @deprecated renamed to {@link #getCurrencyItemTemplateId()} — the field
-     *     is a TEMPLATE id, not an instance id. Removed once every producer
-     *     emits {@code currencyItemTemplateId} (bohpts game-server restart
-     *     under the new adapter jar).
-     */
-    @Deprecated
-    public long getCurrencyItemId() {
-        return currencyItemId;
-    }
-
-    /**
      * Currency item template id (typically {@code 57} = Adena). {@code null}
-     * on old producers that only emit the deprecated
-     * {@link #getCurrencyItemId() currencyItemId}.
+     * when the host does not report it.
      */
     public @Nullable Long getCurrencyItemTemplateId() {
         return currencyItemTemplateId;
@@ -127,7 +105,6 @@ public final class Offer {
                 .attributes(attributes)
                 .count(count)
                 .unitPrice(unitPrice)
-                .currencyItemId(currencyItemId)
                 .currencyItemTemplateId(currencyItemTemplateId)
                 .packaged(packaged);
     }
@@ -151,7 +128,6 @@ public final class Offer {
         return traderId == that.traderId
                 && count == that.count
                 && unitPrice == that.unitPrice
-                && currencyItemId == that.currencyItemId
                 && Objects.equals(itemId, that.itemId)
                 && Objects.equals(currencyItemTemplateId, that.currencyItemTemplateId)
                 && Objects.equals(enchantLevel, that.enchantLevel)
@@ -162,15 +138,7 @@ public final class Offer {
     @Override
     public int hashCode() {
         return Objects.hash(
-                itemId,
-                traderId,
-                enchantLevel,
-                attributes,
-                count,
-                unitPrice,
-                currencyItemId,
-                currencyItemTemplateId,
-                packaged);
+                itemId, traderId, enchantLevel, attributes, count, unitPrice, currencyItemTemplateId, packaged);
     }
 
     @Override
@@ -181,7 +149,6 @@ public final class Offer {
                 + ", attributes=" + attributes
                 + ", count=" + count
                 + ", unitPrice=" + unitPrice
-                + ", currencyItemId=" + currencyItemId
                 + ", currencyItemTemplateId=" + currencyItemTemplateId
                 + ", packaged=" + packaged + "]";
     }
@@ -193,7 +160,6 @@ public final class Offer {
         private @Nullable Map<Attribute, Integer> attributes;
         private long count;
         private long unitPrice;
-        private long currencyItemId;
         private @Nullable Long currencyItemTemplateId;
         private @Nullable Boolean packaged;
 
@@ -227,15 +193,6 @@ public final class Offer {
             return this;
         }
 
-        /**
-         * @deprecated renamed to {@link #currencyItemTemplateId(long)}.
-         */
-        @Deprecated
-        public Builder currencyItemId(long currencyItemId) {
-            this.currencyItemId = currencyItemId;
-            return this;
-        }
-
         public Builder currencyItemTemplateId(@Nullable Long currencyItemTemplateId) {
             this.currencyItemTemplateId = currencyItemTemplateId;
             return this;
@@ -248,15 +205,7 @@ public final class Offer {
 
         public Offer build() {
             return new Offer(
-                    itemId,
-                    traderId,
-                    enchantLevel,
-                    attributes,
-                    count,
-                    unitPrice,
-                    currencyItemId,
-                    currencyItemTemplateId,
-                    packaged);
+                    itemId, traderId, enchantLevel, attributes, count, unitPrice, currencyItemTemplateId, packaged);
         }
     }
 }

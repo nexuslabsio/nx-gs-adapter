@@ -62,10 +62,10 @@ final class EventTypeRegistry {
         register(map, families, PrivateStorePurchaseEvent.class, "privatestore", evt -> null);
         register(map, families, PrivateStoreSnapshotEvent.class, "privatestore", evt -> {
             PrivateStoreSnapshotEvent e = (PrivateStoreSnapshotEvent) evt;
-            // itemTemplateId is the new name; fall back to the deprecated itemId while
-            // producers still on the old adapter emit only the latter (same value).
+            // itemTemplateId is always set by current producers; 0 is a degenerate
+            // partition key for the (unexpected) null case, not a real fallback.
             Long tpl = e.getItemTemplateId();
-            long templateId = tpl != null ? tpl : e.getItemId();
+            long templateId = tpl != null ? tpl : 0L;
             return LongBytes.bigEndian(templateId);
         });
         register(

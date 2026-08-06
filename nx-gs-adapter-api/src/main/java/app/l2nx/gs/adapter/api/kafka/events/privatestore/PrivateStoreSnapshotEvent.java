@@ -33,13 +33,6 @@ import org.jspecify.annotations.Nullable;
  * by {@code (unitPrice ASC, traderId ASC, enchantLevel ASC)} BEFORE hashing,
  * to keep change-detection from firing on insertion-order noise.</p>
  *
- * <p><b>Rename in flight (spec 065 §2.2, release N of 2).</b> {@code itemId}
- * is a TEMPLATE reference and is being renamed to {@code itemTemplateId}.
- * Both fields ride the wire this release — producers set both to the same
- * value, consumers should read {@code itemTemplateId} with a fallback to
- * {@code itemId}. {@code itemId} is removed once every producer emits
- * {@code itemTemplateId} (release N+1).</p>
- *
  * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
  * parameter names so Gson / Jackson can deserialize without
  * {@code @JsonProperty}.</p>
@@ -47,7 +40,6 @@ import org.jspecify.annotations.Nullable;
 public final class PrivateStoreSnapshotEvent {
 
     private final UUID eventId;
-    private final long itemId;
     private final @Nullable Long itemTemplateId;
     private final PrivateStoreSide side;
     private final List<Offer> offers;
@@ -55,13 +47,11 @@ public final class PrivateStoreSnapshotEvent {
 
     public PrivateStoreSnapshotEvent(
             UUID eventId,
-            long itemId,
             @Nullable Long itemTemplateId,
             PrivateStoreSide side,
             @Nullable List<Offer> offers,
             @Nullable Map<String, String> metadata) {
         this.eventId = eventId;
-        this.itemId = itemId;
         this.itemTemplateId = itemTemplateId;
         this.side = side;
         this.offers = freezeList(offers);
@@ -78,23 +68,11 @@ public final class PrivateStoreSnapshotEvent {
     }
 
     /**
-     * @deprecated renamed to {@link #getItemTemplateId()} — the field is a
-     *     TEMPLATE id, not an instance id. Removed once every producer emits
-     *     {@code itemTemplateId} (bohpts game-server restart under the new
-     *     adapter jar).
-     */
-    @Deprecated
-    public long getItemId() {
-        return itemId;
-    }
-
-    /**
      * The item template this order-book snapshot describes. Used as the
-     * Kafka partition key (8-byte big-endian) going forward, so all updates
-     * for the same item template land on the same partition for ordered
-     * consumption / topic compaction. {@code null} on old producers that only
-     * emit the deprecated {@link #getItemId() itemId} — see the class-level
-     * rename-in-flight Javadoc.
+     * Kafka partition key (8-byte big-endian), so all updates for the same
+     * item template land on the same partition for ordered consumption /
+     * topic compaction. {@code null} when the host does not resolve a
+     * template for the pair.
      */
     public @Nullable Long getItemTemplateId() {
         return itemTemplateId;
@@ -133,7 +111,6 @@ public final class PrivateStoreSnapshotEvent {
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
-                .itemId(itemId)
                 .itemTemplateId(itemTemplateId)
                 .side(side)
                 .offers(offers)
@@ -156,8 +133,7 @@ public final class PrivateStoreSnapshotEvent {
         if (this == o) return true;
         if (!(o instanceof PrivateStoreSnapshotEvent)) return false;
         PrivateStoreSnapshotEvent that = (PrivateStoreSnapshotEvent) o;
-        return itemId == that.itemId
-                && Objects.equals(itemTemplateId, that.itemTemplateId)
+        return Objects.equals(itemTemplateId, that.itemTemplateId)
                 && Objects.equals(eventId, that.eventId)
                 && side == that.side
                 && Objects.equals(offers, that.offers)
@@ -166,13 +142,12 @@ public final class PrivateStoreSnapshotEvent {
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, itemId, itemTemplateId, side, offers, metadata);
+        return Objects.hash(eventId, itemTemplateId, side, offers, metadata);
     }
 
     @Override
     public String toString() {
         return "PrivateStoreSnapshotEvent[eventId=" + eventId
-                + ", itemId=" + itemId
                 + ", itemTemplateId=" + itemTemplateId
                 + ", side=" + side
                 + ", offers=" + offers
@@ -181,7 +156,6 @@ public final class PrivateStoreSnapshotEvent {
 
     public static final class Builder {
         private UUID eventId;
-        private long itemId;
         private @Nullable Long itemTemplateId;
         private PrivateStoreSide side;
         private @Nullable List<Offer> offers;
@@ -189,15 +163,6 @@ public final class PrivateStoreSnapshotEvent {
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
-            return this;
-        }
-
-        /**
-         * @deprecated renamed to {@link #itemTemplateId(long)}.
-         */
-        @Deprecated
-        public Builder itemId(long itemId) {
-            this.itemId = itemId;
             return this;
         }
 
@@ -222,7 +187,7 @@ public final class PrivateStoreSnapshotEvent {
         }
 
         public PrivateStoreSnapshotEvent build() {
-            return new PrivateStoreSnapshotEvent(eventId, itemId, itemTemplateId, side, offers, metadata);
+            return new PrivateStoreSnapshotEvent(eventId, itemTemplateId, side, offers, metadata);
         }
     }
 }
