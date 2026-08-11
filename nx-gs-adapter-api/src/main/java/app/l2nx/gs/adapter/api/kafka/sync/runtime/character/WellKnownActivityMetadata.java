@@ -15,10 +15,15 @@ import app.l2nx.gs.adapter.api.domain.character.CharacterPrivateStore;
  * without an API release, and consumers ignore keys they do not understand.
  * Adding a constant here is a non-breaking minor-version change.</p>
  *
+ * <p><b>Durations are ISO-8601</b> ({@code "PT15M"} / {@code "PT4H59M49S"}) — the same form every
+ * other duration on the platform takes, so a consumer parses one format. The superseded
+ * {@code *_seconds} / {@code seconds_*} keys carried raw seconds and are deprecated below.</p>
+ *
  * <h2>Common</h2>
  * <ul>
- *   <li>{@link #ELAPSED_SECONDS} — how long the character has been in this
- *   activity, in seconds. Applicable to any timed activity, not just fishing.</li>
+ *   <li>{@link #ELAPSED} — how long the character has been in this activity.
+ *   Applicable to any timed activity, not just fishing.</li>
+ *   <li>{@link #REMAINING} — how long before a timed activity expires.</li>
  * </ul>
  *
  * <h2>Fishing ({@link WellKnownActivities#FISHING})</h2>
@@ -30,14 +35,14 @@ import app.l2nx.gs.adapter.api.domain.character.CharacterPrivateStore;
  *   decimal string (e.g. {@code "1.0"} / {@code "0.5"} / {@code "0.1"}).</li>
  *   <li>{@link #PENALTY_TIER} — current penalty tier; canonical values
  *   {@link #TIER_NONE} / {@link #TIER_1} / {@link #TIER_2}.</li>
- *   <li>{@link #SECONDS_TO_NEXT_TIER} — seconds of further active fishing until
- *   the next penalty tier kicks in. Omitted once at the worst tier (no next).</li>
+ *   <li>{@link #TIME_TO_NEXT_TIER} — further active fishing until the next
+ *   penalty tier kicks in. Omitted once at the worst tier (no next).</li>
  * </ul>
  *
  * <h2>Autofarming ({@link WellKnownActivities#AUTOFARMING})</h2>
  * <ul>
- *   <li>{@link #SECONDS_REMAINING} — seconds of purchased auto-farm time left
- *   before it expires. Omitted when the farm is unlimited / free (no countdown).</li>
+ *   <li>{@link #REMAINING} — purchased auto-farm time left before it expires.
+ *   Omitted when the farm is unlimited / free (no countdown).</li>
  * </ul>
  *
  * <h2>Trading ({@link WellKnownActivities#TRADE} / {@link WellKnownActivities#OFFLINE_TRADE})</h2>
@@ -52,14 +57,31 @@ public final class WellKnownActivityMetadata {
     // ── Common ──────────────────────────────────────────────────────────────
 
     /**
-     * Seconds the character has been in this activity (any timed activity).
+     * How long the character has been in this activity, ISO-8601 (any timed activity).
      */
+    public static final String ELAPSED = "elapsed";
+
+    /**
+     * How long before a timed activity expires, ISO-8601 (e.g. purchased
+     * auto-farm time). Omitted when the activity has no countdown.
+     */
+    public static final String REMAINING = "remaining";
+
+    /**
+     * Raw-seconds spelling of {@link #ELAPSED}.
+     *
+     * @deprecated use {@link #ELAPSED} (ISO-8601). Removed once every host emits the ISO key —
+     *     for bohpts, the morning game-server restart following the core release that switched.
+     */
+    @Deprecated
     public static final String ELAPSED_SECONDS = "elapsed_seconds";
 
     /**
-     * Seconds remaining before a timed activity expires (e.g. purchased
-     * auto-farm time). Omitted when the activity has no countdown.
+     * Raw-seconds spelling of {@link #REMAINING}.
+     *
+     * @deprecated use {@link #REMAINING} (ISO-8601). Same removal gate as {@link #ELAPSED_SECONDS}.
      */
+    @Deprecated
     public static final String SECONDS_REMAINING = "seconds_remaining";
 
     // ── Fishing ─────────────────────────────────────────────────────────────
@@ -75,8 +97,17 @@ public final class WellKnownActivityMetadata {
     public static final String PENALTY_TIER = "penalty_tier";
 
     /**
-     * Seconds of further active fishing until the next penalty tier.
+     * Further active fishing until the next penalty tier, ISO-8601.
      */
+    public static final String TIME_TO_NEXT_TIER = "time_to_next_tier";
+
+    /**
+     * Raw-seconds spelling of {@link #TIME_TO_NEXT_TIER}.
+     *
+     * @deprecated use {@link #TIME_TO_NEXT_TIER} (ISO-8601). Same removal gate as
+     *     {@link #ELAPSED_SECONDS}.
+     */
+    @Deprecated
     public static final String SECONDS_TO_NEXT_TIER = "seconds_to_next_tier";
 
     /**

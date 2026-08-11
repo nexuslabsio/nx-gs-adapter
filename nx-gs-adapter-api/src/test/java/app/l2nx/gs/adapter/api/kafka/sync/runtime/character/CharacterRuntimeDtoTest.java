@@ -18,7 +18,7 @@ class CharacterRuntimeDtoTest {
     private static Activity fishing() {
         return Activity.builder()
                 .type(WellKnownActivities.FISHING)
-                .metadata(Collections.singletonMap(WellKnownActivityMetadata.ELAPSED_SECONDS, "1820"))
+                .metadata(Collections.singletonMap(WellKnownActivityMetadata.ELAPSED, "PT30M20S"))
                 .build();
     }
 
@@ -106,7 +106,7 @@ class CharacterRuntimeDtoTest {
         assertEquals("idle", dto.getAiStatus());
         assertEquals(Collections.singletonList(activity), dto.getActivities());
         assertEquals("fishing", dto.getActivities().get(0).getType());
-        assertEquals("1820", dto.getActivities().get(0).getMetadata().get(WellKnownActivityMetadata.ELAPSED_SECONDS));
+        assertEquals("PT30M20S", dto.getActivities().get(0).getMetadata().get(WellKnownActivityMetadata.ELAPSED));
     }
 
     @Test
@@ -216,7 +216,7 @@ class CharacterRuntimeDtoTest {
     void activities_shouldCarryMultipleEntries() {
         Activity autofarming = Activity.builder()
                 .type(WellKnownActivities.AUTOFARMING)
-                .metadata(Collections.singletonMap(WellKnownActivityMetadata.SECONDS_REMAINING, "3600"))
+                .metadata(Collections.singletonMap(WellKnownActivityMetadata.REMAINING, "PT1H"))
                 .build();
         CharacterRuntimeDto dto = CharacterRuntimeDto.builder()
                 .id(42L)
