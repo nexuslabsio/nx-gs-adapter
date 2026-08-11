@@ -10,7 +10,8 @@ import java.util.Objects;
  *
  * <p><b>Money.</b> {@code paidTotalAdena = itemsTotalAdena + taxAdena}, where
  * {@code itemsTotalAdena} went to the seller and {@code taxAdena} was burned —
- * debited from the buyer and credited to nobody.</p>
+ * debited from the buyer and credited to nobody. The constructor enforces this
+ * invariant via {@link IllegalArgumentException} for programmatic construction.</p>
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
@@ -22,14 +23,25 @@ public final class BuyFromPrivateStoreResult {
     private final long paidTotalAdena;
     private final List<BoughtLine> bought;
     private final boolean storeClosed;
+    private final long mailId;
 
     public BuyFromPrivateStoreResult(
-            long itemsTotalAdena, long taxAdena, long paidTotalAdena, List<BoughtLine> bought, boolean storeClosed) {
+            long itemsTotalAdena,
+            long taxAdena,
+            long paidTotalAdena,
+            List<BoughtLine> bought,
+            boolean storeClosed,
+            long mailId) {
+        if (paidTotalAdena != itemsTotalAdena + taxAdena) {
+            throw new IllegalArgumentException("paidTotalAdena (" + paidTotalAdena
+                    + ") must equal itemsTotalAdena + taxAdena (" + (itemsTotalAdena + taxAdena) + ")");
+        }
         this.itemsTotalAdena = itemsTotalAdena;
         this.taxAdena = taxAdena;
         this.paidTotalAdena = paidTotalAdena;
         this.bought = PrivateStoreLists.freeze(bought);
         this.storeClosed = storeClosed;
+        this.mailId = mailId;
     }
 
     /**
@@ -70,13 +82,23 @@ public final class BuyFromPrivateStoreResult {
         return storeClosed;
     }
 
+    /**
+     * Id of the delivery mail carrying the bought items; eventual-consistent —
+     * resolving it through the mail-read API immediately after this reply may
+     * still 404 until the asynchronous mail-ingest catches up.
+     */
+    public long getMailId() {
+        return mailId;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .itemsTotalAdena(itemsTotalAdena)
                 .taxAdena(taxAdena)
                 .paidTotalAdena(paidTotalAdena)
                 .bought(bought)
-                .storeClosed(storeClosed);
+                .storeClosed(storeClosed)
+                .mailId(mailId);
     }
 
     public static Builder builder() {
@@ -92,12 +114,13 @@ public final class BuyFromPrivateStoreResult {
                 && taxAdena == that.taxAdena
                 && paidTotalAdena == that.paidTotalAdena
                 && storeClosed == that.storeClosed
+                && mailId == that.mailId
                 && Objects.equals(bought, that.bought);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(itemsTotalAdena, taxAdena, paidTotalAdena, bought, Boolean.valueOf(storeClosed));
+        return Objects.hash(itemsTotalAdena, taxAdena, paidTotalAdena, bought, Boolean.valueOf(storeClosed), mailId);
     }
 
     @Override
@@ -106,7 +129,8 @@ public final class BuyFromPrivateStoreResult {
                 + ", taxAdena=" + taxAdena
                 + ", paidTotalAdena=" + paidTotalAdena
                 + ", bought=" + bought
-                + ", storeClosed=" + storeClosed + "]";
+                + ", storeClosed=" + storeClosed
+                + ", mailId=" + mailId + "]";
     }
 
     public static final class Builder {
@@ -115,6 +139,7 @@ public final class BuyFromPrivateStoreResult {
         private long paidTotalAdena;
         private List<BoughtLine> bought;
         private boolean storeClosed;
+        private long mailId;
 
         public Builder itemsTotalAdena(long itemsTotalAdena) {
             this.itemsTotalAdena = itemsTotalAdena;
@@ -141,8 +166,14 @@ public final class BuyFromPrivateStoreResult {
             return this;
         }
 
+        public Builder mailId(long mailId) {
+            this.mailId = mailId;
+            return this;
+        }
+
         public BuyFromPrivateStoreResult build() {
-            return new BuyFromPrivateStoreResult(itemsTotalAdena, taxAdena, paidTotalAdena, bought, storeClosed);
+            return new BuyFromPrivateStoreResult(
+                    itemsTotalAdena, taxAdena, paidTotalAdena, bought, storeClosed, mailId);
         }
     }
 }

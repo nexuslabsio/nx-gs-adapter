@@ -17,16 +17,27 @@ import org.jspecify.annotations.Nullable;
  */
 public final class BoughtLine {
 
+    private final int itemId;
     private final long itemTemplateId;
     private final @Nullable Integer enchantLevel;
     private final long count;
     private final long unitPriceAdena;
 
-    public BoughtLine(long itemTemplateId, @Nullable Integer enchantLevel, long count, long unitPriceAdena) {
+    public BoughtLine(
+            int itemId, long itemTemplateId, @Nullable Integer enchantLevel, long count, long unitPriceAdena) {
+        this.itemId = itemId;
         this.itemTemplateId = itemTemplateId;
         this.enchantLevel = enchantLevel;
         this.count = count;
         this.unitPriceAdena = unitPriceAdena;
+    }
+
+    /**
+     * Object id of the specific item instance the buyer saw in the market
+     * book — the same identity key as the requesting {@link BuyLine#getItemId()}.
+     */
+    public int getItemId() {
+        return itemId;
     }
 
     public long getItemTemplateId() {
@@ -56,6 +67,7 @@ public final class BoughtLine {
 
     public Builder toBuilder() {
         return new Builder()
+                .itemId(itemId)
                 .itemTemplateId(itemTemplateId)
                 .enchantLevel(enchantLevel)
                 .count(count)
@@ -71,7 +83,8 @@ public final class BoughtLine {
         if (this == o) return true;
         if (!(o instanceof BoughtLine)) return false;
         BoughtLine that = (BoughtLine) o;
-        return itemTemplateId == that.itemTemplateId
+        return itemId == that.itemId
+                && itemTemplateId == that.itemTemplateId
                 && count == that.count
                 && unitPriceAdena == that.unitPriceAdena
                 && Objects.equals(enchantLevel, that.enchantLevel);
@@ -79,22 +92,29 @@ public final class BoughtLine {
 
     @Override
     public int hashCode() {
-        return Objects.hash(itemTemplateId, enchantLevel, count, unitPriceAdena);
+        return Objects.hash(itemId, itemTemplateId, enchantLevel, count, unitPriceAdena);
     }
 
     @Override
     public String toString() {
-        return "BoughtLine[itemTemplateId=" + itemTemplateId
+        return "BoughtLine[itemId=" + itemId
+                + ", itemTemplateId=" + itemTemplateId
                 + ", enchantLevel=" + enchantLevel
                 + ", count=" + count
                 + ", unitPriceAdena=" + unitPriceAdena + "]";
     }
 
     public static final class Builder {
+        private int itemId;
         private long itemTemplateId;
         private @Nullable Integer enchantLevel;
         private long count;
         private long unitPriceAdena;
+
+        public Builder itemId(int itemId) {
+            this.itemId = itemId;
+            return this;
+        }
 
         public Builder itemTemplateId(long itemTemplateId) {
             this.itemTemplateId = itemTemplateId;
@@ -117,7 +137,7 @@ public final class BoughtLine {
         }
 
         public BoughtLine build() {
-            return new BoughtLine(itemTemplateId, enchantLevel, count, unitPriceAdena);
+            return new BoughtLine(itemId, itemTemplateId, enchantLevel, count, unitPriceAdena);
         }
     }
 }

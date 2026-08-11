@@ -1,8 +1,11 @@
 package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Inbound command instructing the game-server to buy the given lots from
@@ -23,6 +26,8 @@ import java.util.Objects;
  *     weight, slots, regulated combat, …).</li>
  *     <li>{@code FORBIDDEN} — the buyer is barred from trading at all
  *     (security lock, cursed weapon, restricted account).</li>
+ *     <li>{@code COMMAND_EXPIRED} — {@link #getDeadline() deadline} has
+ *     already passed when the host picked up the command; nothing moved.</li>
  * </ul>
  *
  * <p><b>Machine-readable reject reason.</b> Every non-OK reply carries a
@@ -39,11 +44,12 @@ import java.util.Objects;
  * silently buying less than the caller saw.</p>
  *
  * <p><b>Required fields.</b> {@link #getBuyerCharId() buyerCharId},
- * {@link #getSellerCharId() sellerCharId} and a non-empty {@link #getLines()
- * lines} are REQUIRED; buyer and seller MUST differ. The constructor enforces
- * this via {@link IllegalArgumentException} for programmatic construction.
- * Wire-path deserialization bypasses the constructor — the handler re-checks
- * and emits {@code VALIDATION_FAILED}.</p>
+ * {@link #getSellerCharId() sellerCharId}, a non-empty {@link #getLines()
+ * lines} and {@link #getDeadline() deadline} are REQUIRED; buyer and seller
+ * MUST differ. The constructor enforces this via
+ * {@link IllegalArgumentException} for programmatic construction. Wire-path
+ * deserialization bypasses the constructor — the handler re-checks and emits
+ * {@code VALIDATION_FAILED}.</p>
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
@@ -53,25 +59,54 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
     /** Upper bound the host clamps {@link #getTax() tax} to. */
     public static final int MAX_TAX_PERCENT = 50;
 
+    /**
+     * Hard cap on {@link #getLines() lines} — the host delivers the purchase as
+     * a single mail with one attachment slot per line, and the engine's mail
+     * attachment cap ({@code Config.MAIL_MAX_ATTACHMENTS}) is 36.
+     */
+    public static final int MAX_LINES = 36;
+
     private final int buyerCharId;
     private final int sellerCharId;
     private final List<BuyLine> lines;
     private final int tax;
+    private final Instant deadline;
 
-    public BuyFromPrivateStoreCommand(int buyerCharId, int sellerCharId, List<BuyLine> lines, int tax) {
-        if (lines == null || lines.isEmpty()) {
-            throw new IllegalArgumentException("lines is required and must be non-empty");
+    public BuyFromPrivateStoreCommand(
+            int buyerCharId, int sellerCharId, List<BuyLine> lines, int tax, Instant deadline) {
+        if (buyerCharId <= 0) {
+            throw new IllegalArgumentException("buyerCharId must be positive (got " + buyerCharId + ")");
+        }
+        if (sellerCharId <= 0) {
+            throw new IllegalArgumentException("sellerCharId must be positive (got " + sellerCharId + ")");
         }
         if (buyerCharId == sellerCharId) {
             throw new IllegalArgumentException("buyerCharId must differ from sellerCharId (got " + buyerCharId + ")");
         }
-        if (tax < 0) {
-            throw new IllegalArgumentException("tax must be non-negative (got " + tax + ")");
+        if (lines == null || lines.isEmpty()) {
+            throw new IllegalArgumentException("lines is required and must be non-empty");
+        }
+        if (lines.size() > MAX_LINES) {
+            throw new IllegalArgumentException(
+                    "lines must not exceed MAX_LINES=" + MAX_LINES + " (got " + lines.size() + ")");
+        }
+        Set<Integer> seenItemIds = new HashSet<>();
+        for (BuyLine line : lines) {
+            if (line == null) {
+                throw new IllegalArgumentException("lines must not contain null elements");
+            }
+            if (!seenItemIds.add(line.getItemId())) {
+                throw new IllegalArgumentException("lines must not repeat itemId (duplicate " + line.getItemId() + ")");
+            }
+        }
+        if (tax < 0 || tax > MAX_TAX_PERCENT) {
+            throw new IllegalArgumentException("tax must be in 0.." + MAX_TAX_PERCENT + " (got " + tax + ")");
         }
         this.buyerCharId = buyerCharId;
         this.sellerCharId = sellerCharId;
         this.lines = PrivateStoreLists.freeze(lines);
         this.tax = tax;
+        this.deadline = Objects.requireNonNull(deadline, "deadline");
     }
 
     /**
@@ -107,12 +142,26 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         return tax;
     }
 
+    /**
+     * Moment after which the host MUST refuse to execute this command
+     * ({@code COMMAND_EXPIRED}, nothing moves) instead of running it. The
+     * platform stamps {@code now + reply-timeout} at dispatch; the host checks
+     * this first, before resolving the seller or touching the seller's trade
+     * list. Guards against a command sitting in the Kafka backlog (retention
+     * ~3h) while the game-server was down and executing stale on restart.
+     * REQUIRED — {@code null} rejected in the constructor.
+     */
+    public Instant getDeadline() {
+        return deadline;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .buyerCharId(buyerCharId)
                 .sellerCharId(sellerCharId)
                 .lines(lines)
-                .tax(tax);
+                .tax(tax)
+                .deadline(deadline);
     }
 
     public static Builder builder() {
@@ -127,12 +176,13 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         return buyerCharId == that.buyerCharId
                 && sellerCharId == that.sellerCharId
                 && tax == that.tax
-                && Objects.equals(lines, that.lines);
+                && Objects.equals(lines, that.lines)
+                && Objects.equals(deadline, that.deadline);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(buyerCharId, sellerCharId, lines, tax);
+        return Objects.hash(buyerCharId, sellerCharId, lines, tax, deadline);
     }
 
     @Override
@@ -140,7 +190,8 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         return "BuyFromPrivateStoreCommand[buyerCharId=" + buyerCharId
                 + ", sellerCharId=" + sellerCharId
                 + ", lines=" + lines
-                + ", tax=" + tax + "]";
+                + ", tax=" + tax
+                + ", deadline=" + deadline + "]";
     }
 
     public static final class Builder {
@@ -148,6 +199,7 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         private int sellerCharId;
         private List<BuyLine> lines;
         private int tax;
+        private Instant deadline;
 
         public Builder buyerCharId(int buyerCharId) {
             this.buyerCharId = buyerCharId;
@@ -169,8 +221,13 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
             return this;
         }
 
+        public Builder deadline(Instant deadline) {
+            this.deadline = deadline;
+            return this;
+        }
+
         public BuyFromPrivateStoreCommand build() {
-            return new BuyFromPrivateStoreCommand(buyerCharId, sellerCharId, lines, tax);
+            return new BuyFromPrivateStoreCommand(buyerCharId, sellerCharId, lines, tax, deadline);
         }
     }
 }
