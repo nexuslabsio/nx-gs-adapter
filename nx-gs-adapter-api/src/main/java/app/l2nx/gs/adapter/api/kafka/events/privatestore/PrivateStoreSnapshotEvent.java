@@ -40,14 +40,14 @@ import org.jspecify.annotations.Nullable;
 public final class PrivateStoreSnapshotEvent {
 
     private final UUID eventId;
-    private final @Nullable Long itemTemplateId;
+    private final long itemTemplateId;
     private final PrivateStoreSide side;
     private final List<Offer> offers;
     private final @Nullable Map<String, String> metadata;
 
     public PrivateStoreSnapshotEvent(
             UUID eventId,
-            @Nullable Long itemTemplateId,
+            long itemTemplateId,
             PrivateStoreSide side,
             @Nullable List<Offer> offers,
             @Nullable Map<String, String> metadata) {
@@ -71,10 +71,9 @@ public final class PrivateStoreSnapshotEvent {
      * The item template this order-book snapshot describes. Used as the
      * Kafka partition key (8-byte big-endian), so all updates for the same
      * item template land on the same partition for ordered consumption /
-     * topic compaction. {@code null} when the host does not resolve a
-     * template for the pair.
+     * topic compaction.
      */
-    public @Nullable Long getItemTemplateId() {
+    public long getItemTemplateId() {
         return itemTemplateId;
     }
 
@@ -133,7 +132,7 @@ public final class PrivateStoreSnapshotEvent {
         if (this == o) return true;
         if (!(o instanceof PrivateStoreSnapshotEvent)) return false;
         PrivateStoreSnapshotEvent that = (PrivateStoreSnapshotEvent) o;
-        return Objects.equals(itemTemplateId, that.itemTemplateId)
+        return itemTemplateId == that.itemTemplateId
                 && Objects.equals(eventId, that.eventId)
                 && side == that.side
                 && Objects.equals(offers, that.offers)
@@ -156,7 +155,7 @@ public final class PrivateStoreSnapshotEvent {
 
     public static final class Builder {
         private UUID eventId;
-        private @Nullable Long itemTemplateId;
+        private long itemTemplateId;
         private PrivateStoreSide side;
         private @Nullable List<Offer> offers;
         private @Nullable Map<String, String> metadata;
@@ -166,7 +165,7 @@ public final class PrivateStoreSnapshotEvent {
             return this;
         }
 
-        public Builder itemTemplateId(@Nullable Long itemTemplateId) {
+        public Builder itemTemplateId(long itemTemplateId) {
             this.itemTemplateId = itemTemplateId;
             return this;
         }

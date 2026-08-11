@@ -23,7 +23,7 @@ public final class PrivateStoreOfferHasher {
         if (c != 0) return c;
         c = Long.compare(a.count, b.count);
         if (c != 0) return c;
-        c = Long.compare(a.currencyItemId, b.currencyItemId);
+        c = Long.compare(a.currencyItemTemplateId, b.currencyItemTemplateId);
         if (c != 0) return c;
         // Total tie-breaker: itemId is unique per instance, so equal rows are
         // impossible past this point (spec 065 §2.1).
@@ -58,7 +58,7 @@ public final class PrivateStoreOfferHasher {
             h = mixAttributes(h, r.attributes);
             h = Fnv1a64.mix(h, r.count);
             h = Fnv1a64.mix(h, r.unitPrice);
-            h = Fnv1a64.mix(h, r.currencyItemId);
+            h = Fnv1a64.mix(h, r.currencyItemTemplateId);
             // Must be hashed: a SELL<->PACKAGE_SELL re-seat with identical
             // items/prices otherwise produces the same hash and never republishes.
             h = Fnv1a64.mix(h, r.packaged);

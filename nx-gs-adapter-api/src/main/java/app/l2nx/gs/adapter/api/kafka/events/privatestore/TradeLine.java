@@ -14,20 +14,20 @@ import org.jspecify.annotations.Nullable;
  */
 public final class TradeLine {
 
-    private final @Nullable Long itemTemplateId;
+    private final long itemTemplateId;
     private final @Nullable Integer enchantLevel;
     private final @Nullable Map<Attribute, Integer> attributes;
     private final long count;
     private final long unitPrice;
-    private final @Nullable Long currencyItemTemplateId;
+    private final long currencyItemTemplateId;
 
     public TradeLine(
-            @Nullable Long itemTemplateId,
+            long itemTemplateId,
             @Nullable Integer enchantLevel,
             @Nullable Map<Attribute, Integer> attributes,
             long count,
             long unitPrice,
-            @Nullable Long currencyItemTemplateId) {
+            long currencyItemTemplateId) {
         this.itemTemplateId = itemTemplateId;
         this.enchantLevel = enchantLevel;
         this.attributes = freezeMap(attributes);
@@ -37,10 +37,9 @@ public final class TradeLine {
     }
 
     /**
-     * Source-side L2 item template ID. {@code null} when the host does not
-     * report it.
+     * Source-side L2 item template ID.
      */
-    public @Nullable Long getItemTemplateId() {
+    public long getItemTemplateId() {
         return itemTemplateId;
     }
 
@@ -66,9 +65,9 @@ public final class TradeLine {
 
     /**
      * Currency item template id (typically {@code 57} = Adena; can differ for
-     * alt-currency stores). {@code null} when the host does not report it.
+     * alt-currency stores).
      */
-    public @Nullable Long getCurrencyItemTemplateId() {
+    public long getCurrencyItemTemplateId() {
         return currencyItemTemplateId;
     }
 
@@ -100,8 +99,8 @@ public final class TradeLine {
         TradeLine that = (TradeLine) o;
         return count == that.count
                 && unitPrice == that.unitPrice
-                && Objects.equals(itemTemplateId, that.itemTemplateId)
-                && Objects.equals(currencyItemTemplateId, that.currencyItemTemplateId)
+                && itemTemplateId == that.itemTemplateId
+                && currencyItemTemplateId == that.currencyItemTemplateId
                 && Objects.equals(enchantLevel, that.enchantLevel)
                 && Objects.equals(attributes, that.attributes);
     }
@@ -122,14 +121,14 @@ public final class TradeLine {
     }
 
     public static final class Builder {
-        private @Nullable Long itemTemplateId;
+        private long itemTemplateId;
         private @Nullable Integer enchantLevel;
         private @Nullable Map<Attribute, Integer> attributes;
         private long count;
         private long unitPrice;
-        private @Nullable Long currencyItemTemplateId;
+        private long currencyItemTemplateId;
 
-        public Builder itemTemplateId(@Nullable Long itemTemplateId) {
+        public Builder itemTemplateId(long itemTemplateId) {
             this.itemTemplateId = itemTemplateId;
             return this;
         }
@@ -154,7 +153,7 @@ public final class TradeLine {
             return this;
         }
 
-        public Builder currencyItemTemplateId(@Nullable Long currencyItemTemplateId) {
+        public Builder currencyItemTemplateId(long currencyItemTemplateId) {
             this.currencyItemTemplateId = currencyItemTemplateId;
             return this;
         }

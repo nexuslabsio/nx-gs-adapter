@@ -203,8 +203,8 @@ class PrivateStoreOfferHasherTest {
             Map<Attribute, Integer> attrs,
             long count,
             long unitPrice,
-            long currencyItemId) {
-        return row(traderId, enchantLevel, attrs, count, unitPrice, currencyItemId, false);
+            long currencyItemTemplateId) {
+        return row(traderId, enchantLevel, attrs, count, unitPrice, currencyItemTemplateId, false);
     }
 
     private static OfferRow row(
@@ -213,8 +213,8 @@ class PrivateStoreOfferHasherTest {
             Map<Attribute, Integer> attrs,
             long count,
             long unitPrice,
-            long currencyItemId,
+            long currencyItemTemplateId,
             boolean packaged) {
-        return new OfferRow(1L, traderId, enchantLevel, attrs, count, unitPrice, currencyItemId, packaged);
+        return new OfferRow(1L, traderId, enchantLevel, attrs, count, unitPrice, currencyItemTemplateId, packaged);
     }
 }

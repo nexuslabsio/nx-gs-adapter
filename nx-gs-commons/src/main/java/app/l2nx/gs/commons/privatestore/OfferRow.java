@@ -17,7 +17,7 @@ public final class OfferRow {
     public final @Nullable Map<Attribute, Integer> attributes;
     public final long count;
     public final long unitPrice;
-    public final long currencyItemId;
+    public final long currencyItemTemplateId;
     public final boolean packaged;
 
     public OfferRow(
@@ -27,7 +27,7 @@ public final class OfferRow {
             @Nullable Map<Attribute, Integer> attributes,
             long count,
             long unitPrice,
-            long currencyItemId,
+            long currencyItemTemplateId,
             boolean packaged) {
         this.itemId = itemId;
         this.traderId = traderId;
@@ -35,7 +35,7 @@ public final class OfferRow {
         this.attributes = attributes;
         this.count = count;
         this.unitPrice = unitPrice;
-        this.currencyItemId = currencyItemId;
+        this.currencyItemTemplateId = currencyItemTemplateId;
         this.packaged = packaged;
     }
 }

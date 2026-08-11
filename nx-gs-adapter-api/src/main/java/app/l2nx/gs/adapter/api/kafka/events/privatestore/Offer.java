@@ -20,7 +20,7 @@ public final class Offer {
     private final @Nullable Map<Attribute, Integer> attributes;
     private final long count;
     private final long unitPrice;
-    private final @Nullable Long currencyItemTemplateId;
+    private final long currencyItemTemplateId;
     private final @Nullable Boolean packaged;
 
     public Offer(
@@ -30,7 +30,7 @@ public final class Offer {
             @Nullable Map<Attribute, Integer> attributes,
             long count,
             long unitPrice,
-            @Nullable Long currencyItemTemplateId,
+            long currencyItemTemplateId,
             @Nullable Boolean packaged) {
         this.itemId = itemId;
         this.traderId = traderId;
@@ -81,10 +81,9 @@ public final class Offer {
     }
 
     /**
-     * Currency item template id (typically {@code 57} = Adena). {@code null}
-     * when the host does not report it.
+     * Currency item template id (typically {@code 57} = Adena).
      */
-    public @Nullable Long getCurrencyItemTemplateId() {
+    public long getCurrencyItemTemplateId() {
         return currencyItemTemplateId;
     }
 
@@ -128,8 +127,8 @@ public final class Offer {
         return traderId == that.traderId
                 && count == that.count
                 && unitPrice == that.unitPrice
+                && currencyItemTemplateId == that.currencyItemTemplateId
                 && Objects.equals(itemId, that.itemId)
-                && Objects.equals(currencyItemTemplateId, that.currencyItemTemplateId)
                 && Objects.equals(enchantLevel, that.enchantLevel)
                 && Objects.equals(attributes, that.attributes)
                 && Objects.equals(packaged, that.packaged);
@@ -160,7 +159,7 @@ public final class Offer {
         private @Nullable Map<Attribute, Integer> attributes;
         private long count;
         private long unitPrice;
-        private @Nullable Long currencyItemTemplateId;
+        private long currencyItemTemplateId;
         private @Nullable Boolean packaged;
 
         public Builder itemId(@Nullable Long itemId) {
@@ -193,7 +192,7 @@ public final class Offer {
             return this;
         }
 
-        public Builder currencyItemTemplateId(@Nullable Long currencyItemTemplateId) {
+        public Builder currencyItemTemplateId(long currencyItemTemplateId) {
             this.currencyItemTemplateId = currencyItemTemplateId;
             return this;
         }
