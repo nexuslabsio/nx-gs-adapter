@@ -22,9 +22,18 @@ mail, link a Telegram user to a character. Every command:
 
 **Naming convention.** Every command's reply type is `{X}Result`
 (strip `Command` suffix, append `Result`): `TransferItemToCharacterCommand` →
-`TransferItemToCharacterResult`, `DeleteItemCommand` → `DeleteItemResult`. Wire
-`Nx-Message-Type` header on the reply matches the R class name
-(`TransferItemToCharacterResult`, not `TransferItemToCharacterCommandResult`).
+`TransferItemToCharacterResult`, `DeleteItemCommand` → `DeleteItemResult`.
+
+The wire `Nx-Message-Type` header on the reply is derived from the **command**
+class name by that same rule (`CommandTypeBinding.deriveReplyTypeName`), not
+from the `R` class — so it is `TransferItemToCharacterResult`, not
+`TransferItemToCharacterCommandResult`. The two coincide whenever the naming
+convention is followed, and diverge when a command reuses another command's
+result type or declares `NxCommand<Void>`: `StartPrivateStorePackageSellCommand`
+returns a `StartPrivateStoreResult` but replies under the header
+`StartPrivateStorePackageSellResult`, and `DeleteAutoAnnouncementCommand`
+(`NxCommand<Void>`) replies under `DeleteAutoAnnouncementResult`. Consumers
+dispatch on the header, so they must key off the command they sent.
 
 ## End-to-end lifecycle
 
@@ -45,9 +54,9 @@ mail, link a Telegram user to a character. Every command:
                ▼
 ┌──────────────────────────────────────┐
 │ Kafka topic <tenant>.gs.commands     │
-│   key:    null (partition by round-  │
-│           robin; web-side may set    │
-│           key=charId for ordering)   │
+│   key:    charId for character-      │
+│           scoped commands, null      │
+│           (round-robin) otherwise    │
 │   headers:                           │
 │     Nx-Message-Type =                │
 │       "TransferItemToCharacterCommand"          │
@@ -92,7 +101,7 @@ mail, link a Telegram user to a character. Every command:
 │   key:    bigEndian(corrId.msb)      │
 │   headers:                           │
 │     Nx-Message-Type =                │
-│       "TransferItemToCharacterCommandResult"    │
+│       "TransferItemToCharacterResult" │
 │     Nx-Correlation-Id = <echoed>     │
 │   value:  Gson(CommandResult) bytes  │
 └──────────────┬───────────────────────┘
@@ -166,9 +175,12 @@ That's the whole story. The rest is "why" and edge cases.
 
 Every command declares its reply via `NxCommand<R>`. The handler MUST
 return `CommandResult<R>` matching that `R` — the compiler enforces it.
-Every command ships with a dedicated `{X}Result` class (no `Void` /
-shared `Payload` types) so the reply echoes confirmation data even for
-"void-success" commands.
+Commands should ship a dedicated `{X}Result` class rather than a shared
+`Payload` type, so the reply echoes confirmation data even for
+"void-success" commands. The exception in the code today is
+`DeleteAutoAnnouncementCommand implements NxCommand<Void>` — nothing to echo
+beyond the status — which is what `CommandResult.ok()` (payload-less) exists
+for.
 
 ```java
 public final class TransferCharToAccountCommand implements NxCommand<TransferCharToAccountResult> { ... }
@@ -243,15 +255,17 @@ poll → if (empty) continue
 What this trades off:
 
 | Scenario               | At-most-once (current)               | Hypothetical at-least-once                                          |
-|------------------------|--------------------------------------|---------------------------------------------------------------------|
+| ---------------------- | ------------------------------------ | ------------------------------------------------------------------- |
 | Handler succeeds       | reply sent                           | reply sent                                                          |
 | JVM crash mid-handler  | record lost → operator re-issues     | record redelivers → handler re-invoked → idempotency required       |
 | Reply lost in flight   | caller timeout → operator re-issues  | caller timeout → redeliver → handler re-invoked → dedup required    |
 | Producer broker outage | adapter commit fails → batch dropped | offsets re-fetched → infinite redelivery loop until broker recovers |
 
-The legacy `l2nx.commands.reply-flush-timeout-ms` knob is no longer
-consulted by the dispatch loop; it stays in `CommandsConfig` for binary
-compat and will be removed in a future minor.
+The legacy `l2nx.commands.reply-flush-timeout-ms` knob and the reply-drain gate
+it fed are gone: they gated nothing under at-most-once, and
+`KafkaProducer.close(timeout)` on adapter shutdown already waits out in-flight
+reply sends. Leaving the key in `l2nx.properties` is harmless — unknown keys are
+ignored.
 
 ## Threading model — what runs where
 
@@ -274,7 +288,7 @@ handlers, AI ticks, scheduled tasks). Three pools, each with a clear
 role:
 
 | Pool            | Accessor                               | Use for                                                                  |
-|-----------------|----------------------------------------|--------------------------------------------------------------------------|
+| --------------- | -------------------------------------- | ------------------------------------------------------------------------ |
 | Game thread     | `ctx.host().sync(...)` / `.async(...)` | Game-state mutations, packet sends, in-memory game-loop touches          |
 | Adapter IO pool | `ctx.io()` (Executor)                  | Blocking JDBC, blocking HTTP, FS calls — anything that waits on syscalls |
 | Consumer thread | (no hop)                               | Pure CPU / non-blocking work only                                        |
@@ -482,7 +496,7 @@ return CommandResult.error(CommandStatus.VALIDATION_FAILED,
 ### Picking the right `CommandStatus`
 
 | Status                | Tier         | Meaning                                 | Example                                                    |
-|-----------------------|--------------|-----------------------------------------|------------------------------------------------------------|
+| --------------------- | ------------ | --------------------------------------- | ---------------------------------------------------------- |
 | `OK`                  | OK           | Handler executed; payload non-null      | Transfer succeeded; mail created                           |
 | `NOT_FOUND`           | CLIENT_ERROR | Subject doesn't exist                   | `getPlayer(charId)` returned null                          |
 | `INVALID_STATE`       | CLIENT_ERROR | Subject exists but cannot accept op now | Player in jail; capacity exceeded                          |
@@ -560,10 +574,10 @@ The adapter publishes replies to `<tenant>.gs.commands.replies` with:
   (so replies for the same correlation co-locate on a partition; useful
   for tooling)
 - **Headers**:
-    - `Nx-Server-Id` (auto, from connect handshake)
-    - `Nx-Correlation-Id` (echoed from inbound)
-    - `Nx-Message-Type = "<OriginalCommandClass>Result"` (e.g.
-      `"TransferItemToCharacterCommandResult"`)
+  - `Nx-Server-Id` (auto, from connect handshake)
+  - `Nx-Correlation-Id` (echoed from inbound)
+  - `Nx-Message-Type = "<OriginalCommandClass>Result"` (e.g.
+    `"TransferItemToCharacterCommandResult"`)
 - **Value** = `gson.toJson(commandResult)`
 
 The platform-side correlator listens on the replies topic, extracts
@@ -583,17 +597,21 @@ commands runtime exposes:
   "state": "ACTIVE",
   "stats": {
     "commands": {
-      "consumed-total":         1234,
-      "handled-total":          1230,
-      "unsupported-total":      0,
+      "consumed-total": 1234,
+      "handled-total": 1230,
+      "unsupported-total": 0,
       "validation-failed-total": 1,
-      "internal-errors-total":  3,
+      "internal-errors-total": 3,
       "replies-published-total": 1230,
-      "replies-failed-total":   0,
-      "registered-types":       ["DeleteItemCommand", "TransferItemToCharacterCommand",
-                                 "TransferCharToAccountCommand", "SendMailCommand",
-                                 "TelegramCharLinkCommand"],
-      "commit-failures-total":  0
+      "replies-failed-total": 0,
+      "registered-types": [
+        "DeleteItemCommand",
+        "TransferItemToCharacterCommand",
+        "TransferCharToAccountCommand",
+        "SendMailCommand",
+        "TelegramCharLinkCommand"
+      ],
+      "commit-failures-total": 0
     }
   }
 }
@@ -720,7 +738,7 @@ fresh `correlationId`).
 - [`catalog.md`](./catalog.md) — per-command business contract: inputs,
   result fields, error statuses, side effects (sync triggers)
 - [`spec.md`](./spec.md) — formal requirements + decisions
-- [`docs/specs/008-messaging/spec.md`](../008-messaging/spec.md) — sibling
+- [`docs/specs/008-messaging.md`](../008-messaging.md) — sibling
   outbound-events feature
 - `app.l2nx.gs.adapter.api.kafka.commands.NxCommand` — Javadoc on the
   marker
