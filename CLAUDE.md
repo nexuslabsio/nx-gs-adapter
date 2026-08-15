@@ -1,215 +1,83 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
+
+This file is a **map plus the non-obvious**: where things live, which invariants are not
+negotiable, and which traps have already been paid for. It deliberately does **not** restate wire
+contracts, DTO fields, or class structure — those live in the code and in `docs/specs/`
+(index: [`docs/CLAUDE.md`](docs/CLAUDE.md)). A doc that mirrors code always drifts.
 
 ## Workflow
 
 - Always confirm before creating or modifying files — never write code without user approval
 - Keep `CLAUDE.md`, `README.md`, and `docs/` in sync with code changes
-- Do not run `compile`/`build` after every change — only when explicitly asked or all changes are complete
+- Do not run `compile`/`build` after every change — only when explicitly asked or all changes are
+  complete
 
 ## Project
 
-`nx-gs-adapter` is the multimodule Gradle project hosting the runtime modules of the L2NX game-server
-adapter. The adapter embeds into the JVM of a game-server core (L2J / Lucera / Essence and forks),
-connects to the L2NX platform via outbound HTTPS, and synchronizes data via Kafka.
+`nx-gs-adapter` is the multimodule Gradle project hosting the runtime modules of the L2NX
+game-server adapter. The adapter embeds into the JVM of a game-server core (L2J / Lucera / Essence
+and forks), connects to the L2NX platform via outbound HTTPS, and synchronizes data via Kafka.
 
-Architecture is documented per-feature under `docs/specs/NNN-<feature-name>/spec.md` (+
-`tech.md`) as features land — a spec-only feature is a flat `docs/specs/NNN-<feature-name>.md`
-instead. `NNN` is a zero-padded sequential id; the index lives in `docs/CLAUDE.md`.
+Design lives per feature in `docs/specs/NNN-<feature>.md` (or `docs/specs/NNN-<feature>/spec.md`
+when a feature carries companion docs). `NNN` is a zero-padded sequential id; the index is
+[`docs/CLAUDE.md`](docs/CLAUDE.md) and any spec change updates it in the same pass.
 
 ## Modules
 
-- `:nx-gs-adapter-api` — wire contracts (REST + Kafka DTOs) and SPI types (Tier-1
-  `AdapterModule`, Tier-2 `DbSchemaProvider` / `RuntimeStateProvider`, Tier-3
-  `JdbcConnectionSource`) shared with the platform and module authors. Java 8 POJOs,
-  zero runtime deps, package root `app.l2nx.gs.adapter.api`. Includes
-  `kafka.NxHeaders` — the wire-level Kafka header contract (`NX_SERVER_ID` raw-16-byte
-  UUID stamped on every record post-`/connect`, `NX_MESSAGE_TYPE` simple class name
-  for polymorphic dispatch on outbound events / inbound commands / replies,
-  `NX_CORRELATION_ID` carrying the platform-issued UUID on inbound commands and
-  echoed onto reply records). Hosts the per-family event DTOs under
-  `kafka.events.<family>` — Phase 1 families:
-  `events.premiumpurchase.PremiumPurchaseEvent` (single-event family;
-  multi-line items + services + per-line multi-currency `Payment`s, plus
-  `WellKnownServices` constants);
-  `events.serveronline.ServerOnlineSnapshotEvent` (single-event family;
-  periodic population breakdown carrying UUIDv7 `eventId` + open
-  `Map<String, Long> buckets` keyed by `WellKnownServerOnlineBuckets`
-  lower_snake_case constants — required `total` / `unique`, optional
-  canonical `offline_trade` / `fishing`; hosts MAY publish arbitrary
-  non-canonical keys; cadence host-managed);
-  `events.privatestore` (multi-event family: `PrivateStorePurchaseEvent`
-  for closed deals + `PrivateStoreSnapshotEvent` for per-`(itemTemplateId, side)`
-  order book, with `TradeLine` / `Offer` line types, `PrivateStoreSide`
-  enum, and `WellKnownElements` constants — no abstract base; one publish
-  method per concrete subtype on `NxEvents`). `WellKnownPrivateStoreMetadata`
-  (keys for `PrivateStorePurchaseEvent.metadata`) gained `SOURCE` (`SOURCE_IN_GAME` /
-  `SOURCE_REMOTE`, how the deal was initiated), `TAX_ADENA` (buyer-side surcharge burned
-  on the deal), and `TAX_PERCENT` (the rate it was computed at) for remote buy-now
-  purchases (spec 065). The inbound-commands marker
-  `kafka.commands.NxCommand<R>` + reply envelope `kafka.commands.CommandResult<R>`
-  with structured `kafka.commands.ErrorCode` enum (`NOT_FOUND` / `INVALID_STATE` /
-  `FORBIDDEN` / `RATE_LIMITED` / `UNAVAILABLE` / `VALIDATION_FAILED` /
-  `INTERNAL_ERROR` / `UNSUPPORTED_COMMAND`). Concrete command DTOs ship under
-  `kafka.commands.<group>.*` (group = code-org bucket: `character` / `item` /
-  `mail` / `account` / `sync` / `privatestore`); shipped today: `commands.item.DeleteItemCommand`
-  (`NxCommand<DeleteItemResult>`) and `commands.mail.SendMailCommand`
-  (`NxCommand<SendMailResult>` carrying `Long charId` + `String author?` +
-  `String title` + `String body?` + `List<MailItem>` attachments;
-  `SendMailResult` carries `List<Long> createdMailIds` + `List<ItemDeliveryError>`
-  partial-failure entries on the success envelope), plus
-  `commands.privatestore.BuyFromPrivateStoreCommand` (`NxCommand<BuyFromPrivateStoreResult>`
-  carrying `buyerCharId` / `sellerCharId` / `List<BuyLine>` lines / `tax` whole-percent
-  surcharge) with its `BuyLine` / `BuyFromPrivateStoreResult` / `BoughtLine` quartet — a
-  platform-issued remote buy-now against another character's private store (spec 065 in
-  `nx-gameservers`), plus the force-resync pair
-  `commands.sync.ResyncEntitiesCommand` (`UUID resyncId` + `entities?`, null/empty
-  = all db-sync entities; ack = `acceptedEntities`) and
-  `commands.sync.ResyncRowsCommand` (`resyncId` + `entityName` + `pks` capped at
-  `MAX_PKS=1000` + `cascade`; ack = `invalidatedByEntity` counts). Single-event
-  family `events.sync.ResyncCompletedEvent` (UUIDv7 `eventId` + `resyncId` +
-  `entityName` + adapter-clock `cycleStartedAt` / `completedAt` Instants) signals
-  per-entity resync completion for the platform sweep; partition key `null`.
-  `spi.ParentRef` + `EntityMapping.parentRefs()` (default empty, binary-compatible)
-  let schema providers declare cross-entity ownership (item →
-  `("character", "owner_id")`) for the `cascade=true` row-resync fan-out.
-  Capability SPIs live in `spi.*`: `NxEvents` (events fanout,
-  acquired via `ConnectContext.events()`), `NxCommands` (handler registration,
-  acquired via `ConnectContext.commands()`), `CommandHandler<C, R>` SAM,
-  `CommandContext` (per-invocation correlationId / host() / events()),
-  `HostExecutor` (game-thread hop helper with `sync(Runnable)` / `<T> sync(Supplier<T>)`
-  / `async(Runnable)`). Both contexts also surface an adapter-owned IO `Executor`
-  via `ConnectContext.io()` (module-level) and `CommandContext.io()` (handler-level)
-  for blocking IO (JDBC, HTTP) — handlers MUST hop here instead of running JDBC on
-  the game thread or the Kafka consumer thread (sanctioned exception: the db-sync
-  resync handlers' bounded cascade-resolution JDBC runs synchronously because the
-  ack reply needs the counts).
-- `:nx-gs-commons` — shared utilities for adapter modules and tenant providers:
-  `concurrent.SafeRunnable` (exception-swallowing Runnable wrapper), `hash.Fnv1a64`
-  (FNV-1a 64-bit hash), `Nulls` (sentinel-to-null), `jdbc.JdbcNulls` (null-aware
-  `ResultSet` readers), `UUIDv7` (RFC 9562 time-ordered ids — pure JDK, monotonic
-  per-JVM, used as `eventId` on outbound events so platform consumers extract
-  `occurredAt` from the id alone). Java 8, deps: `jspecify` only. Package root
-  `app.l2nx.gs.commons`. `:nx-gs-log` shadow-included. Published to Maven Central.
-- `:nx-gs-kafka` — lightweight Kafka client facade. Java 8, depends on `kafka-clients` + `gson`,
-  `slf4j-api` compileOnly. Package root `app.l2nx.gs.kafka`. `:nx-gs-log` shadow-included.
-  Producer supports connection-scoped static headers (`KafkaConfig.Builder.producerStaticHeader` /
-  `NxProducer.create(props, gson, headers)`) — adapter-core stamps `Nx-Server-Id`
-  (raw 16-byte UUID) on every record post-`/connect`. Per-record headers (e.g.
-  `Nx-Message-Type`) attach via `NxKafka.sendBytesKeyRecord(record, callback)`
-  — used by adapter-core's events publisher for outbound family dispatch.
-- `:nx-gs-adapter-core` — runtime: config resolution, POST `/connect`, heartbeat, ServiceLoader-based
-  module discovery, lifecycle. Hosts the built-in `NxEvents` capability — bounded-queue
-  - daemon-thread fan-out (`events.EventsPublisher`, `events.NxEventsImpl`,
-    `events.EventTypeRegistry` — one `register(...)` entry per concrete event
-    type, including the `sync` family for db-sync's `ResyncCompletedEvent`,
-    partition key `null`) reading per-family topic addressing from
-    `ConnectResponse.messagingTopics.events`. Default `drop-policy` is `newest`
-    (drop incoming on overflow — preserves queue order). `oldest` (evict head)
-    remains an option but over-counts `dropped-total` under multi-producer
-    contention because the displaced envelope is counted on the eviction path
-    even when concurrent enqueuers race for the same slot. Heartbeat surfaces an
-    `events` module slot (`queue-depth`, `published-total`, `dropped-total`,
-    `failed-total`, `disabled-families`) via `ModuleStatus.Stats.events`. The
-    `NxEvents` façade handed out via `ConnectContext.events()` survives reconnect
-    — an `AtomicReference` inside the façade is swapped to the live publisher on
-    every reconnect cycle, so host modules cache the reference once at `start()`
-    and never re-acquire. Also hosts the built-in `NxCommands` capability —
-    single Kafka consumer + dispatch table (`commands.CommandsConsumer`,
-    `commands.NxCommandsImpl`, `commands.CommandTypeRegistry`) reading inbound
-    topic from `MessagingTopics.commandsTopic` and publishing replies to
-    `MessagingTopics.commandsRepliesTopic` via the existing producer. Manual
-    offset commit per batch; handler `RuntimeException` auto-wraps as
-    `INTERNAL_ERROR` reply. The `NxCommands` façade follows the same
-    survive-reconnect pattern (AtomicReference swap on reconnect). Heartbeat
-    surfaces a `commands` module slot (`consumed-total` / `handled-total` /
-    `unsupported-total` / `validation-failed-total` / `internal-errors-total` /
-    `replies-published-total` / `replies-failed-total` / `commit-failures-total`
-    / `registered-types`) via `ModuleStatus.Stats.commands`. Host registers its
-    game-thread `Executor` via static `NxAdapter.hostExecutor(Executor)` BEFORE
-    `start()`; the adapter wraps it as `HostExecutor` for handler-side
-    `ctx.host().sync(...)` / `.async(...)` hops. The adapter also owns a shared
-    IO pool (`nx-io-N` daemon threads, sized by `l2nx.io.workers`, default
-    `max(2, cores/2)`) surfaced via `ConnectContext.io()` and
-    `CommandContext.io()` — handlers doing JDBC/HTTP MUST hop here. Connect-flow
-    retry uses ±25% jitter on the configured interval to avoid thundering-herd
-    reconnect on platform recovery. Heartbeat start/stop is `synchronized` so
-    reconnect concurrent with shutdown cannot leave a scheduler running. Engine
-    configs under `l2nx.events.*` (queue-capacity / drop-policy /
-    shutdown-drain-timeout-ms) and `l2nx.commands.*` (poll-timeout-ms /
-    shutdown-timeout-ms / kafka.<prop>); both file-first source chain. Depends
-    on `:nx-gs-adapter-api` + `:nx-gs-kafka` + `:nx-gs-commons` + `gson`.
-    Package root `app.l2nx.gs.adapter.core`. `:nx-gs-log` shadow-included.
-- `:nx-gs-db-sync-core` — DB-sync `AdapterModule` shipped to Maven Central. Owns the
-  CRC32 two-phase CDC engine (shared bounded pool — `l2nx.cdc-engine.workers` daemon
-  threads, default `max(2, min(entities, cores/2))` — replaces the legacy
-  thread-per-entity model; entities are scheduled as tasks onto the pool, server-side
-  CRC32 hashing, per-row snapshot swap on Kafka ack) and resolves the Tier-2
-  `DbSchemaProvider` SPI (defined in `nx-gs-adapter-api` so client providers depend
-  only on the api artifact). Reads its per-entity Kafka topics from
-  `ctx.syncTopics().db()` (db namespace of the namespaced `SyncTopics` bundle).
-  Surfaces both `pool` (from `JdbcConnectionSource.stats()`) and `entities`
-  (per-entity `EntityStats`) slots in the heartbeat. Engine config lives under
-  `l2nx.cdc-engine.*` (file-first source chain) — including `workers` and
-  `fetch-size` (default `10_000`). JDBC dialect is auto-detected from the
-  connection URL: MySQL Connector/J (`jdbc:mysql:`) → `Integer.MIN_VALUE`
-  streaming fetch (row-by-row, the only mode it honors for large result
-  sets); MariaDB Connector/J (`jdbc:mariadb:`) → positive `fetch-size` hint
-  (3.x rejects negative fetchSize; add `useCursorFetch=true` to the URL for
-  true server-side cursors); Postgres / others → `fetch-size` as a cursor-batch hint. All identifiers passed via
-  `EntityMapping` /
-  `PrimarySource` / `ChildSource` (tableName / pkColumn / fkColumn / hashedColumns)
-  MUST match `^[A-Za-z_][A-Za-z0-9_]{0,63}$` — schema-qualified or quoted names are
-  rejected at engine start — and the same regex now also guards
-  `mapping.entityName()` and `provider.schemaName()` since both are
-  interpolated into the on-disk snapshot file path. **Snapshot persistence**
-  (sub-package `app.l2nx.gs.db.sync.engine.persist`): always on,
-  per-entity binary file `<persist.dir>/<schemaName>/<entityName>.snap`
-  (`nx-cdc-snapshot` default dir relative to JVM cwd) written
-  tmp → fsync → atomic-rename on every successful cycle (per-entity
-  throttle `l2nx.cdc-engine.persist.checkpoint-min-interval-seconds`
-  default 300s), force-flushed on `engine.stop()`, reloaded on
-  `engine.start()` before the first tick. Directory-level
-  `FileChannel.tryLock` on `.lock` refuses a second adapter JVM pointed at
-  the same dir → module `STATE_FAILED`. Closes the orphan-on-restart bug
-  where rows deleted from the host DB while the adapter was offline were
-  never observed by the next cycle (diff against empty snapshot
-  misclassified everything as CREATE). **Force resync**
-  (`docs/specs/021-force-resync.md`): `DbSyncModule` registers
-  `ResyncEntitiesCommand` / `ResyncRowsCommand` handlers in `onConnect`
-  (engine down → `UNAVAILABLE`; unknown entity / empty / >1000 pks →
-  `VALIDATION_FAILED`); requests enqueue snapshot-hash invalidation on
-  `CdcEngine.requestForceResync(...)` — applied strictly on the entity's
-  cycle thread before window planning (whole-entity in-place perturb, or
-  per-PK perturb + sentinel insert for ghost PKs) — and trigger an immediate
-  cycle; a request landing mid-cycle re-submits at cycle end. After the first
-  fully successful cycle (HEALTHY + zero failed/pending publishes —
-  `CycleResult` carries publish-outcome counters for this gate) the engine
-  emits one `events.sync.ResyncCompletedEvent` per drained `resyncId` via the
-  `NxEvents` facade threaded in from `ConnectContext`. `cascade=true` on a
-  row resync resolves dependent rows through the provider-declared
-  `EntityMapping.parentRefs()` (fkColumn/parent validated at start alongside
-  the identifier validation). Pending requests and in-flight resyncIds are
-  in-memory only — dropped on stop/reconnect. Depends on `:nx-gs-adapter-api` +
-  `:nx-gs-kafka` + `:nx-gs-commons` + `fastutil-core` + `gson`. Package
-  root `app.l2nx.gs.db.sync`. `:nx-gs-log` shadow-included.
-- `:nx-gs-runtime-sync-core` — Runtime-sync `AdapterModule` shipped to Maven Central.
-  Owns the in-memory snapshot+diff engine (shared bounded pool —
-  `l2nx.runtime-sync.workers` daemon threads, default `max(2, min(entities,
-cores/2))` — replaces the legacy thread-per-entity model; FNV-1a 64-bit hashing
-  in Java, replay-on-failed-publish per the at-least-once contract) and resolves
-  the Tier-2 `RuntimeStateProvider` SPI for in-memory game-server stores. Reads
-  per-entity topics from `ctx.syncTopics().runtime()`. No tombstone on logout —
-  `db-sync` owns "permanently gone" semantics. Engine config lives under
-  `l2nx.runtime-sync.*` (per-module — independent of `l2nx.cdc-engine.*` because
-  the two engines have different tick cadences). Depends on `:nx-gs-adapter-api` +
-  `:nx-gs-kafka` + `:nx-gs-commons` + `fastutil-core` + `gson`. Package root
-  `app.l2nx.gs.runtime.sync`. `:nx-gs-log` shadow-included.
-- `:nx-gs-log` — internal logging facade (`app.l2nx.gs.log`). NOT published; classes are bundled
-  into `:nx-gs-commons`, `:nx-gs-kafka`, `:nx-gs-adapter-core`, `:nx-gs-db-sync-core`,
-  and `:nx-gs-runtime-sync-core` jars at build time. Auto-detects SLF4J via reflection,
-  falls back to console output. Library code never imports SLF4J directly.
+| module                     | package root               | what it is                                                                 | primary specs                     |
+| -------------------------- | -------------------------- | -------------------------------------------------------------------------- | --------------------------------- |
+| `:nx-gs-adapter-api`       | `app.l2nx.gs.adapter.api`  | wire contracts (REST + Kafka DTOs) and the SPI tiers. Zero runtime deps.   | see `nx-gs-adapter-api/CLAUDE.md` |
+| `:nx-gs-commons`           | `app.l2nx.gs.commons`      | shared utilities for adapter modules and tenant providers                  | —                                 |
+| `:nx-gs-kafka`             | `app.l2nx.gs.kafka`        | lightweight Kafka client facade (producer/consumer, static headers)        | 008-messaging                     |
+| `:nx-gs-adapter-core`      | `app.l2nx.gs.adapter.core` | runtime: config, `/connect`, heartbeat, module discovery, events, commands | 001, 002, 008, 009, 011           |
+| `:nx-gs-db-sync-core`      | `app.l2nx.gs.db.sync`      | DB-sync module: CRC32 two-phase CDC engine over the Tier-2 schema SPI      | 003, 004, 005, 007, 012, 021      |
+| `:nx-gs-runtime-sync-core` | `app.l2nx.gs.runtime.sync` | runtime-sync module: in-memory snapshot+diff over the Tier-2 state SPI     | 006-runtime-sync                  |
+| `:nx-gs-gd-sync-core`      | `app.l2nx.gs.gd.sync`      | gd-sync module: static game-data catalog snapshots                         | 030-gamedata-sync                 |
+| `:nx-gs-log`               | `app.l2nx.gs.log`          | internal logging facade — NOT published, bundled into the jars above       | —                                 |
+
+Every published module shadow-includes `:nx-gs-log`. Library code never imports SLF4J directly:
+the facade auto-detects it by reflection and falls back to console output.
+
+SPI tiers: Tier-1 `AdapterModule` (a module), Tier-2 the per-domain provider SPIs the host
+implements (`DbSchemaProvider`, `RuntimeStateProvider`, the gd catalog providers), Tier-3
+`JdbcConnectionSource`. All of them are declared in `:nx-gs-adapter-api` so a host provider depends
+on the contracts artifact alone.
+
+## Cross-cutting gotchas
+
+Things that cost time to learn and are not visible from the code you are editing:
+
+- **`ConnectContext.io()` / `CommandContext.io()` is mandatory for blocking IO.** JDBC / HTTP must
+  hop onto the adapter IO pool — never the game thread, never the Kafka consumer thread. Sanctioned
+  exception: the db-sync resync handlers resolve cascades synchronously because the ack reply needs
+  the counts, and `ResyncRowsCommand.MAX_PKS` bounds the stall.
+- **Capability façades survive reconnect.** `NxEvents` / `NxCommands` handed out via
+  `ConnectContext` hold an `AtomicReference` swapped to the live publisher on every reconnect, so
+  host modules cache the reference once at `start()` and never re-acquire it.
+- **The host registers its game-thread executor via `NxAdapter.hostExecutor(Executor)` BEFORE
+  `start()`** — that is what backs `ctx.host().sync(...)` hops in command handlers.
+- **Events drop-policy defaults to `newest`** (drop the incoming envelope on overflow, preserving
+  queue order). `oldest` is still selectable but over-counts `dropped-total` under multi-producer
+  contention: the displaced envelope is counted on the eviction path even when concurrent enqueuers
+  race for the same slot.
+- **JDBC fetch-size is dialect-dependent and silently wrong if ignored.** MySQL Connector/J
+  (`jdbc:mysql:`) honours only `Integer.MIN_VALUE` streaming for large result sets; MariaDB
+  Connector/J 3.x rejects a negative `fetchSize` and needs `useCursorFetch=true` in the URL for a
+  true server-side cursor; Postgres and others take the configured value as a cursor-batch hint.
+  The engine auto-detects from the URL.
+- **SQL identifiers are validated, not quoted.** Everything passed through `EntityMapping` /
+  `PrimarySource` / `ChildSource` — plus `entityName()` and `schemaName()`, which are interpolated
+  into the on-disk snapshot path — must match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`. Schema-qualified or
+  quoted names are rejected at engine start.
+- **Two adapter JVMs must not share a snapshot dir.** db-sync takes a `FileChannel.tryLock` on
+  `<persist.dir>/.lock`; losing it puts the module in `FAILED` rather than corrupting snapshots.
+- **runtime-sync emits no tombstone on logout.** "Permanently gone" is db-sync's semantics; the
+  runtime channel only carries volatile state.
+- **`SNAPSHOT_COMPLETE` is a reconcile point.** A `count=0` marker deletes every row of that entity
+  on the platform, so a provider with nothing to give returns `null` (burst aborted, nothing
+  reconciled) — never an empty collection. See 030-gamedata-sync §2.
 
 ## Threading model
 
@@ -226,34 +94,34 @@ Adapter-owned threads (all daemon — never block JVM exit):
 | `nx-io-N`                | configurable | Adapter-owned IO pool (`ctx.io()` for JDBC/HTTP hops) |
 | `nx-cdc-pool-<schema>-N` | configurable | Shared CDC engine pool (db-sync, all entities)        |
 | `nx-runtime-sync-pool-N` | configurable | Shared runtime-sync engine pool (all entities)        |
+| `nx-gd-sync-scheduler`   | 0-1          | gd-sync host-readiness polling + periodic resync      |
 | Kafka producer I/O       | 1            | Internal to `KafkaProducer` (kafka-clients-managed)   |
 
-Pool sizing keys: `l2nx.io.workers`, `l2nx.cdc-engine.workers`,
-`l2nx.runtime-sync.workers` (all default `max(2, cores/2)` or
-`max(2, min(entities, cores/2))` for engines).
+Pool sizing keys: `l2nx.io.workers`, `l2nx.cdc-engine.workers`, `l2nx.runtime-sync.workers` (all
+default `max(2, cores/2)`, or `max(2, min(entities, cores/2))` for the engines). Per-engine config
+namespaces are independent on purpose — `l2nx.cdc-engine.*`, `l2nx.runtime-sync.*`,
+`l2nx.gd-sync.*` — because the engines tick at different cadences.
 
 ## Constraints
 
-- **Maximally tenant- and build-agnostic — model generic L2 game concepts, not one core's logic.** The
-  contracts (Kafka / REST DTOs, SPI types, enums) describe _what_ a value means in generic Lineage 2
-  terms; they never encode _how_ a specific host / core decides it. Classification, detection cascades,
-  and build-specific rules belong to the integration (host) code — the adapter ships only the shared
-  vocabulary + its generic semantics. Example: `RaidBossKind` defines `RAID` / `EPIC` / `INSTANCE_BOSS`
-  and what each means; the host decides which value a given boss gets — never bake division names,
-  `instanceof` / engine-API detection (`getReflection()`, `isRaid()`), or other core-specific logic into
-  adapter Javadoc / spec. Generalizes the proprietary-schema rule (Distribution & licensing) from
-  table/column names to _logic_: we focus on L2 game logic, not a specific core's implementation.
+- **Maximally tenant- and build-agnostic — model generic L2 game concepts, not one core's logic.**
+  The contracts (Kafka / REST DTOs, SPI types, enums) describe _what_ a value means in generic
+  Lineage 2 terms; they never encode _how_ a specific host / core decides it. Classification,
+  detection cascades, and build-specific rules belong to the integration (host) code — the adapter
+  ships only the shared vocabulary + its generic semantics. Example: `RaidBossKind` defines `RAID` /
+  `EPIC` / `INSTANCE_BOSS` and what each means; the host decides which value a given boss gets —
+  never bake division names, `instanceof` / engine-API detection (`getReflection()`, `isRaid()`), or
+  other core-specific logic into adapter Javadoc / spec. Generalizes the proprietary-schema rule
+  (Distribution & licensing) from table/column names to _logic_: we focus on L2 game logic, not a
+  specific core's implementation.
 - **Java 8 source + target** — host JVMs span Java 8 to 25+. No `var`, no `Stream.toList()`, no
   records, no `Map.of`, no text blocks, no switch expressions, no pattern matching. Stream API +
   lambda + Optional + `try-with-resources` are fine.
-- **No Spring** — adapter loads into a host JVM that may have its own classpath; Spring would clash.
-- **Minimum dependencies** — only what is justified:
-  - `nx-gs-adapter-api` (contracts)
-  - `nx-gs-kafka` (Kafka facade)
-  - `gson` (JSON for `/connect`)
-  - `slf4j-api` (compileOnly — never imported directly; use the local logging facade)
-  - JDK `HttpURLConnection` for HTTP (no OkHttp / Apache HttpClient)
-  - JDK `java.util.Properties` for config (no SnakeYAML)
+- **No Spring** — the adapter loads into a host JVM that may have its own classpath; Spring would
+  clash.
+- **Minimum dependencies** — only what is justified: `nx-gs-adapter-api` (contracts), `nx-gs-kafka`
+  (Kafka facade), `gson` (JSON for `/connect`), `slf4j-api` (compileOnly, never imported directly),
+  JDK `HttpURLConnection` for HTTP, JDK `java.util.Properties` for config.
 - **Never block game-server threads** — connect / heartbeat / sync run on dedicated daemon threads.
   Any uncaught exception must be caught and logged, never propagated to the host JVM.
 - **No reflection-heavy DI** — wiring is plain `new`. Constructor injection only.
@@ -261,68 +129,53 @@ Pool sizing keys: `l2nx.io.workers`, `l2nx.cdc-engine.workers`,
 
 ## Distribution & licensing
 
-Open-core. This repo and every artifact published from it (`nx-gs-adapter-api`,
-`nx-gs-commons`, `nx-gs-kafka`, `nx-gs-adapter-core`, `nx-gs-db-sync-core`,
-`nx-gs-runtime-sync-core`) are public under Apache 2.0 and published to Maven Central.
-The vanilla sync modules (`nx-gs-db-l2j`, `nx-gs-db-lucera`, `nx-gs-dp-l2j`,
-`nx-gs-dp-lucera`, `nx-gs-runtime-l2j`, …) — when they land — ship from this repo on
-the same terms.
+Open-core. This repo and every artifact published from it is public under Apache 2.0 and published
+to Maven Central. The vanilla sync modules (`nx-gs-db-l2j`, `nx-gs-dp-lucera`, …) — when they land —
+ship from this repo on the same terms.
 
-Per-client overrides (`nx-gs-db-l2j-<client>`, `nx-gs-dp-<core>-<client>`) live in
-private repos and are shipped privately to that client only — never to Maven Central — to avoid
-leaking client-proprietary DB schemas / datapack layouts. They extend a vanilla module via the
+Per-client overrides (`nx-gs-db-l2j-<client>`, `nx-gs-dp-<core>-<client>`) live in private repos and
+are shipped privately to that client only — never to Maven Central — to avoid leaking
+client-proprietary DB schemas / datapack layouts. They extend a vanilla module via the
 template-method pattern.
 
-Implication: nothing committed to this repo, `nx-gs-adapter-api`, or `nx-gs-kafka` may reference
-client-proprietary schemas, table names, or column layouts.
+Implication: nothing committed to this repo may reference client-proprietary schemas, table names,
+or column layouts.
 
 ## Versioning
 
-Per-module independent versioning via slash-namespaced git tags:
+Per-module independent versioning via slash-namespaced git tags: `api/`, `commons/`, `kafka/`,
+`core/`, `db-sync/`, `runtime-sync/`, `gd-sync/` + `vX.Y.Z`; future `db-l2j/`, `dp-l2j/`, … CI parses
+the tag, maps the prefix to its subproject, passes `-P<subproject>.version=X.Y.Z`, and publishes
+ONLY that module — the others stay at the fallback literal in their own `build.gradle.kts`.
+`nx-gs-log` is internal-only (no tag namespace, no publication).
 
-- `api/vX.Y.Z` → publish `nx-gs-adapter-api`
-- `commons/vX.Y.Z` → publish `nx-gs-commons`
-- `kafka/vX.Y.Z` → publish `nx-gs-kafka`
-- `core/vX.Y.Z` → publish `nx-gs-adapter-core`
-- `db-sync/vX.Y.Z` → publish `nx-gs-db-sync-core`
-- `runtime-sync/vX.Y.Z` → publish `nx-gs-runtime-sync-core`
-- `gd-sync/vX.Y.Z` → publish `nx-gs-gd-sync-core`
-- future: `db-l2j/vX.Y.Z`, `dp-l2j/vX.Y.Z`, `runtime-l2j/vX.Y.Z`, ...
-
-Each module's `build.gradle.kts` declares
-`version = findProperty("${project.name}.version") as String? ?: "<base>"`. CI parses the tag,
-maps prefix → subproject (api → nx-gs-adapter-api, commons → nx-gs-commons, kafka →
-nx-gs-kafka, core → nx-gs-adapter-core, db-sync → nx-gs-db-sync-core, runtime-sync →
-nx-gs-runtime-sync-core), passes `-P<subproject>.version=X.Y.Z`, and publishes ONLY
-that module. Other modules stay at fallback. `nx-gs-log` is internal-only (no tag
-namespace, no publication).
-
-Local builds default to the per-module fallback (no `local-SNAPSHOT`). Maven Central is the
-publish target; CI uses `signingKey`/`signingPassword` Gradle properties (GPG) and
-`CENTRAL_TOKEN` for the Sonatype Central Portal upload.
+Local builds default to the per-module fallback (no `local-SNAPSHOT`). Maven Central is the publish
+target; CI uses `signingKey` / `signingPassword` Gradle properties (GPG) and `CENTRAL_TOKEN` for the
+Sonatype Central Portal upload. Central propagation takes ~15-30 min — a dependent release must wait
+for the artifact to be resolvable, not just for the tag to be pushed.
 
 ### Breaking wire changes go out in two releases, via `@Deprecated`
 
 Renaming or removing anything on the wire (a DTO field, a getter, a whole DTO, an enum constant) is
 **never** a single release. It is always:
 
-1. **Additive release.** Add the new shape. Keep the old one alongside it, marked `@Deprecated`, with
-   Javadoc naming the replacement AND the concrete event that gates removal ("removed once every
-   schema provider emits `classes` — for bohpts, the morning game-server restart"). Consumers migrate
-   to the new shape and keep a fallback to the old one.
+1. **Additive release.** Add the new shape. Keep the old one alongside it, marked `@Deprecated`,
+   with Javadoc naming the replacement AND the concrete event that gates removal ("removed once
+   every schema provider emits `classes` — for bohpts, the morning game-server restart"). Consumers
+   migrate to the new shape and keep a fallback to the old one.
 2. **Removal release.** Delete the deprecated members once that gate has actually fired. This one is
    breaking and takes its own version bump.
 
 The reason is deploy ordering, not politeness: the platform is always deployed **before** the schema
 providers that feed it (nx-gameservers, then adapter-api to Maven Central, then the tenant fork). So
 there is always a window in which a new consumer reads events emitted by an old producer. A one-shot
-rename makes the new consumer blind to that traffic for the whole window — silently, since an unknown
-JSON field just deserializes to `null`. Maven Central propagation (~15-30 min) and game-server restart
+rename makes the new consumer blind to that traffic for the whole window — silently, since an
+unknown JSON field just deserializes to `null`. Central propagation and game-server restart
 schedules make the window hours-to-days wide, not seconds.
 
-Add the migration note to the release's spec (`docs/specs/`), with both gates spelled out — the
-deprecation gate and the drop gate are usually different events and cannot be cleared in one pass.
-Reference: `docs/specs/029-character-class-state-sync.md` (`subclasses` → `classes`).
+Add the migration note to the release's spec, with both gates spelled out — the deprecation gate and
+the drop gate are usually different events and cannot be cleared in one pass. Reference:
+`docs/specs/029-character-class-state-sync.md` (`subclasses` → `classes`).
 
 ## Commands
 
@@ -341,25 +194,23 @@ Reference: `docs/specs/029-character-class-state-sync.md` (`subclasses` → `cla
 - nx-gs-kafka itself is exercised end-to-end via Testcontainers in its own repo — adapter tests treat
   the Kafka facade as a unit-under-test only at the wiring level
 
-## Enum-like vocabulary values
+## Naming conventions
 
-- **Any open-string field representing a closed / enum-like vocabulary** (`type`, `kind`, `category`, `element`,
-  `operateType`, `skillType`, `targetType`, `trait`, drop-category, …) carries **UPPER_SNAKE_CASE** values. Map a core
-  enum via `.name()` (Java enum constants are already UPPER_SNAKE) or translate a bitmask / int into a canonical
-  UPPER_SNAKE token — never lowercase / camelCase / PascalCase. Single-token codes (`A1`, `TG`) are fine as-is.
-- Free-form identifiers are NOT enum-like and stay verbatim: effect-handler names (`p_attack`), icon/resource names,
-  localized text. Don't force them to UPPER_SNAKE.
-- Icon names are emitted verbatim by the adapter; the platform lowercases them consumer-side (nx-gamedata
-  `IconPaths.normalize` — platform-wide lowercase icon canon). Do NOT normalize in the adapter.
-
-## Item-template references
-
-- **Any field/column referencing an item template is named `itemTemplateId`** (wire/Java) / `item_template_id` (DB) —
-  never `itemId`, `itemConsumeId`, `consumeItemId`, etc. It is an FK to the item-template entity (`itemtemplate` /
-  `gd_item_templates`); the single canonical name keeps the relationship obvious in any DTO/table. The accompanying
-  quantity is `itemTemplateCount` / `item_template_count`.
-- Example: a skill level that consumes an item on cast carries `itemTemplateId` (+ `itemTemplateCount`), not
-  `itemConsumeId` / `itemConsumeCount`.
+- **Enum-like vocabulary values are `UPPER_SNAKE_CASE`.** Any open-string field standing for a
+  closed vocabulary (`type`, `kind`, `category`, `element`, `operateType`, `skillType`, `targetType`,
+  `trait`, drop-category, …) carries UPPER_SNAKE: map a core enum via `.name()`, or translate a
+  bitmask / int into a canonical token. Never lowercase / camelCase / PascalCase. Single-token codes
+  (`A1`, `TG`) are fine as-is.
+  Free-form identifiers are NOT enum-like and stay verbatim: effect-handler names (`p_attack`),
+  icon / resource names, localized text. Icon names are emitted verbatim — the platform lowercases
+  them consumer-side (nx-gamedata `IconPaths.normalize`); do NOT normalize in the adapter.
+- **Any field/column referencing an item template is `itemTemplateId` / `item_template_id`** — never
+  `itemId`, `itemConsumeId`, `consumeItemId`. It is an FK to the item-template entity; the
+  accompanying quantity is `itemTemplateCount`. A reference to a concrete item instance is `itemId`.
+  Example: a skill level that consumes an item on cast carries `itemTemplateId` +
+  `itemTemplateCount`.
+- **Units live in field names, not comments** — `respawnSec`, `reuseDelayMs`, `chancePercent`.
+  Non-physical counts / ids (`level`, `weight`, coordinates, stat values) stay unsuffixed.
 
 ## Comments
 
@@ -377,6 +228,10 @@ Reference: `docs/specs/029-character-class-state-sync.md` (`subclasses` → `cla
 
 ## Docs
 
-- `docs/specs/NNN-<feature-name>/spec.md` (+ `tech.md`) — per-feature design, or a flat
-  `docs/specs/NNN-<feature-name>.md` for a spec-only feature; populated by the `spec-authoring`
-  skill. Index of all specs: `docs/CLAUDE.md`
+- [`docs/CLAUDE.md`](docs/CLAUDE.md) — the spec index, auto-loaded each session. Source of truth for
+  which specs exist.
+- `docs/specs/NNN-<feature>.md` — one living spec per feature; iterations update the existing spec
+  rather than adding a new number. A feature that grows companion docs becomes
+  `docs/specs/NNN-<feature>/spec.md` + siblings. Populated by the `spec-authoring` skill.
+- `nx-gs-adapter-api/CLAUDE.md` — the wire-contract map (packages, families, contracts worth calling
+  out). Anything about DTO shape belongs there or in a spec, not in this file.
