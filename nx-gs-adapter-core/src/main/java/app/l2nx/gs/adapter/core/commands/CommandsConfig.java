@@ -27,31 +27,17 @@ public final class CommandsConfig {
      * than a wedged consumer thread.
      */
     public static final long DEFAULT_HOST_SYNC_TIMEOUT_MS = 30_000L;
-    /**
-     * Bound on the per-batch reply-flush wait between handler completion and
-     * Kafka offset commit. Replies are sent async via the Kafka producer; the
-     * dispatcher waits up to this window for all in-flight callbacks to fire
-     * before advancing the consumer offset, ensuring at-least-once delivery
-     * across the inbound + reply legs.
-     */
-    public static final long DEFAULT_REPLY_FLUSH_TIMEOUT_MS = 5_000L;
 
     private final long pollTimeoutMs;
     private final long shutdownTimeoutMs;
     private final long hostSyncTimeoutMs;
-    private final long replyFlushTimeoutMs;
     private final Map<String, Object> kafkaOverrides;
 
     public CommandsConfig(
-            long pollTimeoutMs,
-            long shutdownTimeoutMs,
-            long hostSyncTimeoutMs,
-            long replyFlushTimeoutMs,
-            Map<String, Object> kafkaOverrides) {
+            long pollTimeoutMs, long shutdownTimeoutMs, long hostSyncTimeoutMs, Map<String, Object> kafkaOverrides) {
         this.pollTimeoutMs = pollTimeoutMs;
         this.shutdownTimeoutMs = shutdownTimeoutMs;
         this.hostSyncTimeoutMs = hostSyncTimeoutMs;
-        this.replyFlushTimeoutMs = replyFlushTimeoutMs;
         this.kafkaOverrides = kafkaOverrides == null
                 ? Collections.<String, Object>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, Object>(kafkaOverrides));
@@ -62,7 +48,6 @@ public final class CommandsConfig {
                 DEFAULT_POLL_TIMEOUT_MS,
                 DEFAULT_SHUTDOWN_TIMEOUT_MS,
                 DEFAULT_HOST_SYNC_TIMEOUT_MS,
-                DEFAULT_REPLY_FLUSH_TIMEOUT_MS,
                 Collections.<String, Object>emptyMap());
     }
 
@@ -76,10 +61,6 @@ public final class CommandsConfig {
 
     public long getHostSyncTimeoutMs() {
         return hostSyncTimeoutMs;
-    }
-
-    public long getReplyFlushTimeoutMs() {
-        return replyFlushTimeoutMs;
     }
 
     public Map<String, Object> getKafkaOverrides() {

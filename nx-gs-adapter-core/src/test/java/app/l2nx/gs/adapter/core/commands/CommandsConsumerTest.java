@@ -35,9 +35,9 @@ class CommandsConsumerTest {
     }
 
     /**
-     * Captures every reply record sent and synchronously invokes its callback
-     * so {@code pendingReplies} drains. Callback is invoked with success
-     * metadata by default; tests that need failure semantics can swap.
+     * Captures every reply record sent and synchronously invokes its callback.
+     * Callback is invoked with success metadata by default; tests that need
+     * failure semantics can swap.
      */
     static final class CapturingReplySender implements CommandsConsumer.ReplySender {
         final List<ProducerRecord<byte[], Object>> sent = new ArrayList<>();
@@ -316,15 +316,33 @@ class CommandsConsumerTest {
     }
 
     @Test
-    void processRecord_pendingRepliesShouldDrainAfterCallback() {
-        registry.register(FakeCommand.class, (cmd, ctx) -> CommandResult.ok());
+    void currentStatus_shouldReportActive_whenRepliesTopicConfigured() {
         CommandsConsumer consumer = build("out");
+        consumer.start();
+        try {
+            assertEquals("ACTIVE", consumer.currentStatus().getState());
+        } finally {
+            consumer.stop();
+        }
+    }
 
-        consumer.processRecord(recordWithHeaders(
-                "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8)));
+    @Test
+    void currentStatus_shouldReportDegraded_whenRepliesTopicMissing() {
+        CommandsConsumer consumer = build(null);
+        consumer.start();
+        try {
+            assertEquals(
+                    "DEGRADED",
+                    consumer.currentStatus().getState(),
+                    "commands execute but every reply is dropped — that is not a healthy module");
+        } finally {
+            consumer.stop();
+        }
+    }
 
-        assertEquals(
-                0, consumer.pendingReplies(), "callback fired synchronously in fake — pending should be back to 0");
+    @Test
+    void currentStatus_shouldReportDisabled_beforeStart() {
+        assertEquals("DISABLED", build("out").currentStatus().getState());
     }
 
     @Test

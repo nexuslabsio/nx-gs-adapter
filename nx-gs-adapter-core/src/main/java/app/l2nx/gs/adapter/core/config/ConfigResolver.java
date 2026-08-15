@@ -65,7 +65,6 @@ public final class ConfigResolver {
     static final String KEY_COMMANDS_POLL_TIMEOUT_MS = "l2nx.commands.poll-timeout-ms";
     static final String KEY_COMMANDS_SHUTDOWN_TIMEOUT_MS = "l2nx.commands.shutdown-timeout-ms";
     static final String KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS = "l2nx.commands.host-sync-timeout-ms";
-    static final String KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS = "l2nx.commands.reply-flush-timeout-ms";
     static final String KEY_COMMANDS_KAFKA_PREFIX = "l2nx.commands.kafka.";
 
     private static final String SERVER_KEY_PREFIX = "nx_sk_";
@@ -177,15 +176,8 @@ public final class ConfigResolver {
             throw new IllegalStateException("Invalid value for '" + KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS + "': "
                     + hostSyncTimeoutMs + " (expected positive integer)");
         }
-        long replyFlushTimeoutMs =
-                resolveLong(KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS, CommandsConfig.DEFAULT_REPLY_FLUSH_TIMEOUT_MS);
-        if (replyFlushTimeoutMs < 0) {
-            throw new IllegalStateException("Invalid value for '" + KEY_COMMANDS_REPLY_FLUSH_TIMEOUT_MS + "': "
-                    + replyFlushTimeoutMs + " (expected non-negative; 0 disables flush)");
-        }
         Map<String, Object> kafkaOverrides = resolveCommandsKafkaOverrides();
-        return new CommandsConfig(
-                pollTimeoutMs, shutdownTimeoutMs, hostSyncTimeoutMs, replyFlushTimeoutMs, kafkaOverrides);
+        return new CommandsConfig(pollTimeoutMs, shutdownTimeoutMs, hostSyncTimeoutMs, kafkaOverrides);
     }
 
     private Map<String, Object> resolveCommandsKafkaOverrides() {

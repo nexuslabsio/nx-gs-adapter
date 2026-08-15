@@ -20,7 +20,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -47,12 +46,18 @@ import org.jspecify.annotations.Nullable;
  * {@link CommandStatus#UNSUPPORTED_COMMAND}; Gson failure →
  * {@link CommandStatus#VALIDATION_FAILED}; {@link HostExecutorTimeoutException}
  * → {@link CommandStatus#UNAVAILABLE}; other {@code RuntimeException} or
- * {@code null} return → {@link CommandStatus#INTERNAL_ERROR}; {@code Error}
- * (OOM) escapes uncaught.</p>
+ * {@code null} return → {@link CommandStatus#INTERNAL_ERROR}; an {@code Error}
+ * (OOM) unwinds the poll loop, which stops the consumer and drops the module to
+ * {@code DISABLED}.</p>
  */
 public final class CommandsConsumer {
 
     private static final NxLog log = NxLogFactory.getLogger(CommandsConsumer.class);
+
+    // Same module-state vocabulary the Tier-1 sync modules report (DbSyncModule, GameDataSyncModule).
+    private static final String STATE_ACTIVE = "ACTIVE";
+    private static final String STATE_DEGRADED = "DEGRADED";
+    private static final String STATE_DISABLED = "DISABLED";
 
     private static final long SHUTDOWN_GRACE_MS = 1_000L;
     private static final byte[] FALLBACK_REPLY_TYPE_BYTES = "CommandResult".getBytes(StandardCharsets.UTF_8);
@@ -79,7 +84,6 @@ public final class CommandsConsumer {
     private final Gson gson;
     private final long pollTimeoutMs;
     private final long shutdownTimeoutMs;
-    private final long replyFlushTimeoutMs;
     private final Thread daemon;
 
     private final AtomicLong consumedTotal = new AtomicLong();
@@ -91,10 +95,6 @@ public final class CommandsConsumer {
     private final AtomicLong repliesPublishedTotal = new AtomicLong();
     private final AtomicLong repliesFailedTotal = new AtomicLong();
     private final AtomicLong commitFailuresTotal = new AtomicLong();
-    private final AtomicLong replyFlushTimeoutsTotal = new AtomicLong();
-
-    private final AtomicInteger pendingReplies = new AtomicInteger(0);
-    private final Object replyDrainLock = new Object();
 
     private volatile boolean running = false;
 
@@ -124,7 +124,6 @@ public final class CommandsConsumer {
         this.gson = gson;
         this.pollTimeoutMs = Math.max(1L, config.getPollTimeoutMs());
         this.shutdownTimeoutMs = Math.max(0L, config.getShutdownTimeoutMs());
-        this.replyFlushTimeoutMs = Math.max(0L, config.getReplyFlushTimeoutMs());
         this.daemon = new Thread(SafeRunnable.wrap(this::pollLoop, log), "nx-commands-consumer");
         this.daemon.setDaemon(true);
     }
@@ -179,9 +178,22 @@ public final class CommandsConsumer {
         CommandsStats stats = currentStats();
         return ModuleStatus.builder()
                 .name("commands")
-                .state(running ? "ACTIVE" : "DISABLED")
+                .state(currentState())
                 .stats(ModuleStatus.Stats.builder().commands(stats).build())
                 .build();
+    }
+
+    /**
+     * Consuming with no replies topic is DEGRADED, not ACTIVE: commands still execute but every
+     * reply is dropped, so each caller waits out its timeout and may re-issue a command that already
+     * ran. The counters alone cannot say this — {@code replies-failed} is monotonic, so an operator
+     * reading a rising total cannot tell "all replies lost" from "some replies failed once".
+     */
+    private String currentState() {
+        if (!running) {
+            return STATE_DISABLED;
+        }
+        return repliesTopic == null ? STATE_DEGRADED : STATE_ACTIVE;
     }
 
     CommandsStats currentStats() {
@@ -200,6 +212,16 @@ public final class CommandsConsumer {
     }
 
     private void pollLoop() {
+        try {
+            poll();
+        } finally {
+            // SafeRunnable swallows whatever escapes here, so without this the module would keep
+            // reporting ACTIVE for a consumer thread that has permanently stopped polling.
+            running = false;
+        }
+    }
+
+    private void poll() {
         while (running) {
             ConsumerRecords<byte[], byte[]> records;
             try {
@@ -243,63 +265,6 @@ public final class CommandsConsumer {
                 processRecord(record);
             }
         }
-    }
-
-    /**
-     * Block the consumer thread until every reply send started during the
-     * current batch has fired its callback (or the configured flush timeout
-     * elapses). Bounds the at-most-once reply window: with this gate in
-     * place, a JVM crash before the gate clears leaves the batch
-     * uncommitted, so records redeliver and replies are re-emitted by the
-     * idempotent handlers.
-     *
-     * <p>Skipped when {@code replyFlushTimeoutMs == 0} — interpreted as
-     * "operator opts out of flushing"; the at-most-once window reopens.</p>
-     *
-     * @return {@code true} when the wait returned via thread interrupt with
-     * pending replies still outstanding — caller MUST skip the offset commit
-     * so the batch redelivers. {@code false} otherwise (drained or timed
-     * out cleanly).
-     */
-    private boolean awaitRepliesDrain() {
-        if (replyFlushTimeoutMs <= 0L) {
-            return false;
-        }
-        long deadline = System.currentTimeMillis() + replyFlushTimeoutMs;
-        synchronized (replyDrainLock) {
-            while (pendingReplies.get() > 0) {
-                long remaining = deadline - System.currentTimeMillis();
-                if (remaining <= 0L) {
-                    int leftover = pendingReplies.get();
-                    if (leftover > 0) {
-                        replyFlushTimeoutsTotal.incrementAndGet();
-                        log.warn(
-                                "Reply flush timed out with {} send(s) still in flight after {}ms — "
-                                        + "committing offset anyway; pending sends will continue and may still "
-                                        + "succeed asynchronously",
-                                leftover,
-                                replyFlushTimeoutMs);
-                    }
-                    return false;
-                }
-                try {
-                    replyDrainLock.wait(remaining);
-                } catch (InterruptedException ie) {
-                    int leftover = pendingReplies.get();
-                    running = false;
-                    Thread.currentThread().interrupt();
-                    if (leftover > 0) {
-                        log.warn(
-                                "Interrupted during reply drain; skipping offset commit so {} "
-                                        + "pending record(s) will redeliver",
-                                leftover);
-                        return true;
-                    }
-                    return false;
-                }
-            }
-        }
-        return false;
     }
 
     // package-visible for unit tests; production callers go through pollLoop()
@@ -398,7 +363,8 @@ public final class CommandsConsumer {
             return;
         }
 
-        // 3. Invoke handler — Throwable (Error) intentionally NOT caught (lets JVM-level handler take over)
+        // 3. Invoke handler — an Error is deliberately not caught here; it unwinds the poll loop,
+        // SafeRunnable logs it, and the consumer stops (module state falls back to DISABLED).
         CommandContext ctx = new CommandContextImpl(correlationId, hostExecutor, events, ioExecutor, sync);
         @SuppressWarnings({"unchecked", "rawtypes"})
         CommandHandler handler = binding.handler();
@@ -470,34 +436,18 @@ public final class CommandsConsumer {
                 .add(NxHeaders.NX_CORRELATION_ID, correlationId.toString().getBytes(StandardCharsets.UTF_8));
         record.headers().add(NxHeaders.NX_MESSAGE_TYPE, replyMessageTypeBytes);
 
-        pendingReplies.incrementAndGet();
         try {
             replySender.send(record, (metadata, exception) -> {
-                try {
-                    if (exception != null) {
-                        repliesFailedTotal.incrementAndGet();
-                        log.warn("Reply send failed for corr={}: {}", correlationId, exception.getMessage(), exception);
-                    } else {
-                        repliesPublishedTotal.incrementAndGet();
-                    }
-                } finally {
-                    if (pendingReplies.decrementAndGet() == 0) {
-                        synchronized (replyDrainLock) {
-                            replyDrainLock.notifyAll();
-                        }
-                    }
+                if (exception != null) {
+                    repliesFailedTotal.incrementAndGet();
+                    log.warn("Reply send failed for corr={}: {}", correlationId, exception.getMessage(), exception);
+                } else {
+                    repliesPublishedTotal.incrementAndGet();
                 }
             });
         } catch (Throwable t) {
             // send() itself threw synchronously (rare — usually invalid config or producer-closed).
-            // Decrement the counter we incremented above so awaitRepliesDrain doesn't hang waiting
-            // for a callback that will never fire.
             repliesFailedTotal.incrementAndGet();
-            if (pendingReplies.decrementAndGet() == 0) {
-                synchronized (replyDrainLock) {
-                    replyDrainLock.notifyAll();
-                }
-            }
             log.error(
                     "Reply send threw for corr={}: {} ({})",
                     correlationId,
@@ -619,13 +569,5 @@ public final class CommandsConsumer {
 
     long commitFailuresTotal() {
         return commitFailuresTotal.get();
-    }
-
-    long replyFlushTimeoutsTotal() {
-        return replyFlushTimeoutsTotal.get();
-    }
-
-    int pendingReplies() {
-        return pendingReplies.get();
     }
 }
