@@ -58,6 +58,15 @@ import org.apache.kafka.clients.producer.ProducerRecord;
  * snapshot once. Both run on {@code ctx.io()} so they never block the connect / game
  * thread.</p>
  *
+ * <p><b>Host readiness.</b> Every snapshot pass is gated on the optional
+ * {@link GameDataReadinessProvider} (absent = always ready). The adapter connects during host boot,
+ * before the datapack is parsed, so an ungated pass would touch providers that have nothing yet —
+ * force-loading the host's parsers out of order, and letting the {@code gearscore} singleton publish
+ * a {@code count=0} marker that reconcile-deletes the platform's ruleset. While the host is unready
+ * the module publishes nothing and polls readiness every
+ * {@link #READINESS_POLL_INTERVAL_SECONDS} seconds, so the catalogs sync even if the host never
+ * calls {@code publishSnapshot()} itself.</p>
+ *
  * <p>Exception-safe throughout: every hook catches {@link Throwable} and never
  * propagates to the host JVM. A failure publishing one entity never aborts another.</p>
  */
@@ -75,15 +84,40 @@ public final class GameDataSyncModule implements AdapterModule {
     private final List<EntityDescriptor<?, ?>> descriptors;
     private final GameDataSender sender;
     private final GameDataSyncConfig config;
+    private final List<GameDataReadinessProvider> readinessProviders;
+
+    /**
+     * How often the module re-asks an unready host whether its game data has loaded. The check is a
+     * single boolean call, so a fixed interval beats a backoff — it costs nothing and picks the host
+     * up within seconds of it finishing boot.
+     */
+    static final long READINESS_POLL_INTERVAL_SECONDS = 5L;
+
+    /**
+     * How long the host may stay unready before that stops being "still booting" and becomes an
+     * alarm. Deliberately a separate constant from the publisher's null-snapshot grace: the two
+     * happen to share a value, but tuning one must not silently retune the other.
+     */
+    static final long READINESS_GRACE_MS = 15L * 60L * 1000L;
 
     private final AtomicBoolean snapshotRunning = new AtomicBoolean(false);
     private final AtomicBoolean rerunRequested = new AtomicBoolean(false);
+    private final AtomicBoolean readinessProbeFailed = new AtomicBoolean(false);
+
+    /** Guards the scheduler lifecycle: creation, the readiness poll handle, and shutdown. */
+    private final Object schedulerLock = new Object();
 
     private volatile String state = STATE_INIT;
     private volatile ConnectContext context;
     private volatile GameDataSnapshotPublisher publisher;
     private volatile List<EntitySync<?>> entitySyncs = Collections.emptyList();
-    private volatile ScheduledExecutorService resyncScheduler;
+    private volatile GameDataReadinessProvider readiness;
+    private volatile EscalationTracker readinessTracker;
+
+    // @GuardedBy("schedulerLock")
+    private ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> readinessPoll;
+    private boolean schedulerShutdown;
 
     public GameDataSyncModule() {
         this(defaultDescriptors(), GameDataSyncModule::sendViaNxKafka, GameDataSyncConfig.fromProductionChain());
@@ -94,9 +128,24 @@ public final class GameDataSyncModule implements AdapterModule {
     }
 
     GameDataSyncModule(List<EntityDescriptor<?, ?>> descriptors, GameDataSender sender, GameDataSyncConfig config) {
+        this(descriptors, sender, config, null);
+    }
+
+    /**
+     * @param readinessProviders explicit readiness-provider list, or {@code null} to discover them
+     *                           via {@link ServiceLoader} as production does. The explicit form
+     *                           exists because ServiceLoader cannot express "none registered" or
+     *                           "two registered" on a classpath shared by the whole test module.
+     */
+    GameDataSyncModule(
+            List<EntityDescriptor<?, ?>> descriptors,
+            GameDataSender sender,
+            GameDataSyncConfig config,
+            List<GameDataReadinessProvider> readinessProviders) {
         this.descriptors = descriptors;
         this.sender = sender;
         this.config = config;
+        this.readinessProviders = readinessProviders;
     }
 
     /**
@@ -191,10 +240,56 @@ public final class GameDataSyncModule implements AdapterModule {
             return;
         }
 
+        List<GameDataReadinessProvider> discovered =
+                readinessProviders != null ? readinessProviders : loadProviders(GameDataReadinessProvider.class);
+        if (discovered.size() > 1) {
+            log.error(
+                    "Multiple GameDataReadinessProvider impls on classpath: [{}]. gd-sync FAILED.",
+                    classNamesOf(discovered));
+            state = STATE_FAILED;
+            return;
+        }
+        this.readiness = discovered.isEmpty() ? null : discovered.get(0);
+        this.readinessTracker = new EscalationTracker(READINESS_GRACE_MS, System::currentTimeMillis);
+        this.readinessProbeFailed.set(false);
+        resetSchedulerShutdown();
+        if (readiness != null) {
+            log.info(
+                    "GameDataReadinessProvider resolved: {}",
+                    readiness.getClass().getName());
+        }
+
         this.entitySyncs = Collections.unmodifiableList(resolved);
         this.publisher = new GameDataSnapshotPublisher(sender);
         registerResyncHandler(ctx);
         state = STATE_ACTIVE;
+    }
+
+    /**
+     * Whether the host says its game-data catalogs are loaded. No provider registered means the host
+     * predates the SPI and is treated as always ready. A provider that throws counts as NOT ready:
+     * publishing on a broken readiness signal risks an empty snapshot reconcile-deleting a catalog,
+     * while refusing only delays the burst until the next poll.
+     */
+    private boolean hostReady() {
+        GameDataReadinessProvider provider = readiness;
+        if (provider == null) {
+            return true;
+        }
+        try {
+            boolean ready = provider.ready();
+            readinessProbeFailed.compareAndSet(true, false);
+            return ready;
+        } catch (Throwable t) {
+            if (readinessProbeFailed.compareAndSet(false, true)) {
+                log.warn(
+                        "GameDataReadinessProvider {} threw {} — treating the host as not ready",
+                        provider.getClass().getName(),
+                        t.getClass().getName(),
+                        t);
+            }
+            return false;
+        }
     }
 
     private void registerResyncHandler(ConnectContext ctx) {
@@ -217,6 +312,11 @@ public final class GameDataSyncModule implements AdapterModule {
         List<EntitySync<?>> syncs = entitySyncs;
         if (!STATE_ACTIVE.equals(state) || ctx == null || pub == null || syncs.isEmpty()) {
             return CommandResult.unavailable("gd-sync module is not active");
+        }
+        if (!hostReady()) {
+            // Acking with acceptedEntities and then publishing nothing would leave the platform
+            // waiting for a snapshot that was never scheduled.
+            return CommandResult.unavailable("gd-sync host game data is not ready yet");
         }
         List<String> entityNames = registeredEntityNames(syncs);
         try {
@@ -265,17 +365,80 @@ public final class GameDataSyncModule implements AdapterModule {
                     t);
         }
 
+        if (hostReady()) {
+            dispatchSnapshot(ctx, pub);
+        } else {
+            log.info("gd-sync: host game data not ready — deferring the initial snapshot");
+            startReadinessPolling(ctx, pub);
+        }
+
+        startResyncScheduler(ctx, pub);
+    }
+
+    private void dispatchSnapshot(ConnectContext ctx, GameDataSnapshotPublisher pub) {
         try {
             Executor io = ctx.io();
             io.execute(() -> runAllSnapshots(ctx, pub));
         } catch (Throwable t) {
             log.error(
-                    "gd-sync initial snapshot dispatch threw {} — no snapshot published",
+                    "gd-sync snapshot dispatch threw {} — no snapshot published",
                     t.getClass().getName(),
                     t);
         }
+    }
 
-        startResyncScheduler(ctx, pub);
+    /**
+     * Re-check host readiness until it flips, then publish once and stop polling. Makes the module
+     * self-sufficient: a host that never calls {@code publishSnapshot()} still gets its catalogs
+     * synced, and one that does simply beats the poller to it.
+     */
+    private void startReadinessPolling(ConnectContext ctx, GameDataSnapshotPublisher pub) {
+        synchronized (schedulerLock) {
+            if (readinessPoll != null) {
+                return;
+            }
+            ScheduledExecutorService exec = ensureScheduler();
+            if (exec == null) {
+                return;
+            }
+            Runnable probe = SafeRunnable.wrap(() -> pollReadinessOnce(ctx, pub), log);
+            readinessPoll = exec.scheduleWithFixedDelay(
+                    probe, READINESS_POLL_INTERVAL_SECONDS, READINESS_POLL_INTERVAL_SECONDS, TimeUnit.SECONDS);
+        }
+    }
+
+    // package-visible for unit tests; production callers go through startReadinessPolling()
+    void pollReadinessOnce(ConnectContext ctx, GameDataSnapshotPublisher pub) {
+        if (hostReady()) {
+            // runAllSnapshots cancels the poll itself once its gate opens — going through the
+            // dispatch keeps a single place responsible for that.
+            dispatchSnapshot(ctx, pub);
+            return;
+        }
+        EscalationTracker tracker = readinessTracker;
+        if (tracker != null && tracker.observe() == EscalationTracker.Stage.ESCALATED) {
+            log.error(
+                    "gd-sync: host game data still not ready after {} minutes — no catalog will sync "
+                            + "until the host reports ready",
+                    READINESS_GRACE_MS / 60000L);
+        }
+    }
+
+    private void cancelReadinessPolling() {
+        synchronized (schedulerLock) {
+            ScheduledFuture<?> poll = readinessPoll;
+            readinessPoll = null;
+            if (poll != null) {
+                poll.cancel(false);
+            }
+        }
+    }
+
+    // package-visible for unit tests — proves the fallback poll is disarmed once a pass publishes
+    boolean readinessPollArmed() {
+        synchronized (schedulerLock) {
+            return readinessPoll != null;
+        }
     }
 
     private void startResyncScheduler(ConnectContext ctx, GameDataSnapshotPublisher pub) {
@@ -283,30 +446,69 @@ public final class GameDataSyncModule implements AdapterModule {
             return;
         }
         final int hours = config.resyncIntervalHours();
-        ScheduledExecutorService scheduler =
-                Executors.newSingleThreadScheduledExecutor(DaemonThreadFactory.named("nx-gd-sync-resync", log));
         Runnable tick = SafeRunnable.wrap(() -> runAllSnapshots(ctx, pub), log);
-        scheduler.scheduleWithFixedDelay(tick, hours, hours, TimeUnit.HOURS);
-        this.resyncScheduler = scheduler;
+        synchronized (schedulerLock) {
+            ScheduledExecutorService exec = ensureScheduler();
+            if (exec == null) {
+                return;
+            }
+            exec.scheduleWithFixedDelay(tick, hours, hours, TimeUnit.HOURS);
+        }
         log.info("gd-sync scheduled resync enabled — every {}h", hours);
+    }
+
+    /**
+     * One scheduler serves both readiness polling and the periodic resync — they never run long
+     * enough to block each other, and a second daemon thread per connection buys nothing. Returns
+     * {@code null} once the module has been shut down: {@code start()} runs on the adapter's connect
+     * thread while {@code stop()} runs on the host's, so a late scheduling attempt must not resurrect
+     * a daemon that would outlive the connection.
+     */
+    private ScheduledExecutorService ensureScheduler() {
+        assert Thread.holdsLock(schedulerLock);
+        if (schedulerShutdown) {
+            return null;
+        }
+        if (scheduler == null) {
+            scheduler =
+                    Executors.newSingleThreadScheduledExecutor(DaemonThreadFactory.named("nx-gd-sync-scheduler", log));
+        }
+        return scheduler;
+    }
+
+    private void shutdownScheduler() {
+        ScheduledExecutorService exec;
+        synchronized (schedulerLock) {
+            schedulerShutdown = true;
+            ScheduledFuture<?> poll = readinessPoll;
+            readinessPoll = null;
+            if (poll != null) {
+                poll.cancel(false);
+            }
+            exec = scheduler;
+            scheduler = null;
+        }
+        if (exec != null) {
+            exec.shutdownNow();
+        }
+    }
+
+    private void resetSchedulerShutdown() {
+        synchronized (schedulerLock) {
+            schedulerShutdown = false;
+        }
     }
 
     @Override
     public void stop() {
-        ScheduledExecutorService scheduler = resyncScheduler;
-        resyncScheduler = null;
-        if (scheduler != null) {
-            scheduler.shutdownNow();
-        }
+        shutdownScheduler();
     }
 
     @Override
     public void onDisconnect() {
-        ScheduledExecutorService scheduler = resyncScheduler;
-        resyncScheduler = null;
-        if (scheduler != null) {
-            scheduler.shutdownNow();
-        }
+        shutdownScheduler();
+        readiness = null;
+        readinessTracker = null;
         entitySyncs = Collections.emptyList();
         context = null;
         publisher = null;
@@ -351,6 +553,25 @@ public final class GameDataSyncModule implements AdapterModule {
      * of a pass still fires exactly one more pass.
      */
     private void runAllSnapshots(ConnectContext ctx, GameDataSnapshotPublisher pub) {
+        // A task queued on a previous connection's io() must not publish against the serverId and
+        // topic map of the connection that replaced it.
+        if (!STATE_ACTIVE.equals(state) || ctx != context) {
+            return;
+        }
+        // Gate the whole pass, not each entity: the providers must not be touched at all while the
+        // host is loading (reading them force-loads its parsers out of order), and the gearscore
+        // singleton cannot express "not ready" — its Optional.empty() would publish a legal
+        // count=0 marker and reconcile-delete the platform's ruleset.
+        if (!hostReady()) {
+            // Also covers a host that goes unready again (datapack reload) after a successful pass:
+            // without re-arming, nothing would ever publish again.
+            startReadinessPolling(ctx, pub);
+            return;
+        }
+        // Whoever opens the gate first — the host's own publishSnapshot() or the fallback poll —
+        // makes the poll redundant. Cancelling here rather than in the poll is what stops a boot
+        // from publishing the whole catalog twice.
+        cancelReadinessPolling();
         rerunRequested.set(true);
         while (snapshotRunning.compareAndSet(false, true)) {
             try {
@@ -359,7 +580,7 @@ public final class GameDataSyncModule implements AdapterModule {
                     for (EntitySync<?> sync : entitySyncs) {
                         sync.run(pub, ctx);
                     }
-                } while (rerunRequested.get());
+                } while (rerunRequested.get() && hostReady());
             } finally {
                 snapshotRunning.set(false);
             }

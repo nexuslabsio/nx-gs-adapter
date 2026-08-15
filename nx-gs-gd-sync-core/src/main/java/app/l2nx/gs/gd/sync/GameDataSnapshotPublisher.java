@@ -8,6 +8,9 @@ import app.l2nx.gs.log.NxLogFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.LongSupplier;
 import java.util.function.ToLongFunction;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
@@ -39,10 +42,28 @@ public final class GameDataSnapshotPublisher {
     public static final String OP_UPSERT = "UPSERT";
     public static final String OP_SNAPSHOT_COMPLETE = "SNAPSHOT_COMPLETE";
 
+    /**
+     * How long a provider may keep answering {@code null} before it stops being "the host is still
+     * booting" and becomes an alarm. Applies only to hosts without a
+     * {@link app.l2nx.gs.adapter.api.spi.GameDataReadinessProvider} — a host that has one is gated by
+     * {@link GameDataSyncModule} and never reaches the null path.
+     */
+    static final long NOT_READY_GRACE_MS = 15L * 60L * 1000L;
+
     private final GameDataSender sender;
+    private final long notReadyGraceMs;
+    private final LongSupplier clock;
+    private final ConcurrentMap<String, EscalationTracker> nullTrackers =
+            new ConcurrentHashMap<String, EscalationTracker>();
 
     public GameDataSnapshotPublisher(GameDataSender sender) {
+        this(sender, NOT_READY_GRACE_MS, System::currentTimeMillis);
+    }
+
+    GameDataSnapshotPublisher(GameDataSender sender, long notReadyGraceMs, LongSupplier clock) {
         this.sender = sender;
+        this.notReadyGraceMs = notReadyGraceMs;
+        this.clock = clock;
     }
 
     /**
@@ -63,13 +84,13 @@ public final class GameDataSnapshotPublisher {
             return null;
         }
         if (items == null) {
-            // null breaks the never-null contract; aborting (no marker) avoids a count=0
+            // null means "nothing to give yet"; aborting (no marker) avoids a count=0
             // SNAPSHOT_COMPLETE that would reconcile-delete the whole catalog. Empty is legal and
-            // still emits count=0 via the loop below.
-            log.error(
-                    "gd-sync provider for entity '{}' returned null snapshot (contract violation) "
-                            + "— burst aborted, no SNAPSHOT_COMPLETE emitted",
-                    entity);
+            // still emits count=0 via the loop below. A host that registers a
+            // GameDataReadinessProvider never gets here — the module gates the pass instead — so
+            // this path serves hosts without that SPI, where the first bursts of a boot are
+            // expected to be null and only a provider stuck null is a real fault.
+            reportNullSnapshot(entity);
             return null;
         }
 
@@ -111,8 +132,40 @@ public final class GameDataSnapshotPublisher {
             return new Result(syncId, count, false);
         }
 
+        // Only touch existing state: a host with a readiness provider never reaches the null path,
+        // so the success path must not allocate a tracker just to reset it.
+        EscalationTracker tracker = nullTrackers.get(entity);
+        if (tracker != null) {
+            tracker.reset();
+        }
         log.info("gd-sync published snapshot for entity '{}': {} template(s), syncId {}", entity, count, syncId);
         return new Result(syncId, count, true);
+    }
+
+    private void reportNullSnapshot(String entity) {
+        switch (trackerFor(entity).observe()) {
+            case FIRST:
+            case REPEAT:
+                log.warn(
+                        "gd-sync provider for entity '{}' has no snapshot yet — burst deferred, "
+                                + "retrying on the next one",
+                        entity);
+                break;
+            case ESCALATED:
+                log.error(
+                        "gd-sync provider for entity '{}' still returns null after {} minutes — "
+                                + "no snapshot has ever been published for it",
+                        entity,
+                        notReadyGraceMs / 60000L);
+                break;
+            case SILENT:
+                break;
+        }
+    }
+
+    // package-visible for tests: the per-entity null history behind the WARN-then-ERROR decision
+    EscalationTracker trackerFor(String entity) {
+        return nullTrackers.computeIfAbsent(entity, name -> new EscalationTracker(notReadyGraceMs, clock));
     }
 
     private <T> void send(String topic, byte[] key, GameDataSyncEvent<T> value) {
