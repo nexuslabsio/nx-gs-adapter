@@ -65,6 +65,24 @@ jobs:
           echo "module=$GRADLE_MODULE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      # CI passes -P<module>.version only for the module being released; every OTHER module resolves
+      # this one through the fallback literal in its build.gradle.kts. A fallback left behind the tag
+      # therefore ships POMs pinning a version that predates the code they were built from.
+      - name: Verify the module's fallback version matches the tag
+        env:
+          MODULE: ${{ steps.parsed.outputs.module }}
+          VERSION: ${{ steps.parsed.outputs.version }}
+        run: |
+          FALLBACK=$(sed -n 's/^version = findProperty(.*?: "\([0-9][0-9.]*\)".*/\1/p' "${MODULE}/build.gradle.kts")
+          if [ -z "$FALLBACK" ]; then
+            echo "::error::Could not read the fallback version from ${MODULE}/build.gradle.kts"
+            exit 1
+          fi
+          if [ "$FALLBACK" != "$VERSION" ]; then
+            echo "::error::${MODULE}/build.gradle.kts declares fallback '${FALLBACK}' but the tag releases '${VERSION}' — bump the fallback in the release commit, other modules pin this one by that literal."
+            exit 1
+          fi
+
       - name: Run tests for target module
         env:
           MODULE: ${{ steps.parsed.outputs.module }}

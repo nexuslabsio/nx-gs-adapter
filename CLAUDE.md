@@ -149,6 +149,11 @@ the tag, maps the prefix to its subproject, passes `-P<subproject>.version=X.Y.Z
 ONLY that module — the others stay at the fallback literal in their own `build.gradle.kts`.
 `nx-gs-log` is internal-only (no tag namespace, no publication).
 
+**The release commit bumps the module's fallback literal to the version being tagged.** CI passes
+`-P` only for the tagged module, so every other module's POM pins this one at whatever its
+`build.gradle.kts` fallback says — a stale literal ships a dependency pin at a version that predates
+the code. The publish workflow refuses to release when the two disagree.
+
 Local builds default to the per-module fallback (no `local-SNAPSHOT`). Maven Central is the publish
 target; CI uses `signingKey` / `signingPassword` Gradle properties (GPG) and `CENTRAL_TOKEN` for the
 Sonatype Central Portal upload. Central propagation takes ~15-30 min — a dependent release must wait
