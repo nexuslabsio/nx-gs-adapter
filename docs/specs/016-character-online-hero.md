@@ -22,7 +22,7 @@ That timeline is durable, scarce, high-value data and needs a discrete event
 emitted at the crowning moment, not just a current-state flag.
 
 This slice drains `onlineTime` + `hero` from
-[`character-deferred-fields.md`](../character-deferred-fields.md) and adds a
+[`character-deferred-fields.md`](013-character-core-extension.md#deferred-fields-and-filters-backlog) and adds a
 `HeroGrantedEvent` for the historical record.
 
 Audience: platform-side consumers (admin character page, olympiad/hero
@@ -32,7 +32,7 @@ crowning path.
 ## Requirements
 
 > Parent / sibling features:
-> - [`character-core-extension`](013-character-core-extension/spec.md) —
+> - [`character-core-extension`](013-character-core-extension.md) —
     > `CharacterDbDto` shape, CDC + runtime presence. UNCHANGED.
 > - [`db-sync`](003-db-sync/spec.md) / [`cdc-engine`](005-cdc-engine/spec.md) —
     > CDC mapping, `hashedColumns`, whole-DTO emit on change. UNCHANGED.
@@ -224,8 +224,8 @@ crowning path.
 
 ## Links
 
-- Parent: [`character-core-extension`](013-character-core-extension/spec.md)
-- Backlog drained: [`character-deferred-fields.md`](../character-deferred-fields.md)
+- Parent: [`character-core-extension`](013-character-core-extension.md)
+- Backlog drained: [`character-deferred-fields.md`](013-character-core-extension.md#deferred-fields-and-filters-backlog)
 - Event family extended: [`olympiad-events`](015-olympiad-events.md)
 - CDC mechanism: [`db-sync`](003-db-sync/spec.md), [`cdc-engine`](005-cdc-engine/spec.md)
 - Host sources: `bohpts-core` `l2e.gameserver.l2nx.sync.db.CharacterMapping`,

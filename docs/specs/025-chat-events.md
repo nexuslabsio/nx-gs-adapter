@@ -23,7 +23,7 @@ authors hooking the chat-handler path.
 ## Requirements
 
 > Sibling feature carrying the wire dispatch plumbing:
-> - [`messaging`](008-messaging/spec.md) — `MessagingTopics.events.<family>` topic
+> - [`messaging`](008-messaging.md) — `MessagingTopics.events.<family>` topic
     > addressing, `Nx-Server-Id` connection-scoped header, `Nx-Message-Type`
     > per-record header, UUIDv7 idempotency. UNCHANGED by this slice.
 
@@ -127,5 +127,5 @@ on an older api jar simply never publishes the family; the platform sees no
 ## Links
 
 - Sibling reference (host-push publisher pattern + registry binding):
-  [`docs/specs/011-events-online-snapshot/spec.md`](011-events-online-snapshot/spec.md)
-- Wire dispatch plumbing: [`docs/specs/008-messaging/spec.md`](008-messaging/spec.md)
+  [`docs/specs/011-events-online-snapshot.md`](011-events-online-snapshot.md)
+- Wire dispatch plumbing: [`docs/specs/008-messaging.md`](008-messaging.md)

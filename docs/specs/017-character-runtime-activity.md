@@ -33,9 +33,9 @@ runtime character mapping.
 ## Requirements
 
 > Parent / sibling features:
-> - [`runtime-sync`](006-runtime-sync/spec.md) — the FNV-1a snapshot+diff engine
+> - [`runtime-sync`](006-runtime-sync.md) — the FNV-1a snapshot+diff engine
     > and `RuntimeEntityMapping` SPI this rides. UNCHANGED.
-> - [`character-core-extension`](013-character-core-extension/spec.md) /
+> - [`character-core-extension`](013-character-core-extension.md) /
     > [`character-online-hero`](016-character-online-hero.md) —
     > `CharacterRuntimeDto` / `CharacterDbDto` shape. Extended additively.
 
@@ -259,9 +259,9 @@ runtime character mapping.
 
 ## Links
 
-- Rides: [`runtime-sync`](006-runtime-sync/spec.md)
+- Rides: [`runtime-sync`](006-runtime-sync.md)
 - Sibling: [`character-online-hero`](016-character-online-hero.md),
-  [`character-core-extension`](013-character-core-extension/spec.md)
+  [`character-core-extension`](013-character-core-extension.md)
 - Pattern precedent: [`events-raid`](014-events-raid.md)
   (`BossRespawnEntry.status` open string + `WellKnownBossStatuses`)
 - Host source: `bohpts-core`

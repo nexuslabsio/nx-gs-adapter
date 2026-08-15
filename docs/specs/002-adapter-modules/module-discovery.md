@@ -1,6 +1,7 @@
 # Adapter Modules — module discovery & registration
 
-> Sibling: [spec.md](./spec.md), [tech.md](./tech.md)
+> Sibling: [spec.md](./spec.md) — implementation detail lives in its Technical design
+> section
 > Audience: anyone implementing an `AdapterModule` impl (db-sync, dp-sync, future
 > metrics, custom in-house module) — plus general SPI mechanics that apply to every
 > SPI tier in this stack.
@@ -8,7 +9,7 @@
 This doc walks through how `AdapterModule` impls are discovered by `nx-gs-adapter-core`
 at startup. It also covers the general `java.util.ServiceLoader` mechanics that the same
 adapter stack reuses at lower SPI tiers (Tier-2 `DbSchemaProvider` in `db-sync`, Tier-3
-`JdbcConnectionSource` in `jdbc-connection-source` — but the *mechanics* documented in
+`JdbcConnectionSource` in `jdbc-connection-source` — but the _mechanics_ documented in
 "Why ServiceLoader" and "Common mistakes" sections below apply uniformly to all tiers).
 
 ## SPI tier landscape
@@ -64,9 +65,9 @@ Cross-references:
   [`docs/specs/003-db-sync/module-discovery.md`](../003-db-sync/module-discovery.md)
 - Tier 2 (runtime-sync `RuntimeStateProvider` discovery — same ServiceLoader
   mechanics, host-provided in-memory game-state extractors):
-  [`docs/specs/006-runtime-sync/spec.md`](../006-runtime-sync/spec.md)
+  [`docs/specs/006-runtime-sync.md`](../006-runtime-sync.md)
 - Tier 3 (`JdbcConnectionSource` resolution: host SPI Path 1 + bundled-Hikari Path 2
-  fallback): [`docs/specs/004-jdbc-connection-source/spec.md`](../004-jdbc-connection-source/spec.md)
+  fallback): [`docs/specs/004-jdbc-connection-source.md`](../004-jdbc-connection-source.md)
   (full doc; no separate `module-discovery.md` for that tier — content is already in
   spec/tech).
 
@@ -223,7 +224,7 @@ nx-gs-db-sync-core/
   "no AdapterModule on classpath" (or the equivalent for whichever tier). Fix: add
   the file under `src/main/resources/META-INF/services/`.
 - **Wrong file name.** The descriptor file's name MUST be the fully-qualified
-  interface name *exactly* (no `.txt`, no `.list`, no `.services`). For Tier 1 that's
+  interface name _exactly_ (no `.txt`, no `.list`, no `.services`). For Tier 1 that's
   literally `app.l2nx.gs.adapter.api.spi.AdapterModule` — dots and all. Some IDEs / OS
   filename helpers append extensions automatically; disable that or rename after
   saving.

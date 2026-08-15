@@ -168,6 +168,6 @@ and does not map the `ban` entity until rebuilt against the new api.
 ## Links
 
 - Sibling reference (concrete-command handler + DTO migration pattern):
-  [`docs/specs/010-commands-send-mail/spec.md`](010-commands-send-mail/spec.md)
+  [`docs/specs/010-commands-send-mail.md`](010-commands-send-mail.md)
 - Commands rail infrastructure: [`docs/specs/009-commands/spec.md`](009-commands/spec.md)
 - Up-channel sync infrastructure: [`docs/specs/003-db-sync/spec.md`](003-db-sync/spec.md)

@@ -44,7 +44,7 @@ bot), operators (server-status menu section), and platform-side consumers
 ## Requirements
 
 > Sibling feature carrying the wire dispatch plumbing — UNCHANGED by this spec:
-> [`messaging`](008-messaging/spec.md) — `MessagingTopics.events.<family>` topic
+> [`messaging`](008-messaging.md) — `MessagingTopics.events.<family>` topic
 > addressing, `Nx-Server-Id` connection-scoped header, `Nx-Message-Type`
 > per-record header, UUIDv7 idempotency, host-pushed `NxEvents.publish(...)` +
 > `EventTypeRegistry` binding pattern.
@@ -404,9 +404,9 @@ bot), operators (server-status menu section), and platform-side consumers
 ## Links
 
 - Sibling feature (events runtime + per-family fanout):
-  [`docs/specs/008-messaging/spec.md`](008-messaging/spec.md)
+  [`docs/specs/008-messaging.md`](008-messaging.md)
 - Reference family + publisher pattern (snapshot-style, host-pushed):
-  [`docs/specs/011-events-online-snapshot/spec.md`](011-events-online-snapshot/spec.md)
+  [`docs/specs/011-events-online-snapshot.md`](011-events-online-snapshot.md)
 - Reference family + publisher pattern (multi-event family, discrete fact +
   snapshot): [`docs/specs/014-events-raid.md`](014-events-raid.md)
 - bohpts-core sources: `l2e.gameserver.Config.SERVER_GMONLY`,

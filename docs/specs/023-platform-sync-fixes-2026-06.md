@@ -6,15 +6,18 @@ Scope: three independent fixes across `nx-gs-adapter`, `nx-gameservers`,
 `nx-gamedata`, and `bohpts-core`, specified together but implementable in
 parallel.
 
-| # | Fix                                                  | Repos touched                                                             |
-|---|------------------------------------------------------|---------------------------------------------------------------------------|
-| ① | Targeted-window force-resync (fast per-PK republish) | `nx-gs-adapter` (`nx-gs-db-sync-core`)                                    |
-| ② | Upsert character-locks command (IP / HWID / ITEM)    | `nx-gs-adapter-api`, `nx-gameservers`, `nx-users` (seed), `bohpts-core`   |
-| ③ | Gearscore gd-sync deploy gap                         | `nx-gs-adapter` (release), `bohpts-core` (dep bump), `nx-gamedata` (test) |
+| #   | Fix                                                  | Repos touched                                                             |
+| --- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
+| ①   | Targeted-window force-resync (fast per-PK republish) | `nx-gs-adapter` (`nx-gs-db-sync-core`)                                    |
+| ②   | Upsert character-locks command (IP / HWID / ITEM)    | `nx-gs-adapter-api`, `nx-gameservers`, `nx-users` (seed), `bohpts-core`   |
+| ③   | Gearscore gd-sync deploy gap                         | `nx-gs-adapter` (release), `bohpts-core` (dep bump), `nx-gamedata` (test) |
 
 ---
 
 ## Fix ① — Targeted-window force-resync
+
+> Living spec for the feature: [021-force-resync.md](021-force-resync.md), which already carries the
+> shipped windowing behaviour. This section is the 2026-06 change record.
 
 ### Problem (confirmed)
 
@@ -54,8 +57,8 @@ Components:
   `pks` + `noEventPks`) to the caller, and a flag `targetedOnly` = true when
   `all == false`. When `all` is pending, `targetedOnly = false` (full scan
   required — invalidate-all must re-scan everything).
-- **`CdcEngine.runGuardedCycle`** — distinguish a *scheduled* tick from a
-  *triggered* (out-of-band) run. Only a triggered run with a non-empty targeted
+- **`CdcEngine.runGuardedCycle`** — distinguish a _scheduled_ tick from a
+  _triggered_ (out-of-band) run. Only a triggered run with a non-empty targeted
   set and `targetedOnly == true` takes the fast path. A scheduled tick always
   runs the full scan (it must catch external deletes/changes the resync set does
   not know about).
@@ -105,6 +108,10 @@ destination in `CharacterTransferService` online paths.
 
 ## Fix ② — Upsert character-locks command
 
+> Current contracts: the lock wire shape lives in
+> [013-character-core-extension.md](013-character-core-extension.md), the command's request/reply
+> contract in [009-commands/catalog.md](009-commands/catalog.md). This section is the change record.
+
 ### Problem
 
 Operators cannot set, change, or clear a character's IP / HWID / ITEM lock from
@@ -124,26 +131,26 @@ issues several calls.
 **`nx-gs-adapter-api`** (`kafka.commands.character`):
 
 - `UpsertCharacterLockCommand implements NxCommand<UpsertCharacterLockResult>`
-    - `Long charId`
-    - `String lockType` — one of `WellKnownCharacterLockTypes` (`IP`/`HWID`/`ITEM`)
-    - `@Nullable String value` — non-blank ⇒ set/replace to this value; null/blank
-      ⇒ clear (host writes the `"0"` sentinel, matching the core convention)
-    - hand-written builder, Javadoc on the wire contract (Java 8 POJO).
+  - `Long charId`
+  - `String lockType` — one of `WellKnownCharacterLockTypes` (`IP`/`HWID`/`ITEM`)
+  - `@Nullable String value` — non-blank ⇒ set/replace to this value; null/blank
+    ⇒ clear (host writes the `"0"` sentinel, matching the core convention)
+  - hand-written builder, Javadoc on the wire contract (Java 8 POJO).
 - `UpsertCharacterLockResult`
-    - `Long charId`
-    - `CharacterLockState lock` — final state of the affected lock (type + active
-        + value), so the caller sees the post-upsert truth for that one lock.
+  - `Long charId`
+  - `CharacterLockState lock` — final state of the affected lock (type + active
+    - value), so the caller sees the post-upsert truth for that one lock.
 
 **`nx-gameservers`** (`api/rest/commands`):
 
 - `CommandsController` → `POST /gameservers/v1/commands/characters/lock`
-    - `@RequirePermission(Permissions.GS_COMMANDS_CHARACTER_LOCK_UPDATE)`
-    - `@Operation.summary` prefixed `❗` (mutates a character's access state); the
-      OpenAPI customizer mirrors `❗` into the permission block.
-    - Request DTO `UpsertCharacterLockRequest { Long charId, String lockType, String value }`
-      with validation (`charId` required; `lockType` ∈ enum, required; `value`
-      optional — absent/blank = clear).
-    - Thin: map → command → `sender.sendAndAwait(...)` → response.
+  - `@RequirePermission(Permissions.GS_COMMANDS_CHARACTER_LOCK_UPDATE)`
+  - `@Operation.summary` prefixed `❗` (mutates a character's access state); the
+    OpenAPI customizer mirrors `❗` into the permission block.
+  - Request DTO `UpsertCharacterLockRequest { Long charId, String lockType, String value }`
+    with validation (`charId` required; `lockType` ∈ enum, required; `value`
+    optional — absent/blank = clear).
+  - Thin: map → command → `sender.sendAndAwait(...)` → response.
 - `Permissions` — add leaf `GS_COMMANDS_CHARACTER_LOCK_UPDATE` under the
   `GS_COMMANDS` domain (covered by `GS_COMMANDS_ALL`).
 
@@ -155,18 +162,18 @@ game world / access) in each locale.
 **`bohpts-core`** (`commands/character` — new package):
 
 - `UpsertCharacterLockHandler implements CommandHandler<UpsertCharacterLockCommand, UpsertCharacterLockResult>`
-    - validate `charId` (in-int-range) + `lockType` (known); resolve the var name
-      (`lockIp`/`lockHwid`/`lockItem`);
-    - resolve online vs offline (`GameObjectsStorage.getPlayer`);
-    - online → `ctx.host().sync(...)`: `player.setVar(varName, value)` (set) or
-      `player.setVar(varName, 0)` (clear);
-    - offline → `ctx.io()`: direct JDBC upsert/delete on `character_variables`
-      for that single `(charId, varName)` row (set value, or set `"0"`),
-      mirroring `ItemPersistence`;
-    - on success `ctx.sync().requestResync("character", [charId], false)` (locks
-      are character-variable children of the `character` entity — no item cascade).
-      With Fix ① this resync is fast.
-    - return `UpsertCharacterLockResult` with the affected lock's final state.
+  - validate `charId` (in-int-range) + `lockType` (known); resolve the var name
+    (`lockIp`/`lockHwid`/`lockItem`);
+  - resolve online vs offline (`GameObjectsStorage.getPlayer`);
+  - online → `ctx.host().sync(...)`: `player.setVar(varName, value)` (set) or
+    `player.setVar(varName, 0)` (clear);
+  - offline → `ctx.io()`: direct JDBC upsert/delete on `character_variables`
+    for that single `(charId, varName)` row (set value, or set `"0"`),
+    mirroring `ItemPersistence`;
+  - on success `ctx.sync().requestResync("character", [charId], false)` (locks
+    are character-variable children of the `character` entity — no item cascade).
+    With Fix ① this resync is fast.
+  - return `UpsertCharacterLockResult` with the affected lock's final state.
 - Register in `BohptsCommandsModule.onConnect`.
 
 ### Tests
@@ -186,6 +193,9 @@ and surface it in the session.
 ---
 
 ## Fix ③ — Gearscore gd-sync deploy gap
+
+> Feature spec for the module itself: [030-gamedata-sync.md](030-gamedata-sync.md). This section
+> records a version-skew incident, not the gd-sync design.
 
 ### Root cause (confirmed)
 

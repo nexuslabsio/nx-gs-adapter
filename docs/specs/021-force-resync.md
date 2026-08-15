@@ -437,7 +437,7 @@ predates the cycle.
   feature uses the inbound command channel that cdc-engine R14 anticipated
   (R14 itself — dynamic per-entity config overrides — remains open).
 - Snapshot store & persistence (single-writer contract, checkpoint timing):
-  [`docs/specs/012-snapshot-persistence/spec.md`](012-snapshot-persistence/spec.md).
+  [`docs/specs/012-snapshot-persistence.md`](012-snapshot-persistence.md).
 - Inbound commands RPC (handler SPI, reply envelope, error codes):
   [`docs/specs/009-commands/spec.md`](009-commands/spec.md).
 - Platform command bridge (`CommandsSender`, audits) — nx-gameservers repo,

@@ -31,7 +31,7 @@ host-side authors hooking raid-death paths.
 ## Requirements
 
 > Sibling feature carrying the wire dispatch plumbing:
-> - [`messaging`](008-messaging/spec.md) — `MessagingTopics.events.<family>`
+> - [`messaging`](008-messaging.md) — `MessagingTopics.events.<family>`
     > topic addressing, `Nx-Server-Id` connection-scoped header,
     > `Nx-Message-Type` per-record header, UUIDv7 idempotency. UNCHANGED.
 
@@ -323,7 +323,7 @@ host-side authors hooking raid-death paths.
 ## Links
 
 - Sibling reference (host-push publisher pattern + module wiring):
-  [`docs/specs/011-events-online-snapshot/spec.md`](011-events-online-snapshot/spec.md)
+  [`docs/specs/011-events-online-snapshot.md`](011-events-online-snapshot.md)
 - Legacy (decommissioned) rail emitting only START / END phase notifications
   with a single `bossId` and no damage / drop / participant detail:
   `bohpts-core/core/src/main/java/l2e/gameserver/feature/analytics/epicboss/EpicBossAnalyticsService.java`

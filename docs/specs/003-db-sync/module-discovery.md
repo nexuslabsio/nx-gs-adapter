@@ -1,6 +1,6 @@
 # DB Sync — Tier-2 schema-provider discovery
 
-> Sibling: [spec.md](./spec.md), [tech.md](./tech.md)
+> Sibling: [spec.md](./spec.md) (see its Technical design section)
 > Audience: vanilla schema authors (`nx-gs-db-l2j`, `nx-gs-db-lucera` when those
 > land), client overrides (bohpts, future per-client schema variants).
 >

@@ -1,7 +1,7 @@
 # CDC Engine — Block Diagrams
 
-Plain block diagrams. See [`spec.md`](./spec.md) for requirements,
-[`tech.md`](./tech.md) for class-level details.
+Plain block diagrams. See [`spec.md`](./spec.md) for requirements and the
+Technical design section for class-level details.
 
 ## Component layout
 
