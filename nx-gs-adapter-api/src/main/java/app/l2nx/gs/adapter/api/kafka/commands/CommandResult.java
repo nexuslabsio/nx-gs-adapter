@@ -169,6 +169,10 @@ public final class CommandResult<R> {
         return error(CommandStatus.RATE_LIMITED, title);
     }
 
+    public static <R> CommandResult<R> commandExpired(String title) {
+        return error(CommandStatus.COMMAND_EXPIRED, title);
+    }
+
     public static <R> CommandResult<R> unavailable(String title) {
         return error(CommandStatus.UNAVAILABLE, title);
     }

@@ -15,6 +15,13 @@ public enum CommandStatus {
     VALIDATION_FAILED(Tier.CLIENT_ERROR),
     RATE_LIMITED(Tier.CLIENT_ERROR),
     UNSUPPORTED_COMMAND(Tier.CLIENT_ERROR),
+    /**
+     * The command carried an execution deadline that had already passed when the host picked it up,
+     * so it was refused without running — nothing was read, charged, or moved. Distinct from
+     * {@link #INVALID_STATE}: the world was never consulted, so a retry with a fresh deadline is
+     * meaningful, whereas re-sending this exact command never is.
+     */
+    COMMAND_EXPIRED(Tier.CLIENT_ERROR),
 
     UNAVAILABLE(Tier.SERVER_ERROR),
     INTERNAL_ERROR(Tier.SERVER_ERROR);
