@@ -34,17 +34,15 @@ import java.util.Objects;
  * for programmatic construction. Wire-path Gson bypasses the constructor —
  * handler-side null-checking is the wire-validation gate.</p>
  *
- * <p><b>Partitioning.</b> Routed by {@link #getTelegramUserId()
- * telegramUserId} on the commands topic — sequential with other link
- * attempts from the same Telegram user.</p>
+ * <p><b>Partitioning.</b> The record key is the producer's choice (see
+ * {@link app.l2nx.gs.adapter.api.rest.MessagingTopics#getCommandsTopic()}); for this command it is
+ * meant to be {@link #getTelegramUserId() telegramUserId}, keeping link attempts from one Telegram
+ * user sequential. The adapter never reads the key.</p>
  *
- * <p><b>Idempotency.</b> Handler MUST be idempotent on the same
- * {@code Nx-Correlation-Id} — Kafka redelivery on crash recovery may
- * re-invoke the handler. Best practice: cache recently-processed
- * correlation ids and replay the original {@link TelegramCharLinkPayload}
- * on a hit. Sending the verification mail twice is a real player-facing
- * defect (duplicate mails in the inbox) and a tiny mail-store growth
- * cost.</p>
+ * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
+ * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller re-issuing after a
+ * reply timeout, which the handler cannot tell from a fresh request: the verification mail is sent
+ * twice — a player-facing defect (duplicate mails in the inbox).</p>
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>

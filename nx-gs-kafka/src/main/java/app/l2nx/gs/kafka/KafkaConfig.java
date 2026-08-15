@@ -159,10 +159,12 @@ public final class KafkaConfig {
          * Default: 10 seconds. Prevents the JVM shutdown hook from hanging when
          * the broker is unreachable.
          *
-         * <p>Operators using {@code nx-gs-adapter-core}'s commands engine MUST
-         * keep this {@code >=} {@code l2nx.commands.reply-flush-timeout-ms +
-         * l2nx.events.shutdown-drain-timeout-ms} — otherwise in-flight reply /
-         * event drains will be truncated mid-send during shutdown.</p>
+         * <p>This close is what actually gets in-flight command replies onto the
+         * wire at shutdown — the commands engine sends them fire-and-forget and
+         * does not drain them itself. Operators running
+         * {@code nx-gs-adapter-core} MUST keep this {@code >=}
+         * {@code l2nx.events.shutdown-drain-timeout-ms}, otherwise reply and
+         * event sends are truncated mid-flight and their callers time out.</p>
          */
         public Builder producerCloseTimeout(Duration timeout) {
             this.producerCloseTimeout = timeout;

@@ -58,11 +58,10 @@ import java.util.Objects;
  * concurrent commands keyed by {@code charIdTo} — handlers MUST not assume
  * exclusive access to the target.</p>
  *
- * <p><b>Idempotency.</b> Handler MUST be idempotent — Kafka redelivery on
- * crash recovery may re-invoke the handler with the same {@code
- * Nx-Correlation-Id}. Best practice: check the inbound correlation id
- * against a recently-processed cache; if matched, treat as already-applied
- * and reply success without re-moving the items.</p>
+ * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
+ * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller re-issuing after a
+ * reply timeout. The items may already have moved, and the handler cannot tell that apart from a
+ * fresh request — deciding whether the transfer landed is the caller's job.</p>
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>

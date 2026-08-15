@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
  * rejects a specific line (template id unknown, item factory fails, …), the
  * mail is still sent without that attachment and the failure is reported as an
  * entry in {@link #getItemErrors() itemErrors}. The reply envelope remains
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult#success(Object)
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult#ok(Object)
  * success} — the platform must inspect {@code itemErrors} to detect partial
  * failures. This preserves the legacy bohpts semantic (mail delivery is the
  * primary contract; per-item failures are diagnostic).</p>

@@ -4,7 +4,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One per-item failure entry in {@link SendMailPayload#getItemErrors()}.
+ * One per-item failure entry in {@link SendMailResult#getItemErrors()}.
  * Carries an optional inbound-line hint plus a non-null host-supplied reason
  * string so the platform can render a partial-success report.
  *
@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  * catalog, or the host's attachment-creation pipeline rejects the line for
  * other reasons). The mail itself is still sent — only specific attachment
  * lines are dropped — so partial failures surface as
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult#success(Object)
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult#ok(Object)
  * success} with a non-empty {@code itemErrors}, NOT as an error envelope.</p>
  *
  * <p><b>Identity is best-effort.</b> The bohpts {@code MailManager} reports

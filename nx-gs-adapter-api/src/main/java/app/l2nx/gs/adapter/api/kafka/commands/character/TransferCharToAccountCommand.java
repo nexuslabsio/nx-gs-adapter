@@ -42,11 +42,11 @@ import java.util.Objects;
  * commands topic — sequential with other character-scoped operations on
  * the same character.</p>
  *
- * <p><b>Idempotency.</b> Handler MUST be idempotent — Kafka redelivery on
- * crash recovery may re-invoke the handler with the same
- * {@code Nx-Correlation-Id}. If the character's {@code account_name}
- * already matches {@link #getAccountTo() accountTo}, the handler SHOULD
- * treat the call as a no-op success rather than re-issuing the UPDATE.</p>
+ * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
+ * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller re-issuing after a
+ * reply timeout, where the transfer may already have landed. If the character's
+ * {@code account_name} already matches {@link #getAccountTo() accountTo}, the handler SHOULD treat
+ * the call as a no-op success rather than re-issuing the UPDATE.</p>
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>

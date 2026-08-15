@@ -22,20 +22,23 @@ import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
  * <p><b>Exception contract.</b> Handler MAY throw {@code RuntimeException};
  * the adapter catches and replies with
  * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#INTERNAL_ERROR}
- * carrying the exception class + message in {@code errorDetails}.
- * {@code Error} (OOM, StackOverflow) propagates uncaught — the consumer
- * thread aborts and the JVM-level handler decides what to do; offset is NOT
- * committed and the record is redelivered on next start.</p>
+ * carrying the exception class + message in the reply's
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandProblem} extensions.
+ * An {@code Error} (OOM, StackOverflow) is not caught: it unwinds the consumer's
+ * poll loop, which is logged and stops the consumer — the {@code commands} module
+ * then reports {@code DISABLED} on the heartbeat.</p>
  *
- * <p><b>Idempotency.</b> Kafka delivers at-least-once. The same
- * {@code correlationId} MAY arrive twice (mid-batch crash → redelivery).
- * Handlers MUST be idempotent; the adapter does not maintain a built-in
- * dedup cache.</p>
+ * <p><b>Delivery is at-most-once, so handlers do NOT need to be
+ * idempotent.</b> The consumer commits the batch BEFORE dispatching it, so a
+ * crash or a commit failure drops the in-flight records instead of replaying
+ * them: a command is delivered once or not at all, never twice. Nothing is
+ * redelivered on restart, no dedup cache exists, and the caller's recovery
+ * path is its own reply timeout followed by re-issuing the command.</p>
  *
  * <p><b>Type safety.</b> The bound {@code C extends NxCommand<R>} forces the
  * handler's reply payload type to match the command's declared payload type
- * at compile time — a handler for {@code DeleteItemCommand} (which is
- * {@code NxCommand<Void>}) cannot return {@code CommandResult<String>}; the
+ * at compile time — a handler for {@code DeleteAutoAnnouncementCommand} (which
+ * is {@code NxCommand<Void>}) cannot return {@code CommandResult<String>}; the
  * compiler rejects it.</p>
  *
  * @param <C> concrete {@link NxCommand} subtype this handler accepts; its

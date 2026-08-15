@@ -19,11 +19,13 @@ import org.jspecify.annotations.Nullable;
  *     ({@code <tenant>.gs.events.<family>}). Phase-1 family: {@code premiumpurchase}.
  *     Phase-2 reserved keys: {@code character}, {@code clan}, {@code server}.</li>
  *     <li>{@link #getCommandsTopic()} — single inbound topic for all command
- *     types (e.g. {@code <tenant>.gs.commands}). Phase-2 contract: cross-domain
- *     ordering per character is preserved by partitioning records on
- *     {@code charId}; web side resolves human identifiers to {@code charId}
- *     before sending. Routing inside the topic is by {@code Nx-Message-Type}
- *     Kafka header.</li>
+ *     types (e.g. {@code <tenant>.gs.commands}). The record key is a nullable
+ *     {@code Long}: character-scoped commands are keyed on {@code charId} so
+ *     cross-domain ordering per character is preserved, and commands with no
+ *     natural character (announcements, resync, …) are sent unkeyed. The key is
+ *     producer-side only — the adapter never reads it; routing inside the topic
+ *     is by the {@code Nx-Message-Type} header, and server targeting by
+ *     {@code Nx-Target-Server-Id}.</li>
  *     <li>{@link #getCommandsRepliesTopic()} — single outbound topic for
  *     command replies (e.g. {@code <tenant>.gs.commands.replies}). Each reply
  *     carries the inbound {@code Nx-Correlation-Id} header so the platform

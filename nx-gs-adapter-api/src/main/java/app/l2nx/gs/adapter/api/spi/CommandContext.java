@@ -4,7 +4,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 
 /**
- * Per-invocation context handed to a {@link CommandHandler#handle(Object, CommandContext)}
+ * Per-invocation context handed to a {@link CommandHandler#handle}
  * call. Exposes the inbound correlation id for log tagging, the host's
  * {@link HostExecutor} for game-state hops, and the {@link NxEvents} capability
  * so handlers MAY publish side-effect events while processing.

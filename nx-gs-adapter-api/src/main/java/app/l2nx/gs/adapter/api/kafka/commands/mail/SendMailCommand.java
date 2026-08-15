@@ -48,13 +48,11 @@ import org.jspecify.annotations.Nullable;
  * commands topic — sequential with other character-scoped operations on the
  * same recipient.</p>
  *
- * <p><b>Idempotency.</b> The handler MUST be idempotent — Kafka redelivery on
- * crash recovery may re-invoke the handler with the same
- * {@code Nx-Correlation-Id}. Best practice: cache recently-processed
- * correlation ids and short-circuit on a hit, replying with the original
- * {@link SendMailResult}. Re-creating mails on every redelivery would result
- * in duplicate attachments grants, which is a real-money bug for paid
- * deliveries from the platform's commerce flows.</p>
+ * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
+ * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller re-issuing after a
+ * reply timeout, which the handler cannot tell from a fresh send: the mail lands twice, granting
+ * the attachments twice. For paid deliveries from the platform's commerce flows that is a
+ * real-money bug, so the caller MUST establish whether the first send landed before re-issuing.</p>
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
