@@ -6,6 +6,7 @@ import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandStatus;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import app.l2nx.gs.adapter.api.kafka.ops.CommandsStats;
+import app.l2nx.gs.adapter.api.kafka.ops.ModuleStates;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.spi.*;
 import app.l2nx.gs.commons.UUIDv7;
@@ -53,11 +54,6 @@ import org.jspecify.annotations.Nullable;
 public final class CommandsConsumer {
 
     private static final NxLog log = NxLogFactory.getLogger(CommandsConsumer.class);
-
-    // Same module-state vocabulary the Tier-1 sync modules report (DbSyncModule, GameDataSyncModule).
-    private static final String STATE_ACTIVE = "ACTIVE";
-    private static final String STATE_DEGRADED = "DEGRADED";
-    private static final String STATE_DISABLED = "DISABLED";
 
     private static final long SHUTDOWN_GRACE_MS = 1_000L;
     private static final byte[] FALLBACK_REPLY_TYPE_BYTES = "CommandResult".getBytes(StandardCharsets.UTF_8);
@@ -191,9 +187,9 @@ public final class CommandsConsumer {
      */
     private String currentState() {
         if (!running) {
-            return STATE_DISABLED;
+            return ModuleStates.DISABLED;
         }
-        return repliesTopic == null ? STATE_DEGRADED : STATE_ACTIVE;
+        return repliesTopic == null ? ModuleStates.DEGRADED : ModuleStates.ACTIVE;
     }
 
     CommandsStats currentStats() {

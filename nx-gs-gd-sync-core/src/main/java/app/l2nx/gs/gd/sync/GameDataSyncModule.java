@@ -5,6 +5,7 @@ import app.l2nx.gs.adapter.api.kafka.commands.gd.GdResyncCommand;
 import app.l2nx.gs.adapter.api.kafka.commands.gd.GdResyncResult;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
+import app.l2nx.gs.adapter.api.kafka.ops.ModuleStates;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.armorsettemplate.ArmorSetTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.classtemplate.ClassTemplate;
@@ -76,10 +77,10 @@ public final class GameDataSyncModule implements AdapterModule {
 
     static final String NAME = "gd-sync";
 
-    static final String STATE_INIT = "INIT";
-    static final String STATE_DISABLED = "DISABLED";
-    static final String STATE_FAILED = "FAILED";
-    static final String STATE_ACTIVE = "ACTIVE";
+    static final String STATE_INIT = ModuleStates.INIT;
+    static final String STATE_DISABLED = ModuleStates.DISABLED;
+    static final String STATE_FAILED = ModuleStates.FAILED;
+    static final String STATE_ACTIVE = ModuleStates.ACTIVE;
 
     private final List<EntityDescriptor<?, ?>> descriptors;
     private final GameDataSender sender;

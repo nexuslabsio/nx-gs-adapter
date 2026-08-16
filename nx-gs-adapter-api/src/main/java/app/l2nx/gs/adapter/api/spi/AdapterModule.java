@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.spi;
 
+import app.l2nx.gs.adapter.api.kafka.ops.ModuleStates;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 
 /**
@@ -67,15 +68,15 @@ public interface AdapterModule {
      * invokes this per-tick (wrapped in {@code SafeRunnable}) and folds the result
      * into {@code HeartbeatEvent.enabledModules}.
      *
-     * <p>Default returns {@code {name, "ACTIVE", empty Stats}}. Modules override to
-     * report degraded states or attach module-specific stats (e.g. db-sync injects
+     * <p>Default returns {@code {name, ModuleStates.ACTIVE, empty Stats}}. Modules override
+     * to report degraded states or attach module-specific stats (e.g. db-sync injects
      * the {@code pool} slot from its {@code JdbcConnectionSource.stats()}). If this
-     * method throws, adapter-core falls back to {@code {name, "FAILED", empty Stats}}.</p>
+     * method throws, adapter-core falls back to {@code {name, ModuleStates.FAILED, empty Stats}}.</p>
      */
     default ModuleStatus currentStatus() {
         return ModuleStatus.builder()
                 .name(name())
-                .state("ACTIVE")
+                .state(ModuleStates.ACTIVE)
                 .stats(ModuleStatus.Stats.empty())
                 .build();
     }

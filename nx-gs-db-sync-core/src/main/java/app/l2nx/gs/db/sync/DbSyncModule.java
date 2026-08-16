@@ -6,6 +6,7 @@ import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncEntitiesResult;
 import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncRowsCommand;
 import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncRowsResult;
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
+import app.l2nx.gs.adapter.api.kafka.ops.ModuleStates;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
 import app.l2nx.gs.adapter.api.spi.*;
@@ -64,11 +65,11 @@ public final class DbSyncModule implements AdapterModule {
     static final String NAME = "db-sync";
     static final int SMOKE_VALID_TIMEOUT_SECONDS = 5;
 
-    static final String STATE_INIT = "INIT";
-    static final String STATE_DISABLED = "DISABLED";
-    static final String STATE_FAILED = "FAILED";
-    static final String STATE_DEGRADED = "DEGRADED";
-    static final String STATE_ACTIVE = "ACTIVE";
+    static final String STATE_INIT = ModuleStates.INIT;
+    static final String STATE_DISABLED = ModuleStates.DISABLED;
+    static final String STATE_FAILED = ModuleStates.FAILED;
+    static final String STATE_DEGRADED = ModuleStates.DEGRADED;
+    static final String STATE_ACTIVE = ModuleStates.ACTIVE;
 
     private final Supplier<List<JdbcConnectionSource>> jdbcDiscoverer;
     private final Supplier<List<DbSchemaProvider>> schemaDiscoverer;

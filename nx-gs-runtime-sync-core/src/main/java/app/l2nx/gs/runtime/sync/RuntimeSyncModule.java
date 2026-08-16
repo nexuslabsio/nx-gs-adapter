@@ -1,6 +1,7 @@
 package app.l2nx.gs.runtime.sync;
 
 import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
+import app.l2nx.gs.adapter.api.kafka.ops.ModuleStates;
 import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
 import app.l2nx.gs.adapter.api.spi.AdapterModule;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
@@ -38,10 +39,10 @@ public final class RuntimeSyncModule implements AdapterModule {
 
     static final String NAME = "runtime-sync";
 
-    static final String STATE_INIT = "INIT";
-    static final String STATE_DISABLED = "DISABLED";
-    static final String STATE_FAILED = "FAILED";
-    static final String STATE_ACTIVE = "ACTIVE";
+    static final String STATE_INIT = ModuleStates.INIT;
+    static final String STATE_DISABLED = ModuleStates.DISABLED;
+    static final String STATE_FAILED = ModuleStates.FAILED;
+    static final String STATE_ACTIVE = ModuleStates.ACTIVE;
 
     private final Supplier<List<RuntimeStateProvider>> providerDiscoverer;
     private final Function<String, String> configSource;
