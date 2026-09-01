@@ -17,8 +17,8 @@ import java.util.Set;
  * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link BuyFromPrivateStoreResult}{@code >}.
  * Common error replies:</p>
  * <ul>
- *     <li>{@code VALIDATION_FAILED} — malformed {@link #getLines() lines}, or
- *     buyer and seller are the same character.</li>
+ *     <li>{@code VALIDATION_FAILED} — malformed {@link #getLines() lines},
+ *     blank mail text, or buyer and seller are the same character.</li>
  *     <li>{@code NOT_FOUND} — the seller is not in the world or has no open
  *     sell-store.</li>
  *     <li>{@code INVALID_STATE} — the lot no longer matches the request, the
@@ -35,7 +35,10 @@ import java.util.Set;
  * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandProblem#getExtensions()
  * CommandProblem.extensions}, with the numeric context of that reason
  * (required vs available adena / slots / weight) in sibling extension keys.
- * The platform localizes the code; the host never sends player-facing text.</p>
+ * The platform localizes the code; the host never sends player-facing text.
+ * The delivery mail's text is the platform's too — it arrives already
+ * localized in this command, and the host writes it into the mail
+ * verbatim.</p>
  *
  * <p><b>All-or-nothing.</b> Either every line is bought at exactly the
  * requested count and price, or nothing is charged and nothing moves. The host
@@ -45,11 +48,12 @@ import java.util.Set;
  *
  * <p><b>Required fields.</b> {@link #getBuyerCharId() buyerCharId},
  * {@link #getSellerCharId() sellerCharId}, a non-empty {@link #getLines()
- * lines} and {@link #getDeadline() deadline} are REQUIRED; buyer and seller
- * MUST differ. The constructor enforces this via
- * {@link IllegalArgumentException} for programmatic construction. Wire-path
- * deserialization bypasses the constructor — the handler re-checks and emits
- * {@code VALIDATION_FAILED}.</p>
+ * lines}, {@link #getDeadline() deadline}, and the non-blank
+ * {@link #getMailSender() mailSender}, {@link #getMailSubject() mailSubject},
+ * {@link #getMailBody() mailBody} are REQUIRED; buyer and seller MUST differ.
+ * The constructor enforces this via {@link IllegalArgumentException} for
+ * programmatic construction. Wire-path deserialization bypasses the
+ * constructor — the handler re-checks and emits {@code VALIDATION_FAILED}.</p>
  *
  * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
  * {@code -parameters}-preserved constructor parameter names.</p>
@@ -71,9 +75,19 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
     private final List<BuyLine> lines;
     private final int tax;
     private final Instant deadline;
+    private final String mailSender;
+    private final String mailSubject;
+    private final String mailBody;
 
     public BuyFromPrivateStoreCommand(
-            int buyerCharId, int sellerCharId, List<BuyLine> lines, int tax, Instant deadline) {
+            int buyerCharId,
+            int sellerCharId,
+            List<BuyLine> lines,
+            int tax,
+            Instant deadline,
+            String mailSender,
+            String mailSubject,
+            String mailBody) {
         if (buyerCharId <= 0) {
             throw new IllegalArgumentException("buyerCharId must be positive (got " + buyerCharId + ")");
         }
@@ -107,6 +121,16 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         this.lines = PrivateStoreLists.freeze(lines);
         this.tax = tax;
         this.deadline = Objects.requireNonNull(deadline, "deadline");
+        this.mailSender = requireText(mailSender, "mailSender");
+        this.mailSubject = requireText(mailSubject, "mailSubject");
+        this.mailBody = requireText(mailBody, "mailBody");
+    }
+
+    private static String requireText(String value, String field) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
+        return value;
     }
 
     /**
@@ -155,13 +179,35 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         return deadline;
     }
 
+    /**
+     * Author name of the delivery mail: final, already-localized text with no
+     * placeholders — no locale travels on the wire. REQUIRED, non-blank —
+     * rejected in the constructor.
+     */
+    public String getMailSender() {
+        return mailSender;
+    }
+
+    /** Subject of the delivery mail; same rules as {@link #getMailSender() mailSender}. */
+    public String getMailSubject() {
+        return mailSubject;
+    }
+
+    /** Body of the delivery mail; same rules as {@link #getMailSender() mailSender}. */
+    public String getMailBody() {
+        return mailBody;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .buyerCharId(buyerCharId)
                 .sellerCharId(sellerCharId)
                 .lines(lines)
                 .tax(tax)
-                .deadline(deadline);
+                .deadline(deadline)
+                .mailSender(mailSender)
+                .mailSubject(mailSubject)
+                .mailBody(mailBody);
     }
 
     public static Builder builder() {
@@ -177,12 +223,15 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
                 && sellerCharId == that.sellerCharId
                 && tax == that.tax
                 && Objects.equals(lines, that.lines)
-                && Objects.equals(deadline, that.deadline);
+                && Objects.equals(deadline, that.deadline)
+                && Objects.equals(mailSender, that.mailSender)
+                && Objects.equals(mailSubject, that.mailSubject)
+                && Objects.equals(mailBody, that.mailBody);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(buyerCharId, sellerCharId, lines, tax, deadline);
+        return Objects.hash(buyerCharId, sellerCharId, lines, tax, deadline, mailSender, mailSubject, mailBody);
     }
 
     @Override
@@ -191,7 +240,10 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
                 + ", sellerCharId=" + sellerCharId
                 + ", lines=" + lines
                 + ", tax=" + tax
-                + ", deadline=" + deadline + "]";
+                + ", deadline=" + deadline
+                + ", mailSender=" + mailSender
+                + ", mailSubject=" + mailSubject
+                + ", mailBody=" + mailBody + "]";
     }
 
     public static final class Builder {
@@ -200,6 +252,9 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         private List<BuyLine> lines;
         private int tax;
         private Instant deadline;
+        private String mailSender;
+        private String mailSubject;
+        private String mailBody;
 
         public Builder buyerCharId(int buyerCharId) {
             this.buyerCharId = buyerCharId;
@@ -226,8 +281,24 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
             return this;
         }
 
+        public Builder mailSender(String mailSender) {
+            this.mailSender = mailSender;
+            return this;
+        }
+
+        public Builder mailSubject(String mailSubject) {
+            this.mailSubject = mailSubject;
+            return this;
+        }
+
+        public Builder mailBody(String mailBody) {
+            this.mailBody = mailBody;
+            return this;
+        }
+
         public BuyFromPrivateStoreCommand build() {
-            return new BuyFromPrivateStoreCommand(buyerCharId, sellerCharId, lines, tax, deadline);
+            return new BuyFromPrivateStoreCommand(
+                    buyerCharId, sellerCharId, lines, tax, deadline, mailSender, mailSubject, mailBody);
         }
     }
 }

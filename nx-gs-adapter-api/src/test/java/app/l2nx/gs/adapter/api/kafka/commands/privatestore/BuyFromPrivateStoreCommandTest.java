@@ -10,13 +10,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class BuyFromPrivateStoreCommandTest {
 
     private static final Instant DEADLINE = Instant.parse("2026-08-11T12:00:00Z");
+    private static final String MAIL_SENDER = "Courier";
+    private static final String MAIL_SUBJECT = "You've got a delivery!";
+    private static final String MAIL_BODY = "Your purchase from the private store has arrived.";
 
     private static BuyLine line(int itemId) {
         return BuyLine.builder()
@@ -33,7 +39,10 @@ class BuyFromPrivateStoreCommandTest {
                 .sellerCharId(2)
                 .lines(Collections.singletonList(line(1)))
                 .tax(5)
-                .deadline(DEADLINE);
+                .deadline(DEADLINE)
+                .mailSender(MAIL_SENDER)
+                .mailSubject(MAIL_SUBJECT)
+                .mailBody(MAIL_BODY);
     }
 
     @ParameterizedTest(name = "buyerCharId={0}")
@@ -124,6 +133,30 @@ class BuyFromPrivateStoreCommandTest {
         assertThrows(NullPointerException.class, builder::build);
     }
 
+    static Stream<Arguments> blankMailText() {
+        Stream.Builder<Arguments> args = Stream.builder();
+        for (String blank : new String[] {null, "", " ", "	"}) {
+            args.add(
+                    Arguments.of("mailSender", (MailTextSetter) BuyFromPrivateStoreCommand.Builder::mailSender, blank));
+            args.add(Arguments.of(
+                    "mailSubject", (MailTextSetter) BuyFromPrivateStoreCommand.Builder::mailSubject, blank));
+            args.add(Arguments.of("mailBody", (MailTextSetter) BuyFromPrivateStoreCommand.Builder::mailBody, blank));
+        }
+        return args.build();
+    }
+
+    @ParameterizedTest(name = "{0}=[{2}]")
+    @MethodSource("blankMailText")
+    void constructor_shouldReject_whenMailTextBlank(String field, MailTextSetter setter, String blank) {
+        BuyFromPrivateStoreCommand.Builder builder = setter.apply(valid(), blank);
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, builder::build);
+        assertTrue(exception.getMessage().contains(field));
+    }
+
+    interface MailTextSetter {
+        BuyFromPrivateStoreCommand.Builder apply(BuyFromPrivateStoreCommand.Builder builder, String value);
+    }
+
     @Test
     void getLines_shouldBeUnmodifiable() {
         BuyFromPrivateStoreCommand command = valid().build();
@@ -139,6 +172,9 @@ class BuyFromPrivateStoreCommandTest {
 
         assertEquals(original, copy);
         assertNotSame(original, copy);
+        assertEquals(MAIL_SENDER, copy.getMailSender());
+        assertEquals(MAIL_SUBJECT, copy.getMailSubject());
+        assertEquals(MAIL_BODY, copy.getMailBody());
     }
 
     @Test
@@ -146,5 +182,13 @@ class BuyFromPrivateStoreCommandTest {
         BuyFromPrivateStoreCommand a = valid().deadline(DEADLINE).build();
         BuyFromPrivateStoreCommand b = valid().deadline(DEADLINE.plusSeconds(1)).build();
         assertTrue(!a.equals(b));
+    }
+
+    @Test
+    void equals_shouldDistinguishMailBody() {
+        BuyFromPrivateStoreCommand a = valid().mailBody(MAIL_BODY).build();
+        BuyFromPrivateStoreCommand b = valid().mailBody(MAIL_BODY + " ...").build();
+        assertTrue(!a.equals(b));
+        assertTrue(a.hashCode() != b.hashCode());
     }
 }
