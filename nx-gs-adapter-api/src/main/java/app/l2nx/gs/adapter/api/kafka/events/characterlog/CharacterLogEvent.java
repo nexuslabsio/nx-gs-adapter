@@ -4,35 +4,17 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Discrete fact about a character that is not recoverable from synced state —
- * the <b>moment</b> a threshold was crossed, as opposed to the resulting state
- * the CDC rail already replicates. Sole message type of the {@code characterlog}
- * family ({@code <tenant>.gs.events.character.log}).
+ * Discrete fact about a character that is not recoverable from synced state — the <b>moment</b> a
+ * threshold was crossed, not the resulting state the CDC rail already replicates. Sole message type
+ * of the {@code characterlog} family ({@code <tenant>.gs.events.character.log}).
  *
- * <p>The payload is discriminated by {@link #getType() type} and carried in an
- * open {@link #getMetadata() metadata} map rather than by a class per fact. A
- * host can therefore ship a new fact kind without a synchronised release of this
- * API and every consumer: unknown types stay parseable, and a consumer learns to
- * read them later against data it has already been accumulating.</p>
+ * <p>Discriminated by an open {@link #getType() type} with an open
+ * {@link #getMetadata() metadata} map rather than a class per fact, so a host can ship a new fact
+ * kind without a synchronised release of this API and every consumer.</p>
  *
- * <p>Partitioned by {@link #getCharId() charId}, so one character's facts land on
- * one partition in occurrence order.</p>
- *
- * <p>Fields:
- * <ul>
- *   <li>{@link #getEventId() eventId} — UUIDv7, REQUIRED. Idempotency key for
- *   at-least-once delivery; the platform extracts {@code occurredAt} from the
- *   time-ordered prefix, so no timestamp is carried separately.</li>
- *   <li>{@link #getCharId() charId} — REQUIRED. The character the fact is about,
- *   and the Kafka partition key.</li>
- *   <li>{@link #getType() type} — REQUIRED. Open token classifying the fact.
- *   Canonical values in {@link WellKnownCharacterLogTypes}; hosts MAY publish
- *   tokens no consumer understands yet.</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   per-type attributes; {@code null} when absent. Canonical keys in
- *   {@link WellKnownCharacterLogMetadata}. Numeric values travel as decimal
- *   strings, matching the rest of this API's metadata maps.</li>
- * </ul>
+ * <p>{@code eventId} is a UUIDv7 — the idempotency key, and the source of {@code occurredAt}, which
+ * is why no timestamp is carried. {@code charId} is also the partition key. Metadata values are
+ * decimal strings, as everywhere else in this API.</p>
  */
 public final class CharacterLogEvent {
 

@@ -78,8 +78,8 @@ progression paths.
   Two blanket skips apply to all three: phantoms (server-driven bots with no account behind them),
   and characters not yet registered in the world. The second is what separates restored state from a
   real transition — `CharacterDAO` reverts a subclass-relogin exploit with
-  `setClassId(getBaseClass())` during load, which without the guard reads as a fresh profession
-  transfer.
+  `setClassId(getBaseClass())` during load, which without the guard reads as a freshly taken
+  profession.
 
 - [wip]  R6. The publisher MUST report drops through `EventDrops`, without rate limiting. These are
   non-repeatable facts with no next tick, and a suppressed warning would hide exactly the case the
@@ -103,7 +103,7 @@ progression paths.
 
 ### Edge cases
 
-- **Class transfer on an active subclass.** `Player.setClassId` also rewrites the active subclass
+- **A profession taken on an active subclass.** `Player.setClassId` also rewrites the active subclass
   slot, so a 3rd profession taken on a subclass produces a real event. It is emitted with
   `class_index > 0`; whether that counts is the consumer's business, not the host's.
 - **Admin `//setclass`.** `EditChar` funnels through the same choke point, so an admin-granted
