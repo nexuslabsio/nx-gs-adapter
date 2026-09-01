@@ -39,6 +39,7 @@ Any spec change (new spec, rename, re-scope, deletion) updates this table in the
 | 028 | character-inventory-capacity      | 2026-07-26 | [spec](specs/028-character-inventory-capacity.md)      |
 | 029 | character-class-state-sync        | 2026-07-27 | [spec](specs/029-character-class-state-sync.md)        |
 | 030 | gamedata-sync                     | 2026-08-15 | [spec](specs/030-gamedata-sync.md)                     |
+| 031 | character-log-events              | 2026-09-01 | [spec](specs/031-character-log-events.md)              |
 
 Companion docs of the folder-form specs:
 

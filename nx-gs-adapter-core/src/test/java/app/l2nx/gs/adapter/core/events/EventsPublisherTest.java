@@ -206,6 +206,7 @@ class EventsPublisherTest {
         topics.put("serveronline", "acme.gs.events.serveronline");
         topics.put("privatestore", "acme.gs.events.privatestore");
         topics.put("character", "acme.gs.events.character");
+        topics.put("characterlog", "acme.gs.events.character.log");
         topics.put("raid", "acme.gs.events.raid");
         topics.put("mail", "acme.gs.events.mail");
         topics.put("privatetrade", "acme.gs.events.privatetrade");

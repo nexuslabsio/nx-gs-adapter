@@ -5,6 +5,7 @@ import app.l2nx.gs.adapter.api.kafka.events.castle.CastleSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.castle.SiegeFinishedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterDeathEvent;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
+import app.l2nx.gs.adapter.api.kafka.events.characterlog.CharacterLogEvent;
 import app.l2nx.gs.adapter.api.kafka.events.chat.ChatMessageEvent;
 import app.l2nx.gs.adapter.api.kafka.events.gameevents.GameEventSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.leveldata.LevelExpTableSnapshotEvent;
@@ -79,6 +80,12 @@ final class EventTypeRegistry {
                 "character",
                 evt -> LongBytes.bigEndian(((CharacterDeathEvent) evt).getCharId()));
         register(map, families, LevelExpTableSnapshotEvent.class, "character", evt -> null);
+        register(
+                map,
+                families,
+                CharacterLogEvent.class,
+                "characterlog",
+                evt -> LongBytes.bigEndian(((CharacterLogEvent) evt).getCharId()));
         register(
                 map,
                 families,

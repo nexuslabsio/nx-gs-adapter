@@ -40,9 +40,9 @@ assuming):
 - **gd sync**: `armorsettemplate`, `classtemplate`, `gearscore`, `instancetemplate`, `itemtemplate`,
   `npctemplate`, `recipetemplate`, `skill`, `soulcrystaltemplate`
 - **runtime sync**: `character`
-- **events**: `account`, `castle`, `character`, `chat`, `gameevents`, `leveldata`, `mail`,
-  `olympiad`, `premiumpurchase`, `privatestore`, `privatetrade`, `raid`, `schedule`, `serveronline`,
-  `sync`
+- **events**: `account`, `castle`, `character`, `characterlog`, `chat`, `gameevents`, `leveldata`,
+  `mail`, `olympiad`, `premiumpurchase`, `privatestore`, `privatetrade`, `raid`, `schedule`,
+  `serveronline`, `sync`
 - **commands**: `announcement`, `ban`, `character`, `gd`, `item`, `mail`, `privatestore`, `sync`,
   `telegram`
 
