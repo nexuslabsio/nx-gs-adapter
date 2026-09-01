@@ -204,6 +204,12 @@ Release order is forced by the handshake and the artifact graph:
 3. `nx-gameservers` — consumer and table, idle until messages arrive.
 4. `bohpts-core` — publisher, rebuilt against the new adapter version.
 
+**Shipped 2026-09-01.** Steps 0-3 are live: topic created, `api/v0.85.0` + `core/v0.37.0` on Central,
+`nx-tenants v1.27.0` advertising the family, `nx-gameservers v0.123.0` consuming it (migration
+applied, consumer group subscribed, zero lag, journal empty as expected). Step 4 is green on the
+`test` branch and waiting on PR #2901 into `release`; until that merges and the game servers restart,
+the journal stays empty by design.
+
 Steps 3 and 4 may swap: the topic keeps three hours of retention, so a consumer arriving slightly
 late still catches everything. Publishing before step 2 loses events silently, which is why that
 ordering is not optional.
