@@ -11,8 +11,8 @@ contract every web-side caller of `NxCommandSender.sendSync(...)` is
 coding against.
 
 All commands ship under `app.l2nx.gs.adapter.api.kafka.commands.<group>.*`
-where group is one of: `announcement`, `ban`, `character`, `gd`, `item`,
-`mail`, `privatestore`, `sync`, `telegram`. The group is purely a
+where group is one of: `announcement`, `ban`, `character`, `chat`, `gd`,
+`item`, `mail`, `privatestore`, `sync`, `telegram`. The group is purely a
 code-organization split; on the wire every command travels on the single
 `<tenant>.gs.commands` topic, routed by the `Nx-Message-Type` header.
 
@@ -25,6 +25,12 @@ declared on the command's `NxCommand<R>` marker.
 ## Announcement commands
 
 ### `AnnounceNowCommand`
+
+> **Superseded.** `SendChatMessageCommand` covers this exact call with
+> `senderCharacterId: null`, `senderDisplayName: ""`, `channel: ANNOUNCEMENT`,
+> `audience: ALL_ONLINE`. It stays registered only while the fallback described in
+> [`025-chat-events.md`](../025-chat-events.md) R13 is active, and is removed together
+> with `AnnounceResult` once the fallback metric reads zero on every server.
 
 **Purpose.** Broadcast a one-shot chat announcement to the game-server —
 the platform's scheduler (or an operator's "send now" action) decides
@@ -153,6 +159,52 @@ ban) already holds.
 | `FORBIDDEN`         | Operation rejected on host policy grounds                      |
 
 ---
+
+## Chat commands
+
+### `SendChatMessageCommand`
+
+**Purpose.** Put a line of text into game chat from outside the game
+client — the generic outbound counterpart of `ChatMessageEvent`. Covers
+the mini app posting into clan chat as the player's own character (the
+character may be offline), and the platform speaking under an arbitrary
+display name. Supersedes `AnnounceNowCommand`; see spec
+[`025-chat-events.md`](../025-chat-events.md) for the cutover phases.
+
+Idempotent by `messageId` provided the host keeps a bounded window of
+seen ids — re-issuing after a reply timeout then converges on one message
+rather than posting twice.
+
+**Inputs**
+
+| Field               | Type      | Required | Notes                                                                                                                                                                                                              |
+| ------------------- | --------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `messageId`         | `UUID`    | yes      | UUIDv7 minted by the platform. The host echoes it as the `eventId` of the resulting `ChatMessageEvent`, and dedupes re-deliveries on it                                                                            |
+| `channel`           | `String`  | yes      | `WellKnownChatChannels` code. Accepted values are a whitelist that grows per slice — currently `CLAN` and `ANNOUNCEMENT`; anything else is `VALIDATION_FAILED`. `CRITICAL_ANNOUNCEMENT` is deliberately not part of the contract |
+| `audience`          | `String`  | yes      | `CHARACTER`, `CLAN` or `ALL_ONLINE` — the recipient list, orthogonal to `channel`                                                                                                                                  |
+| `audienceId`        | `Long?`   | cond.    | Character id for `CHARACTER`, clan id for `CLAN`; `null` for `ALL_ONLINE`                                                                                                                                          |
+| `senderCharacterId` | `Long?`   | no       | Who speaks legally — drives the host's gates, the packet's `objectId` and platform attribution. `null` means the platform itself speaks                                                                            |
+| `senderDisplayName` | `String`  | yes      | What the client renders, composed in full by the platform (`"Vasya (TMA)"`, `"System"`, `"Дед Мороз"`). Empty string reproduces the nameless announcement line                                                     |
+| `source`            | `String`  | yes      | Where the message originates (`TMA`, `AUTO_ANNOUNCEMENT`, …). Echoed into the event metadata under `ChatMetadataKeys.SOURCE`; the host cannot infer the surface, and without it analysis cannot tell platform traffic from what players typed in-game |
+| `text`              | `String`  | yes      | Body in the neutral chat micro-format: plain text, literal `
+` hard line breaks, bare `http(s)://` URLs for auto-linking. Translating those into build-specific wire tokens is a host concern                     |
+
+**Result** (`SendChatMessageResult`)
+
+| Field        | Type  | Notes                                                                                                        |
+| ------------ | ----- | ------------------------------------------------------------------------------------------------------------ |
+| `linesSent`  | `int` | Physical chat lines emitted — the count of non-empty lines after splitting `text` on `
+`                    |
+| `recipients` | `int` | Online recipients the packet actually reached. Best-effort telemetry; hosts that don't track it MAY report `0` |
+
+**Errors**
+
+| Status              | When                                                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------- |
+| `NOT_FOUND`         | `senderCharacterId` or `audienceId` resolves to nothing on this server                          |
+| `FORBIDDEN`         | Host policy refuses — chat ban, shadow ban, block list, academy level floor                     |
+| `VALIDATION_FAILED` | Missing required field, `channel` outside the accepted whitelist, or `audienceId` absent where the `audience` requires it |
+| `INTERNAL_ERROR`    | Broadcast mechanism failed host-side                                                            |
 
 ## Character commands
 
@@ -717,7 +769,10 @@ skew between platform and core.
   servers and across the item's lifetime.
 - `itemId` — per-stack object-id assigned by the host on creation.
   Unique per game-server lifetime; identifies one specific stack.
-- `charId` — character primary key in the host DB. Stable.
+- `charId` — character primary key in the host DB. Stable. Spelled
+  `characterId` on commands added from 2026-09 onward (`SendChatMessageCommand`),
+  per the platform naming canon; older fields keep the short form because
+  renaming a released wire field breaks the rail for no functional gain.
 - All wire ids are `Long` to accommodate hosts that may use 64-bit ids;
   hosts using `int` internally bounds-check + downcast at the handler
   boundary.

@@ -21,7 +21,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@link #getCharId() charId} is the sender object id and the partition key
  * (8-byte big-endian) so one sender's messages keep occurrence order on a
- * single partition.</p>
+ * single partition. It is a primitive and therefore cannot carry a wire null,
+ * so {@code 0} means <em>no legal sender</em> — the platform itself spoke and
+ * there is no character to attribute the line to. That follows the game's own
+ * convention for a senderless chat packet; consumers store it as an absent
+ * character rather than as object id zero.</p>
  *
  * <p>{@link #getChannel() channel} is a {@link WellKnownChatChannels} code (or
  * {@code UNKNOWN_<int>} for a build-specific channel this catalog does not yet

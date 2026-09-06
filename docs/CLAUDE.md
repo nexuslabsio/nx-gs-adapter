@@ -33,7 +33,7 @@ Any spec change (new spec, rename, re-scope, deletion) updates this table in the
 | 022 | class-canonicalization            | 2026-06-13 | [spec](specs/022-class-canonicalization.md)            |
 | 023 | platform-sync-fixes-2026-06       | 2026-06-29 | [spec](specs/023-platform-sync-fixes-2026-06.md)       |
 | 024 | ban-commands                      | 2026-06-29 | [spec](specs/024-ban-commands.md)                      |
-| 025 | chat-events                       | 2026-06-29 | [spec](specs/025-chat-events.md)                       |
+| 025 | chat (events + send command)      | 2026-06-29 | [spec](specs/025-chat-events.md)                       |
 | 026 | item-augmentation-sync            | 2026-07-18 | [spec](specs/026-item-augmentation-sync.md)            |
 | 027 | etctype-consumable-market-signals | 2026-07-22 | [spec](specs/027-etctype-consumable-market-signals.md) |
 | 028 | character-inventory-capacity      | 2026-07-26 | [spec](specs/028-character-inventory-capacity.md)      |
