@@ -26,40 +26,12 @@ declared on the command's `NxCommand<R>` marker.
 
 ### `AnnounceNowCommand`
 
-> **Superseded.** `SendChatMessageCommand` covers this exact call with
+> **Removed in `api/v0.87.0`.** `SendChatMessageCommand` covers this exact call with
 > `senderCharacterId: null`, `senderDisplayName: ""`, `channel: ANNOUNCEMENT`,
-> `audience: ALL_ONLINE`. It stays registered only while the fallback described in
-> [`025-chat-events.md`](../025-chat-events.md) R13 is active, and is removed together
-> with `AnnounceResult` once the fallback metric reads zero on every server.
-
-**Purpose.** Broadcast a one-shot chat announcement to the game-server —
-the platform's scheduler (or an operator's "send now" action) decides
-_when_ to fire; this command carries only the final text and channel,
-nothing about scheduling or origin. NOT idempotent — re-delivery (e.g.
-Kafka redelivery on crash recovery) re-broadcasts the message; announcements
-carry no unique id to dedupe on.
-
-**Inputs**
-
-| Field      | Type      | Required | Notes                                                                                                                                                                                                          |
-| ---------- | --------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `text`     | `String`  | yes      | Neutral chat micro-format: plain text, literal `\n` hard line breaks, bare `http(s)://` URLs for auto-linking. Never carries the bohpts-specific `/n` or `[=url=]` wire tokens — translating is a host concern |
-| `critical` | `boolean` | yes      | `false` = normal announcement channel, `true` = the more visible critical/alert channel. Applies to the whole message                                                                                          |
-
-**Result** (`AnnounceResult`)
-
-| Field       | Type  | Notes                                                                                                                                                                                       |
-| ----------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `linesSent` | `int` | Number of physical chat lines actually broadcast — typically the count of non-empty lines after splitting `text` on `\n`. Best-effort telemetry; hosts that don't track this MAY report `0` |
-
-**Errors**
-
-| Status              | When                                 |
-| ------------------- | ------------------------------------ |
-| `VALIDATION_FAILED` | Wire payload missing `text`          |
-| `INTERNAL_ERROR`    | Broadcast mechanism failed host-side |
-
----
+> `audience: ALL_ONLINE`, so the two never coexisted as choices — see
+> [`025-chat-events.md`](../025-chat-events.md). Hosts pinned to `api/v0.86.0` or earlier still
+> compile against it; anything upgrading past that sends the chat command instead. `AnnounceResult`
+> went with it.
 
 ### `DeleteAutoAnnouncementCommand`
 

@@ -88,11 +88,11 @@ the chat handler path and registering the command handler.
   `UNKNOWN_<int>`); set `targetCharId` / `targetCharName` only for whispers. Any uncaught `Throwable`
   in the publish path is caught and logged, never propagated to the game thread.
 
-- [todo] R5. The platform MUST run a consumer over `<tenant>.gs.events.chat`. Partition key is the
+- [done] R5. The platform MUST run a consumer over `<tenant>.gs.events.chat`. Partition key is the
   sender id; retention follows the platform-wide event-topic default — long-term moderation history
   is a consumer-side concern, not Kafka's. Design: `nx-gameservers/docs/specs/073-chat.md`.
 
-- [todo] R7. On the `CLAN` and `ALLIANCE` channels the host SHOULD carry the speaker's clan id in
+- [done] R7. On the `CLAN` and `ALLIANCE` channels the host SHOULD carry the speaker's clan id in
   `metadata` under the key `clanId`. The platform scopes clan-chat reads by it. Resolving the clan
   from the platform's own replica instead is wrong: the replica lags, so a message from a character
   who just left the clan lands in the wrong scope, while the host knows the clan at the moment of
@@ -100,7 +100,7 @@ the chat handler path and registering the command handler.
 
 ## Requirements — outbound command
 
-- [todo] R8. `nx-gs-adapter-api.kafka.commands.chat.SendChatMessageCommand` MUST ship as the single
+- [done] R8. `nx-gs-adapter-api.kafka.commands.chat.SendChatMessageCommand` MUST ship as the single
   generic "put this text into game chat" command, implementing `NxCommand<SendChatMessageResult>`.
   Per-command wire contract lives in [`009-commands/catalog.md`](009-commands/catalog.md); the
   design decisions behind its shape are here.
@@ -135,12 +135,12 @@ the chat handler path and registering the command handler.
   anything outside the current whitelist is answered `VALIDATION_FAILED`. `CRITICAL_ANNOUNCEMENT` is
   deliberately absent — see R11.
 
-- [todo] R9. The host handler MUST publish a `ChatMessageEvent` for every message it sends, reusing
+- [done] R9. The host handler MUST publish a `ChatMessageEvent` for every message it sends, reusing
   `messageId` as `eventId` and marking origin in `metadata`. Otherwise platform-originated messages
   never reach the chat table, the RMT corpus, or the live stream other clan members read, and chat
   ends up with two sources of truth.
 
-- [todo] R10. The host handler MUST run the same gates as the native chat handler for the target
+- [done] R10. The host handler MUST run the same gates as the native chat handler for the target
   channel — for `CLAN` that is `isChatBanned` + `Config.BAN_CHAT_CHANNELS`, the shadow-ban check, and
   the academy level floor. Skipping them turns the command into a chat-ban bypass. An offline speaker
   is resolved through the clan table rather than a live `Player`, and the clan broadcast reaches the
@@ -154,13 +154,13 @@ chat handlers use. In command terms that is exactly `senderCharacterId: null`,
 `senderDisplayName: ""`, `channel: ANNOUNCEMENT`, `audience: ALL_ONLINE`. So `SendChatMessageCommand`
 supersedes `AnnounceNowCommand` rather than living beside it.
 
-- [todo] R11. The `critical` flag MUST NOT be carried over. It is visually near-worthless on the
+- [done] R11. The `critical` flag MUST NOT be carried over. It is visually near-worthless on the
   bohpts client, the front-end already always sends `critical: false`, and its only channel
   (`CreatureSay` type 18) is the one where the clickable-link token `[=url=]` renders literally.
   Dropping it removes the trap along with the flag. If a real need appears later, it comes back as its
   own change.
 
-- [todo] R12. Text handling (`\n` split into physical lines, wrapping bare `http(s)://` URLs in the
+- [done] R12. Text handling (`\n` split into physical lines, wrapping bare `http(s)://` URLs in the
   host's clickable-link token, trimming trailing punctuation out of the wrapper) MUST move into the
   new handler, and `AnnounceNowHandler` MUST be rewritten as a thin delegate over it. Then the two
   paths agree by construction rather than by reviewer attention.
@@ -176,13 +176,22 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
 > heartbeat topic. No platform service consumes heartbeats at all, so this would mean standing up a
 > consumer for a whole family to read one flag.
 
-- [todo] R13. **Phase 1 (expand).** The platform's announcement scheduler sends the new command and,
+- [done] R13. **Phase 1 (expand).** The platform's announcement scheduler sends the new command and,
   on an `UNSUPPORTED_COMMAND` reply, immediately re-sends the legacy `AnnounceNowCommand`. The
   fallback is counted by a metric. `AnnounceNowHandler` stays registered host-side.
-- [todo] R14. **Phase 2 (contract).** Once the fallback metric reads zero across every server for
-  several consecutive days — the trigger is the metric, not a date — the fallback, `AnnounceNowHandler`,
-  `AnnounceNowCommand` and `AnnounceResult` are all removed. Naming the trigger is what makes the
-  compatibility layer a phase instead of a permanent straddle.
+- [todo] R14. **Phase 2 (contract).** Once the fallback stops firing on every **live** server — the
+  trigger is that observation, not a date — the fallback, `AnnounceNowHandler`, `AnnounceNowCommand`
+  and `AnnounceResult` are all removed. Naming the trigger is what makes the compatibility layer a
+  phase instead of a permanent straddle. Met on 2026-09-07: after the morning restart x500, x500-new,
+  x20 and x7-oldschool all answer the new command with `OK`. `x7-test` is excluded — it builds from
+  the `test` branch of `bohpts-core`, which never received the handler, and stays on the legacy path
+  until that branch converges with `release`.
+- [todo] R15. Removing the command from the api module MUST NOT strand the platform's command audit.
+  `Command.ANNOUNCE_NOW` on the platform side is not only a dispatch type: it is also the discriminator
+  persisted on every historical audit row, so deleting it breaks reading them. The platform migrates
+  those rows onto `SEND_CHAT_MESSAGE` in the same release — see `nx-gameservers/docs/specs/073-chat.md`
+  §5.4. Nothing is required of the adapter beyond dropping the classes in `api/v0.87.0`; hosts pinned
+  to `0.86.0` keep compiling.
 
 ## Topic & wire summary
 
