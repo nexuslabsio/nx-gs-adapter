@@ -149,34 +149,32 @@ rather than posting twice.
 
 **Inputs**
 
-| Field               | Type      | Required | Notes                                                                                                                                                                                                              |
-| ------------------- | --------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `messageId`         | `UUID`    | yes      | UUIDv7 minted by the platform. The host echoes it as the `eventId` of the resulting `ChatMessageEvent`, and dedupes re-deliveries on it                                                                            |
-| `channel`           | `String`  | yes      | `WellKnownChatChannels` code. Accepted values are a whitelist that grows per slice — currently `CLAN` and `ANNOUNCEMENT`; anything else is `VALIDATION_FAILED`. `CRITICAL_ANNOUNCEMENT` is deliberately not part of the contract |
-| `audience`          | `String`  | yes      | `CHARACTER`, `CLAN` or `ALL_ONLINE` — the recipient list, orthogonal to `channel`                                                                                                                                  |
-| `audienceId`        | `Long?`   | cond.    | Character id for `CHARACTER`, clan id for `CLAN`; `null` for `ALL_ONLINE`                                                                                                                                          |
-| `senderCharacterId` | `Long?`   | no       | Who speaks legally — drives the host's gates, the packet's `objectId` and platform attribution. `null` means the platform itself speaks                                                                            |
-| `senderDisplayName` | `String`  | yes      | What the client renders, composed in full by the platform (`"Vasya (TMA)"`, `"System"`, `"Дед Мороз"`). Empty string reproduces the nameless announcement line                                                     |
-| `source`            | `String`  | yes      | Where the message originates (`TMA`, `AUTO_ANNOUNCEMENT`, …). Echoed into the event metadata under `ChatMetadataKeys.SOURCE`; the host cannot infer the surface, and without it analysis cannot tell platform traffic from what players typed in-game |
-| `text`              | `String`  | yes      | Body in the neutral chat micro-format: plain text, literal `
-` hard line breaks, bare `http(s)://` URLs for auto-linking. Translating those into build-specific wire tokens is a host concern                     |
+| Field               | Type     | Required | Notes                                                                                                                                                                                                                                                 |
+| ------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `messageId`         | `UUID`   | yes      | UUIDv7 minted by the platform. The host echoes it as the `eventId` of the resulting `ChatMessageEvent`, and dedupes re-deliveries on it                                                                                                               |
+| `channel`           | `String` | yes      | `WellKnownChatChannels` code. Accepted values are a whitelist that grows per slice — currently `CLAN` and `ANNOUNCEMENT`; anything else is `VALIDATION_FAILED`. `CRITICAL_ANNOUNCEMENT` is deliberately not part of the contract                      |
+| `audience`          | `String` | yes      | `CHARACTER`, `CLAN` or `ALL_ONLINE` — the recipient list, orthogonal to `channel`                                                                                                                                                                     |
+| `audienceId`        | `Long?`  | cond.    | Character id for `CHARACTER`, clan id for `CLAN`; `null` for `ALL_ONLINE`                                                                                                                                                                             |
+| `senderCharacterId` | `Long?`  | no       | Who speaks legally — drives the host's gates, the packet's `objectId` and platform attribution. `null` means the platform itself speaks                                                                                                               |
+| `senderDisplayName` | `String` | yes      | What the client renders, composed in full by the platform (`"Vasya (TMA)"`, `"System"`, `"Дед Мороз"`). Empty string reproduces the nameless announcement line                                                                                        |
+| `source`            | `String` | yes      | Where the message originates (`TMA`, `AUTO_ANNOUNCEMENT`, …). Echoed into the event metadata under `ChatMetadataKeys.SOURCE`; the host cannot infer the surface, and without it analysis cannot tell platform traffic from what players typed in-game |
+| `text`              | `String` | yes      | Body in the neutral chat micro-format: plain text, LF hard line breaks, bare `http(s)://` URLs for auto-linking. Translating those into build-specific wire tokens is a host concern                                                                  |
 
 **Result** (`SendChatMessageResult`)
 
-| Field        | Type  | Notes                                                                                                        |
-| ------------ | ----- | ------------------------------------------------------------------------------------------------------------ |
-| `linesSent`  | `int` | Physical chat lines emitted — the count of non-empty lines after splitting `text` on `
-`                    |
+| Field        | Type  | Notes                                                                                                          |
+| ------------ | ----- | -------------------------------------------------------------------------------------------------------------- |
+| `linesSent`  | `int` | Physical chat lines emitted — the count of non-empty lines after splitting `text` on LF                        |
 | `recipients` | `int` | Online recipients the packet actually reached. Best-effort telemetry; hosts that don't track it MAY report `0` |
 
 **Errors**
 
-| Status              | When                                                                                         |
-| ------------------- | ---------------------------------------------------------------------------------------------- |
-| `NOT_FOUND`         | `senderCharacterId` or `audienceId` resolves to nothing on this server                          |
-| `FORBIDDEN`         | Host policy refuses — chat ban, shadow ban, block list, academy level floor                     |
+| Status              | When                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `NOT_FOUND`         | `senderCharacterId` or `audienceId` resolves to nothing on this server                                                    |
+| `FORBIDDEN`         | Host policy refuses — chat ban, shadow ban, block list, academy level floor                                               |
 | `VALIDATION_FAILED` | Missing required field, `channel` outside the accepted whitelist, or `audienceId` absent where the `audience` requires it |
-| `INTERNAL_ERROR`    | Broadcast mechanism failed host-side                                                            |
+| `INTERNAL_ERROR`    | Broadcast mechanism failed host-side                                                                                      |
 
 ## Character commands
 
@@ -247,6 +245,78 @@ state.
 | `NOT_FOUND`         | Character does not exist                                                                 |
 | `VALIDATION_FAILED` | Wire payload missing `charId` or `lockType`, or `lockType` is not a recognized lock kind |
 | `FORBIDDEN`         | Operation rejected on host policy grounds                                                |
+
+---
+
+### `SetCharacterAccessLevelCommand`
+
+**Purpose.** Set a character's access level to an absolute value, mirroring the in-game
+`//changelvl` command. Applies to a live session on the game thread when the target is online,
+or to the offline row otherwise. `staffNotes` is a staff-only note (see
+[`guide.md`](./guide.md)); the host never shows it to the player.
+
+**Inputs**
+
+| Field         | Type      | Required | Notes                                                                                                                                                                         |
+| ------------- | --------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `charId`      | `Long`    | yes      | Target character's primary key                                                                                                                                                |
+| `accessLevel` | `String`  | yes      | Opaque, same vocabulary as `CharacterDbDto.accessLevel`: numeric text on int-based builds (e.g. `"7"`), a role name on string-role builds. The host converts to its own model |
+| `staffNotes`  | `String?` | no       | Internal staff note; host MUST NOT show it to the player, SHOULD log it on the audit line                                                                                     |
+
+**Result** (`SetCharacterAccessLevelResult`)
+
+| Field                 | Type      | Notes                                                                                                      |
+| --------------------- | --------- | ---------------------------------------------------------------------------------------------------------- |
+| `charId`              | `Long`    | Echo                                                                                                       |
+| `accessLevel`         | `String`  | The level as the host stored it, in the same vocabulary                                                    |
+| `previousAccessLevel` | `String?` | The level before the write, `null` when the host could not read it                                         |
+| `wasOnline`           | `boolean` | `true` when applied to a live session (full effect on next login); `false` when written to the offline row |
+
+**Errors**
+
+| Status              | When                                                                                                                             |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `NOT_FOUND`         | Character does not exist (offline path)                                                                                          |
+| `INVALID_STATE`     | A login raced the offline write                                                                                                  |
+| `VALIDATION_FAILED` | `charId` / `accessLevel` missing, `accessLevel` not an integer, negative (bans go through `BanCommand`), or level not registered |
+| `FORBIDDEN`         | Level above the host's platform-grantable ceiling (bohpts: `5`); the in-game command is not capped                               |
+| `UNAVAILABLE`       | DB error on the offline path                                                                                                     |
+| `INTERNAL_ERROR`    | Unexpected host failure (offline dispatch threw)                                                                                 |
+
+**Side effects on success.** `requestResync("character", [charId])`.
+
+---
+
+### `KickCharacterCommand`
+
+**Purpose.** Disconnect an online character, either dropping it to the login screen or closing
+the client outright. Not idempotent — a second delivery after the player relogged would kick
+them again — hosts dedupe on the correlation id. `staffNotes` is a staff-only note (see
+[`guide.md`](./guide.md)); the host never shows it to the player.
+
+**Inputs**
+
+| Field         | Type      | Required | Notes                                                            |
+| ------------- | --------- | -------- | ---------------------------------------------------------------- |
+| `charId`      | `Long`    | yes      | Target character's primary key                                   |
+| `closeClient` | `boolean` | yes      | `true` closes the game client; `false` drops to the login screen |
+| `staffNotes`  | `String?` | no       | Internal staff note; not shown to the player                     |
+
+**Result** (`KickCharacterResult`)
+
+| Field           | Type      | Notes                                                                                          |
+| --------------- | --------- | ---------------------------------------------------------------------------------------------- |
+| `charId`        | `Long`    | Echo                                                                                           |
+| `offlineTrader` | `boolean` | `true` when the target was an offline trader: the store was ended, `closeClient` had no effect |
+
+**Errors**
+
+| Status              | When                                |
+| ------------------- | ----------------------------------- |
+| `NOT_FOUND`         | No such character exists            |
+| `INVALID_STATE`     | Character exists but is not online  |
+| `VALIDATION_FAILED` | `charId` missing / out of int range |
+| `INTERNAL_ERROR`    | Unexpected failure                  |
 
 ---
 
