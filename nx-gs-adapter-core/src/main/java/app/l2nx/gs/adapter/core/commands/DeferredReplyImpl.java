@@ -52,11 +52,11 @@ final class DeferredReplyImpl<R> implements DeferredReply<R> {
 
     @Override
     public boolean complete(CommandResult<R> result) {
-        CommandResult<?> effective = result != null
+        CommandResult<?> effective = result != null && result != pending
                 ? result
                 : CommandResult.error(
                         CommandStatus.INTERNAL_ERROR,
-                        "Deferred reply completed with null",
+                        "Deferred reply completed with no result",
                         "error.cause",
                         "deferred-null-result");
         if (!completeRaw(effective)) {
@@ -85,7 +85,7 @@ final class DeferredReplyImpl<R> implements DeferredReply<R> {
             f.cancel(false);
         }
         owner.closed(this, false);
-        publisher.publish(correlationId, replyMessageTypeBytes, result);
+        owner.publish(() -> publisher.publish(correlationId, replyMessageTypeBytes, result));
         return true;
     }
 

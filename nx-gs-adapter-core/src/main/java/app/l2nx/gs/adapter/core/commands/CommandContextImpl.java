@@ -24,6 +24,7 @@ final class CommandContextImpl implements CommandContext {
     private final byte[] replyMessageTypeBytes;
     private final DeferredReplies.Publisher publisher;
     private @Nullable DeferredReplyImpl<?> deferred;
+    private boolean sealed;
 
     CommandContextImpl(
             UUID correlationId,
@@ -73,13 +74,19 @@ final class CommandContextImpl implements CommandContext {
     @SuppressWarnings("unchecked")
     public synchronized <R> DeferredReply<R> deferReply() {
         if (deferred == null) {
+            if (sealed) {
+                // the dispatcher already answered; a handle opened now would send a second reply
+                throw new IllegalStateException("deferReply() called after the command was answered");
+            }
             deferred = deferredReplies.open(correlationId, replyMessageTypeBytes, publisher);
         }
         return (DeferredReply<R>) deferred;
     }
 
+    /** Freezes the context once the handler returned; returns the handle it took, if any. */
     @Nullable
-    synchronized DeferredReplyImpl<?> takenDeferredReply() {
+    synchronized DeferredReplyImpl<?> seal() {
+        sealed = true;
         return deferred;
     }
 }

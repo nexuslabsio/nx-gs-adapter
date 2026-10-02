@@ -15,9 +15,10 @@ import app.l2nx.gs.adapter.api.spi.CommandContext;
 public interface DeferredReply<R> {
 
     /**
-     * Publishes the reply under the original correlation id. Thread-safe and first-wins: returns
-     * {@code true} for the call that published, {@code false} for every later call, including one
-     * that arrives after the adapter expired the handle. A {@code null} result is published as
+     * Hands the reply to the adapter, which publishes it under the original correlation id from its
+     * own thread — never blocks the caller. Thread-safe and first-wins: {@code true} for the call
+     * that won, {@code false} for every later one, including after the adapter expired the handle.
+     * {@code null} or the handle's own {@link #pending()} marker is published as
      * {@code INTERNAL_ERROR}.
      */
     boolean complete(CommandResult<R> result);

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.CommandStatus;
+import app.l2nx.gs.adapter.api.spi.CommandContext;
 import app.l2nx.gs.adapter.api.spi.capability.CommandHandler;
 import app.l2nx.gs.adapter.api.spi.capability.DeferredReply;
 import app.l2nx.gs.adapter.core.commands.CommandsConsumerTest.CapturingReplySender;
@@ -70,7 +71,21 @@ class DeferredReplyTest {
         return r;
     }
 
+    /** Replies are published on the adapter's own thread, so the test waits for them. */
+    private void awaitSent(int count) {
+        long deadline = System.currentTimeMillis() + 5_000L;
+        while (sender.sent.size() < count && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(5L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
     private CommandResult<?> onlyReply() {
+        awaitSent(1);
         assertEquals(1, sender.sent.size());
         return (CommandResult<?>) sender.sent.get(0).value();
     }
@@ -107,6 +122,7 @@ class DeferredReplyTest {
 
             assertTrue(taken.get().complete(CommandResult.<Void>ok()));
 
+            awaitSent(1);
             ProducerRecord<byte[], Object> reply = sender.sent.get(0);
             assertArrayEquals(
                     corr.toString().getBytes(StandardCharsets.UTF_8),
@@ -125,6 +141,7 @@ class DeferredReplyTest {
             taken.get().complete(CommandResult.<Void>ok());
 
             assertFalse(taken.get().complete(CommandResult.<Void>ok()));
+            awaitSent(2);
             assertEquals(1, sender.sent.size());
         }
 
@@ -237,6 +254,48 @@ class DeferredReplyTest {
             consumer.processRecord(record(UUID.randomUUID()));
 
             assertEquals(1L, consumer.currentStats().getDeferredOpen());
+        }
+    }
+
+    @Nested
+    class Lifecycle {
+
+        @Test
+        void processRecord_shouldAnswerThroughHandle_whenHandlerTakesHandleAndThrows() {
+            register((cmd, ctx) -> {
+                taken.set(ctx.<Void>deferReply());
+                throw new IllegalStateException("boom");
+            });
+
+            consumer(60_000L).processRecord(record(UUID.randomUUID()));
+
+            assertEquals(CommandStatus.INTERNAL_ERROR, onlyReply().getStatus());
+            assertFalse(taken.get().complete(CommandResult.<Void>ok()));
+        }
+
+        @Test
+        void deferReply_shouldThrow_whenCalledAfterCommandWasAnswered() {
+            AtomicReference<CommandContext> leaked = new AtomicReference<>();
+            register((cmd, ctx) -> {
+                leaked.set(ctx);
+                return CommandResult.ok();
+            });
+            consumer(60_000L).processRecord(record(UUID.randomUUID()));
+
+            assertThrows(IllegalStateException.class, () -> leaked.get().deferReply());
+            assertEquals(CommandStatus.OK, onlyReply().getStatus());
+        }
+
+        @Test
+        void open_shouldAnswerUnavailableAtOnce_whenCalledAfterShutdown() {
+            deferringHandler();
+            CommandsConsumer consumer = consumer(60_000L);
+            deferredReplies.shutdown();
+
+            consumer.processRecord(record(UUID.randomUUID()));
+
+            assertEquals(CommandStatus.UNAVAILABLE, onlyReply().getStatus());
+            assertEquals(0L, deferredReplies.openCount());
         }
     }
 }

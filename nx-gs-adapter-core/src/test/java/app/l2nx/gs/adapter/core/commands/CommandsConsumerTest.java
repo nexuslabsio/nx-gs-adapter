@@ -11,9 +11,9 @@ import app.l2nx.gs.adapter.api.spi.capability.CommandHandler;
 import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
 import app.l2nx.gs.adapter.core.kafka.gson.AdapterGson;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -35,7 +35,7 @@ class CommandsConsumerTest {
     }
 
     static final class CapturingReplySender implements CommandsConsumer.ReplySender {
-        final List<ProducerRecord<byte[], Object>> sent = new ArrayList<>();
+        final List<ProducerRecord<byte[], Object>> sent = new CopyOnWriteArrayList<>();
         boolean simulateFailure = false;
 
         @Override

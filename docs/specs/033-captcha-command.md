@@ -60,7 +60,8 @@ uses it.
     A consumer treats an unknown value as `ABORTED`.
 
   - `Instant startedAt`, `Instant finishedAt` — host clock, UTC.
-  - `long durationMs` — `finishedAt - startedAt`, from the host's monotonic view of the check.
+  - `long durationMs` — `finishedAt - startedAt`, same host wall clock; a clock step during the
+    check skews it.
   - `List<CaptchaRoundResult> rounds` — every picture the player was shown, in order; empty when
     the check ended before the first picture.
   - `Map<String, String> metadata` — host-defined consequences and context; never null, may be
@@ -80,14 +81,18 @@ uses it.
   (see [`TODO.md`](../TODO.md) §1) no `WellKnown*` class is shipped and the keys are host-defined.
   Hosts SHOULD align ban-like consequences with the platform ban vocabulary: `ban.type` (a value
   from `WellKnownBanTypes`), `ban.expiresAt` (ISO-8601 instant); a disconnect is `kick=true`.
-  Host-internal escalation state uses unprefixed keys (bohpts: `stage`, `mode`).
+  Host-internal escalation state uses unprefixed keys (bohpts: `stage`, `mode`). A host that only
+  logs failures (bohpts `mode=LOG_ONLY`) reports the stage the failure would have reached, with no
+  `ban.*` / `kick` keys.
 
 ### Rail behaviour
 
-- [done] R5. The handler uses the deferred reply (`commands` R27): it starts the check, takes
-  `ctx.deferReply()` and returns the deferred marker; the host completes the reply when the check
-  ends, from whatever thread ends it. A check that cannot start replies immediately with an error
-  (R6) and takes no deferred reply.
+- [done] R5. The handler uses the deferred reply (`commands` R27): it takes `ctx.deferReply()`
+  before starting the check, returns the deferred marker, and every answer — the outcome or a
+  refusal to start — goes through the handle, first one wins. Taking the handle first matters: the
+  start can end the check it is creating, and a start that outlives the host-executor timeout still
+  runs later on the game thread. Validation that needs no host state (R6 `VALIDATION_FAILED`,
+  `NOT_FOUND` for an absent character) may return directly before the handle is taken.
 
 - [done] R6. Immediate errors (statuses are `commands` R23):
   - `VALIDATION_FAILED` — `characterId` missing / out of the host's id range.
@@ -99,7 +104,9 @@ uses it.
   - `UNAVAILABLE` — the check is disabled on this server, the concurrent-check limit is reached, or
     no picture could be produced.
 
-  Host-specific causes beyond these go into `problem.extensions`, never into new statuses.
+  These arrive right after the command, either as the handler's return or through the handle
+  (R5); the consumer cannot tell the two apart. Host-specific causes beyond these go into
+  `problem.extensions`, never into new statuses.
 
 - [done] R7. Upper bound: a check ends well inside `l2nx.commands.deferred-reply-max-ms` (R27). A
   host whose check can outlive the bound MUST raise the bound in its config, otherwise the adapter

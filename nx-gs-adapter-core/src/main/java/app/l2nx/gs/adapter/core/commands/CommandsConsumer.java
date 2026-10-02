@@ -392,7 +392,7 @@ public final class CommandsConsumer {
                             .build());
         }
 
-        DeferredReplyImpl<?> deferred = ctx.takenDeferredReply();
+        DeferredReplyImpl<?> deferred = ctx.seal();
         if (deferred != null && deferred.isPending(result)) {
             handledTotal.incrementAndGet();
             return;
@@ -410,7 +410,12 @@ public final class CommandsConsumer {
         }
         if (deferred != null) {
             // handler took a handle but answered directly; the handle closes with this answer
-            deferred.completeRaw(result);
+            if (!deferred.completeRaw(result)) {
+                log.debug(
+                        "Direct answer for {} (corr={}) dropped: its deferred reply was already completed",
+                        messageType,
+                        correlationId);
+            }
             return;
         }
         sendReply(correlationId, replyTypeBytes, result);

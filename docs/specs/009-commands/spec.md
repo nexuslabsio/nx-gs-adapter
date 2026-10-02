@@ -356,10 +356,14 @@ replies-published == 0}` is visible as a failure rather than as silence
     `nx-gs-adapter-api.spi.capability.DeferredReply<R>` exposes `boolean complete(CommandResult<R>)`
     and `CommandResult<R> pending()`. The handler returns `pending()` — a marker the dispatcher
     recognises by identity and never serializes.
-  - `complete(...)` publishes the reply exactly as R13 would have (same correlation id, R26 type
-    header, replies topic) from the calling thread. It is thread-safe and first-wins: it returns
-    `true` for the call that published, `false` (WARN) for every later call. A `null` result is
-    published as `INTERNAL_ERROR`, `error.cause = "deferred-null-result"`.
+  - `complete(...)` hands the reply to the adapter, which publishes it exactly as R13 would have
+    (same correlation id, R26 type header, replies topic) from its own `nx-commands-deferred`
+    thread — handles are completed from game threads, and `KafkaProducer.send` may block for
+    `max.block.ms`. It is thread-safe and first-wins: `true` for the winning call, `false` (WARN)
+    for every later one. A `null` result, or the handle's own marker, is published as
+    `INTERNAL_ERROR`, `error.cause = "deferred-null-result"`.
+  - The context is sealed once the handler returns: `deferReply()` called later (from a task the
+    handler leaked the context to) throws `IllegalStateException` instead of opening a second reply.
   - Bound: a handle not completed within `l2nx.commands.deferred-reply-max-ms` (default `300000`)
     is completed by the adapter with `INTERNAL_ERROR`, `error.cause = "deferred-reply-expired"`,
     `timeout.ms`. The host's late `complete(...)` then returns `false`.
@@ -367,7 +371,8 @@ replies-published == 0}` is visible as a failure rather than as silence
     `error.cause = "foreign-deferred-marker"`. Handler takes a handle but returns a regular result →
     that result is published immediately and the handle is closed (later `complete` → `false`).
   - Adapter stop completes every open handle with `UNAVAILABLE`, `error.cause = "host-shutdown"`,
-    best-effort before the producer closes (R17). A handshake re-roll (R10) keeps open handles:
+    and flushes queued replies before the producer closes (R17). A handle taken after stop (a
+    handler that outlived the consumer join) is answered the same way at once. A handshake re-roll (R10) keeps open handles:
     they publish through the live producer behind the facade.
   - Heartbeat `CommandsStats` gains `deferred-open` (gauge) and `deferred-expired-total`.
 

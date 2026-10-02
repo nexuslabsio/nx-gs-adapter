@@ -591,8 +591,10 @@ nx.commands().on(SendCaptchaCommand.class, (cmd, ctx) -> {
 });
 ```
 
-- `complete(...)` may run on any thread; the first call publishes, later
-  calls return `false`.
+- `complete(...)` may run on any thread and never blocks it: the adapter
+  publishes from its own thread. The first call wins, later calls return `false`.
+- Do not keep the `ctx` after the handler returns: `deferReply()` on a
+  finished command throws.
 - Take the handle only once the work has really started — every early
   rejection is a plain immediate result.
 - Make sure every path that ends the work completes the handle. A handle
