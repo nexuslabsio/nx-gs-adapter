@@ -2,7 +2,7 @@
 
 > Owner: @n1rmata
 >
-> Host counterpart: bohpts-core `l2e.gameserver.l2nx.commands.character.*` (host specs are local
+> Host counterpart: the host's command handlers (host specs are local
 > to that repo and not published).
 
 ## Problem
@@ -79,13 +79,13 @@ shows it to the player.
   (recorded in [`009-commands/guide.md`](guide.md)); retrofitting the existing
   commands is a separate slice.
 
-### Host (bohpts-core)
+### Host (host)
 
 - [done] R6. `SetCharacterAccessLevelHandler`, registered through the dedup decorator:
   - `VALIDATION_FAILED` when `charId` is missing / out of int range, when `accessLevel` is not
     an integer, when it is negative (a ban goes through `BanCommand`, never through the access
     level), or when the level is not registered in the host's access-level registry.
-  - `FORBIDDEN` when the level is above the host's platform-grantable ceiling (bohpts: `5`, the
+  - `FORBIDDEN` when the level is above the host's platform-grantable ceiling (e.g. `5`, the
     top support tier; GM / admin tiers stay an in-game decision). The ceiling binds only this
     command — the in-game `//changelvl` keeps its full range.
   - Online target: on the game thread, `Player.setAccessLevel(level)` +

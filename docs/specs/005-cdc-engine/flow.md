@@ -45,7 +45,7 @@ Technical design section for class-level details.
 │   ┌── Tier-3 SPI ──┐    ┌── Tier-2 SPI ──┐                       │          │
 │   │ JdbcConnection │    │ DbSchema       │                       │          │
 │   │ Source         │    │ Provider       │                       │          │
-│   │  (bohpts impl) │    │  (bohpts impl) │                       │          │
+│   │  (host impl)   │    │  (host impl)   │                       │          │
 │   └────────┬───────┘    └────────────────┘                       │          │
 │            │                                                     │          │
 └────────────┼─────────────────────────────────────────────────────┼──────────┘
@@ -286,7 +286,7 @@ CdcEngine.stop()
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Window planning at scale (bohpts x20 reference)
+## Window planning at scale (large-server reference)
 
 ```
 clan_data        characters       items

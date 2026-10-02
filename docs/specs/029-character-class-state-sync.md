@@ -152,7 +152,7 @@ often than any of them, so no additional tick is generated in practice.
 With `classId` on the wire the platform routes a runtime tick to the right per-class row instead of
 guessing from the last db-sync snapshot, which is what makes a class switch visible immediately.
 
-## Schema provider (bohpts-core)
+## Schema provider (host)
 
 - `CharacterPrimarySource.mapRow` — read `exp` / `sp` (`JdbcNulls.nullableLong`); `HASHED` unchanged.
 - `CharacterSubclassesChildSource.mapRow` — read `exp` / `sp`; `HASHED` stays `("class_id", "level")`.
@@ -160,10 +160,10 @@ guessing from the last db-sync snapshot, which is what makes a class switch visi
   `base_class` / `level` / `exp` / `sp`, one `SUB` entry per `character_subclasses` row. A character
   whose `base_class` does not resolve to a canonical `CharacterClass` gets no `MAIN` entry (same
   drop-with-WARN rule that already applies to subclass rows).
-- `CharacterRuntimeMapping.toDto` — add `classId` (via `BohptsCharacterClasses.fromClassId`), `level`,
+- `CharacterRuntimeMapping.toDto` — add `classId` (via the host's class-id mapping), `level`,
   `sp`; `hash(...)` mixes the three new fields.
 
-bohpts stores only subclasses in `character_subclasses`, so no de-duplication against the `MAIN` entry
+the host stores only subclasses in `character_subclasses`, so no de-duplication against the `MAIN` entry
 is needed there — but the roster contract is what lets a future tenant that stores `class_index = 0`
 handle it locally.
 
@@ -179,7 +179,7 @@ Hence the transition release is additive rather than a swap:
   `CharacterSubclassDbDto` stays in place (deprecated). Dropping the old field in the same release would
   make the new platform blind to the old adapter's payload for the whole window.
 - Deprecation Javadoc states the removal gate explicitly: the field goes once every schema provider
-  emits `classes` (for bohpts, the morning game-server restart that ships the new adapter).
+  emits `classes` (for a host, the game-server restart that ships the new adapter).
 - The platform mirrors this with a legacy ingest branch that reconstructs the roster from
   `baseClassId` + flat `level` + `subclasses` — see the nx-gameservers spec, section «Совместимость и
   cutover».
@@ -189,7 +189,7 @@ adapter-api once the cutover is done. That one IS breaking and takes its own ver
 
 The transition release itself is a minor version bump — every change in it is additive. Deploy ordering
 is in the nx-gameservers spec: platform, then nx-telegram, then adapter-api to Maven Central, then
-bohpts-core, then force-resync.
+the host, then force-resync.
 
 ## Tests
 
@@ -200,7 +200,7 @@ bohpts-core, then force-resync.
   coverage, plus `classId` and `kind` being required.
 - `CharacterRuntimeDto` test — new fields round-trip; `hash(...)` changes when `classId` / `level` / `sp`
   change.
-  Schema-provider coverage is NOT part of this release: the roster assembly lives in bohpts-core, which
+  Schema-provider coverage is NOT part of this release: the roster assembly lives in the host, which
   ships no test source set at all (`core/build.gradle` wires none). The properties that would be asserted
   there — the roster carrying exactly one `MAIN` entry plus one per subclass row, and `hashedColumns()`
   staying unchanged on both sources — are instead verified by review and, on the consuming side, by

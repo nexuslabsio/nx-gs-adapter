@@ -22,7 +22,7 @@ kind, and the expiry. The host maps those onto its own engine and decides how a
 ban is enforced.
 
 Audience: platform-side moderation authors composing ban commands / consuming
-the ban sync stream; host-side (bohpts-core) authors wiring the handlers + the
+the ban sync stream; host-side (host) authors wiring the handlers + the
 schema-provider mapping.
 
 ## Requirements
@@ -126,10 +126,10 @@ schema-provider mapping.
   the existing `NxCommands` consumer; the ban DTO rides the standard db-sync
   per-entity flow.
 
-### Host (bohpts-core)
+### Host (host)
 
 - [todo] R9. The host MUST register a `BanCommand` handler and an `UnbanCommand`
-  handler via `NxCommands.on(...)` (in its `BohptsCommandsModule.onConnect`).
+  handler via `NxCommands.on(...)` (in its `HostCommandsModule.onConnect`).
   Each handler:
     - validates `targetType` / `targetValue` / `banType` (known vocab) and emits
       `VALIDATION_FAILED` on a missing / unrecognized value, `NOT_FOUND` when the

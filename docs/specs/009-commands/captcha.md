@@ -6,8 +6,8 @@
 >
 > - nx-gameservers `docs/specs/076-character-captcha.md` — REST entry points, fast window, audit.
 > - nx-sac-sentinel `docs/specs/012-captcha-measure.md` — the automatic caller and reply consumer.
-> - bohpts-core `l2e.gameserver.l2nx.commands.captcha.SendCaptchaHandler` over the host captcha
->   service `l2e.gameserver.handler.captcha.CaptchaService` (host specs are local to that repo).
+> - the host `SendCaptchaHandler` over the host's captcha
+>   service (host specs are local to the host's repo).
 
 ## Problem
 
@@ -69,7 +69,7 @@ uses it.
 
 - [done] R3. `kafka.commands.captcha.model.CaptchaRoundResult` — one picture:
   - `int index` — 1-based position in the check.
-  - `String questionType` — host vocabulary, UPPER_SNAKE (bohpts: `MAX_AREA`, `MIN_AREA`,
+  - `String questionType` — host vocabulary, UPPER_SNAKE (e.g. `MAX_AREA`, `MIN_AREA`,
     `ODD_COLOR`, `SHAPE_COUNT`, `MISSING_KIND`). The platform stores it verbatim.
   - `@Nullable Integer pickedSlot` — 0-based button the player clicked; `null` when the round
     timed out without an answer.
@@ -81,8 +81,8 @@ uses it.
   (see [`TODO.md`](../../TODO.md) §1) no `WellKnown*` class is shipped and the keys are host-defined.
   Hosts SHOULD align ban-like consequences with the platform ban vocabulary: `ban.type` (a value
   from `WellKnownBanTypes`), `ban.expiresAt` (ISO-8601 instant); a disconnect is `kick=true`.
-  Host-internal escalation state uses unprefixed keys (bohpts: `stage`, `mode`). A host that only
-  logs failures (bohpts `mode=LOG_ONLY`) reports the stage the failure would have reached, with no
+  Host-internal escalation state uses unprefixed keys (e.g. `stage`, `mode`). A host that only
+  logs failures (e.g. `mode=LOG_ONLY`) reports the stage the failure would have reached, with no
   `ban.*` / `kick` keys.
 
 ### Rail behaviour

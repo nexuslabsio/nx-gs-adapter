@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 
 class SyncEventPublisherTest {
 
-    private static final String TOPIC = "bohpts.gs.sync.clans";
+    private static final String TOPIC = "acme.gs.sync.clans";
 
     @Test
     void publish_shouldEmitSyncEvent_forCreated() throws Exception {

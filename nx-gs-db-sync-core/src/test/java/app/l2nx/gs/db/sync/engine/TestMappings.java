@@ -19,7 +19,7 @@ public final class TestMappings {
         return clanWithChildren(Collections.emptyList());
     }
 
-    /** Full bohpts clan shape: {@code clan_data} (zero leader_id/ally_id map to null) plus child {@code clan_skills}. */
+    /** Full clan shape: {@code clan_data} (zero leader_id/ally_id map to null) plus child {@code clan_skills}. */
     public static EntityMapping<ClanDbDto> clanWithSkills() {
         ChildSource<TestClanSkillRow> skills = new ChildSource<TestClanSkillRow>() {
             @Override

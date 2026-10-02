@@ -56,7 +56,7 @@ class CdcEngineE2ETest {
 
     @Container
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0.36")
-            .withDatabaseName("bohpts")
+            .withDatabaseName("acme")
             .withUsername("test")
             .withPassword("test");
 

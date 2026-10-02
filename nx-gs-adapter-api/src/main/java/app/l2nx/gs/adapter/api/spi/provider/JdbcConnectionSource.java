@@ -16,7 +16,7 @@ import java.util.Optional;
 public interface JdbcConnectionSource {
 
     /**
-     * Informational name for logging (e.g. {@code "bohpts-hikari"}).
+     * Informational name for logging (e.g. {@code "my-hikari"}).
      */
     String name();
 

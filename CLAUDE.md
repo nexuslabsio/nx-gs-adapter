@@ -47,7 +47,7 @@ on the contracts artifact alone.
 
 **Planned external Tier-1 consumer.** `nx-sac-agent-adapter` (repo `nx-sac`) is planned to implement
 `AdapterModule` from outside this repository. Today the SAC packet-capture agent is started by the
-host itself (bohpts `GameServerInitializer`, `nx-sac/docs/specs/003-sac-agent.md` §11) and does not
+host itself (`nx-sac/docs/specs/003-sac-agent.md` §11) and does not
 depend on the adapter. Once it lands it uses the module lifecycle only — its Kafka producer, queue
 and thread are its own. Keep Tier-1 SPI changes backwards compatible or coordinate with that spec.
 
@@ -173,7 +173,7 @@ Renaming or removing anything on the wire (a DTO field, a getter, a whole DTO, a
 
 1. **Additive release.** Add the new shape. Keep the old one alongside it, marked `@Deprecated`,
    with Javadoc naming the replacement AND the concrete event that gates removal ("removed once
-   every schema provider emits `classes` — for bohpts, the morning game-server restart"). Consumers
+   every schema provider emits `classes` — the hosts' next restart"). Consumers
    migrate to the new shape and keep a fallback to the old one.
 2. **Removal release.** Delete the deprecated members once that gate has actually fired. This one is
    breaking and takes its own version bump.
@@ -250,3 +250,4 @@ the drop gate are usually different events and cannot be cleared in one pass. Re
   `guide.md`. Never open a top-level `NNN` for a command.
 - `nx-gs-adapter-api/CLAUDE.md` — the wire-contract map (packages, families, contracts worth calling
   out). Anything about DTO shape belongs there or in a spec, not in this file.
+- **No tenant names in docs or Javadoc.** Never name a concrete tenant / server or link its files (repo paths, its classes, its tickets) — in specs, guides, READMEs or public Javadoc. Describe the host generically; this repo is a tenant-agnostic product and a named competitor scares off potential clients.

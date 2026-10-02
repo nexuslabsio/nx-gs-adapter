@@ -51,7 +51,7 @@ heartbeat consumers (read enriched `enabledModules`).
     the platform via `ConnectResponse.syncTopics` (see
     [`adapter-bootstrap` R16](../001-adapter-bootstrap.md)). Keyed by
     `entityName` (`"clan"`, `"character"`, …); value is the fully-qualified topic
-    (`"bohpts.gs.sync.clans"`). Returns an immutable map view; modules treat it
+    (`"<tenant>.gs.sync.clans"`). Returns an immutable map view; modules treat it
     as read-only. Empty map (or absent field on legacy responses) is a valid
     value — modules decide their own response (`db-sync` transitions to
     `DISABLED`).
@@ -441,7 +441,7 @@ NxAdapter.shutdown()
 - **`db-sync` feature** — first consumer. `DbSyncModule implements AdapterModule`,
   registered via `META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule`. Consumes
   `ConnectContext` in `onConnect`; produces `ModuleStatus` per tick.
-- **`jdbc-connection-source` feature** — `BohptsJdbcConnectionSource` is a Tier-3
+- **`jdbc-connection-source` feature** — the host's `JdbcConnectionSource` is a Tier-3
   SPI (different file), but it's invoked from inside `DbSyncModule.onConnect` which
   receives the `ConnectContext` defined here.
 - **`cdc-engine` feature** — populates `Stats.entities[]` per CDC cycle via the

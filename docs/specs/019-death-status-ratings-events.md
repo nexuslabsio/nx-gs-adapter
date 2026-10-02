@@ -3,14 +3,14 @@
 > Owner: @n1rmata
 
 Cross-repo feature. Wire contracts originate in `nx-gs-adapter` (this repo);
-platform-side work spans `bohpts-core`, `nx-tenants`, `nx-gameservers`,
+platform-side work spans the host integration, `nx-tenants`, `nx-gameservers`,
 `nx-telegram`, and the Kafka topic runbooks in `nx-infra`. The feature is split
 into three independently-shippable milestones (A, B, C); each adds a new outbound
 event shape plus its platform consumers.
 
 ## Problem
 
-Three gaps in the bohpts event pipeline, each reproducing or extending behaviour
+Three gaps in the host event pipeline, each reproducing or extending behaviour
 that the legacy Telegram bot had:
 
 1. **Unattended death** — players who leave a character fishing/farming unattended
@@ -18,10 +18,8 @@ that the legacy Telegram bot had:
    them. Today the only "your character is in trouble" signal is the involuntary
    *disconnect* notification (`events.character`, `logout_reason=disconnect`);
    an in-world death while autofarming or on an auto-macro produces no signal at
-   all. bohpts-core already tracks both unattended modes (autofarm via
-   `Player.getFarmSystem().isAutofarming()`, auto-macro sessions via
-   `l2e.gameserver.instancemanager.AutoMacroManager`) but nothing leaves the JVM
-   on death.
+   all. a host may already track both unattended modes (autofarm,
+   auto-macro sessions) but nothing leaves the JVM on death.
 
 2. **Server lifecycle** — operators and players have no in-bot signal that a
    server came up or is going down. The platform only sees periodic population
@@ -31,13 +29,12 @@ that the legacy Telegram bot had:
    Maintenance restarts (the daily ~06:30 MSK restart) would spam a naive
    start/stop notifier twice a day.
 
-3. **Fisher ratings** — bohpts-core runs a fishing championship with a live
-   ranked leaderboard (`l2e.gameserver.instancemanager.games.FishingChampionship`),
-   but the ranking never leaves the game server, so the platform cannot store,
+3. **Fisher ratings** — a host may run a fishing championship with a live
+   ranked leaderboard, but the ranking never leaves the game server, so the platform cannot store,
    chart, or surface it. More ranked leaderboards (PvP, raids, …) are expected
    later, so the platform-side store must not be fishing-specific.
 
-Audience: bohpts players (death + server-status notifications via the Telegram
+Audience: players (death + server-status notifications via the Telegram
 bot), operators (server-status menu section), and platform-side consumers
 (ratings store for future surfaces).
 
@@ -93,13 +90,11 @@ bot), operators (server-status menu section), and platform-side consumers
   big-endian (same extractor used for `CharacterPresenceEvent`). Host publishes
   through the existing generic `NxEvents.publish(Object)` — no new SPI method.
 
-- [todo] R4. `bohpts-core` MUST publish a `CharacterDeathEvent` from the player
+- [todo] R4. The host MUST publish a `CharacterDeathEvent` from the player
   death path **only when the dying character was unattended** at time of death —
-  on autofarm (`Player.getFarmSystem().isAutofarming()`) or on an auto-macro
-  session (`AutoMacroManager.isMacroActive`). Attended deaths emit nothing. A new
-  `l2e.gameserver.l2nx.events.character.CharacterDeathPublisher` is bound in
-  `BohptsEventsModule.onConnect` / released in `onDisconnect`, alongside the
-  existing `CharacterPresencePublisher`. Killer type + killer id are resolved on
+  on autofarm or on an auto-macro session. Attended deaths emit nothing. A
+  death publisher is bound in the host events module's `onConnect` / released in
+  `onDisconnect`, alongside the existing character presence publisher. Killer type + killer id are resolved on
   the game thread and written into `metadata` (`killer_type` from
   `WellKnownKillerTypes`; `killer_id` = char object-id for a player killer, NPC
   template-id for a monster/boss killer), along with `farm_mode` classifying the
@@ -159,15 +154,15 @@ bot), operators (server-status menu section), and platform-side consumers
   message-types `"ServerStartedEvent"` / `"ServerStoppingEvent"`, partition-key
   extractor returning `null`.
 
-- [todo] R9. `bohpts-core` MUST emit `ServerStartedEvent` once the world is fully
-  loaded, stamping `metadata.gm_only = Config.SERVER_GMONLY`, and
-  `ServerStoppingEvent` on the graceful-shutdown path (`Shutdown.run`). Wiring
-  lives in `BohptsEventsModule`.
+- [todo] R9. The host MUST emit `ServerStartedEvent` once the world is fully
+  loaded, stamping `metadata.gm_only` (the host's GM-only startup flag), and
+  `ServerStoppingEvent` on the graceful-shutdown path. Wiring
+  lives in the host events module.
 
-- [todo] R10. `bohpts-core` MUST suppress emission of **both**
+- [todo] R10. The host MUST suppress emission of **both**
   `ServerStartedEvent` and `ServerStoppingEvent` during the daily maintenance
   restart window, **hard-coded to 06:00–07:00 Europe/Moscow** (server time) in
-  `ServerLifecyclePublisher`. The platform applies no restart-related logic.
+  the lifecycle publisher. The platform applies no restart-related logic.
   Outside the window, start/stop emit normally.
 
 - [todo] R11. `nx-gameservers` `ServerOnlineEventConsumer` MUST dispatch on
@@ -206,7 +201,7 @@ bot), operators (server-status menu section), and platform-side consumers
       `gmOnly = true`** (read from the event `metadata`, regardless of the
       subscriber's toggle) — GM-only runs are operator tests with frequent
       restarts. The filter lives on the platform (telegram), not in the host:
-      bohpts always emits both facts with `gm_only` stamped.
+      the host always emits both facts with `gm_only` stamped.
     - Dedup by `eventId` (reuse the notification dedup machinery).
     - `info.yml` ru/en/uk templates for server up / server down (legacy copy:
       start = "update the client" reminder, stop = "23 техника устанавливают
@@ -262,15 +257,14 @@ bot), operators (server-status menu section), and platform-side consumers
     - Add `"gs.events.rating"` to the `STANDARD_TOPICS` array in
       `komodo/l2nx/prod-kafka/scripts/create-tenant.sh` so new tenants get it on
       creation.
-    - Document the `bohpts.gs.events.rating` topic in
-      `komodo/l2nx/prod-kafka/tenants/bohpts.md` (prod: 2 partitions, 3h
-      retention) and `komodo/l2nx/dev-kafka/tenants/test1.md` (dev: 1 partition,
+    - Document the per-tenant `gs.events.rating` topic in the per-tenant
+      Kafka runbooks (prod: 2 partitions, 3h retention; dev: 1 partition,
       1h retention), each with the `docker exec … kafka-topics --create` runbook
       command, matching the existing per-family sections.
 
-- [todo] R18. `bohpts-core` MUST publish a `RatingSnapshotEvent` every 1 minute
+- [todo] R18. The host MUST publish a `RatingSnapshotEvent` every 1 minute
   via a new `RatingSnapshotPublisher` (scheduled `scheduleAtFixedDelay`, bound in
-  `BohptsEventsModule`), reading `FishingChampionship.snapshotCurrentTop(1000)`,
+  the host events module), reading the top 1000 of its fishing championship,
   mapping each `SnapshotEntry{rank, charId, name, points}` → `RatingEntry`
   (dropping `name`, `points` → `score`), publishing with
   `ratingType = WellKnownRatingTypes.FISHING`. Fewer than 1000 active fishers
@@ -295,7 +289,7 @@ bot), operators (server-status menu section), and platform-side consumers
   `events.privatestore` with key `STORE_OWNER_ADENA = "store_owner_adena"`. The
   existing `PrivateStorePurchaseEvent.metadata` map carries it; no new field.
 
-- [todo] R24. `bohpts-core` `PrivateStorePurchasePublisher` MUST stamp
+- [todo] R24. The host's private-store purchase publisher MUST stamp
   `metadata.store_owner_adena` = the **store-opener's** adena balance after the
   deal closed (decimal string). Store-opener = `ASK ? seller : buyer` (ASK = sell
   store opened by the seller; BID = buy store opened by the buyer) — i.e. the
@@ -332,7 +326,7 @@ bot), operators (server-status menu section), and platform-side consumers
   families (`character`, `serveronline`) as new message types — no `/connect`
   change. Only `ratings` is a new family.
 - **Platform-side restart-window logic.** The maintenance-window suppression is
-  entirely bohpts-core's responsibility (R10). The platform never special-cases
+  entirely the host's responsibility (R10). The platform never special-cases
   restart times.
 - **Server-status broadcast to a fixed ops channel.** Server start/stop
   notifications are per-user opt-in via the menu toggle, not a channel broadcast.
@@ -375,7 +369,7 @@ bot), operators (server-status menu section), and platform-side consumers
   confirmed.]
 - [resolved: GM_ONLY carried in `ServerStartedEvent.metadata` (`gm_only`), bot
   suppresses the start notification; maintenance restart suppressed at source by
-  bohpts-core, window hard-coded 06:00–07:00 MSK (no config knob) — user
+  the host, window hard-coded 06:00–07:00 MSK (no config knob) — user
   confirmed.]
 - [resolved: killer info moved off typed fields into `CharacterDeathEvent.metadata`
   (`killer_type` + `killer_id`); platform resolves the killer name from the id;
@@ -394,8 +388,8 @@ bot), operators (server-status menu section), and platform-side consumers
 - [resolved: `RatingEntry` carries no `charName`; source stamps `rank`; top 1000;
   `ratingType` value is `"fishing"` (`WellKnownRatingTypes.FISHING`) — user
   confirmed.]
-- [resolved: GM-only source is `Config.SERVER_GMONLY`; fisher leaderboard source
-  is `FishingChampionship.snapshotCurrentTop(int)` — confirmed in bohpts-core.]
+- [resolved: GM-only source is the host's GM-only startup flag; fisher leaderboard
+  source is the host's fishing championship top-N snapshot — confirmed.]
 - [resolved: `ratings` goes in BOTH `create-tenant.sh` `STANDARD_TOPICS` AND the
   per-tenant `.md` runbook docs — user confirmed.]
 - [ ] `gs_ratings` `score` column type: `BIGINT` assumed (championship `points`
@@ -409,10 +403,6 @@ bot), operators (server-status menu section), and platform-side consumers
   [`docs/specs/011-events-online-snapshot.md`](011-events-online-snapshot.md)
 - Reference family + publisher pattern (multi-event family, discrete fact +
   snapshot): [`docs/specs/014-events-raid.md`](014-events-raid.md)
-- bohpts-core sources: `l2e.gameserver.Config.SERVER_GMONLY`,
-  `l2e.gameserver.instancemanager.AutoFarmManager`,
-  `l2e.gameserver.instancemanager.games.FishingChampionship`,
-  `l2e.gameserver.l2nx.events.BohptsEventsModule`
 - nx-tenants `/connect`:
   `app.l2nx.tenants.api.rest.adapter.AdapterController.connect()`
 - Kafka topic runbooks: `nx-infra/komodo/l2nx/{prod,dev}-kafka/tenants/`

@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * One event per credential-entry outcome on the login server, success or any failure, independent of whether the
  * account proceeds to world entry. Partition key is {@code accountName.toLowerCase(Locale.ROOT)} (per-account order).
  * {@code eventId} is a UUIDv7 idempotency key (at-least-once). {@code accountName} is lowercased and trimmed by the
- * producer. {@code hwid} is always {@code null} on bohpts; {@code failureDetail} never carries secrets.
+ * producer. {@code hwid} is always {@code null} for hosts whose protocol lacks it; {@code failureDetail} never carries secrets.
  * {@code metadata} is an open map; hosts MAY add keys without an API release, consumers ignore unknown ones.
  */
 public final class AccountAuthAttemptEvent {

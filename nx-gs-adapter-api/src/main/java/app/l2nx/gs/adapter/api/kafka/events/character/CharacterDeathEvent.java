@@ -7,7 +7,7 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Death of a character the host chooses to report; bohpts emits it only for unattended deaths (autofarm or auto-macro,
+ * Death of a character the host chooses to report; a host may report only unattended deaths (autofarm or auto-macro,
  * mode in the {@code farm_mode} metadata key). Shares the {@code character} topic with {@link CharacterPresenceEvent}
  * (dispatched by {@code Nx-Message-Type}) and the {@code charId} partition key.
  * {@code eventId} is a UUIDv7 idempotency key (at-least-once). {@code metadata} is an open map; canonical keys in

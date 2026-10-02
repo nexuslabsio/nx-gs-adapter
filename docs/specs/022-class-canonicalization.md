@@ -2,7 +2,7 @@
 
 - Date: 2026-06-13
 - Status: **implemented** (full migration per D5; D4 = global seeded `gd_class_names`)
-- Primary repo: `nx-gs-adapter` (contract). Cross-repo impact: `bohpts-core`, `nx-gamedata`, `nx-wiki`.
+- Primary repo: `nx-gs-adapter` (contract). Cross-repo impact: host integration, `nx-gamedata`, `nx-wiki`.
 
 ## 1. Goal
 
@@ -15,8 +15,8 @@ values; display names and i18n live consumer-side** (nx-gamedata / nx-wiki — D
 
 - `nx-gs-adapter-api` = closed canonical enums only. No numeric source ids baked into the
   enum, no display strings, no localization.
-- The source-id → enum translation is a **host detail** → lives in the host provider
-  (bohpts), not in the shared contract.
+- The source-id → enum translation is a **host detail** → lives in the host provider,
+  not in the shared contract.
 - Display names (EN) and translations (RU/UK) are **platform data** → live in
   nx-gamedata / nx-wiki (DB table or config bundle), keyed by the canonical enum token.
 
@@ -31,7 +31,7 @@ values; display names and i18n live consumer-side** (nx-gamedata / nx-wiki — D
   numeric `id` + `byId(int)` + `getId()`**. Used by:
     - `CharacterDbDto` / `CharacterSubclassDbDto` (character db-sync wire) — as a **field type**
       (`classId` / `baseClassId`), serialized by name.
-    - bohpts `CharacterMapping` — maps source DB `classid`/`base_class`/subclass `class_id` →
+    - Host `CharacterMapping` — maps source DB `classid`/`base_class`/subclass `class_id` →
       enum via `CharacterClass.byId(int)` (the **only** functional `byId` caller).
     - `CharacterClassTest` (asserts id uniqueness + `byId` round-trip).
     - Olympiad events carry a **raw `int classId`** (not the enum) — unaffected.
@@ -51,15 +51,15 @@ canonical). The enum is now a pure agnostic vocabulary.
 
 ### D2 — source-id → enum mapping moves to the host
 
-Because `byId` is gone, the numeric-id → `CharacterClass` translation lives in **bohpts**
+Because `byId` is gone, the numeric-id → `CharacterClass` translation lives in **the host**
 (the source detail belongs to the host). One shared helper, e.g.
-`l2e.gameserver.l2nx.data.BohptsCharacterClasses.fromClassId(ClassId)` — a `switch` over the
+`CharacterClasses.fromClassId(ClassId)` — a `switch` over the
 host `ClassId` enum returning the matching `CharacterClass` (103 cases; dummy/unknown → null).
 Reused by:
 
 - `CharacterMapping` (character-sync) — replaces `CharacterClass.byId(code)`
   (`ClassId.getClassId(code)` → `fromClassId`).
-- `BohptsClassTemplateProvider` (this feature) — `fromClassId(cid)`.
+- Host `ClassTemplateProvider` (this feature) — `fromClassId(cid)`.
 
 ### D3 — class template is token-keyed, no numeric id
 
@@ -100,7 +100,7 @@ existing `class_name` is a misnomer for a token).
   column; PK `(tenant_id, server_id, skill_template_id, clazz)`. **No numeric class id
   remains anywhere.**
 - `fromClassId` is shared by **three** host providers: `CharacterMapping` (character-sync),
-  `BohptsClassTemplateProvider`, `BohptsSkillTemplateProvider`.
+  host `ClassTemplateProvider`, host `SkillTemplateProvider`.
 
 **Lighter alternative** (smaller skill-side scope): rename only the DB column
 `gd_skill_template_classes.class_name → clazz` and canonicalize its value, but keep
@@ -134,7 +134,7 @@ the global seed (same pattern as item/skill localization overrides). Not now.
 | Repo                     | Change                                                                                                                                                                                                                                                             |
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `nx-gs-adapter-api`      | `CharacterClass`: drop `id`/`byId`/`getId`/`BY_ID`. `ClassTemplate`: `clazz: CharacterClass`, drop `name`. Update `CharacterClassTest` (remove id/byId asserts; keep count/uniqueness-of-name).                                                                    |
-| `bohpts-core`            | New `BohptsCharacterClasses.fromClassId(ClassId)` switch. `CharacterMapping` uses it (replaces `byId`). `BohptsClassTemplateProvider` emits `clazz` (drops `getName`-based `name`). CRLF. ⚠️ won't compile until adapter-api released + pinned (version lockstep). |
+| Host integration         | New `CharacterClasses.fromClassId(ClassId)` switch. `CharacterMapping` uses it (replaces `byId`). Host `ClassTemplateProvider` emits `clazz` (drops `getName`-based `name`). CRLF. ⚠️ won't compile until adapter-api released + pinned (version lockstep). |
 | `nx-gamedata`            | `gd_class_templates`: `name` column → `clazz VARCHAR` (token). Domain/mapper/adapter: store `clazz.name()`; drop `name`. (Revise the not-yet-deployed `v2.5.0` migration.)                                                                                         |
 | `nx-wiki`                | Class DTOs: carry `clazz: CharacterClass` + resolved display `name` (from D4 source). Query service resolves the name. Skills/tree unchanged otherwise.                                                                                                            |
 | frontend (`nx-wiki-web`) | Out of scope; api-changelog updated (class identity now an enum + resolved name).                                                                                                                                                                                  |
@@ -149,7 +149,7 @@ the global seed (same pattern as item/skill localization overrides). Not now.
   `CharacterClassTest` (updated). No other functional caller. Olympiad unaffected (raw int).
 - **Wire**: `CharacterClass` constant **names are unchanged**, so the character-sync wire value
   is unchanged — **not** a wire-breaking rename. The break is purely source-level (`byId` gone).
-- **Skill `class_name` value canonicalization** — `BohptsSkillTemplateProvider` switches from the
+- **Skill `class_name` value canonicalization** — Host `SkillTemplateProvider` switches from the
   host token (`SORCEROR`) to the canonical token (`SORCERER`). On the next skill re-sync,
   `gd_skill_template_classes.class_name` repopulates with canonical tokens. Any consumer
   filtering/joining on the old host spelling must switch to the canonical token. (nx-wiki's
@@ -157,7 +157,7 @@ the global seed (same pattern as item/skill localization overrides). Not now.
 - **Class-template wire reshape** (`int id`/`parentClassId` → `clazz`/`parentClazz`) is
   internal-only — the classes-page pipeline isn't released yet (canonicalization ships first, §7.4).
 - **Release order (version lockstep)**: publish `nx-gs-adapter-api` (+ `gd-sync-core` if its
-  ClassTemplate ref changes) → bump pins in bohpts-core → bohpts compiles. Same gate already
+  ClassTemplate ref changes) → bump pins in the host integration → host compiles. Same gate already
   noted for the classes-page feature.
 - **nx-gamedata migration**: `v2.5.0` not yet deployed → edit in place (token-keyed
   `gd_class_templates` + new seeded `gd_class_names`), no forward migration needed.

@@ -9,11 +9,11 @@ Kafka so player-facing UI and operator dashboards can show real data — but the
 ship one hardcoded set of SQL queries.
 
 This slice introduces a generic CRC32-CDC engine plus a two-tier SPI so vendors and clients
-can plug in their own schema descriptions. MVP target: a single bohpts client implementation
+can plug in their own schema descriptions. MVP target: a single reference integration
 syncing the `clan_data` table end-to-end. The schema-provider code lives directly in the
-client's own repo (`bohpts-core`), not as a separate published artifact — the SPI hosts
+host's own repo, not as a separate published artifact — the SPI hosts
 multi-tenant schema variants without forcing per-client Maven Central publishing. Vanilla
-`nx-gs-db-l2j` is intentionally deferred until a second non-bohpts customer arrives (premature
+`nx-gs-db-l2j` is intentionally deferred until a second customer with an L2J-family schema arrives (premature
 extraction is YAGNI). Audience: operators (drop in `nx-gs-db-sync-core` JAR + a host JAR that
 ships a `DbSchemaProvider`), platform-side consumers of `gs.sync.*` Kafka topics, future
 module authors (datapack sync, metrics).
@@ -29,7 +29,7 @@ module authors (datapack sync, metrics).
 > - The CRC32 two-phase CDC algorithm — scheduler, in-memory snapshot, RAM cap, query
     > timeout, MIN/MAX recompute, sliding windows, per-table stats publishing — lives in
     > [`cdc-engine`](../005-cdc-engine/spec.md). db-sync owns the AdapterModule wiring, the
-    > Tier-2 SPI shape (`DbSchemaProvider` / `TableMapping`), and bohpts MVP. The engine
+    > Tier-2 SPI shape (`DbSchemaProvider` / `TableMapping`), and the reference-integration MVP. The engine
     > consumes `TableMapping`s from db-sync's resolved `DbSchemaProvider` and runs the
     > protocol uniformly.
 >
@@ -38,11 +38,11 @@ module authors (datapack sync, metrics).
 > **Phase split:**
 > - **Phase 1 (smoke test):** R1, R2 (smoke borrow only — not CDC), R9 (module-level
     > exception isolation), R11 (versions), R12 (heartbeat enrichment with `pool` slot only;
-    > no `tables` slot yet). Goal: bohpts-core boots, registers
-    > `BohptsJdbcConnectionSource`, db-sync surfaces
+    > no `tables` slot yet). Goal: the host boots, registers
+    > `HostJdbcConnectionSource`, db-sync surfaces
     > `{name: "db-sync", state: ACTIVE, stats: {pool: ...}}` in heartbeat.
 > - **Phase 2 (CDC engine):** R3, R4, R5, R10, plus R12 upgrade to full `tables: List<TableStats>`
-    > (per `cdc-engine` R10). Adds `DbSchemaProvider` Tier-2 SPI, bohpts `clan_data`
+    > (per `cdc-engine` R10). Adds `DbSchemaProvider` Tier-2 SPI, the reference `clan_data`
     > mapping, and wires the cdc-engine — engine R lands in the cdc-engine spec, NOT here.
 > - **Could (post-MVP):** none directly on db-sync (R14 / R15 moved to cdc-engine).
 
@@ -84,13 +84,13 @@ module authors (datapack sync, metrics).
       the host JVM keep running)
     - **1 impl** → engine uses it (the dominant case)
     - **>1 impls** → log actionable ERROR listing the conflicting impl class names; db-sync
-      transitions to `FAILED`. **Caveat:** when a client-override JAR (e.g. `nx-gs-db-bohpts`)
+      transitions to `FAILED`. **Caveat:** when a client-override JAR (e.g. a per-client `nx-gs-db-<client>` JAR)
       brings the vanilla `nx-gs-db-l2j` JAR transitively, both ship a service descriptor — see
       Open question on resolution strategy. MVP assumes operator's classpath has exactly one
       activated descriptor.
 
 - [done] R4. **[Phase 2]** `DbSchemaProvider` interface MUST expose:
-    - `String schemaName()` — e.g. `"l2j"`, `"bohpts"`, `"lucera"` (informational; not a
+    - `String schemaName()` — e.g. `"l2j"`, `"lucera"`, `"my-server"` (informational; not a
       selection key in MVP)
     - `List<TableMapping<?>> mappings()` — the tables this provider knows about
 
@@ -207,14 +207,14 @@ module authors (datapack sync, metrics).
   config when ServiceLoader returns 0 (Phase 3); bundled Hikari pool fails to open
   (Phase 3).
 
-- [wip] R10. **[Phase 2]** Bohpts client + clan entity MVP — `bohpts-core` repo
-  (private; `E:/projects/bohpts/bohpts-core`) MUST host a `BohptsDbSchemaProvider`
+- [wip] R10. **[Phase 2]** Reference client + clan entity MVP — the host's own
+  (private) repo MUST host a `HostDbSchemaProvider`
   class implementing `DbSchemaProvider` directly (no `extends` — there is no
   vanilla `nx-gs-db-l2j` to inherit from in MVP), plus a
   `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider` resource
-  pointing to it. Bohpts-core declares `implementation
+  pointing to it. The host declares `implementation
   'app.l2nx:nx-gs-adapter-api:0.7.0'` from Maven Central. Provider contract:
-    - `schemaName()` = `"bohpts"`
+    - `schemaName()` = `"my-server"` (any host-chosen label)
     - `mappings()` returns exactly one `EntityMapping<ClanDbDto>` for the `clan`
       entity:
         - `entityName()` = `"clan"`
@@ -262,13 +262,12 @@ module authors (datapack sync, metrics).
     - `ClanSkillDbDto` (new, ships in `nx-gs-adapter-api`) is a Java 8 POJO with
       `int skillId`, `int skillLevel`, hand-written builder, equals/hashCode/
       toString.
-    - The package for `BohptsDbSchemaProvider` inside bohpts-core is
-      `l2e.gameserver.l2nx`. No bohpts-internal class names or column
-      conventions leak into this monorepo (bohpts-core is private; this
-      monorepo stays open-core).
+    - The package for `HostDbSchemaProvider` inside the host is chosen by the
+      host. No host-internal class names or column conventions leak into this
+      monorepo (the host's repo is private; this monorepo stays open-core).
     - The Kafka topic the engine publishes `clan` events to is delivered by the
       platform via `ConnectResponse.syncTopics["clan"]` (e.g.
-      `"bohpts.gs.sync.clans"`) — NOT declared in the mapping.
+      `"<tenant>.gs.sync.clans"`) — NOT declared in the mapping.
 
 - [wip] R11. **Module versions (current state):**
     - `nx-gs-adapter-api` = `0.7.0` (breaking SPI change for multi-source
@@ -282,8 +281,8 @@ module authors (datapack sync, metrics).
     - `nx-gs-adapter-core` stays at `0.3.2` (no wire change in `/connect` /
       `ConnectContext` for this slice).
     - `nx-gs-kafka` stays at `0.2.0` (no wire change).
-    - **No** `nx-gs-db-bohpts` artifact is published — the bohpts schema
-      provider is shipped as part of the bohpts-core game-server JAR itself.
+    - **No** per-client artifact is published — the host's schema
+      provider is shipped as part of the host's own game-server JAR.
 
 **Should:**
 
@@ -344,16 +343,16 @@ module authors (datapack sync, metrics).
   expected to have `GRANT SELECT` only.
 - **Backfill control from platform** — no operator-triggered "resync from scratch".
   Snapshot is wiped on `onDisconnect` and rebuilt on next `onConnect`.
-- **Vanilla `nx-gs-db-l2j` artifact** — deferred until a second non-bohpts customer arrives.
+- **Vanilla `nx-gs-db-l2j` artifact** — deferred until a second customer with an L2J-family schema arrives.
   Until then, premature extraction of "common L2J vanilla code" is YAGNI: there is no
   evidence yet for what's actually shareable across forks. When the second customer ships,
-  common code is extracted into `nx-gs-db-l2j` and bohpts is refactored to extend it via
+  common code is extracted into `nx-gs-db-l2j` and the first host is refactored to extend it via
   template method.
 - **Vanilla Lucera support (`nx-gs-db-lucera`)** — separate slice (next vanilla provider
-  after the SPI design is validated by bohpts MVP).
+  after the SPI design is validated by the reference-integration MVP).
 - **Datapack sync (`nx-gs-dp-*`)** — separate slice; uses the same Tier-1 SPI but a
   different engine (file-based diffing, not CRC32-CDC).
-- **Bohpts-specific columns** — `crest_id`, `ally_name`, `ally_crest_id`,
+- **Host-specific columns** (in the reference schema) — `crest_id`, `ally_name`, `ally_crest_id`,
   `ally_penalty_type`, `ally_penalty_expiry_time`, `char_penalty_expiry_time`,
   `dissolving_expiry_time`, and the `membersCount` Hibernate `@Formula` are NOT synced in
   MVP. Goal is plain-data smoke test of the SPI + CDC engine, not feature-complete clan
@@ -380,7 +379,7 @@ module authors (datapack sync, metrics).
   `query-timeout-seconds` / `publish-flush-seconds`. No `mapping.strategy()` —
   engine has a single windowed strategy. Dynamic Kafka-driven per-entity config
   remains a future Could on cdc-engine R14.]
-- [resolved: Multi-impl `DbSchemaProvider` resolution is a non-issue in MVP. Bohpts-core
+- [resolved: Multi-impl `DbSchemaProvider` resolution is a non-issue in MVP. The host
   ships exactly one provider; no transitive vanilla JAR exists yet (`nx-gs-db-l2j` deferred
   per Non-goals). The conflict scenario re-emerges only once vanilla L2J ships AND a
   customer takes a transitive dep on it. At that point the resolution strategy (config
@@ -408,10 +407,9 @@ module authors (datapack sync, metrics).
   siblings: `nx-gs-db-l2j`, `nx-gs-db-lucera`, `nx-gs-dp-l2j`, `nx-gs-dp-lucera`. Update
   README + CLAUDE.md siblings list. Confirmed for `nx-gs-db-sync-core` already;
   sweep the rest before the first vanilla module ships.]
-- [NEEDS CLARIFICATION: Java package for `BohptsDbSchemaProvider` inside bohpts-core.
-  Candidates: `l2e.gameserver.nx.db` (matches existing bohpts-core convention),
-  `app.l2nx.gs.db.bohpts` (uses L2NX namespace inside bohpts), `com.bohpts.gs.l2nx`. Up to
-  bohpts-core owner; no impact on the SPI contract.]
+- [NEEDS CLARIFICATION: Java package for `HostDbSchemaProvider` inside the host.
+  Up to the host owner (follow the host's own package convention); no impact on the SPI
+  contract.]
 - [assumed: `AdapterModule.name()` literal = `"db-sync"`. Used by heartbeat
   `enabledModules`.]
 - [assumed: SyncEvent send semantics — events are fire-and-forget; if Kafka send fails
@@ -430,15 +428,15 @@ module authors (datapack sync, metrics).
   — Tier-1 SPI extension lands there
 - Sibling feature (Tier-3 SPI):
   [`docs/specs/004-jdbc-connection-source.md`](../004-jdbc-connection-source.md)
-  — `JdbcConnectionSource` design, pool-agnostic borrowing, bohpts reference impl
-  wrapping `l2e.gameserver.database.DatabaseFactory`
+  — `JdbcConnectionSource` design, pool-agnostic borrowing, reference impl
+  wrapping the host's own connection factory
 - Sibling feature (CDC algorithm):
   [`docs/specs/005-cdc-engine/spec.md`](../005-cdc-engine/spec.md) — CRC32 two-phase
   protocol, single windowed strategy with `rows-per-window` partition, scheduler,
   query timeout, per-entity heartbeat stats
 - Module discovery diagrams: [`module-discovery.md`](./module-discovery.md)
-- CRC32 CDC resource estimates: image attached to /specl-take invocation (bohpts
-  x20 benchmark — Characters 152k / Clans 1k / Items 12M — informs window-count
+- CRC32 CDC resource estimates: image attached to /specl-take invocation (reference
+  benchmark — Characters 152k / Clans 1k / Items 12M — informs window-count
   math in the cdc-engine spec)
 
 ---
@@ -458,7 +456,7 @@ row-DTO mapper, strategy, cadence. The CDC algorithm itself (CRC32 two-phase pro
 scheduler, in-memory snapshot, per-table stats) lives in the
 [`cdc-engine`](../005-cdc-engine/spec.md) feature; `DbSyncModule` instantiates the engine after
 `DbSchemaProvider` is resolved and feeds it the provider's `EntityMapping`s.
-MVP target: bohpts client implements `DbSchemaProvider` directly inside its own `bohpts-core`
+MVP target: the reference client implements `DbSchemaProvider` directly inside its own
 repo (no separate published artifact, no template-method indirection — vanilla L2J
 extraction deferred to second-customer time per spec Non-goals). One `EntityMapping` for
 `clan_data` (4 hashed columns: clan_name, clan_level, leader_id, ally_id) validates the
@@ -478,16 +476,16 @@ design end-to-end.
       (not a separate `kafka/`).
     - `META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule` — service descriptor
       with `app.l2nx.gs.db.sync.DbSyncModule`
-- `bohpts-core/` [planned, **lives in the private bohpts-core repo, NOT this monorepo**]
+- `host/` [planned, **lives in the host's private repo, NOT this monorepo**]
     - depends on `app.l2nx:nx-gs-db-sync-core:0.2.0` (Maven Central)
-    - `<bohpts-package>/BohptsDbSchemaProvider.java` [planned] — implements
+    - `<host-package>/HostDbSchemaProvider.java` [planned] — implements
       `DbSchemaProvider` directly (no `extends` — vanilla L2J doesn't exist yet);
-      `schemaName="bohpts"`. Package up to bohpts-core owner — see spec Open question.
-    - `<bohpts-package>/mapping/ClanMapping.java` [planned] — only `EntityMapping`
+      `schemaName="my-server"`. Package up to the host owner — see spec Open question.
+    - `<host-package>/mapping/ClanMapping.java` [planned] — only `EntityMapping`
       in MVP; `entityName="clan"`, `tableName="clan_data"`. Applies the
       zero-as-null convention to `leader_id` / `ally_id` (`0L` → `null`) in `mapRow`
     - `src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider`
-      [planned] — service descriptor pointing to `BohptsDbSchemaProvider`
+      [planned] — service descriptor pointing to `HostDbSchemaProvider`
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/`
     - `spi/AdapterModule.java` — Tier-1 SPI (declared by `adapter-modules`; listed
       here for completeness because db-sync implements it)
@@ -575,12 +573,12 @@ design end-to-end.
   graph in `start()` and reads from it in `currentStatus()`. Engine code
   physically lives in the `nx-gs-db-sync-core` JAR — db-sync's design
   surface stops at "wire the engine with the resolved provider's mappings".
-- **`BohptsDbSchemaProvider`** [planned] (R10) — implements `DbSchemaProvider` directly
+- **`HostDbSchemaProvider`** [planned] (R10) — implements `DbSchemaProvider` directly
   (no template-method base class in MVP — vanilla L2J extraction deferred to
-  second-customer time per spec Non-goals). Lives in bohpts-core repo. Returns one
-  `ClanMapping` from `mappings()`. `schemaName="bohpts"`.
+  second-customer time per spec Non-goals). Lives in the host's repo. Returns one
+  `ClanMapping` from `mappings()`. `schemaName="my-server"`.
 - **`ClanMapping`** [planned] (R10) — only `EntityMapping` in MVP. Lives in
-  bohpts-core. `entityName = "clan"`, `tableName = "clan_data"`. 4 hashed cols
+  the host's repo. `entityName = "clan"`, `tableName = "clan_data"`. 4 hashed cols
   (`clan_name`, `clan_level`, `leader_id`, `ally_id`). `mapRow` keeps BIGINT
   `leader_id` / `ally_id` as `Long`, applying the zero-as-null convention so the
   wire payload's `leaderId` / `allyId` is `null` for "no value" rather than `0L`.
@@ -653,9 +651,8 @@ NxAdapter.shutdown()
   next cycle for rows removed from the host DB while the adapter was
   offline. See [`snapshot-persistence`](../012-snapshot-persistence.md)
   for the boundary contract + file format.
-- **Host DB tables (read-only)** — bohpts schema confirmed against
-  `bohpts-core/com.bohpts.game.clan.Clan`:
-    - `clan_data` [bohpts] — `clan_id` (PK, BIGINT), `clan_name` (VARCHAR), `clan_level`
+- **Host DB tables (read-only)** — example L2J-family schema:
+    - `clan_data` — `clan_id` (PK, BIGINT), `clan_name` (VARCHAR), `clan_level`
       (INT), `leader_id` (BIGINT FK → `characters.charId`), `crest_id` (BIGINT), `ally_id`
       (BIGINT), `ally_name` (VARCHAR), `ally_crest_id` (BIGINT), `ally_penalty_type` (INT,
       custom converter), `ally_penalty_expiry_time` / `char_penalty_expiry_time` /
@@ -695,16 +692,16 @@ NxAdapter.shutdown()
   Maven Central as `app.l2nx:nx-gs-db-sync-core`. Phase 1 released as `0.1.0`,
   Phase 2 single-table CDC as `0.1.1`, multi-source CDC engine as `0.2.0`
   with `DbSyncModule` only (no engine, no `DbSchemaProvider` SPI yet).
-- **`bohpts-core`** [planned] (R10) — bohpts-core repo (private) declares
+- **Host repo** [planned] (R10) — the host's own (private) repo declares
   `implementation 'app.l2nx:nx-gs-adapter-api:0.7.0'` (Tier-2 SPI lives in api;
-  bohpts-core does NOT need a runtime dep on `nx-gs-db-sync-core`), hosts
-  `BohptsDbSchemaProvider` + `ClanMapping` classes inline in its source tree, and
+  the host does NOT need a runtime dep on `nx-gs-db-sync-core`), hosts
+  `HostDbSchemaProvider` + `ClanMapping` classes inline in its source tree, and
   ships `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider` in its
-  resources. NO separate `nx-gs-db-bohpts` artifact is published.
+  resources. NO separate per-client artifact is published.
 - **`jdbc-connection-source` feature** (R2) — Tier-3 SPI feature delivering
   `JdbcConnectionSource` + the bundled-Hikari fallback. `nx-gs-db-sync-core` consumes
   the resolved instance via `JdbcConnectionSourceResolver`. Pool implementation choice
-  (host Path 1 — bohpts `DatabaseFactory`, vanilla L2J pool, etc. / Path 2 — bundled
+  (host Path 1 — the host's own pool, vanilla L2J pool, etc. / Path 2 — bundled
   shadowed Hikari 3.4.5 from `l2nx.db.*` config) lives in that feature.
 - **Shadowed Hikari 3.4.5** [planned] (R2 fallback path) — bundled in
   `nx-gs-db-sync-core`, relocated to `app.l2nx.shaded.hikari.*` so it cannot collide
@@ -735,21 +732,21 @@ NxAdapter.shutdown()
   to the DB-sync stack — schema variants plug in here. Tier 2 lives in `db-sync-core` (NOT
   `adapter-api`) because `adapter-api` stays focused on platform↔adapter wire contracts;
   internal adapter SPIs do not belong there.
-- **Bohpts schema provider lives inline in `bohpts-core`, not as a published artifact.**
+- **The host's schema provider lives inline in the host's repo, not as a published artifact.**
   Per-client modules whose code references client-proprietary schema details NEVER ship to
   Maven Central — that's the open-core boundary. Two equivalent ways to implement this:
-  (1) a separate published-but-private `nx-gs-db-bohpts` artifact, or (2) the schema-provider
-  classes living directly in bohpts-core's source tree alongside the existing JPA entities.
+  (1) a separate published-but-private `nx-gs-db-<client>` artifact, or (2) the schema-provider
+  classes living directly in the host's source tree alongside the existing JPA entities.
   We pick (2) for MVP: less ceremony, fewer artifacts, schema mapping naturally co-located
-  with the schema source. The bohpts-core JAR is already deployed onto the operator's
+  with the schema source. The host JAR is already deployed onto the operator's
   classpath; adding `META-INF/services/...DbSchemaProvider` + a class is the smallest
   possible change. Switch to (1) only if a third-party operator needs to consume
-  bohpts-equivalent code without owning bohpts-core (no current scenario).
-- **Skip vanilla `nx-gs-db-l2j` in MVP.** Until a second non-bohpts customer arrives,
+  host-equivalent code without owning the host (no current scenario).
+- **Skip vanilla `nx-gs-db-l2j` in MVP.** Until a second customer with an L2J-family schema arrives,
   extracting "common L2J vanilla code" is YAGNI — there is no real evidence yet for what's
-  shareable across forks. The bohpts impl directly implements `DbSchemaProvider` (no
+  shareable across forks. The first host's impl directly implements `DbSchemaProvider` (no
   `extends`). When the second customer ships, common code is extracted into `nx-gs-db-l2j`,
-  bohpts is refactored to extend it via template method, and the multi-impl
+  the first host is refactored to extend it via template method, and the multi-impl
   resolution rules (config selector / shadow exclusion / activator JAR — see spec Open
   questions) are decided.
 - **All IDs serialized as `Long` end-to-end.** PK + FK columns in DTOs +
@@ -757,7 +754,7 @@ NxAdapter.shutdown()
   Phase 2 binds via `setLong(...)`, Kafka key uses `LongSerializer` (8 bytes
   big-endian). Platform stores PK as `long` and reads it back as `long`.
   Rationale:
-  (1) **Numeric PK is the bohpts (and the dominant L2J family) reality** — BIGINT
+  (1) **Numeric PK is the dominant L2J-family reality** — BIGINT
   surrogate keys; cross-schema variance (UUID/composite) is an explicit Non-goal in
   MVP and would arrive as a separate wire-shape variant.
   (2) **No client-side stringification** — engine internals already use `long`
@@ -770,14 +767,14 @@ NxAdapter.shutdown()
   wire variant when a non-numeric customer arrives is cleaner than a premature
   stringification.
   Schema providers still handle the **zero-as-null convention** in `mapRow` (L2J FK
-  columns use `0` to mean "no value" — bohpts emits `null` in the DTO instead of
+  columns use `0` to mean "no value" — the provider emits `null` in the DTO instead of
   `0L` for cleaner platform-side semantics).
 - **Single-impl assumption for `DbSchemaProvider` discovery.** In MVP, only one provider
-  exists on the classpath (the bohpts one, inside bohpts-core). The fail-loud behaviour for
+  exists on the classpath (the host's own). The fail-loud behaviour for
   > 1 providers (R3) surfaces classpath ambiguity to the operator instead of silently picking
   one. The full multi-impl resolution story (config selector / shadow exclusion / activator
   JAR) is open and resolved when vanilla `nx-gs-db-l2j` ships AND a customer ends up with
-  both vanilla and bohpts on classpath — see spec Open questions.
+  both vanilla and a host provider on classpath — see spec Open questions.
 - **Per-entity Kafka topics delivered by the platform via `ConnectResponse.syncTopics`.**
   Topic names arrive at handshake time (`adapter-bootstrap` R16), are surfaced through
   `ConnectContext.syncTopics()` (`adapter-modules` R2), and feed into
@@ -811,7 +808,7 @@ NxAdapter.shutdown()
 - **New table support (vanilla)** — vanilla `L2jSchemaProvider.mappings()` adds new
   `EntityMapping` entries. No engine change.
 - **New schema variant (client)** — implement `DbSchemaProvider` directly (MVP path,
-  bohpts-style) OR extend an existing vanilla provider via template method
+  host-style) OR extend an existing vanilla provider via template method
   (post-vanilla path). Either way, ship a `META-INF/services/...DbSchemaProvider`
   descriptor pointing to the client class. Engine treats both identically.
 - **New module type** — implement `AdapterModule` in a sibling module (e.g.

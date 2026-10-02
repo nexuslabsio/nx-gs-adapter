@@ -220,11 +220,11 @@ class ConnectFlowTest {
                 + "\"heartbeatTopic\":\"hb\","
                 + "\"syncTopics\":{"
                 + "\"db\":{"
-                + "\"clan\":\"bohpts.gs.sync.db.clan\","
-                + "\"character\":\"bohpts.gs.sync.db.character\""
+                + "\"clan\":\"acme.gs.sync.db.clan\","
+                + "\"character\":\"acme.gs.sync.db.character\""
                 + "},"
                 + "\"runtime\":{"
-                + "\"character\":\"bohpts.gs.sync.runtime.character\""
+                + "\"character\":\"acme.gs.sync.runtime.character\""
                 + "}"
                 + "}}";
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
@@ -245,11 +245,11 @@ class ConnectFlowTest {
         ConnectResponse response = (ConnectResponse) active.response();
         assertNotNull(response);
         Map<String, String> expectedDb = new HashMap<String, String>();
-        expectedDb.put("clan", "bohpts.gs.sync.db.clan");
-        expectedDb.put("character", "bohpts.gs.sync.db.character");
+        expectedDb.put("clan", "acme.gs.sync.db.clan");
+        expectedDb.put("character", "acme.gs.sync.db.character");
         assertEquals(expectedDb, response.getSyncTopics().getDb());
         assertEquals(
-                Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"),
+                Collections.singletonMap("character", "acme.gs.sync.runtime.character"),
                 response.getSyncTopics().getRuntime());
         assertTrue(response.getSyncTopics().getGd().isEmpty());
         assertEquals("hb", response.getHeartbeatTopic());

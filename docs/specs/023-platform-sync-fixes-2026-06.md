@@ -3,14 +3,14 @@
 Status: design / approved-in-shape
 Date: 2026-06-29
 Scope: three independent fixes across `nx-gs-adapter`, `nx-gameservers`,
-`nx-gamedata`, and `bohpts-core`, specified together but implementable in
+`nx-gamedata`, and the host integration, specified together but implementable in
 parallel.
 
 | #   | Fix                                                  | Repos touched                                                             |
 | --- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
 | ①   | Targeted-window force-resync (fast per-PK republish) | `nx-gs-adapter` (`nx-gs-db-sync-core`)                                    |
-| ②   | Upsert character-locks command (IP / HWID / ITEM)    | `nx-gs-adapter-api`, `nx-gameservers`, `nx-users` (seed), `bohpts-core`   |
-| ③   | Gearscore gd-sync deploy gap                         | `nx-gs-adapter` (release), `bohpts-core` (dep bump), `nx-gamedata` (test) |
+| ②   | Upsert character-locks command (IP / HWID / ITEM)    | `nx-gs-adapter-api`, `nx-gameservers`, `nx-users` (seed), host integration |
+| ③   | Gearscore gd-sync deploy gap                         | `nx-gs-adapter` (release), host integration (dep bump), `nx-gamedata` (test) |
 
 ---
 
@@ -25,8 +25,8 @@ After an item transfer (or any per-PK resync — item create/delete, mail
 delivery, lock change) the moved rows do not appear on the platform until the
 next scheduled 60s CDC tick, even though the resync path fires correctly.
 
-Root cause is **not** the trigger wiring and **not** a DB-commit race on the
-reference server (`x7/live` runs `LazyItemsUpdate=False` → online item writes
+Root cause is **not** the trigger wiring and **not** a DB-commit race on a
+host running with lazy item updates off (online item writes
 are synchronous). The cause is cycle cost:
 
 - `NxSync.requestResync` → `DbSyncModule.handleNxSyncResync` →
@@ -98,11 +98,11 @@ Components:
 
 ### Out of scope
 
-The secondary `LazyItemsUpdate=True` commit race (destination item flushed via
-`targetitem.updateDatabase()` without `force` in `ItemContainer.transferItem`)
-is **not** addressed here — `x7/live` has lazy updates off. If a high-rate
-server later enables lazy items, a follow-up forces `updateDatabase(true)` on the
-destination in `CharacterTransferService` online paths.
+The secondary lazy-item-update commit race (destination item flushed without a
+forced DB write in the host's item-transfer path)
+is **not** addressed here — the reference host has lazy updates off. If a high-rate
+server later enables lazy items, a follow-up forces a forced DB write on the
+destination in the host's online transfer paths.
 
 ---
 
@@ -159,12 +159,12 @@ issues several calls.
 `ON CONFLICT (name) DO NOTHING`, description starting with `❗` (mutates the
 game world / access) in each locale.
 
-**`bohpts-core`** (`commands/character` — new package):
+**Host integration** (`commands/character` — new package):
 
 - `UpsertCharacterLockHandler implements CommandHandler<UpsertCharacterLockCommand, UpsertCharacterLockResult>`
   - validate `charId` (in-int-range) + `lockType` (known); resolve the var name
     (`lockIp`/`lockHwid`/`lockItem`);
-  - resolve online vs offline (`GameObjectsStorage.getPlayer`);
+  - resolve online vs offline (player lookup by object id);
   - online → `ctx.host().sync(...)`: `player.setVar(varName, value)` (set) or
     `player.setVar(varName, 0)` (clear);
   - offline → `ctx.io()`: direct JDBC upsert/delete on `character_variables`
@@ -174,13 +174,13 @@ game world / access) in each locale.
     are character-variable children of the `character` entity — no item cascade).
     With Fix ① this resync is fast.
   - return `UpsertCharacterLockResult` with the affected lock's final state.
-- Register in `BohptsCommandsModule.onConnect`.
+- Register in the host commands module's `onConnect`.
 
 ### Tests
 
 - `nx-gameservers`: controller maps request → command, permission gate, response
   mapping (`@Nested UpsertLock`).
-- `bohpts-core`: handler validation, online set/clear path, offline JDBC path,
+- Host integration: handler validation, online set/clear path, offline JDBC path,
   resync trigger, and that only the named lock var is touched (per the
   `DeleteItemHandler` test pattern).
 
@@ -200,18 +200,18 @@ and surface it in the session.
 ### Root cause (confirmed)
 
 `gd_gearscore_rulesets` is empty while every other `gd_*` table is populated; the
-topic `bohpts.gd.sync.gearscore` exists but has **0 messages ever published**
+per-tenant `gd.sync.gearscore` topic exists but has **0 messages ever published**
 (offsets `0:0`). Pipeline, consumer, and topic provisioning all work
 (prod `nx-tenants 1.22.0` advertises the gearscore topic in `/connect`;
-`bohpts-core` ships the provider + `META-INF/services` registration; `api 0.64.0`
+the host ships the provider + `META-INF/services` registration; `api 0.64.0`
 carries the SPI + DTOs).
 
-The gap is a **version skew on the runtime gd-sync module**: `bohpts-core` pins
+The gap is a **version skew on the runtime gd-sync module**: the host pins
 `nx-gs-gd-sync-core:0.9.0`, but the gearscore descriptor in
 `GameDataSyncModule.defaultDescriptors()` landed in commit `7431553`
 (2026-06-22), which **no `gd-sync/*` tag contains** (latest is `gd-sync/v0.9.0`).
 So the deployed `GameDataSyncModule` never looks up `GearScoreRulesetProvider`,
-never resolves the bohpts provider, never creates the entity → never publishes.
+never resolves the host provider, never creates the entity → never publishes.
 
 ### Steps
 
@@ -220,11 +220,11 @@ never resolves the bohpts provider, never creates the entity → never publishes
    against the api version it consumes and that the gearscore descriptor is
    present in `defaultDescriptors()`. Confirm Maven Central publish before the
    bump.
-2. **Bump `bohpts-core`** — `core/build.gradle`:
+2. **Bump the host integration** — its Gradle build:
    `nx-gs-gd-sync-core:0.9.0 → 0.10.0`. No coupled bumps required: `api 0.64.0`
    already carries the gearscore SPI/DTO, `db-sync 0.8.0` already contains
    `7431553`'s db-sync part, `core 0.31.0` is unaffected. Rebuild + redeploy
-   bohpts-core (client game host — redeploy is on the client side).
+   the host integration (redeploy is on the host operator's side).
 3. **Regression test (`nx-gamedata`)** — add the missing
    `GearScoreSyncIngestIntegrationTest` (UPSERT + SNAPSHOT_COMPLETE → one
    `gd_gearscore_rulesets` row), matching `ItemTemplateSyncIngestIntegrationTest`.
@@ -244,7 +244,7 @@ before treating an empty table as a failure.
 
 Three independent workstreams; recommended order by impact/effort:
 
-1. **③ Gearscore** — release `gd-sync/v0.10.0`, bump bohpts dep, add test.
+1. **③ Gearscore** — release `gd-sync/v0.10.0`, bump the host dep, add test.
    Smallest change, unblocks the wiki gearscore tables.
 2. **② Upsert locks** — new command across api/platform/host + perm seed.
 3. **① Targeted-window resync** — engine change in `nx-gs-db-sync-core`;

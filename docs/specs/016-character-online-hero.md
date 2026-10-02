@@ -48,7 +48,7 @@ crowning path.
   (`pvpCounter` / `karma`) and avoids forcing every consumer to register a
   binder adapter.
 
-- [todo] R2. Bohpts `CharacterMapping` MUST surface `onlinetime`:
+- [todo] R2. Host `CharacterMapping` MUST surface `onlinetime`:
     - add `onlinetime` to the `CharacterPrimarySource` `HASHED` list;
     - read via `JdbcNulls.nullableLong(rs, "onlinetime")`, thread through
       `CharacterRow` + `mapEntity`;
@@ -71,7 +71,7 @@ crowning path.
 - [todo] R3. `CharacterDbDto` MUST add `@Nullable Boolean hero` — current hero
   status: `true` when the character is a recognized hero in the active cycle.
 
-- [todo] R4. Bohpts `CharacterMapping` MUST surface `hero` via a new `heroes`
+- [todo] R4. Host `CharacterMapping` MUST surface `hero` via a new `heroes`
   child source:
     - `tableName "heroes"`, `fkColumn "charId"` (the `heroes` table is one row
       per character);
@@ -83,7 +83,7 @@ crowning path.
       query (`Hero.GET_HEROES … WHERE heroes.played = 1`); `null` when the
       character has no `heroes` row.
 
-  Impl note: confirm `played` vs `active` against bohpts' exact `Hero`
+  Impl note: confirm `played` vs `active` against the host's exact hero
   lifecycle before finalizing the projected column.
 
 - [todo] R5. `nx-gs-adapter-api` MUST ship
@@ -109,15 +109,15 @@ crowning path.
   key as `OlympiadMatchResultEvent`, so a character's olympiad + hero timeline
   co-locates on one partition in occurrence order.
 
-- [todo] R7. `bohpts-core` MUST ship
-  `l2e.gameserver.l2nx.events.olympiad.HeroGrantedPublisher` — a game-loop-safe
+- [todo] R7. The host MUST ship
+  a `HeroGrantedPublisher` — a game-loop-safe
   static facade mirroring `OlympiadMatchResultPublisher` (volatile
   `@Nullable NxEvents events`, `bind(handle)` / `bind(null)`, error-swallowing
-  `publish`). Bound on `BohptsEventsModule.onConnect`, released on
+  `publish`). Bound on the host events module's `onConnect`, released on
   `onDisconnect`. No new `AdapterModule` ServiceLoader entry — rides the
-  existing `bohpts-events` module.
+  existing host events module.
 
-- [todo] R8. `bohpts-core` MUST hook `Hero.computeNewHeroes(...)` to emit one
+- [todo] R8. The host MUST hook its hero-crowning routine to emit one
   `HeroGrantedEvent` per crowned hero. The hook fires for online **and**
   offline winners — `charId` / `classId` come from the per-hero
   `StatsSet`, `olympiadCycle` from the crowning context. Any uncaught
@@ -153,8 +153,8 @@ crowning path.
 
 **Non-goals:**
 
-- **Hero-diary events** (raid-boss-killed, castle-taken — bohpts tracks these
-  in `Hero`). A separate event family if/when a consumer needs them.
+- **Hero-diary events** (raid-boss-killed, castle-taken — a host may track these
+  in its hero model). A separate event family if/when a consumer needs them.
 - **Hero "revoked" / cycle-reset events.** Derivable from the next crowning +
   the CDC `hero` flip; bulk-reset events would be N-events at the cycle
   boundary, not warranted (same reasoning the `olympiad-events` spec used).
@@ -219,8 +219,8 @@ crowning path.
   fields + new `HeroGrantedEvent`; non-breaking).
 - `nx-gs-adapter-core` — **minor** bump (one `EventTypeRegistry` binding).
 - `nx-gs-db-sync-core` / `nx-gs-kafka` — no contract change.
-- `bohpts-core` — `CharacterMapping` (online-time + heroes child source), new
-  `HeroGrantedPublisher`, `Hero.computeNewHeroes` hook.
+- Host integration — `CharacterMapping` (online-time + heroes child source), new
+  `HeroGrantedPublisher`, hero-crowning hook.
 
 ## Links
 
@@ -228,6 +228,5 @@ crowning path.
 - Backlog drained: [`character-deferred-fields.md`](013-character-core-extension.md#deferred-fields-and-filters-backlog)
 - Event family extended: [`olympiad-events`](015-olympiad-events.md)
 - CDC mechanism: [`db-sync`](003-db-sync/spec.md), [`cdc-engine`](005-cdc-engine/spec.md)
-- Host sources: `bohpts-core` `l2e.gameserver.l2nx.sync.db.CharacterMapping`,
-  `l2e.gameserver.l2nx.events.olympiad.*`, `l2e.gameserver.model.entity.Hero`
-  (`computeNewHeroes` / `GET_HEROES` / `heroes` table)
+- Host sources: character db-sync mapping, olympiad events package, hero model
+  (hero crowning / `heroes` table)

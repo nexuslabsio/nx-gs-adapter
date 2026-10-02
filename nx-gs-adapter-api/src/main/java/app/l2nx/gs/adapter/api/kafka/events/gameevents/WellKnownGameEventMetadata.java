@@ -11,7 +11,7 @@ public final class WellKnownGameEventMetadata {
     public static final String EVENT_KIND = "event_kind";
 
     /**
-     * Team-vs-team style mass-PvP event; on bohpts maps from {@code TeamVSTeamEvent} / {@code SoloPvpZoneEvent}.
+     * Team-vs-team style mass-PvP event; e.g. a host may map it from its own team-vs-team or solo PvP zone events.
      */
     public static final String EVENT_KIND_TVT = "tvt";
 

@@ -17,7 +17,7 @@ public final class WellKnownServerOnlineBuckets {
     /** Every character the host tracks, including offline-trade sessions and bot-driven phantoms. */
     public static final String TOTAL = "total";
 
-    /** Distinct active human players, deduplicated by a host-defined identity tuple (bohpts: HWID + IP). */
+    /** Distinct active human players, deduplicated by a host-defined identity tuple (e.g. HWID + IP). */
     public static final String UNIQUE = "unique";
 
     /** Players parked in offline-trade mode (private store open, client disconnected). */

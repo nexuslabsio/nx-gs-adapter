@@ -77,7 +77,7 @@ path.
 - [done] R4. The platform `/connect` response MUST advertise the chat topic: a `"chat"` entry in
   `ConnectResponse.messagingTopics.events`, resolving to `<tenant-slug> + ".gs.events.chat"`.
 
-- [done] R6. The host (`bohpts-core`) MUST hook its chat-handler path and publish one
+- [done] R6. The host MUST hook its chat-handler path and publish one
   `ChatMessageEvent` per player-typed message via the cached `NxEvents` facade. Sanitize `text`
   host-side; map the build's numeric chat type to a `WellKnownChatChannels` code (or
   `UNKNOWN_<int>`); set `targetCharId` / `targetCharName` only for whispers. Any uncaught `Throwable`
@@ -98,7 +98,7 @@ path.
 | Item              | Value                                                    |
 | ----------------- | -------------------------------------------------------- |
 | Family            | `chat`                                                   |
-| Event topic       | `<tenant>.gs.events.chat` (e.g. `bohpts.gs.events.chat`) |
+| Event topic       | `<tenant>.gs.events.chat`  |
 | `Nx-Message-Type` | `ChatMessageEvent`                                       |
 | Partition key     | `charId` (8-byte big-endian)                             |
 | Idempotency       | `eventId` (UUIDv7), at-least-once delivery               |

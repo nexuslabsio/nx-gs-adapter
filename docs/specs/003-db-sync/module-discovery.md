@@ -2,7 +2,7 @@
 
 > Sibling: [spec.md](./spec.md) (see its Technical design section)
 > Audience: vanilla schema authors (`nx-gs-db-l2j`, `nx-gs-db-lucera` when those
-> land), client overrides (bohpts, future per-client schema variants).
+> land), client overrides (the reference integration, future per-client schema variants).
 >
 > **For general SPI mechanics** (service-descriptor format, `ServiceLoader`
 > internals, "Why ServiceLoader", common mistakes when authoring any tier),
@@ -32,10 +32,10 @@ of its consumers. Internally, `DbSyncModule` adds a second SPI tier
                   │ implements (MVP path — direct)
                   │
    ┌──────────────┴────────────┐
-   │     bohpts-core repo      │  ◄── private; ships as the host
+   │     host's own repo       │  ◄── private; ships as the host
    │     (private)             │      game-server JAR. No separate
-   │                           │      nx-gs-db-bohpts artifact.
-   │  class BohptsDbSchema-    │
+   │                           │      per-client artifact.
+   │  class HostDbSchema-      │
    │  Provider implements      │
    │    DbSchemaProvider       │
    └───────────────────────────┘
@@ -53,8 +53,8 @@ of its consumers. Internally, `DbSyncModule` adds a second SPI tier
    │                  │ extends (template method)               │
    │                  │                                         │
    │   ┌──────────────┴────────────┐                            │
-   │   │  bohpts-core (refactored) │                            │
-   │   │  BohptsDbSchemaProvider   │                            │
+   │   │  host repo (refactored)   │                            │
+   │   │  HostDbSchemaProvider     │                            │
    │   │    extends                │                            │
    │   │    L2jSchemaProvider      │                            │
    │   └───────────────────────────┘                            │
@@ -77,7 +77,7 @@ runs.
 package app.l2nx.gs.adapter.api.spi;
 
 public interface DbSchemaProvider {
-    String schemaName();                 // "l2j", "bohpts", "lucera"
+    String schemaName();                 // "l2j", "lucera", "my-server"
 
     List<EntityMapping<?>> mappings();   // entities this provider knows about
 }
@@ -123,7 +123,7 @@ quoted names are rejected at engine start (see
                                     0, cfg.tickInterval, ...)]
 ```
 
-### Service descriptor in `bohpts-core` JAR (MVP)
+### Service descriptor in the host JAR (MVP)
 
 ```
 META-INF/
@@ -131,11 +131,11 @@ META-INF/
     └── app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider
 ```
 
-Content (single fully-qualified class name — package up to bohpts-core owner per spec
-Open question; example below uses `l2e.gameserver.nx.db`):
+Content (single fully-qualified class name — package up to the host owner per spec
+Open question; example below uses `com.example.host.nx.db`):
 
 ```
-l2e.gameserver.nx.db.BohptsDbSchemaProvider
+com.example.host.nx.db.HostDbSchemaProvider
 ```
 
 (See [`adapter-modules/module-discovery.md`](../002-adapter-modules/module-discovery.md)
@@ -143,17 +143,17 @@ for general descriptor-format rules and common mistakes when authoring SPI impls
 
 ---
 
-## MVP path — direct `DbSchemaProvider` impl (bohpts-core)
+## MVP path — direct `DbSchemaProvider` impl (host-owned)
 
-In MVP there is no vanilla L2J module. Bohpts implements `DbSchemaProvider` directly.
-The class lives in `bohpts-core` source tree (private repo,
-`E:/bohpts/code/bohpts-core`) alongside the existing JPA entities; bohpts-core's
+In MVP there is no vanilla L2J module. The host implements `DbSchemaProvider` directly.
+The class lives in the host's own source tree (private repo)
+alongside its existing entities; the host's
 existing Gradle build produces the JAR that already contains the schema-provider class
 
 + service descriptor.
 
 ```java
-package l2e.gameserver.nx.db;   // example — package decision in spec Open question
+package com.example.host.nx.db;   // example — package decision in spec Open question
 
 import app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider;
 import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
@@ -161,11 +161,11 @@ import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
 import java.util.Collections;
 import java.util.List;
 
-public class BohptsDbSchemaProvider implements DbSchemaProvider {
+public class HostDbSchemaProvider implements DbSchemaProvider {
 
     @Override
     public String schemaName() {
-        return "bohpts";
+        return "my-server";
     }
 
     @Override
@@ -182,7 +182,7 @@ public class BohptsDbSchemaProvider implements DbSchemaProvider {
 the mapping — it lives in `l2nx.properties` under `l2nx.cdc-engine.*`
 (see [`db-sync` spec](./spec.md) for the full key table).
 
-bohpts-core `build.gradle.kts` adds (from Maven Central):
+The host's `build.gradle.kts` adds (from Maven Central):
 
 ```kotlin
 dependencies {
@@ -194,7 +194,7 @@ dependencies {
 
 ## Future path — vanilla → client override (template method)
 
-Activated when a second non-bohpts customer arrives and common L2J vanilla code is
+Activated when a second customer with an L2J-family schema arrives and common L2J vanilla code is
 extracted into `nx-gs-db-l2j`. Clients override `protected` hooks instead of writing
 whole new providers.
 
@@ -232,21 +232,21 @@ public class L2jSchemaProvider implements DbSchemaProvider {
 ```
 
 ```java
-// bohpts-core (refactored once vanilla L2J ships)
-package l2e.gameserver.nx.db;
+// host repo (refactored once vanilla L2J ships)
+package com.example.host.nx.db;
 
 import app.l2nx.gs.db.l2j.L2jSchemaProvider;
 
-public class BohptsDbSchemaProvider extends L2jSchemaProvider {
+public class HostDbSchemaProvider extends L2jSchemaProvider {
 
     @Override
     public String schemaName() {
-        return "bohpts";
+        return "my-server";
     }
 
-    // Bohpts overrides go here. Currently no column overrides needed —
-    // bohpts uses the same `clan_data` table and 4 plain cols as vanilla
-    // would. Customizations land here as new bohpts requirements appear.
+    // Host overrides go here. Currently no column overrides needed —
+    // the host uses the same `clan_data` table and 4 plain cols as vanilla
+    // would. Customizations land here as new host requirements appear.
 }
 ```
 
@@ -254,14 +254,14 @@ public class BohptsDbSchemaProvider extends L2jSchemaProvider {
 
 ## Operator classpath at runtime
 
-### Scenario MVP — bohpts client operator
+### Scenario MVP — client operator
 
-The bohpts game-server JAR (built from `bohpts-core` repo) is itself the
-`DbSchemaProvider` carrier. No separate `nx-gs-db-bohpts` JAR is on the classpath.
+The host's game-server JAR is itself the
+`DbSchemaProvider` carrier. No separate per-client JAR is on the classpath.
 
 ```
 host classpath
-├── bohpts-core-X.Y.Z.jar              ← provides DbSchemaProvider (bohpts impl + descriptor)
+├── host-X.Y.Z.jar                     ← provides DbSchemaProvider (host impl + descriptor)
 ├── nx-gs-adapter-core-X.Y.Z.jar       ← Tier-1 ServiceLoader
 ├── nx-gs-adapter-api-X.Y.Z.jar
 ├── nx-gs-kafka-X.Y.Z.jar
@@ -272,11 +272,11 @@ host classpath
 Discovery:
 
 - Tier 1 → `[DbSyncModule]` (one impl, from `nx-gs-db-sync-core`)
-- Tier 2 → `[BohptsDbSchemaProvider]` (one impl, from `bohpts-core`) → engine starts ✓
+- Tier 2 → `[HostDbSchemaProvider]` (one impl, from the host JAR) → engine starts ✓
 
 ### Scenario Future — vanilla L2J operator (no client customizations)
 
-Activated once `nx-gs-db-l2j` is extracted and published. A non-bohpts L2J operator
+Activated once `nx-gs-db-l2j` is extracted and published. Another L2J operator
 would deploy:
 
 ```
@@ -295,20 +295,20 @@ Discovery:
 - Tier 1 → `[DbSyncModule]` ✓
 - Tier 2 → `[L2jSchemaProvider]` ✓
 
-### Scenario Future — bohpts (refactored to extend vanilla)
+### Scenario Future — host (refactored to extend vanilla)
 
-Once `nx-gs-db-l2j` ships, bohpts-core's `BohptsDbSchemaProvider` is refactored to
-`extends L2jSchemaProvider`. bohpts-core's Gradle build adds
+Once `nx-gs-db-l2j` ships, the host's `HostDbSchemaProvider` is refactored to
+`extends L2jSchemaProvider`. The host's Gradle build adds
 `implementation("app.l2nx:nx-gs-db-l2j:X.Y.Z")` for the inheritance.
 
 ```
 host classpath
-├── bohpts-core-X.Y.Z.jar              ← provides DbSchemaProvider (bohpts override)
+├── host-X.Y.Z.jar                     ← provides DbSchemaProvider (host override)
 ├── nx-gs-adapter-core-X.Y.Z.jar
 ├── nx-gs-adapter-api-X.Y.Z.jar
 ├── nx-gs-kafka-X.Y.Z.jar
 ├── nx-gs-db-sync-core-X.Y.Z.jar
-├── nx-gs-db-l2j-X.Y.Z.jar             ← transitively brought by bohpts-core; classes used
+├── nx-gs-db-l2j-X.Y.Z.jar             ← transitively brought by the host; classes used
 │                                         for inheritance, BUT its descriptor would also
 │                                         register the vanilla provider with ServiceLoader
 ├── HikariCP, mariadb-jdbc, gson, slf4j, ...
@@ -317,8 +317,8 @@ host classpath
 Discovery (open issue, **resolved at vanilla-extraction time**):
 
 - Tier 1 → `[DbSyncModule]` ✓
-- Tier 2 → **conflict if both descriptors are active.** `bohpts-core` ships a
-  descriptor pointing to `BohptsDbSchemaProvider`. The transitively-pulled
+- Tier 2 → **conflict if both descriptors are active.** The host ships a
+  descriptor pointing to `HostDbSchemaProvider`. The transitively-pulled
   `nx-gs-db-l2j` ALSO ships a descriptor pointing to `L2jSchemaProvider`. Pure SPI
   sees both.
 
@@ -328,7 +328,7 @@ exist:
 
 #### Strategy (a) — config selector
 
-Operator sets `l2nx.db-sync.schema=bohpts` in `l2nx.properties`. Engine compares
+Operator sets `l2nx.db-sync.schema=my-server` in `l2nx.properties`. Engine compares
 `schemaName()` of every discovered provider; picks the matching one.
 
 - Pro: no build-time gymnastics required of client modules
@@ -341,7 +341,7 @@ Client modules use the shadow plugin to exclude vanilla's descriptor and ship th
 own:
 
 ```kotlin
-// nx-gs-db-bohpts/build.gradle.kts
+// nx-gs-db-<client>/build.gradle.kts
 shadowJar {
     exclude("META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider")
     // own descriptor lives in src/main/resources/META-INF/services/...
@@ -358,7 +358,7 @@ tiny `nx-gs-db-l2j-default` JAR carries the descriptor pointing to
 `L2jSchemaProvider`. Operators pick:
 
 - Vanilla deployment → `nx-gs-db-l2j` + `nx-gs-db-l2j-default`
-- Client deployment → `nx-gs-db-bohpts` (which pulls `nx-gs-db-l2j` for classes only)
+- Client deployment → `nx-gs-db-<client>` (which pulls `nx-gs-db-l2j` for classes only)
 
 - Pro: no build-time gymnastics in client modules; no config knob
 - Con: extra published artifact per vanilla module

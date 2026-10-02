@@ -8,7 +8,7 @@ An item's **augmentation** (the life-stone result — the two option ids that gr
 stat bonuses and/or a granted skill) is not synced anywhere on the platform. The
 per-instance item feed carries `id / itemTemplateId / ownerId / count /
 enchantLevel / location / attributes(elementals)` only — augmentation is absent
-at every layer (`bohpts-core` mapping → `nx-gs-adapter-api` wire → `gs_items`).
+at every layer (host mapping → `nx-gs-adapter-api` wire → `gs_items`).
 
 The **static catalog already exists** in `nx-gamedata` (git-ingester-owned,
 `v3.3.0_augment_enchant.sql`): `gd_item_options` (option id → color +
@@ -26,7 +26,7 @@ deliberately deferred (separate work).
 
 ## Goal
 
-Sync per-instance augmentation end-to-end: `bohpts-core` reads the engine's
+Sync per-instance augmentation end-to-end: the host reads the engine's
 packed augment int, **decodes it at source** into two explicit option ids, the
 adapter carries them on the item wire DTO, and `nx-gameservers` persists them
 into a new sparse satellite `gs_item_augmentations` — mirroring the existing
@@ -37,13 +37,13 @@ is untouched. No display.
 
 | Decision                          | Choice                                                                                                              |
 |-----------------------------------|---------------------------------------------------------------------------------------------------------------------|
-| Where the packed int is decoded   | At source — `bohpts-core` `ItemMapping` (platform never sees L2 bit-packing)                                        |
+| Where the packed int is decoded   | At source — host `ItemMapping` (platform never sees L2 bit-packing)                                                 |
 | Wire model                        | Singular `@Nullable ItemAugmentationDbDto augmentation` on `ItemDbDto` (one augment per item)                       |
 | Option id representation          | Two explicit ids: `option1Id` (required) + `option2Id` (nullable — absent when the high slot is 0)                  |
 | Platform storage                  | New sparse satellite `gs_item_augmentations` (row only for augmented items) — mirrors `gs_item_attributes`          |
 | Storage vs. columns on `gs_items` | Satellite, not columns — `gs_items` is the 3.86M-row hot UPSERT table; augment is sparse                            |
 | Ingest keep-in-sync               | DELETE-by-touched-item-id + INSERT-if-augmented, per the elementals `batchReplace` idiom                            |
-| Engine sentinels on the wire      | None — `-1`/`0` are absorbed at the `bohpts-core` edge; "absent" is expressed only as `null` (never a magic number) |
+| Engine sentinels on the wire      | None — `-1`/`0` are absorbed at the host edge; "absent" is expressed only as `null` (never a magic number)           |
 | Catalog (option id → bonus/skill) | Untouched — already git-owned in `nx-gamedata`                                                                      |
 | Wire compatibility                | Additive field → `api/vX.Y.Z` minor bump (not breaking; old consumers ignore the new field)                         |
 | Display / resolution              | Out of scope — deferred                                                                                             |
@@ -52,7 +52,7 @@ is untouched. No display.
 
 Three similarly-named things — keep them straight:
 
-- **`item_attributes`** — a **bohpts-core engine** host-DB table. Stores the
+- **`item_attributes`** — a **game-engine** host-DB table. Stores the
   packed augment int per item (`itemId`, `augAttributes`; `-1` = none). Legacy
   engine name, read as-is, never renamed (foreign schema).
 - **`gs_item_attributes`** — a **platform** table. Stores **elemental
@@ -88,7 +88,7 @@ Mandatory Javadoc on the new public type and the new getter (module rule).
 Additive: gson's `serializeNulls=false` omits the field when `null`, old
 consumers ignore an unknown field, and a producer that never sets it emits
 nothing. Not breaking → `api/vX.Y.Z` minor bump. The only producer
-(`bohpts-core`) and the only consumer (`nx-gameservers`) adopt it in lockstep,
+(the host) and the only consumer (`nx-gameservers`) adopt it in lockstep,
 so no transient dual-emit is needed.
 
 Reference existing shape: `ItemDbDto`
@@ -102,9 +102,9 @@ ctor + `Builder` + `toBuilder` + value semantics), `ItemAttributeDbDto`
 > This spec only lands the per-instance option ids; resolving them against that
 > catalog is the deferred display work.
 
-## Source change — `bohpts-core`
+## Source change — host integration
 
-`l2e.gameserver.l2nx.sync.db.ItemMapping` (the item `DbSchemaProvider` mapping)
+The host's `ItemMapping` (the item `DbSchemaProvider` mapping)
 today wires primary source `items` (pk `object_id`) + a single child source
 `ItemElementalsChildSource` over `item_elementals` (fk `itemId`), and
 `mapEntity` builds `ItemDbDto` via `ItemDbDto.builder()…build()` without
@@ -132,13 +132,13 @@ Changes (mirror `ItemElementalsChildSource` exactly — it is the template):
       slot. Build `ItemAugmentationDbDto` and pass it to `.augmentation(...)`.
 
 The decode is the same low/high split the engine itself uses
-(`Augmentation.java:42-43`; client packet write
-`AbstractItemPacket.java:166-167`), so there is no ambiguity about slot order.
+(in its augmentation model and client item packets), so there is no ambiguity
+about slot order.
 Build-specific knowledge (that augmentation lives in `item_attributes`) stays in
-`bohpts-core`, never in the adapter contract — consistent with the
+the host, never in the adapter contract — consistent with the
 tenant/build-agnostic constraint.
 
-Deploying the new `bohpts-core` triggers a full CRC snapshot re-sync of items,
+Deploying the updated host integration triggers a full CRC snapshot re-sync of items,
 which backfills `gs_item_augmentations` for every currently-augmented item.
 
 ## `nx-gameservers`
@@ -197,12 +197,12 @@ the new field for data to flow, so deploy in order:
 1. `nx-gs-adapter-api` — add `ItemAugmentationDbDto` + the `ItemDbDto.augmentation`
    field; release `api/vX.Y.Z` (minor). Wait for Maven Central propagation
    before dependents build.
-2. `bohpts-core` — bump adapter-api dep, add the `item_attributes` child source +
+2. Host integration — bump adapter-api dep, add the `item_attributes` child source +
    decode in `ItemMapping`; deploy → full item re-sync populates augmentation.
 3. `nx-gameservers` — bump adapter-api dep, run the `v3.22.0` migration, extend
    the ingestor/repository. Safe to deploy before or after step 2: with no
    augment field yet on the wire the table simply stays empty until the
-   `bohpts-core` re-sync lands, then fills.
+   host re-sync lands, then fills.
 
 No transient dual-emit — additive field, single producer/consumer pair.
 
@@ -220,7 +220,7 @@ No transient dual-emit — additive field, single producer/consumer pair.
 ## Invariants
 
 - **No engine sentinel crosses the wire.** The engine's `augAttributes = -1`
-  ("no augment") and `= 0` are absorbed entirely in `bohpts-core` `mapEntity`,
+  ("no augment") and `= 0` are absorbed entirely in the host `mapEntity`,
   which emits `augmentation = null`. The platform never receives, stores, or
   compares against `-1`/`0` — absence is `null` at every layer (wire DTO,
   `gs_item_augmentations` has no row). `option_1_id` is only ever a real,
@@ -229,8 +229,7 @@ No transient dual-emit — additive field, single producer/consumer pair.
 
 ## Resolved
 
-- Augment option ids are ≤ 65535 (16-bit low/high packing,
-  `Augmentation.java:42-43`) → `INT` columns are safe, no `BIGINT`.
+- Augment option ids are ≤ 65535 (16-bit low/high packing) → `INT` columns are safe, no `BIGINT`.
 - `item_attributes` is one row per item (`itemId` unique; engine uses
   `REPLACE INTO item_attributes VALUES(?,?)` / `SELECT … WHERE itemId=?`), so the
   new `ChildSource` yields 0 or 1 row per parent.

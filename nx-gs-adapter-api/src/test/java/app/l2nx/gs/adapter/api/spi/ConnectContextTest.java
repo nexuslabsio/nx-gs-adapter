@@ -54,15 +54,15 @@ class ConnectContextTest {
     @Test
     void syncTopics_shouldExposeNamespaces_whenBuilderProvidesIt() {
         SyncTopics topics = SyncTopics.builder()
-                .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
-                .runtime(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"))
+                .db(Collections.singletonMap("clan", "acme.gs.sync.db.clan"))
+                .runtime(Collections.singletonMap("character", "acme.gs.sync.runtime.character"))
                 .build();
 
         ConnectContext ctx = ConnectContext.builder().syncTopics(topics).build();
 
-        assertEquals("bohpts.gs.sync.db.clan", ctx.getSyncTopics().getDb().get("clan"));
+        assertEquals("acme.gs.sync.db.clan", ctx.getSyncTopics().getDb().get("clan"));
         assertEquals(
-                "bohpts.gs.sync.runtime.character",
+                "acme.gs.sync.runtime.character",
                 ctx.getSyncTopics().getRuntime().get("character"));
         assertTrue(ctx.getSyncTopics().getGd().isEmpty());
     }
@@ -70,7 +70,7 @@ class ConnectContextTest {
     @Test
     void syncTopics_namespacesShouldBeUnmodifiable() {
         SyncTopics topics = SyncTopics.builder()
-                .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                .db(Collections.singletonMap("clan", "acme.gs.sync.db.clan"))
                 .build();
         ConnectContext ctx = ConnectContext.builder().syncTopics(topics).build();
 
@@ -89,7 +89,7 @@ class ConnectContextTest {
                 .serverName("Acme Primary")
                 .adapterVersion("0.1.0")
                 .syncTopics(SyncTopics.builder()
-                        .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                        .db(Collections.singletonMap("clan", "acme.gs.sync.db.clan"))
                         .build())
                 .build();
 

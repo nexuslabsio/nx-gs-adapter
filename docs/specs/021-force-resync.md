@@ -207,7 +207,7 @@ predates the cycle.
   tenants are an operator action at rollout)
   (`auto.create.topics.enable=false`): add `gs.events.sync` to
   `STANDARD_TOPICS` in `nx-infra` `create-tenant.sh` (prod + dev), create
-  `<tenant>.gs.events.sync` for every existing tenant (prod: `bohpts`),
+  `<tenant>.gs.events.sync` for every existing tenant ,
   and update the tenant runbook docs. While touching `STANDARD_TOPICS`,
   fix its known staleness (missing raid / mail / privatetrade / olympiad /
   gameevents / castle families) — do not copy the broken precedent.
@@ -426,7 +426,7 @@ predates the cycle.
   existing one — unlike `LevelExpTableSnapshotEvent` (which piggybacked the
   `character` family), resync completion spans all db entities and has no
   semantically adjacent family to borrow.]
-- [assumed: per-client schema providers (bohpts) declare `parentRefs` for
+- [assumed: per-client schema providers (reference host) declare `parentRefs` for
   item → character in their own repos; this repo's vanilla modules only
   ship the SPI.]
 

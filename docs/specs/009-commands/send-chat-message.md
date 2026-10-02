@@ -74,7 +74,7 @@ chat handlers use. In command terms that is exactly `senderCharacterId: null`,
 supersedes `AnnounceNowCommand` rather than living beside it.
 
 - [done] R11. The `critical` flag MUST NOT be carried over. It is visually near-worthless on the
-  bohpts client, the front-end already always sends `critical: false`, and its only channel
+  host client, the front-end already always sends `critical: false`, and its only channel
   (`CreatureSay` type 18) is the one where the clickable-link token `[=url=]` renders literally.
   Dropping it removes the trap along with the flag. If a real need appears later, it comes back as its
   own change.
@@ -101,10 +101,9 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
 - [todo] R14. **Phase 2 (contract).** Once the fallback stops firing on every **live** server — the
   trigger is that observation, not a date — the fallback, `AnnounceNowHandler`, `AnnounceNowCommand`
   and `AnnounceResult` are all removed. Naming the trigger is what makes the compatibility layer a
-  phase instead of a permanent straddle. Met on 2026-09-07: after the morning restart x500, x500-new,
-  x20 and x7-oldschool all answer the new command with `OK`. `x7-test` is excluded — it builds from
-  the `test` branch of `bohpts-core`, which never received the handler, and stays on the legacy path
-  until that branch converges with `release`.
+  phase instead of a permanent straddle. Met once every live server answers the new command with `OK`;
+  a non-production build that never received the handler is excluded and stays on the legacy path
+  until its branch converges with the release line.
 - [todo] R15. Removing the command from the api module MUST NOT strand the platform's command audit.
   `Command.ANNOUNCE_NOW` on the platform side is not only a dispatch type: it is also the discriminator
   persisted on every historical audit row, so deleting it breaks reading them. The platform migrates

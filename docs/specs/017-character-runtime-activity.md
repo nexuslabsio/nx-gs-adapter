@@ -82,7 +82,7 @@ runtime character mapping.
   Wire-compatible: a producer on the old api simply omits the two new JSON keys,
   which deserialize as `null`.
 
-- [done] R6. The bohpts runtime mapping (`CharacterRuntimeMapping`) MUST populate
+- [done] R6. The host runtime mapping (`CharacterRuntimeMapping`) MUST populate
   both fields from live state:
     - `aiStatus` = `player.getAI().getIntention().name().toLowerCase(ROOT)`
       (1:1 with `WellKnownAiStatuses`; `null` when the AI / intention is
@@ -215,7 +215,7 @@ runtime character mapping.
 - `nx-gs-adapter-core` / `nx-gs-db-sync-core` / `nx-gs-runtime-sync-core` /
   `nx-gs-kafka` — no contract change (the runtime engine hashes whatever the
   mapping mixes).
-- `bohpts-core` — `CharacterRuntimeMapping` populates + hashes both fields.
+- the host: `CharacterRuntimeMapping` populates + hashes both fields.
 - `nx-telegram` — character detail view renders the fishing block (R10).
 - `nx-gameservers` — Liquibase `v2.3.0_character_activity.sql`, runtime upsert,
   read API.
@@ -239,7 +239,7 @@ runtime character mapping.
   auto-farm time on the new metadata key
   `WellKnownCustomActivityMetadata.SECONDS_REMAINING` (`seconds_remaining`),
   omitted when the farm is unlimited / free.
-- **A3. bohpts `CharacterRuntimeMapping`** now collects a list:
+- **A3. Host `CharacterRuntimeMapping`** now collects a list:
   `resolveFishing(p)` (unchanged logic) + `resolveAutofarming(p)`. Autofarming is
   emitted while `player.getFarmSystem().isAutofarming()`; `seconds_remaining`
   comes from `AutoFarmOptions.getFarmEndTaskDelay(SECONDS)` (the scheduled
@@ -264,7 +264,7 @@ runtime character mapping.
   [`character-core-extension`](013-character-core-extension.md)
 - Pattern precedent: [`events-raid`](014-events-raid.md)
   (`BossRespawnEntry.status` open string + `WellKnownBossStatuses`)
-- Host source: `bohpts-core`
-  `l2e.gameserver.l2nx.sync.runtime.CharacterRuntimeMapping`
+- Host source: the host
+  `CharacterRuntimeMapping`
 - Consumer: `nx-gameservers` `CharacterRuntimeIngestor` / `CharacterRepository`
   / `CharacterReadRepository`

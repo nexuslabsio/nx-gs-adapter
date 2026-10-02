@@ -2,7 +2,7 @@
 
 > Owner: @n1rmata
 >
-> Consumers that change imports with this slice: bohpts-core, nx-gameservers, nx-gamedata,
+> Consumers that change imports with this slice: the reference host integration, nx-gameservers, nx-gamedata,
 > nx-telegram, nx-tenants, nx-alerts, nx-discord, nx-vk, nx-wiki.
 
 ## Problem

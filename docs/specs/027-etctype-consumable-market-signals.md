@@ -25,8 +25,8 @@ index. No new design decisions are made here.
 ## 1. `EtcItemType` — 3 new constants (`domain.item.EtcItemType`)
 
 `SPELLBOOK`, `MONEY`, `ENSOUL_STONE` added to the shared, build-agnostic etc-item-type vocabulary.
-`NONE` already existed on this enum but the host mapping (`bohpts-core`
-`BohptsItemTemplateProvider.toEtcItemType()`) fell through its `default -> null` branch for it and
+`NONE` already existed on this enum but the host mapping (the host
+its item-template provider) fell through its `default -> null` branch for it and
 for these three — 4 host `EtcItemType` values were silently dropped. The host-side fix (out of scope
 for this repo — see `nx-gameservers` spec 051 §3.1) adds the 4 missing `case`s; `default -> null`
 remains for genuinely unmapped future values. Additive, backward-compatible — no existing constant
@@ -61,7 +61,7 @@ long priceAdena }` — **`priceAdena` is per-unit**; the host charges `count * p
   empty when every line was accepted (partial acceptance is a normal, non-error outcome).
 - `DroppedLine { int itemId, String reason }` — `reason` is host free-form diagnostic text, not a
   closed vocabulary on this contract (the concrete reason tokens a given host emits, e.g.
-  `NOT_TRADEABLE` / `EQUIPPED` / `BAD_COUNT`, are a host-side (`bohpts-core`) convention documented
+  `NOT_TRADEABLE` / `EQUIPPED` / `BAD_COUNT`, are a host-side (the host) convention documented
   in `nx-gameservers` spec 052 §6 — not enforced by this adapter-api type).
 - `StopPrivateStoreResult { String previousStoreType }`.
 
@@ -69,7 +69,7 @@ Reserved for a future iteration, not shipped in this release: `StartPrivateStore
 (private-store BUY / skupka — see `nx-gameservers` spec 052 §8).
 
 Business rules (gates, online/offline positioning, item-lock semantics, own-scoped ownership
-checks) live entirely in `nx-gameservers` / `bohpts-core` — this contract only names the fields.
+checks) live entirely in `nx-gameservers` / the host — this contract only names the fields.
 
 ## 4. `events.privatestore.Offer.packaged`
 
@@ -91,7 +91,7 @@ producer simply never sets them. Ships in the same `api/vX.Y.Z` release as the o
 ## Links
 
 - `nx-gameservers/docs/specs/051-market-category-signals.md` — taxonomy owner for `EtcItemType` +
-  `consumable`, deploy ordering across `nx-gs-adapter` → `bohpts-core` → `nx-gamedata` →
+  `consumable`, deploy ordering across `nx-gs-adapter` → the host → `nx-gamedata` →
   `nx-gameservers`.
 - `nx-gameservers/docs/specs/052-private-store-start-commands.md` — full gate inventory, platform
   wiring (permissions, controller, audit), host handler design for the command family in §3.

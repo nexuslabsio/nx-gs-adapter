@@ -5,9 +5,9 @@
 The L2 game-server core needs a structured, dev-friendly way to (a) signal the platform about
 discrete in-game facts (premium purchases, character lifecycle, clan events, periodic server
 snapshots) and (b) receive structured commands from the platform's web side (rename, kick,
-mail, currency-pay, character-transfer, …). The legacy `bohpts-core / l2e.gameserver.infrastructure.rabbitMq`
-implementation couples handlers directly to game-server internals (`GameObjectsStorage`,
-`MailManager`, `CharacterDAO`, …), maintains 58 hand-rolled DTOs without domain grouping,
+mail, currency-pay, character-transfer, …). The legacy RabbitMQ-based
+implementation couples handlers directly to game-server internals (player storage,
+mail manager, character DAOs, …), maintains 58 hand-rolled DTOs without domain grouping,
 auto-acks before handler execution (drops messages on handler failure), runs handlers on the
 RabbitMQ consumer thread (no game-loop hop, races against game state mutations), and carries
 no tenant / server identity in the envelope.
@@ -24,7 +24,7 @@ This slice introduces two surfaces in `nx-gs-adapter`:
   reply via the events stream) and the high-level SPI hook are committed in Javadoc placeholders;
   the runtime consumer + dispatch implementation is Phase 2.
 
-Audience: bohpts-core (and future per-tenant) integration code that wants to publish premium
+Audience: host integration code that wants to publish premium
 events without touching Kafka directly; platform-side consumers of `gs.events.*`; future
 command-handler authors across `char` / `clan` / `mail` / `account` domains.
 
@@ -115,7 +115,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
     `clan_join_penalty_remove`, `clan_invite_penalty_remove`, `ally_penalty_remove`,
     `level_up`, `level_down`, `karma_recover`, `pk_recover`, `vitality_recover`,
     `augmentation`, `olympiad_pts_buy`, `soul_cloak_transfer`. Catalog is curated
-    from bohpts community-board listeners + multisell custom shop XMLs and is
+    from community-board listeners + multisell custom shop XMLs and is
     L2-canonical — covers L2J / Lucera / Essence forks without per-fork divergence.
     Adding new codes is non-breaking; `nx-gs-adapter-api` minor-bumps the constants list.
 
@@ -138,7 +138,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
     `nx-libs/common` UUIDv7 (which uses `com.fasterxml.uuid` and Java 11 `String.isBlank`)
     because the `:nx-gs-commons` charter is Java-8 + JSpecify-only deps.
   - Public to consumers of `:nx-gs-commons` (adapter-core uses it; tenant providers
-    and bohpts hooks may use it for their own correlation-id needs).
+    and host hooks may use it for their own correlation-id needs).
 
 - [todo] R5. `nx-gs-adapter-api.kafka.NxHeaders` MUST expose a new constant:
   - `String NX_MESSAGE_TYPE = "Nx-Message-Type"` — UTF-8 string header, value =
@@ -212,26 +212,23 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
     pre-connect events; host code is expected to wire publish hooks behind
     `start()` lifecycle.
 
-- [todo] R11. **Bohpts integration (host-side, not in this monorepo).** A new
-  `BohptsPremiumPurchaseHook` MUST live in `bohpts-core/l2e.gameserver.l2nx`
-  alongside existing `BohptsRuntimeStateProvider` / `BohptsDbSchemaProvider`.
+- [todo] R11. **Host integration (host-side, not in this monorepo).** A host-side
+  premium-purchase hook MUST live in the host's own source tree,
+  alongside its `RuntimeStateProvider` / `DbSchemaProvider` impls.
   Wires into existing premium-purchase code paths:
-  - Community-board service listeners (`CSBuyNoblesse`, `CSChangeNickName`,
-    `CSChangeSex`, `CSChangeNickNameColor`, `CSChangeTitleColor`,
-    `CSClanNameChange`, `HeroAnswerListener`, `ClanLevelAnswerListener`,
-    `LevelAnswerListener`, `RecoveryPkAnswerListener`,
-    `RecoveryKarmaAnswerListener`, `RecoveryVitalityAnswerListener`,
-    `ReputationAnswerListener`, `AugmentationAnswerListener`, …) →
+  - Community-board service listeners (buy-noblesse, nickname / sex / color changes,
+    clan rename, hero / clan-level / level purchases, PK / karma / vitality recovery,
+    reputation, augmentation, …) →
     `publishPremiumPurchase(PremiumPurchaseEvent.builder().services(...).build())`.
-  - Multisell custom-shop callback (custom shop entry IDs `20005`/`20011`/`…`/
-    `20204` — Coin-of-Luck-priced multisells per legacy datapack) →
+  - Multisell custom-shop callback (custom shop entries priced in a premium
+    currency) →
     `publishPremiumPurchase(PremiumPurchaseEvent.builder().items(...).build())`.
   - Hook acquires the `NxEvents` facade once at adapter-bootstrap connect
-    callback (host receives the connected `ConnectContext` via existing
-    bohpts ↔ adapter wiring), caches it for the duration of the session.
-  - **Out of scope of this monorepo** — the hook ships in the private
-    `bohpts-core` repo. The spec lists it here so the integration point is
-    discoverable; implementation lives under that repo's PR.
+    callback (host receives the connected `ConnectContext` via its existing
+    host ↔ adapter wiring), caches it for the duration of the session.
+  - **Out of scope of this monorepo** — the hook ships in the host's private
+    repo. The spec lists it here so the integration point is
+    discoverable.
 
 - [todo] R12. **Architectural sketch — commands inbound (NOT IMPLEMENTED in
   this slice).** Documented to commit the wire shape:
@@ -309,7 +306,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
   `l2nx.events.pre-connect-buffer-capacity` (`>0` enables, capped). Comes when
   a real ops case demands it (e.g. host code emits a `CharacterLoggedInEvent`
   during JVM bootstrap before the platform handshake). Phase-1 host code
-  (bohpts premium hook) wires publishes behind game-events that always fire
+  (host premium hook) wires publishes behind game-events that always fire
   post-`start()`, so this is unneeded.
 
 **Non-goals:**
@@ -381,14 +378,14 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
   `ColorChangeParams`) is rejected — the platform side already has weakly-typed
   catalog handling for legacy reasons; pinning the wire to typed records would
   multiply DTO classes per service code. Map<String,String> is lossless for
-  the use cases identified in the bohpts inventory (rename: `old`/`new`,
+  the use cases identified in the reference inventory (rename: `old`/`new`,
   color: `rgb`, level_up: `count`).]
 - [resolved: Source of purchase (community-board / multisell / NPC / item-handler)
   is **NOT** carried in `PremiumPurchaseEvent`. Operator audit / tracing
   belongs in a separate `PurchaseAuditEvent` family if needed; the user-facing
   premium-purchase event keeps to "what was bought + paid" semantics.]
 - [resolved: Item enchant level / attributes go into `PurchaseItem.params`,
-  not first-class fields. Phase-1 premium SKUs in bohpts datapack are all
+  not first-class fields. Phase-1 premium SKUs in the reference datapack are all
   unenchanted; if a future SKU sells an enchanted item, the host hook stamps
   `params.put("enchant", "10")` and the platform consumer reads from there.]
 - [assumed: Heartbeat `events` slot uses module-name `"events"`. Collision
@@ -410,13 +407,8 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
   [`docs/specs/001-adapter-bootstrap.md`](001-adapter-bootstrap.md)
 - Sibling feature (`Nx-Server-Id` header stamping):
   [`docs/specs/007-per-server-sync.md`](007-per-server-sync.md)
-- Legacy reference (RabbitMQ command surface, web side):
-  `E:/bohpts/code/bohpts-web/backend/src/main/java/com/bohpts/messaging/`
-- Legacy reference (RabbitMQ command surface, core side):
-  `E:/projects/bohpts/bohpts-core/core/src/main/java/l2e/gameserver/infrastructure/rabbitMq/`
-- Premium-purchase inventory source: bohpts community-board service listeners
-  (`l2e.gameserver.handler.communityhandlers.impl.*`) + multisell custom shops
-  (`bohpts-datapack/game/data/stats/npcs/multisell/custom/2000*.xml`).
+- Premium-purchase inventory source: the reference host's community-board service
+  listeners + multisell custom shops.
 
 ---
 
@@ -489,9 +481,9 @@ health check — created once at init, reused.
 - `nx-gs-adapter-core/src/main/java/app/l2nx/gs/adapter/core/events/EventsModuleStatus.java`
   [planned] — heartbeat slot generator (counter + gauge snapshot)
 
-Bohpts-side (in `bohpts-core` repo, not this monorepo):
+Host-side (in the host's repo, not this monorepo):
 
-- `bohpts-core/core/src/main/java/l2e/gameserver/l2nx/BohptsPremiumPurchaseHook.java`
+- host premium-purchase hook
   [planned] — wires CB service-listeners + multisell callbacks → `nxEvents.publishPremiumPurchase(...)`
 
 ### Key components
@@ -537,12 +529,12 @@ extends PremiumPurchaseEvent` so Future subtypes (`PremiumRefundEvent`,
   `PremiumGiftReceivedEvent`) plug in without changing `NxEvents`.
 
 - **WellKnownServices** [planned] (implements R3.5) — string constants class,
-  curated from bohpts community-board listener catalog + multisell custom shops.
+  curated from the reference host's community-board listener catalog + multisell custom shops.
   Hosts MAY use additional non-canonical codes; platform treats unknown codes
   as opaque.
 
-- **BohptsPremiumPurchaseHook** [planned] (implements R11; ships in
-  `bohpts-core` repo) — host-side glue. Acquires `NxEvents` once at adapter
+- **Host premium-purchase hook** [planned] (implements R11; ships in
+  the host's repo) — host-side glue. Acquires `NxEvents` once at adapter
   connect callback, wires into existing community-board service handlers and
   multisell callbacks. Listed here for discoverability; out of this monorepo's
   delivery scope.
@@ -551,9 +543,9 @@ extends PremiumPurchaseEvent` so Future subtypes (`PremiumRefundEvent`,
 
 End-to-end publish (premium purchase from a community-board buy-noblesse click):
 
-1. Host code (`CSBuyNoblesse` listener) finishes the in-game state mutation
+1. Host code (buy-noblesse listener) finishes the in-game state mutation
    (player's `noble` flag set, currency item charged).
-2. Host hook (`BohptsPremiumPurchaseHook`) constructs
+2. Host hook constructs
    `PremiumPurchaseEvent.builder()
  .eventId(UUIDv7.generate())
  .characterId(player.getObjectId())
@@ -663,7 +655,7 @@ dropped-total, failed-total, disabled-families}}` per R14. Same envelope
 - **`messagingTopics.events`** [planned] — engine reads per-family topic from
   this map. Map shape and platform-side issuance are owned by
   `adapter-bootstrap`'s `ConnectResponse` extension in this slice.
-- **bohpts community-board listeners + multisell callbacks** [planned] — host
+- **Host community-board listeners + multisell callbacks** [planned] — host
   side hooks into existing premium code paths, listed in spec R11. Read-only
   observation point — never mutates game state, only fires the event.
 
@@ -738,7 +730,7 @@ Object payload)` would allow). Adding a family is a binary-compatible API
 
 - **Decision:** Per-line `payments` (on each `PurchaseItem` and
   `PurchaseService`), not a top-level `payments` on the event.
-  **Why:** Real bohpts SKUs charge per-line (Giant Codex Mastery: 20 CoL +
+  **Why:** Real host SKUs charge per-line (Giant Codex Mastery: 20 CoL +
   10M Adena for ONE item). A top-level `payments` would force consumers to
   apportion the cost across lines themselves. Per-line is honest about how
   pricing works in L2 and lets the platform compute totals trivially by

@@ -118,7 +118,7 @@ DEGRADED` post-handshake. Reconnect cycles (re-fetched creds) MUST shut down the
 syncTopics` field where the key is an entity name (`"clan"`, `"character"`,
   `"item"`, …) and the value is the fully-qualified Kafka topic the adapter is
   authorized to publish that entity's `SyncEvent`s into (e.g.
-  `"bohpts.gs.sync.clans"`). Adapter behavior:
+  `"<tenant>.gs.sync.clans"`). Adapter behavior:
   - On 200 from `/connect`, the parsed `syncTopics` map is stored on
     `ConnectContext` (see [`adapter-modules` R2](002-adapter-modules/spec.md)) and
     surfaced to modules via `ctx.syncTopics()` at `onConnect`.
@@ -207,7 +207,7 @@ syncTopics` field where the key is an entity name (`"clan"`, `"character"`,
     ```
     Entity names within a namespace are local to that namespace — `"character"` may
     appear in BOTH `db` and `runtime` and resolve to different topics (e.g.
-    `bohpts.gs.sync.db.characters` vs `bohpts.gs.sync.runtime.characters`).
+    `<tenant>.gs.sync.db.characters` vs `<tenant>.gs.sync.runtime.characters`).
 
   Adapter behavior:
   - On 200, `heartbeatTopic` becomes the destination for all heartbeat publishes

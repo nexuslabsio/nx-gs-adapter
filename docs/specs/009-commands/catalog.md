@@ -323,7 +323,7 @@ or to the offline row otherwise. `staffNotes` is a staff-only note (see
 | `NOT_FOUND`         | Character does not exist (offline path)                                                                                          |
 | `INVALID_STATE`     | A login raced the offline write                                                                                                  |
 | `VALIDATION_FAILED` | `charId` / `accessLevel` missing, `accessLevel` not an integer, negative (bans go through `BanCommand`), or level not registered |
-| `FORBIDDEN`         | Level above the host's platform-grantable ceiling (bohpts: `5`); the in-game command is not capped                               |
+| `FORBIDDEN`         | Level above the host's platform-grantable ceiling (e.g. `5`); the in-game command is not capped                               |
 | `UNAVAILABLE`       | DB error on the offline path                                                                                                     |
 | `INTERNAL_ERROR`    | Unexpected host failure (offline dispatch threw)                                                                                 |
 

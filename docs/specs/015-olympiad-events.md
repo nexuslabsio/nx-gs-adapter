@@ -105,7 +105,7 @@ when 3v3 support lands.
   DRAW with zero points delta.
 - `TIMEOUT` — both alive at time-up, DRAW with –1/divider penalty each.
 
-## Branch mapping (bohpts `OlympiadGameNormal.validateWinner`)
+## Branch mapping (host `OlympiadGameNormal.validateWinner`)
 
 | Branch condition                      | P1 `(result, reason)`              | P2 `(result, reason)`          | Emits event?                        |
 |---------------------------------------|------------------------------------|--------------------------------|-------------------------------------|
@@ -131,14 +131,14 @@ UUIDv7 at validation start and shared by both per-participant events.
 
 ## Host-side wiring
 
-**`l2e.gameserver.l2nx.events.olympiad.OlympiadMatchResultPublisher`** —
+**`OlympiadMatchResultPublisher`** —
 game-loop-safe facade following the
 `PrivateTradeFinishedPublisher` / `MailSentPublisher` pattern: static
 `volatile @Nullable NxEvents events`, `bind(handle)` / `bind(null)`,
 error-swallowing publish method that emits both per-participant events from
 one call.
 
-`BohptsEventsModule` wires `bind` on `onConnect`, `bind(null)` on
+the host's events module wires `bind` on `onConnect`, `bind(null)` on
 `onDisconnect`.
 
 `OlympiadGameNormal.validateWinner(stadium)` end-of-method dispatcher:

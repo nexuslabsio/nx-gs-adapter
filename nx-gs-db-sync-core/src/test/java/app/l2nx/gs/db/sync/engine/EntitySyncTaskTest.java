@@ -58,7 +58,7 @@ class EntitySyncTaskTest {
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
                 new SyncEventPublisher(neverCalledSender()),
-                entity -> "bohpts.gs.sync.clans",
+                entity -> "acme.gs.sync.clans",
                 EngineConfig.defaults());
 
         CycleResult result = task.runCycle();
@@ -79,7 +79,7 @@ class EntitySyncTaskTest {
                 new Phase1Hasher(),
                 new Phase2Fetcher(),
                 new SyncEventPublisher(neverCalledSender()),
-                entity -> "bohpts.gs.sync.clans",
+                entity -> "acme.gs.sync.clans",
                 EngineConfig.defaults());
 
         CycleResult result = task.runCycle();

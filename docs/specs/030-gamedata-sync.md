@@ -5,7 +5,7 @@
 Living spec for the `:nx-gs-gd-sync-core` module. Covers what the module publishes and how, plus
 the host-readiness contract added in gd-sync `0.11.0` / api `0.83.0`.
 
-Cross-repo: `bohpts-core` (Tier-2 providers + readiness signal), `nx-gamedata` (platform consumer of
+Cross-repo: the host integration (Tier-2 providers + readiness signal), `nx-gamedata` (platform consumer of
 the `gd` stream).
 
 ## Problem
@@ -132,7 +132,7 @@ The adapter starts — and gd-sync fires its initial burst — during host boot,
 parsed its item / npc / skill / spawn catalogs. Pulling a snapshot then would force-load those
 parsers off the host boot thread, out of order (e.g. spawn parsing ahead of zone / territory init),
 risking a half-initialized load or a poisoned singleton. So the host's Tier-2 providers deliberately
-return `null` until boot finishes — exactly as documented in `BohptsGameDataModule`.
+return `null` until boot finishes — exactly as documented in the host's game-data module.
 
 In other words the adapter logged `ERROR` for behaviour it itself required. `null` was carrying two
 distinct states with no way to express the first:
@@ -232,7 +232,7 @@ false `ERROR` per boot (down from eight). If such a host appears, promote both v
 ### 3.7 `null` reclassification (defence in depth)
 
 The gate removes `null` for a host that implements the readiness SPI. `null` can still arrive from a
-host that does not — including `bohpts-core` itself, in the window between the gd-sync release and
+host that does not — including the host itself, in the window between the gd-sync release and
 the host wiring its provider. So the publisher's classification changes:
 
 - Per entity, per connection, the module tracks when `null` was first observed.
@@ -246,13 +246,13 @@ provider that is genuinely broken still surfaces as `ERROR`.
 The classification is a small pure state object (input: entity, now, first-null timestamp → output:
 severity), so tests assert the decision rather than scraping log output.
 
-### 3.8 Host side (`bohpts-core`)
+### 3.8 Host side (the host)
 
-- New `BohptsGameDataReadinessProvider` returning `BohptsHostReady.isReady()`, plus its
+- New host `GameDataReadinessProvider` returning the host's ready flag, plus its
   `META-INF/services` entry.
 - The nine existing providers are unchanged: their `null` / `Optional.empty()` guards stay as
   defence in depth and keep the host compatible with an older adapter.
-- `BohptsGameDataModule.markReady()` keeps calling `NxGameData.publishSnapshot()` — now the fast path
+- The host game-data module's `markReady()` keeps calling `NxGameData.publishSnapshot()` — now the fast path
   rather than the only path.
 
 After the gate is live, `Optional.empty()` from the gear-score provider means only what it should:
@@ -312,7 +312,7 @@ Ordering is forced by Maven Central propagation (~15-30 min) and the host build:
 1. `api/v0.83.0` — additive: new `GameDataReadinessProvider` interface only.
 2. `gd-sync/v0.11.0` — gate + poller + `null` reclassification. **The boot noise is gone at this
    step**, via §3.7, before the host knows anything about readiness.
-3. `bohpts-core` — bump api + gd-sync deps, register `BohptsGameDataReadinessProvider`. Takes effect
+3. the host — bump api + gd-sync deps, register the host's GameDataReadinessProvider. Takes effect
    at the next game-server restart; from then on the unready window produces no log lines at all and
    the gear-score ruleset stops being deleted-and-recreated on boot.
 
@@ -324,6 +324,6 @@ working system.
 - Issue: [nexuslabsio/nx-gs-adapter#8](https://github.com/nexuslabsio/nx-gs-adapter/issues/8)
 - `docs/specs/023-platform-sync-fixes-2026-06.md` — Fix ③, the gear-score deploy gap that first
   shipped the `gearscore` entity (`gd-sync/v0.10.0`); a version-skew incident, not a design record.
-- Host side: `bohpts-core` `l2e.gameserver.l2nx.data.BohptsGameDataModule` (boot-ordering gate and
+- Host side: the host's game-data module (boot-ordering gate and
   the `null` protocol it relies on).
 - Platform consumer: `nx-gamedata` (gd stream ingest, reconcile-on-`SNAPSHOT_COMPLETE`).

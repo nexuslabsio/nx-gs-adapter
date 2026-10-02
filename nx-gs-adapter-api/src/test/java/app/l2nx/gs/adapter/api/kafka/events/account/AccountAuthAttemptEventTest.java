@@ -36,7 +36,7 @@ class AccountAuthAttemptEventTest {
     }
 
     @Test
-    void getHwid_shouldBeNullable_forBohptsProtocol() {
+    void getHwid_shouldBeNullable_forProtocolWithoutHwid() {
         AccountAuthAttemptEvent event = minimal().build();
 
         assertNull(event.getHwid());

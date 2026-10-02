@@ -3,7 +3,7 @@
 > Companion to [`spec.md`](./spec.md) (formal infra contract) and
 > [`catalog.md`](./catalog.md) (per-command business contract — inputs,
 > result fields, error statuses; what the platform-web side codes against).
-> For developers writing command handlers in `bohpts-core` (or any host
+> For developers writing command handlers in a host (or any host
 > embedding `nx-gs-adapter-core`).
 
 ## What is a command?
@@ -141,10 +141,10 @@ import app.l2nx.gs.adapter.api.kafka.commands.character.KickResult;
 import app.l2nx.gs.adapter.api.spi.CommandContext;
 import app.l2nx.gs.adapter.api.spi.capability.NxCommands;
 
-public final class BohptsCommandHandlers {
+public final class HostCommandHandlers {
 
     public static void register(NxCommands commands) {
-        commands.on(KickCommand.class, BohptsCommandHandlers::handleKick);
+        commands.on(KickCommand.class, HostCommandHandlers::handleKick);
     }
 
     static CommandResult<KickResult> handleKick(KickCommand cmd, CommandContext ctx) {
@@ -165,7 +165,7 @@ public final class BohptsCommandHandlers {
 Bootstrap (BEFORE `NxAdapter.start()`):
 
 ```java
-NxAdapter.hostExecutor(task -> ThreadPoolManager.getInstance().executeGeneral(task));
+NxAdapter.hostExecutor(task -> hostGamePool.execute(task));
 NxAdapter.start();
 ```
 
@@ -173,7 +173,7 @@ Registration (inside the adapter's `onConnect` callback — typically an
 `AdapterModule`):
 
 ```java
-ctx.commands().on(KickCommand.class, BohptsCommandHandlers::handleKick);
+ctx.commands().on(KickCommand.class, HostCommandHandlers::handleKick);
 ```
 
 That's the whole story. The rest is "why" and edge cases.
@@ -334,7 +334,7 @@ static CommandResult<SendMailResult> handleSendMail(SendMailCommand cmd, Command
 
 ### Dispatching online vs offline
 
-The bohpts `DeleteItemHandler` and `TransferItemToCharacterHandler` are the canonical
+The reference `DeleteItemHandler` and `TransferItemToCharacterHandler` are the canonical
 patterns. Detect online state on the consumer thread, then dispatch:
 
 ```java
@@ -528,10 +528,10 @@ not emitted; caller sees a timeout.
 ## Registering handlers
 
 ```java
-public final class BohptsCommandsModule implements AdapterModule {
+public final class HostCommandsModule implements AdapterModule {
 
     @Override
-    public String name() { return "bohpts-commands"; }
+    public String name() { return "host-commands"; }
 
     @Override
     public void onConnect(ConnectContext ctx) {
@@ -566,7 +566,7 @@ You register the host's game-side `Executor` once at bootstrap, BEFORE
 `NxAdapter.start()`:
 
 ```java
-NxAdapter.hostExecutor(task -> ThreadPoolManager.getInstance().executeGeneral(task));
+NxAdapter.hostExecutor(task -> hostGamePool.execute(task));
 ```
 
 If you forget: `ctx.host().sync(...)` throws `IllegalStateException` the

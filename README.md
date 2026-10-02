@@ -28,7 +28,7 @@ Future modules:
 - `nx-gs-dp-lucera` — Datapack sync for vanilla Lucera
 
 Per-client overrides (private repos) extend vanilla via the template-method pattern (e.g.
-`nx-gs-db-bohpts`).
+`nx-gs-db-<client>`).
 
 ## Distribution & licensing
 
@@ -92,7 +92,7 @@ Required: `l2nx.gs-key`, `l2nx.platform-url`. Optional: `l2nx.enabled` (default 
 **DB credentials (only when DB-sync modules ship and host JVM doesn't register a
 `JdbcConnectionSource` via SPI):** `l2nx.db.url`, `l2nx.db.username`, `l2nx.db.password` —
 operator-local fallback for the bundled-Hikari pool. Creds NEVER travel through the
-platform; they live only on the operator's machine. If the host (e.g. bohpts-core)
+platform; they live only on the operator's machine. If the host (e.g. a reference integration)
 already exposes a `JdbcConnectionSource` via `META-INF/services`, leave the `l2nx.db.*`
 keys unset — the adapter will reuse the host's existing pool.
 

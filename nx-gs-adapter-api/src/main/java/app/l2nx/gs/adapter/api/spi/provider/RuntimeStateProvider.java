@@ -14,7 +14,7 @@ import java.util.List;
 public interface RuntimeStateProvider {
 
     /**
-     * Informational variant name (e.g. {@code "bohpts"}) for logs and heartbeats.
+     * Informational variant name (e.g. {@code "my-host"}) for logs and heartbeats.
      */
     String schemaName();
 

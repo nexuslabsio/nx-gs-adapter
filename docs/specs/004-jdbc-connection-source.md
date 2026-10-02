@@ -16,7 +16,7 @@ problems on host JVMs we don't control:
    doubling auth handshakes, doubling validation overhead, for state the host already has
    open.
 3. **Encapsulation breaches** — accessing the host's pool via reflection (e.g. peeking at
-   bohpts' `DatabaseFactory.dataSource` private field) couples the adapter to one specific
+   the host's private pool field) couples the adapter to one specific
    implementation and breaks the moment the host refactors. Direct `import com.zaxxer.hikari.*`
    in adapter code couples it to Hikari forever.
 
@@ -27,7 +27,7 @@ credentials never travel through the platform** in either case (operator-side on
 
 - **Path 1 — host-registered SPI** (preferred when source-access is available): host
   implements `JdbcConnectionSource`, returns connections from its existing game-core
-  pool (e.g. bohpts wraps `DatabaseFactory.getInstance().getConnection()` in a 5-line
+  pool (e.g. a host wraps its own pool accessor's `getConnection()` in a 5-line
   class). Adapter discovers via ServiceLoader and borrows. **Zero credential
   duplication** — host's pool already knows them; nothing in `l2nx.properties`,
   nothing on the platform.
@@ -42,7 +42,7 @@ platform never carries DB creds. Operators with source access pick Path 1; every
 gets Path 2 by default.
 
 Audience: host-JVM authors who choose to implement `JdbcConnectionSource` once per
-game-server distribution (bohpts, vanilla L2J / Lucera when those land); operators
+game-server distribution (the reference integration, vanilla L2J / Lucera when those land); operators
 deploying closed-source distributions who configure `l2nx.db.*` locally; db-sync (and
 future DB-reading modules) consume the resolved `JdbcConnectionSource` transparently.
 
@@ -54,7 +54,7 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
   package `app.l2nx.gs.adapter.api.spi` (alongside Tier-1 SPI types — single api
   artifact for every SPI tier; no separate `nx-gs-jdbc-connection-source-api`
   artifact):
-  - `String name()` — provider identifier for logging (e.g. `"bohpts-hikari"`,
+  - `String name()` — provider identifier for logging (e.g. `"host-hikari"`,
     `"l2j-vanilla-dbcp2"`); not a selection key in MVP, informational only
   - `Connection getConnection() throws SQLException` — borrow a connection. Caller
     closes via `try-with-resources` to return it to the host's pool.
@@ -89,8 +89,8 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
     `START TRANSACTION ... READ ONLY` (see
     [`cdc-engine` R11](005-cdc-engine/spec.md)). Providers MAY call
     `Connection.setReadOnly(true)` themselves as defense-in-depth (explicit
-    "adapter doesn't modify host data" signal) — the bohpts reference
-    `BohptsJdbcConnectionSource` does so. This is safe with mainstream
+    "adapter doesn't modify host data" signal) — the reference
+    integration does so. This is safe with mainstream
     pools (HikariCP, DBCP2) that reset the dirty `readOnly` flag on
     connection return; verify your pool's reset semantics before adopting
     the pattern. Providers MUST NOT assume the adapter itself will enforce
@@ -112,17 +112,16 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
   equivalent finally-close) at the end of every query. Provider impls do NOT need to
   track per-borrow lifecycle — the host's pool reclaims connections on close.
 
-- [done] R5. **[Phase 1]** Bohpts reference impl (Path 1) — `bohpts-core` (private
-  repo; `E:/bohpts/code/bohpts-core`) hosts a `BohptsJdbcConnectionSource` class
-  implementing `JdbcConnectionSource`, returning
-  `DatabaseFactory.getInstance().getConnection()`, plus a
+- [done] R5. **[Phase 1]** Reference impl (Path 1) — the reference host integration (a
+  private repo) hosts a `JdbcConnectionSource` implementation returning
+  the host pool's `getConnection()`, plus a
   `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource` resource
-  pointing to it. Bohpts-core declares `implementation 'app.l2nx:nx-gs-adapter-api:X.Y.Z'`
+  pointing to it. The host declares `implementation 'app.l2nx:nx-gs-adapter-api:X.Y.Z'`
   (Maven Central) — that artifact carries the Tier-3 SPI interface. The package for
-  `BohptsJdbcConnectionSource` inside bohpts-core is operator-chosen — see Open
+  the implementation inside the host is operator-chosen — see Open
   questions.
   - SC1. The reference impl body is a single line:
-    `return DatabaseFactory.getInstance().getConnection();`. If the body grows beyond
+    `return hostPool.getConnection();`. If the body grows beyond
     that, something is wrong with the SPI contract.
 
 - [todo] R6. **[Phase 3]** `BundledHikariConnectionSource` (Path 2 fallback) MUST:
@@ -150,10 +149,10 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
 - [wip] R7. **[Phase 1]** `JdbcConnectionSource` SHOULD expose a default
   `Optional<PoolStats> stats()` method (default impl returns `Optional.empty()`) so
   `db-sync`'s heartbeat enrichment (R12 in db-sync spec) can carry pool active / idle /
-  total / waiting counts when the host's pool exposes them. Bohpts impl reads
-  `DatabaseFactory.getBusyConnectionCount` (mapped to `PoolStats.active`) /
-  `getIdleConnectionCount` (mapped to `PoolStats.idle`); `total` and `waiting` left null
-  because bohpts `DatabaseFactory` does not expose those. Vanilla impls without any
+  total / waiting counts when the host's pool exposes them. The reference impl reads
+  the host pool's busy-connection count (mapped to `PoolStats.active`) /
+  idle-connection count (mapped to `PoolStats.idle`); `total` and `waiting` left null
+  because the host pool does not expose those. Vanilla impls without any
   stats just return `Optional.empty()`. Default method preserves backward compat —
   existing impls don't break when the method is added. `PoolStats` lives in
   `app.l2nx.gs.adapter.api.kafka.ops` (shared with `ModuleStatus.Stats.pool`).
@@ -206,20 +205,19 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
   depend only on `nx-gs-adapter-api`, not on `nx-gs-db-sync-core`.]
 - [resolved: Provider takes no parameter at construction. With `ConnectResponse.database`
   removed from the wire, there's no platform-delivered creds for the SPI to forward.
-  Path-1 providers fish from host static state (`DatabaseFactory.getInstance()`); Path-2
+  Path-1 providers fish from host static state (the host's pool singleton); Path-2
   fallback reads `l2nx.db.*` from `ConfigResolver` directly inside
   `BundledHikariConnectionSource`. No `init(ctx)` lifecycle needed.]
-- [NEEDS CLARIFICATION: Java package for `BohptsJdbcConnectionSource` inside bohpts-core
-  source tree. Candidates: `l2e.gameserver.nx.db` (matches bohpts-core convention),
-  `app.l2nx.gs.db.bohpts` (uses L2NX namespace inside the bohpts JAR), `com.bohpts.gs.l2nx`.
-  Up to bohpts-core owner; no impact on the SPI contract. Same Open question as
-  `BohptsDbSchemaProvider` in db-sync — keep both packages aligned.]
-- [assumed: Bohpts MVP picks **Path 1** (host SPI, shared pool via `DatabaseFactory`) —
-  bohpts dev has source access, no creds duplication wins. Path 2 fallback exists for
-  closed-source distributions of bohpts to third parties.]
-- [assumed: Single-impl on classpath in MVP — bohpts-core ships exactly one
+- [NEEDS CLARIFICATION: Java package for the host's `JdbcConnectionSource`
+  implementation inside the host source tree. Up to the host owner; no impact on the
+  SPI contract. Same Open question as the host's `DbSchemaProvider` in db-sync — keep
+  both packages aligned.]
+- [assumed: The reference integration picks **Path 1** (host SPI, shared host pool) —
+  the host dev has source access, no creds duplication wins. Path 2 fallback exists for
+  closed-source distributions to third parties.]
+- [assumed: Single-impl on classpath in MVP — a host ships exactly one
   `JdbcConnectionSource` descriptor; vanilla L2J / Lucera modules will ship their own
-  when they land but never alongside bohpts-core in the same deployment.]
+  when they land but never alongside a host-provided one in the same deployment.]
 - [assumed: Default `stats()` returns `Optional.empty()` if the host's pool doesn't
   expose stats — adapter heartbeat enrichment treats this as "stats unavailable",
   doesn't fail the heartbeat.]
@@ -230,8 +228,6 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
 - Sibling feature (Tier-2 SPI + first consumer):
   [`docs/specs/003-db-sync/spec.md`](003-db-sync/spec.md) — db-sync borrows connections
   through this SPI
-- Bohpts reference for `DatabaseFactory`:
-  `E:/bohpts/code/bohpts-core/core/src/main/java/l2e/gameserver/database/DatabaseFactory.java`
 
 ---
 
@@ -249,7 +245,7 @@ bundled-Hikari fallback second:
   `ServiceLoader.load(JdbcConnectionSource.class)`. Host returns connections from its own
   pool. Adapter agnostic to pool wrapper, version, sizing, credential strategy. The SPI
   body is two methods, so the host's adapter is often a one-line wrapper
-  (`return DatabaseFactory.getInstance().getConnection();`).
+  (`return hostPool.getConnection();`).
 - **Path 2 [Phase 3]** — builtin `BundledHikariConnectionSource` (NOT registered via
   `META-INF/services` — instantiated only when ServiceLoader returns zero impls AND
   `l2nx.db.*` config keys are present). Uses **shadowed Hikari 3.4.5** (relocated to
@@ -277,15 +273,13 @@ field at all.
 - `nx-gs-db-sync-core/build.gradle.kts` [planned, Phase 3] — Hikari 3.4.5 added as
   `implementation` dep; shadowJar relocates `com.zaxxer.hikari.*` →
   `app.l2nx.shaded.hikari.*`
-- `bohpts-core/` (**private repo, NOT this monorepo**)
+- Reference host integration (**private repo, NOT this monorepo**)
   - depends on `app.l2nx:nx-gs-adapter-core:0.3.1` + `nx-gs-db-sync-core:0.1.0`
     (Maven Central)
-  - `core/src/main/java/l2e/gameserver/l2nx/BohptsJdbcConnectionSource.java` —
-    wraps `DatabaseFactory.getInstance().getConnection()`, sets `readOnly=true`
-    per-borrow as defense-in-depth; package follows bohpts convention
-    (`l2e.gameserver.l2nx` houses all l2nx-related plumbing)
-  - `core/src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource`
-    — service descriptor pointing to `BohptsJdbcConnectionSource`
+  - a `JdbcConnectionSource` implementation — wraps the host pool's `getConnection()`,
+    sets `readOnly=true` per-borrow as defense-in-depth
+  - `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource`
+    — service descriptor pointing to that implementation
 
 ### Key components
 
@@ -325,9 +319,9 @@ field at all.
   (HikariCP's `getThreadsAwaitingConnection`, equivalent in other pools). Backward-
   compatible default `stats() = Optional.empty()` so existing impls don't break when
   the type ships.
-- **`BohptsJdbcConnectionSource`** (R5) — bohpts reference impl, lives in
-  bohpts-core source tree under `l2e.gameserver.l2nx`. Body of `getConnection()`
-  borrows from `DatabaseFactory.getInstance()` and flips `setReadOnly(true)` on
+- **Reference `JdbcConnectionSource` impl** (R5) — lives in the reference host's
+  source tree. Body of `getConnection()`
+  borrows from the host pool and flips `setReadOnly(true)` on
   the borrowed Connection as defense-in-depth (closes the connection and
   rethrows on `SQLException`). HikariCP resets the dirty `readOnly` flag back
   to the pool default on connection return, so the flag does NOT leak to the
@@ -336,9 +330,9 @@ field at all.
   cdc-engine R11) — explicit signal to the host that the adapter does not
   modify host data through this source. `stats()` overrides the default with
   `PoolStats.builder()
-.active(DatabaseFactory.getBusyConnectionCount())
-.idle(DatabaseFactory.getIdleConnectionCount()).build()` — `total` and `waiting`
-  left null because `DatabaseFactory` does not expose
+.active(hostPool.busyCount())
+.idle(hostPool.idleCount()).build()` — `total` and `waiting`
+  left null because the host pool does not expose
   `HikariPoolMXBean.getTotalConnections()` / `getThreadsAwaitingConnection()` directly
   (per `PoolStats` contract: every field is nullable).
 
@@ -359,7 +353,7 @@ DbSyncModule.onConnect(ctx)
            META-INF/services/... — see jdbc-connection-source feature docs"); state = FAILED
        >1 → log ERROR listing impl FQCNs; state = FAILED
   → on success log INFO: "JdbcConnectionSource resolved: <source.name()>"
-    (e.g. "bohpts-hikari")
+    (e.g. "host-hikari")
 ```
 
 Phase 3 will add the bundled-Hikari fallback:
@@ -412,7 +406,7 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
 - **`nx-gs-db-sync-core`** (R2, R6) — consumer of the Tier-3 SPI; Phase 1 inlines
   resolution in `DbSyncModule.onConnect`; `BundledHikariConnectionSource` arrives
   in Phase 3. Does NOT define the SPI interface itself.
-- **`bohpts-core`** (R5) — private repo, hosts `BohptsJdbcConnectionSource` and
+- **Reference host integration** (R5) — private repo, hosts the `JdbcConnectionSource` impl and
   the service descriptor. Depends on `app.l2nx:nx-gs-adapter-core:0.3.1` +
   `nx-gs-db-sync-core:0.1.0`. NOT a separately published artifact.
 - **`db-sync` feature** — first consumer. R2 of db-sync invokes
@@ -420,11 +414,10 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
   `setReadOnly` per borrow — the host-pool contract (R3 here) keeps the pool's
   state-reset responsibility on the host, and the CDC engine enforces read-only
   at the SQL level (`START TRANSACTION ... READ ONLY`).
-- **Bohpts `l2e.gameserver.database.DatabaseFactory`** (R5) — the singleton bohpts
-  uses internally; bohpts' `JdbcConnectionSource` impl wraps it. We do NOT touch
-  `DatabaseFactory` itself — only call its public `getConnection()` /
-  `getBusyConnectionCount()` (→ `PoolStats.active`) / `getIdleConnectionCount()`
-  (→ `PoolStats.idle`) methods.
+- **The host's own pool singleton** (R5) — used internally by the host; the host's
+  `JdbcConnectionSource` impl wraps it. We do NOT touch the pool itself — the impl only
+  calls its public `getConnection()` / busy-count (→ `PoolStats.active`) /
+  idle-count (→ `PoolStats.idle`) methods.
 - **`nx-gs-adapter-api`** — no change required. The SPI is internal to host↔adapter (not
   platform-facing), so it stays out of the wire-contracts module.
 
@@ -462,7 +455,7 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
   `DataSource` has 7+ methods (`getConnection(user, pass)`, log writer, login timeout,
   parent logger, `unwrap`, `isWrapperFor`); forcing host impls to fill all of them is
   hostile for the simple "give me a Connection" use case. The two-method SPI is also
-  natural for the bohpts case where `DatabaseFactory.getConnection()` is already the
+  natural for hosts whose pool already exposes `getConnection()` as the
   one-line implementation. If a consumer ever needs the full `DataSource` surface, that
   consumer can wrap an `JdbcConnectionSource` into a tiny `DataSource` adapter locally.
 - **Read-only enforced at SQL level by the engine; provider-level `setReadOnly`
@@ -472,7 +465,7 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
   transaction (see [`cdc-engine` R11](005-cdc-engine/spec.md)) — SQL-level
   enforcement is scoped to the transaction only, no leakage. **Providers MAY
   call `Connection.setReadOnly(true)` themselves** as an explicit "we don't
-  modify your data" signal to the host; the bohpts reference impl does
+  modify your data" signal to the host; the reference impl does
   exactly that (R5). HikariCP and other mainstream pools reset the dirty
   `readOnly` flag back to the pool default on return, so the flag does not
   leak to subsequent host borrowers. The host-pool contract (R3) requires the
@@ -487,13 +480,13 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
   host's pool is the host's decision; the adapter only states the minimum.
 - **Single-impl assumption with fail-loud on multi-impl.** Mirrors the Tier-2
   `DbSchemaProvider` discovery rule. Operator deployments naturally have one provider
-  (host JVM ships its own; vanilla modules + bohpts modules don't co-exist in the same
+  (host JVM ships its own; vanilla modules + host-provided modules don't co-exist in the same
   classpath). Resolution strategies for multi-impl scenarios (config selector / shadow
   exclusion / activator JAR — same options as Tier-2) deferred to vanilla-extraction
   time, decided in the same slice as Tier-2's resolution.
 - **Provider receives no parameters at discovery / construction.** Providers that share
   the host pool reach their pool via the host's static singleton (e.g.
-  `DatabaseFactory.getInstance()`). Providers running Scenario Y (separate read-only
+  the host's pool singleton). Providers running Scenario Y (separate read-only
   pool) are responsible for sourcing their creds — typically from a host-side bootstrap
   hook that stashes `ConnectResponse.database` into a static somewhere accessible.
   Forcing an `init(ConnectContext)`-style lifecycle on every provider would burden the
@@ -504,7 +497,7 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
   `Optional.empty()` so impls upgrade voluntarily. Same for `isHealthy()` (R8).
 - **Adapter never closes the source.** Host owns pool lifecycle. Module `onDisconnect`
   drops the cached source reference and that's it; the source's own static singleton
-  (e.g. bohpts' `DatabaseFactory`) keeps running for the host's own use.
+  (e.g. the host's pool singleton) keeps running for the host's own use.
 
 ### Extension points
 

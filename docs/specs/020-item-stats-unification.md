@@ -3,7 +3,7 @@
 ## Problem
 
 Item stats are carried twice, at every layer of the game-data pipeline
-(`bohpts-core` → `nx-gs-adapter-api` wire → `nx-gamedata` → `nx-wiki`):
+(host integration → `nx-gs-adapter-api` wire → `nx-gamedata` → `nx-wiki`):
 
 - A block of **typed combat fields** (`pAtk`, `mAtk`, `pDef`, `mDef`,
   `attackSpeed`, `criticalRate`, `attackRange`, `randomDamage`, `soulshots`,
@@ -48,7 +48,7 @@ weapon accessors, not from stat functions.
 **One** canonical, build-agnostic stat map — the single home for every item
 stat value, including the weapon mechanics that have no stat-func today. `combat`
 disappears entirely with no replacement block. Normalization happens **at
-source** (`bohpts-core`), so every downstream layer passes the map through
+source** (the host integration), so every downstream layer passes the map through
 unchanged. The only item-stat datum that stays outside the map is `magicWeapon`
 (a boolean — it can't live in a `Map<String,Double>` and already surfaces in
 `flags`).
@@ -57,7 +57,7 @@ unchanged. The only item-stat datum that stays outside the map is `magicWeapon`
 
 | Decision                                                                | Choice                                                                               |
 |-------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
-| Where canonicalization happens                                          | At source — `bohpts-core` provider                                                   |
+| Where canonicalization happens                                          | At source — host item-template provider                                              |
 | Canonical vocabulary home                                               | New `ItemStat` enum in `nx-gs-adapter-api`                                           |
 | Token style                                                             | Short L2-community shorthand (`P_ATK`, `M_ATK`, …)                                   |
 | Weapon mechanics (`soulshots`/`spiritshots`/`mpConsume`/`randomDamage`) | Folded into the unified map (full uniformity — one place)                            |
@@ -78,7 +78,7 @@ reference but that are not themselves wire payloads — `ItemStat` is the first
 resident.
 
 The `Stats → ItemStat` translation is **build-specific knowledge** and lives in
-`bohpts-core`, never in the enum or the wire.
+the host integration, never in the enum or the wire.
 
 ### Token mapping (raw L2J source → canonical `ItemStat`)
 
@@ -151,7 +151,7 @@ STR, DEX, CON, INT, WIT, MEN
 ```
 
 **Unmapped funcs**: a func whose `Stats` value has no entry in the
-`bohpts-core` translation table is dropped from the map and logged once per
+host translation table is dropped from the map and logged once per
 unknown stat. Adding support for a new stat = one `ItemStat` constant + one
 mapping entry — the same discipline as every other enum-like vocabulary on the
 platform.
@@ -177,9 +177,9 @@ Resulting shape: `ItemStats { Boolean magicWeapon; Map<String,Double> stats }`.
 Breaking change → `api/vX.Y.Z` tag bump; the only consumer (`nx-gamedata`) is
 updated in lockstep.
 
-## Source change — `bohpts-core`
+## Source change — host integration
 
-`l2e.gameserver.l2nx.data.BohptsItemTemplateProvider`:
+The host's item-template provider:
 
 - New `Stats → ItemStat` translator (build-specific, lives here). Drives the
   unmapped-stat logging.
@@ -194,7 +194,7 @@ updated in lockstep.
   accessor folds run after, only adding keys the stat-func pass did not already
   produce.
 
-Deploying the new `bohpts-core` triggers a full CRC snapshot re-sync that
+Deploying the updated host integration triggers a full CRC snapshot re-sync that
 repopulates the `stats` map canonically and completely — refreshing the
 in-migration backfill (see `nx-gamedata` below) and filling the 76k-vs-44k gap
 (items that had typed columns but no `stat_bonuses`).
@@ -205,7 +205,7 @@ in-migration backfill (see `nx-gamedata` below) and filling the 76k-vs-44k gap
     1. **Rename** `stat_bonuses` → `stats`.
     2. **Backfill** `stats` in-place from the existing raw-keyed map + the typed
        combat columns, so the read path serves canonical stats immediately
-       (without waiting on the bohpts-core re-sync). Raw L2J keys are translated
+       (without waiting on the host re-sync). Raw L2J keys are translated
        to canonical tokens; the typed columns are folded in as canonical keys
        (`p_atk`→`P_ATK`, …, `soulshots`→`SOULSHOT_COUNT`, …); translated
        stat-func keys win over typed columns; typed `0` is dropped
@@ -220,14 +220,14 @@ in-migration backfill (see `nx-gamedata` below) and filling the 76k-vs-44k gap
   column.
 - **Ordering**: the in-migration backfill makes the schema self-sufficient — once
   it runs, `stats` is populated from the data already in the table, so reads work
-  before the bohpts-core re-sync. The subsequent full re-sync from the
+  before the host re-sync. The subsequent full re-sync from the
   canonical-emitting provider refreshes the values and fills any gaps. The
-  breaking wire change still couples the adapter-api release, bohpts-core, and
+  breaking wire change still couples the adapter-api release, the host integration, and
   nx-gamedata code, so those deploy together (see Rollout); the migration runs as
   part of that nx-gamedata deploy.
 
 > `stat_bonuses` is sync-owned (not in the patch-`COALESCE` set), so the rename
-> is safe — no `bohpts-patch-ingester` writer depends on the old name.
+> is safe — no patch-ingester writer depends on the old name.
 
 ## `nx-wiki`
 
@@ -263,18 +263,18 @@ a coordinated cutover beats transient dual-emit:
 
 1. `nx-gs-adapter-api` — add `ItemStat`, collapse `ItemStats`, release
    `api/vX.Y.Z`.
-2. `bohpts-core` — adopt the enum + translator, emit the canonical `stats` map;
+2. Host integration — adopt the enum + translator, emit the canonical `stats` map;
    deploy → full re-sync repopulates `stats`.
 3. `nx-gamedata` — bump adapter-api dep, update record/mapper/adapter, run the
    rename+backfill+drop migration. The backfill populates `stats` from the
    existing columns/map at migration time, so the read path is correct the
-   instant nx-gamedata is up — independent of when the bohpts-core re-sync lands.
+   instant nx-gamedata is up — independent of when the host re-sync lands.
 4. `nx-wiki` — drop `ItemCombatDto` + `ItemStatsDto`, flat `stats` map,
    `@Schema`, drop combat columns from the read path.
 
-The breaking wire change couples steps 1–3 (adapter-api → bohpts-core →
+The breaking wire change couples steps 1–3 (adapter-api → host integration →
 nx-gamedata deploy together). The in-migration backfill bridges the gap until the
-bohpts-core full re-sync refreshes `stats` with freshly-computed canonical values.
+host full re-sync refreshes `stats` with freshly-computed canonical values.
 
 ## Frontend API changelog
 

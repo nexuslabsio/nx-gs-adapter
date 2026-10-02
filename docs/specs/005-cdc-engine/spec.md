@@ -11,7 +11,7 @@ to every entity.
 
 This slice extracts the CDC algorithm out of `db-sync` into its own design surface.
 `db-sync` keeps the `AdapterModule` contract, the Tier-2 SPI (`DbSchemaProvider` /
-`EntityMapping`), and the bohpts MVP wiring. `cdc-engine` owns the algorithm: CRC32 two-phase
+`EntityMapping`), and the reference-integration MVP wiring. `cdc-engine` owns the algorithm: CRC32 two-phase
 protocol, scheduling, in-memory hash snapshot, change publication, per-entity stats reporting,
 RAM/timeout safety nets. The engine has no knowledge of any specific entity or schema; it is
 fed `EntityMapping`s by `db-sync`'s `DbSchemaProvider` resolver.
@@ -365,9 +365,9 @@ per-entity state via heartbeat enrichment).
        [default], publishFlush=5s [default]`
     2. One line per entity (in `provider.mappings()` order) listing the entity name
        and its platform-supplied Kafka topic:
-       `CdcEngine [clan] → topic=bohpts.gs.sync.clans`
-       `CdcEngine [character] → topic=bohpts.gs.sync.characters`
-       `CdcEngine [item] → topic=bohpts.gs.sync.items`
+       `CdcEngine [clan] → topic=<tenant>.gs.sync.clans`
+       `CdcEngine [character] → topic=<tenant>.gs.sync.characters`
+       `CdcEngine [item] → topic=<tenant>.gs.sync.items`
 
   Per-entity lines have NO source tag — there is no per-entity config to attribute;
   the topic is always `connect-response` (single source) and that's implicit. If
@@ -430,7 +430,7 @@ per-entity state via heartbeat enrichment).
   Map<entityName, topic>`) and are passed into the engine via a `TopicResolver` SAM
   injected by `DbSyncModule`:
     - `String resolveTopic(String entityName)` — returns the platform-supplied topic
-      name (e.g. `"bohpts.gs.sync.clans"` for `entityName = "clan"`), or `null` if the
+      name (e.g. `"<tenant>.gs.sync.clans"` for `entityName = "clan"`), or `null` if the
       platform did not deliver a topic for this entity.
     - For each `EntityMapping`, the engine resolves the topic ONCE at engine start
       (snapshot from the connect-time map; no re-resolution per cycle).
@@ -596,7 +596,7 @@ per-entity state via heartbeat enrichment).
 - [resolved: SyncEvent is **typed** (`SyncEvent<T>`). Gson serializes the payload slot
   as a JSON object (not an escaped string). Platform-side consumer compiles against
   the same `nx-gs-adapter-api` artifact and parameterizes its consumer per topic
-  (`Consumer<SyncEvent<ClanDbDto>>` for `bohpts.gs.sync.clans`). Adding a new entity
+  (`Consumer<SyncEvent<ClanDbDto>>` for `<tenant>.gs.sync.clans`). Adding a new entity
   bumps the api minor; coordinated upgrade with the platform.]
 - [resolved: Snapshot swap is **per-row**. Engine tracks a per-cycle
   `Long2ObjectMap<Future<RecordMetadata>>` keyed by PK; at end-of-cycle (within
@@ -1096,9 +1096,9 @@ Sample log output (R16):
 
 ```
 INFO  CdcEngine config: tickInterval=60s [default], rowsPerWindow=500000 [operator-override l2nx.cdc-engine.rows-per-window=500000], queryTimeout=10s [default], publishFlush=5s [default]
-INFO  CdcEngine [clan] → topic=bohpts.gs.sync.clans
-INFO  CdcEngine [character] → topic=bohpts.gs.sync.characters
-INFO  CdcEngine [item] → topic=bohpts.gs.sync.items
+INFO  CdcEngine [clan] → topic=<tenant>.gs.sync.clans
+INFO  CdcEngine [character] → topic=<tenant>.gs.sync.characters
+INFO  CdcEngine [item] → topic=<tenant>.gs.sync.items
 ```
 
 If platform delivered no topic for an entity:

@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 
 class DbSyncModuleTest {
 
-    private static final Map<String, String> CLAN_TOPIC = Collections.singletonMap("clan", "bohpts.gs.sync.clans");
+    private static final Map<String, String> CLAN_TOPIC = Collections.singletonMap("clan", "acme.gs.sync.clans");
 
     private static final ConnectContext CTX_WITH_TOPICS = ctx(CLAN_TOPIC);
     private static final ConnectContext CTX_NO_TOPICS = ctx(null);

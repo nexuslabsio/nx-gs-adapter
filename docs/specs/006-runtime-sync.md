@@ -12,7 +12,7 @@ seconds, not minutes-to-hours.
 This slice introduces `runtime-sync`: a sibling adapter module to `db-sync` that pulls volatile
 state directly from the host's in-memory game stores via a Tier-2 SPI, computes a Java-side
 hash-and-diff per tick, and publishes deltas to per-entity Kafka topics. MVP target: a single
-`character` runtime entity (vitals + position) end-to-end against bohpts. Audience: operators
+`character` runtime entity (vitals + position) end-to-end against the reference integration. Audience: operators
 (drop in `nx-gs-runtime-sync-core` JAR alongside `db-sync`), platform-side consumers of
 `gs.sync.runtime.*` topics (live dashboards, in-game widgets), future runtime entities (party
 state, siege participants, raid boss vitals).
@@ -51,7 +51,7 @@ state, siege participants, raid boss vitals).
     descriptor.
 
 - [done] R3. `RuntimeStateProvider` interface MUST expose:
-  - `String schemaName()` — informational identifier (e.g. `"bohpts"`, `"l2j"`); not a
+  - `String schemaName()` — informational identifier (e.g. `"host"`, `"l2j"`); not a
     selection key in MVP
   - `List<RuntimeEntityMapping<?>> mappings()` — the runtime entities this provider
     surfaces
@@ -174,21 +174,20 @@ entity '<name>'"`), entity transitions to `DEGRADED`, no publishes for that
   `FAILED` is reserved for non-recoverable startup conditions (0 / >1
   `RuntimeStateProvider`). Same isolation contract as `db-sync` R9.
 
-- [done] R9. Bohpts client + character runtime MVP — `bohpts-core`
-  (`E:/projects/bohpts/bohpts-core`) MUST host a `BohptsRuntimeStateProvider` class
+- [done] R9. Reference client + character runtime MVP — the reference host integration
+  MUST host a `RuntimeStateProvider` class
   implementing `RuntimeStateProvider` directly (no `extends` — there is no vanilla
   `nx-gs-runtime-l2j` to inherit from in MVP), plus a
   `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider` resource pointing
   to it. Provider contract:
-  - `schemaName()` = `"bohpts"`
+  - `schemaName()` = the host identifier
   - `mappings()` returns exactly one `RuntimeEntityMapping<CharacterRuntimeDto>` for
     the `character` entity:
     - `entityName()` = `"character"` (collides with `db-sync` `character` — see R4)
     - `dtoType()` = `CharacterRuntimeDto.class`
-    - `snapshot()` iterates `l2e.gameserver.model.GameObjectsStorage.getPlayers()`
-      — static accessor on bohpts' canonical online-player storage (backed by
-      napile `CHashIntObjectMap<Player>`, returns a live `Collection<Player>`
-      view, concurrent-safe for read-only iteration). Filters `player.isOnline()`
+    - `snapshot()` iterates the host's online-player storage
+      (a live `Collection<Player>` view backed by a concurrent map,
+      safe for read-only iteration). Filters `player.isOnline()`
       (storage may briefly contain just-logged-out instances). Produces a
       `RuntimeRow` per online `Player` with `pk = player.getObjectId()` and
       `dto` populated from live field accessors. Wraps the iteration in a
@@ -196,9 +195,8 @@ entity '<name>'"`), entity transitions to `DEGRADED`, no publishes for that
       stable iteration set even if the underlying map mutates mid-tick.
     - `hash(dto)` — FNV-1a 64-bit over all non-null hash-relevant fields
       (vitals, vit, coordinates).
-  - The package for `BohptsRuntimeStateProvider` inside bohpts-core is
-    `l2e.gameserver.l2nx` (same as `BohptsDbSchemaProvider`; both providers
-    coexist as siblings).
+  - The package for the provider inside the host is host-chosen (the db-sync
+    schema provider and this one coexist as siblings).
 
 - [done] R10. `CharacterRuntimeDto` MUST ship in `nx-gs-adapter-api` package
   `app.l2nx.gs.adapter.api.kafka.sync.runtime.character`, parallel to
@@ -278,15 +276,15 @@ failedAcks, timedOutAcks, consecutiveErrors}`. Same shape as `db-sync` per
 - **Cross-module entity coordination** — `db-sync.character` and `runtime-sync.character`
   publish independently to different topics. Platform-side consumers join them by `id` if
   needed. Engine does NOT serialize-order the two streams.
-- **Vanilla `nx-gs-runtime-l2j` artifact** — deferred until a second non-bohpts customer
+- **Vanilla `nx-gs-runtime-l2j` artifact** — deferred until a second host
   arrives. Same YAGNI rationale as `nx-gs-db-l2j` per
   [`db-sync` Non-goals](003-db-sync/spec.md).
 
 ## Open questions
 
 - [assumed: `RuntimeEntityMapping.snapshot()` returns a defensive copy of the host's live
-  collection. Bohpts impl wraps `GameObjectsStorage.getPlayers()` in
-  `new ArrayList<>(...)` at iteration entry. The underlying napile `CHashIntObjectMap`
+  collection. The reference impl wraps the host's online-player collection in
+  `new ArrayList<>(...)` at iteration entry. The underlying concurrent map
   is concurrent-safe for read-only iteration without copying, but a single tick reads
   HP/MP/CP/coords for ~10k entries and we want a stable iteration target; the copy
   costs ~80 KB / ~100 µs and is negligible against the 10s tick budget.]
@@ -304,12 +302,10 @@ failedAcks, timedOutAcks, consecutiveErrors}`. Same shape as `db-sync` per
   (`syncTopics.db.character` vs `syncTopics.runtime.character`). Single-namespace
   collision (two providers in the same module declaring the same entity) is a
   configuration error that the engine logs as ERROR and rejects at startup.]
-- [resolved: bohpts-core accessor — `l2e.gameserver.model.GameObjectsStorage.getPlayers()`
-  (static), returns `Collection<Player>` view over napile `CHashIntObjectMap`.
-  `getPlayer(int objId)` and `getAllPlayersCount()` are companion accessors. Wired
-  into `BohptsRuntimeStateProvider.snapshot()` per R9.]
-- [resolved: Tick interval default = 10s. Confirmed against ~10k online budget on
-  bohpts. Sub-5s freshness for specific entities (e.g. future raid-boss HP) is
+- [resolved: host accessor — the host's online-player storage returns a
+  `Collection<Player>` view over a concurrent map. Wired
+  into the provider's `snapshot()` per R9.]
+- [resolved: Tick interval default = 10s. Confirmed against a ~10k online budget. Sub-5s freshness for specific entities (e.g. future raid-boss HP) is
   routed through R13 per-entity override when those entities ship.]
 - [resolved: `publish-flush-seconds` is **per-module** —
   `l2nx.runtime-sync.publish-flush-seconds` (default 5s) is independent of
@@ -363,7 +359,7 @@ tombstone) — `db-sync` owns "permanently gone" semantics. `CycleResult` report
 `DEGRADED` whenever any publish future failed or timed out; `failedAcks` /
 `timedOutAcks` counters surface on the per-entity heartbeat slot so Kafka outages
 are visible to operators. MVP entity is `character` (vitals + position) against
-bohpts.
+the reference integration.
 
 ### Structure
 
@@ -387,13 +383,11 @@ bohpts.
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/sync/runtime/character/CharacterRuntimeDto.java`
   [planned] — wire DTO
 
-Bohpts-side (in `bohpts-core` repo, not this monorepo):
+Host-side (in the reference host integration, not this monorepo):
 
-- `bohpts-core/core/src/main/java/l2e/gameserver/l2nx/BohptsRuntimeStateProvider.java`
-  [planned] — Tier-2 impl, sibling of `BohptsDbSchemaProvider`
-- `bohpts-core/core/src/main/java/l2e/gameserver/l2nx/CharacterRuntimeMapping.java`
-  [planned] — `RuntimeEntityMapping<CharacterRuntimeDto>` for the `character` entity
-- `bohpts-core/core/src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider`
+- `RuntimeStateProvider` impl [planned] — Tier-2 impl, sibling of the host's `DbSchemaProvider`
+- `RuntimeEntityMapping<CharacterRuntimeDto>` impl [planned] — mapping for the `character` entity
+- `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider`
   [planned] — ServiceLoader descriptor
 
 ### Key components
@@ -447,9 +441,8 @@ value)` / `mix(state, int)` / `mix(state, boolean)` / `mix(state, CharSequence)`
 - **CharacterRuntimeDto** [planned] (implements R10) — Java 8 POJO in
   `kafka.sync.runtime.character` package. `id` non-null, all other fields `@Nullable
 Integer`. Hand-written builder, equals/hashCode/toString.
-- **BohptsRuntimeStateProvider** [planned] (implements R9) — bohpts-side concrete
-  provider. Lives in `bohpts-core/l2e.gameserver.l2nx`, sibling of
-  `BohptsDbSchemaProvider`. Single mapping for the `character` entity.
+- **Host `RuntimeStateProvider`** [planned] (implements R9) — host-side concrete
+  provider, sibling of the host's `DbSchemaProvider`. Single mapping for the `character` entity.
 
 ### Data flows
 
@@ -459,7 +452,7 @@ End-to-end per tick (one entity, e.g. `character`):
    default). If `AtomicBoolean ticking` is already set → skip+WARN and exit.
 2. Calls `mapping.snapshot()` inside `try/catch (Throwable)` →
    `Iterable<RuntimeRow<CharacterRuntimeDto>>`
-   (bohpts impl: `new ArrayList<>(GameObjectsStorage.getPlayers())`, filtered by
+   (reference impl: `new ArrayList<>(onlinePlayers)`, filtered by
    `player.isOnline()`). On throw → `CycleResult.degraded(elapsed)` + WARN, no
    publishes, entity transitions to `DEGRADED` for this tick.
 3. For each `RuntimeRow{pk, dto}`:
@@ -511,18 +504,18 @@ Wire DTO (Kafka payload):
   `META-INF/services`. `nx-gs-adapter-core` discovers `RuntimeSyncModule` alongside
   `DbSyncModule`; both modules coexist.
 - **Tier-2 SPI: `RuntimeStateProvider`** [planned] — defined in `nx-gs-adapter-api`,
-  consumed by `nx-gs-runtime-sync-core` engine. Bohpts-core ships
-  `BohptsRuntimeStateProvider` impl + ServiceLoader descriptor.
+  consumed by `nx-gs-runtime-sync-core` engine. The host ships
+  a `RuntimeStateProvider` impl + ServiceLoader descriptor.
 - **`ConnectContext.syncTopics().runtime()`** [planned] — engine reads its per-entity
   Kafka topic from this map. Map shape and adapter-side parsing are owned by
   [`adapter-bootstrap` R17](001-adapter-bootstrap.md).
 - **`HeartbeatEvent.enabledModules`** [planned] — surface
   `{name: "runtime-sync", state, stats: {entities: [...]}}` per R12. Same envelope
   shape as `db-sync` — operators read both modules side by side.
-- **bohpts in-memory store** [planned] —
-  `l2e.gameserver.model.GameObjectsStorage.getPlayers()` is the read source for the
-  `character` entity. Returns a `Collection<Player>` view over a napile
-  `CHashIntObjectMap` (concurrent-safe for read-only iteration). Provider wraps in
+- **Host in-memory store** [planned] —
+  the host's online-player storage is the read source for the
+  `character` entity. Returns a `Collection<Player>` view over a
+  concurrent map (safe for read-only iteration). Provider wraps in
   `new ArrayList<>(...)` for stable iteration and filters `player.isOnline()` to
   exclude just-logged-out instances still present in the map. Read-only — never
   mutates game state.

@@ -6,7 +6,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * One service-applied line of a {@link PremiumPurchaseEvent}.
- * <p>{@link #getCode() code} SHOULD come from {@link WellKnownServices} so cross-tenant dashboards aggregate consistently; hosts MAY use private codes (e.g. {@code "bohpts:my_custom_service"}), which the platform treats as opaque.
+ * <p>{@link #getCode() code} SHOULD come from {@link WellKnownServices} so cross-tenant dashboards aggregate consistently; hosts MAY use private codes (e.g. {@code "myhost:my_custom_service"}), which the platform treats as opaque.
  * <p>{@link #getQty() qty} is the number of identical services applied; aggregate units sold via {@code sum(qty)}, not {@code count(*)}.
  * <p>{@link #getParams() params} is a plain {@code Map<String,String>} of per-service arguments (e.g. {@code rename}: {@code old}/{@code new}).
  */

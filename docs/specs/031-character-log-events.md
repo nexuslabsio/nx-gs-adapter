@@ -12,7 +12,7 @@ react to the transition itself — a referral programme paying per achieved goal
 progression analytics — have nothing to subscribe to.
 
 The host already knows every such moment exactly. `Player.setClassId`, `Player.addSubClass` and
-`Player.applyNobleState` are single choke points every progression path funnels through. What bohpts
+`Player.applyNobleState` are single choke points every progression path funnels through. What the host
 does today instead is write a portal-facing `character_referral_status` row from 27 scattered call
 sites: a state table rather than an event stream, carrying four of the five thresholds (no 1st
 profession) and readable only by whoever can reach the game database.
@@ -61,7 +61,7 @@ progression paths.
 - [done] R4. `EventTypeRegistry` MUST bind `CharacterLogEvent` to family key `characterlog` with
   `charId` as the partition-key extractor.
 
-- [wip]  R5. `bohpts-core` MUST publish from three choke points, replacing scattered per-call-site
+- [wip]  R5. The host MUST publish from three choke points, replacing scattered per-call-site
   branches:
 
   - `Player.setClassId(int)` — sample `getClassId().level()` before the change, compare after; on an
@@ -133,8 +133,8 @@ adapter-core, one topic entry in `nx-tenants`.
 - `nx-gs-adapter-api/…/kafka/events/characterlog/WellKnownCharacterLogTypes.java` — `type` tokens.
 - `nx-gs-adapter-api/…/kafka/events/characterlog/WellKnownCharacterLogMetadata.java` — metadata keys.
 - `nx-gs-adapter-core/…/core/events/EventTypeRegistry.java` — one `register(...)` line.
-- `bohpts-core`: `l2e/gameserver/l2nx/events/characterlog/CharacterLogPublisher.java` — host facade,
-  bound by `BohptsEventsModule` on handshake.
+- the host: `CharacterLogPublisher` — host facade,
+  bound by the host's events module on handshake.
 - `nx-tenants`: `api/rest/adapter/AdapterController.java` — one `Map.entry` in the events map.
 
 ### Key components
@@ -202,7 +202,7 @@ Release order is forced by the handshake and the artifact graph:
 2. `nx-tenants` — advertise the family. Until this ships, host publishes are silent no-ops, so it
    must land before the host.
 3. `nx-gameservers` — consumer and table, idle until messages arrive.
-4. `bohpts-core` — publisher, rebuilt against the new adapter version.
+4. the host — publisher, rebuilt against the new adapter version.
 
 **Shipped 2026-09-01.** Steps 0-3 are live: topic created, `api/v0.85.0` + `core/v0.37.0` on Central,
 `nx-tenants v1.27.0` advertising the family, `nx-gameservers v0.123.0` consuming it (migration

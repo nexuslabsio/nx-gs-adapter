@@ -6,10 +6,10 @@
 
 Operators and platform-side dashboards need to chart server population over time —
 both raw "how many players are online" and the breakdown by activity bucket
-(offline-trade vs. real play vs. fishing vs. phantoms). Today bohpts-core renders
+(offline-trade vs. real play vs. fishing vs. phantoms). Today a host may render
 this overlay only inside the game-client character-list window: a custom UI
-iterates `GameObjectsStorage.getPlayers()` on demand, applies inline predicates
-(`isInOfflineMode`, `isFishing`, `isFakePlayer`), and draws the counts. Nothing
+iterates the online players on demand, applies inline predicates
+(offline-mode, fishing, fake-player), and draws the counts. Nothing
 leaves the JVM. The platform sees nothing.
 
 The premium-purchase rail (`events.premiumpurchase` family) shipped in Phase 3 already
@@ -17,7 +17,7 @@ proves the wire-level pattern for discrete in-game facts: per-family Kafka topic
 abstract base class, `Nx-Message-Type` header dispatch, UUIDv7 `eventId`,
 host-pushed via `NxEvents.publishX(...)`. Online stats are the next family to
 ride that rail — but as periodic snapshots rather than per-fact deltas. Stat
-cardinality (counts per bucket) is build-agnostic: bohpts has offline-trade,
+cardinality (counts per bucket) is build-agnostic: a reference host has offline-trade,
 fishing, phantoms; Lucera/Essence forks have a different set; client-specific
 forks add custom buckets. The wire schema MUST accommodate all of these without
 api releases for every new bucket.
@@ -67,8 +67,8 @@ plugging in a snapshot-builder.
   - `TOTAL` → `"total"` — total character presence (includes offline-trade
     and phantoms).
   - `UNIQUE` → `"unique"` — distinct active human players, deduplicated by
-    a host-defined identity tuple (bohpts: HWID + IP among
-    `!isInOfflineMode() && !isFakePlayer()`).
+    a host-defined identity tuple (e.g. HWID + IP among
+    players that are neither in offline mode nor fake).
 
   **Optional canonical** (host SHOULD publish when concept applies;
   consumers MUST tolerate absence):
@@ -100,29 +100,28 @@ plugging in a snapshot-builder.
   short-circuit logic as `publishPremiumPurchase`. No new internal infrastructure —
   reuses `EventsPublisher` / `EventEnvelope` / `EventTypeRegistry` as-is.
 
-- [todo] R7. `bohpts-core` MUST extend the existing
-  `l2e.gameserver.l2nx.events.BohptsEventsModule` (the same module that owns
+- [todo] R7. The host MUST extend its existing events module (the same module that owns
   the `events.premiumpurchase` wiring) to additionally:
   - `onConnect(ctx)` — bind the captured `ctx.events()` handle into a new
     `OnlineSnapshotBuilder` static facade alongside the existing
     `PremiumPublisher.bind(...)` call.
-  - `start()` — schedule a periodic snapshot task on `ThreadPoolManager`
-    via `scheduleAtFixedDelay` (NOT `scheduleAtFixedRate` — a stalled tick
+  - `start()` — schedule a periodic snapshot task on the host scheduler
+    via fixed-delay scheduling (NOT fixed-rate scheduling — a stalled tick
     must NOT trigger catch-up bursts) at a 30-second period.
   - `stop()` — cancel the scheduled task.
   - `onDisconnect()` — also release the `OnlineSnapshotBuilder` handle.
 
-  The snapshot-builder iterates `GameObjectsStorage.getPlayers()` once per tick,
-  walks every player, applies the bohpts predicates (`isInOfflineMode`,
-  `isFishing`, `isFakePlayer`, `getHWID`, `getIPAddress`) and computes the
+  The snapshot-builder iterates the online players once per tick,
+  walks every player, applies the host predicates (offline mode,
+  fishing, fake player, HWID, IP address) and computes the
   four canonical buckets:
   - `total` — every player in the iteration (including phantoms and
     offline-trade).
-  - `unique` — `Set<(hwid, ip)>.size()` accumulated across players where
-    `!isInOfflineMode() && !isFakePlayer()` and both HWID and IP are
+  - `unique` — `Set<(hwid, ip)>.size()` accumulated across players that are
+    neither in offline mode nor fake, and both HWID and IP are
     meaningful (HWID != `"N/A"`, IP != `"N/A"` and != `"Disconnected"`).
-  - `offline_trade` — `isInOfflineMode()`.
-  - `fishing` — `isFishing()` regardless of offline-trade / phantom state.
+  - `offline_trade` — player is in offline mode.
+  - `fishing` — player is fishing, regardless of offline-trade / phantom state.
 
   Builds `ServerOnlineSnapshotEvent` with UUIDv7 `eventId`, calls
   `nxEvents.publishServerOnlineSnapshot(event)`. Any uncaught `Throwable` is
@@ -130,7 +129,7 @@ plugging in a snapshot-builder.
   `PremiumPublisher`.
 
   No separate `AdapterModule` registration — `events.serveronline` rides the same
-  `bohpts-events` module entry in `META-INF/services` as `events.premiumpurchase`.
+  host events module entry in `META-INF/services` as `events.premiumpurchase`.
 
 **Should:**
 
@@ -214,7 +213,7 @@ plugging in a snapshot-builder.
 - Sibling reference (premium-family wire DTOs + publisher pattern):
   `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/events/premium/`
 - Technical design: see the Technical design section below — wire layout,
-  binding registration, and the bohpts snapshot-builder walkthrough
+  binding registration, and the reference snapshot-builder walkthrough
 
 ---
 
@@ -235,10 +234,10 @@ non-canonical keys (open map). Hosts publish via a single
 `NxEvents.publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)` SPI method.
 Adapter-core registers the binding in `EventTypeRegistry`; the existing
 `EventsPublisher` / `EventEnvelope` machinery handles fanout, headers, and
-disabled-family short-circuiting unchanged. bohpts-core extends its existing
-`BohptsEventsModule` (the module that already owns `events.premiumpurchase` wiring)
-to schedule a 30-second snapshot tick (`scheduleAtFixedDelay`) on
-`ThreadPoolManager`, walking `GameObjectsStorage.getPlayers()`, computing
+disabled-family short-circuiting unchanged. the host extends its existing
+events module (the module that already owns `events.premiumpurchase` wiring)
+to schedule a 30-second snapshot tick (fixed delay) on
+its scheduler, walking the online players, computing
 the four canonical buckets, and publishing.
 
 ### Structure
@@ -254,11 +253,11 @@ the four canonical buckets, and publishing.
   - `EventTypeRegistry.java` — adds `online` family + `ServerOnlineSnapshotEvent`
     binding
   - `NxEventsImpl.java` — adds `publishServerOnlineSnapshot` dispatch
-- `bohpts-core/core/src/main/java/l2e/gameserver/l2nx/events/`
-  - `BohptsEventsModule.java` — extended to also schedule the online snapshot
+- Host integration, events package
+  - events module — extended to also schedule the online snapshot
     tick alongside its existing premium wiring
-  - `OnlineSnapshotBuilder.java` — pure player-iteration → bucket-counts +
-    publish facade (lives next to `PremiumPublisher.java`)
+  - `OnlineSnapshotBuilder` — pure player-iteration → bucket-counts +
+    publish facade (lives next to `PremiumPublisher`)
 
 ### Key components
 
@@ -275,8 +274,8 @@ the four canonical buckets, and publishing.
 
 - **WellKnownServerOnlineBuckets** (implements R3) — string constants split
   into required (`TOTAL`, `UNIQUE`) and optional canonical (`OFFLINE_TRADE`,
-  `FISHING`). Each constant carries a Javadoc paragraph clarifying the bohpts
-  reference definition; other forks may reuse the constant with their own
+  `FISHING`). Each constant carries a Javadoc paragraph clarifying the reference
+  definition; other forks may reuse the constant with their own
   bucket-builder logic so long as the operator-facing meaning is consistent
   (e.g. `UNIQUE` is "distinct active humans" — the identity tuple is
   host-defined).
@@ -300,19 +299,19 @@ the four canonical buckets, and publishing.
   consumer groups by `Nx-Server-Id` header (always present post-handshake)
   and orders within-server by the UUIDv7 timestamp.
 
-- **BohptsEventsModule** (implements R7) — pre-existing Tier-1 module
+- **Host events module** (implements R7) — pre-existing Tier-1 module
   extended with one `ScheduledFuture<?>` slot for the online tick.
   `onConnect` calls both `PremiumPublisher.bind(...)` and
   `OnlineSnapshotBuilder.bind(...)`; `start()` schedules
   `OnlineSnapshotBuilder::tick` via
-  `ThreadPoolManager.scheduleAtFixedDelay` (30 s — fixed-delay so a
+  the host scheduler's fixed-delay scheduling (30 s — fixed-delay so a
   stalled tick never triggers a catch-up burst); `stop()` cancels;
   `onDisconnect()` unbinds both publishers.
 
 - **OnlineSnapshotBuilder** — public static facade in the same
   `l2nx.events` package as `PremiumPublisher`. Holds the current
   `NxEvents` handle (volatile). `tick()` iterates the player set on
-  whatever thread `ThreadPoolManager` provides, computes the four
+  whatever thread the host scheduler provides, computes the four
   canonical counts in a single pass, builds the event, and publishes.
   Wraps the whole tick in `try { ... } catch (Throwable t) { log.debug }`
   for game-loop-safety symmetry with `PremiumPublisher`.
@@ -322,15 +321,15 @@ the four canonical buckets, and publishing.
 Snapshot tick (host → platform):
 
 ```
-ThreadPoolManager.scheduleAtFixedDelay
+host scheduler (fixed delay)
   → OnlineSnapshotBuilder.tick()
-    → GameObjectsStorage.getPlayers() iteration (single pass)
+    → online-player iteration (single pass)
       → counters: total++ always
-                  offlineTrade++ if isInOfflineMode()
+                  offlineTrade++ if player is in offline mode
                   uniqueSet.add(hwid + "|" + ip) if !offline && !fake
                                                 && hwid != "N/A"
                                                 && ip ∉ {"N/A","Disconnected"}
-                  fishing++ if isFishing()
+                  fishing++ if player is fishing
       → unique = uniqueSet.size()
     → ServerOnlineSnapshotEvent (eventId = UUIDv7.generate(), buckets = Map.of(...))
     → NxEvents.publishServerOnlineSnapshot(event)

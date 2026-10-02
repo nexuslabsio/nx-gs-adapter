@@ -101,7 +101,7 @@ two message types**, no db-sync entity, no runtime entity.
   map, and the Kafka topic must be created — else the family is "disabled" and
   `publish` is a silent no-op.
 
-- [done] R6. Host (bohpts-core) ships:
+- [done] R6. Host (host) ships:
     - `CastleSnapshotPublisher` (static `bind(NxEvents)` + `tick()`) — builds a
       `CastleSnapshotEvent` from `CastleManager.getCastles()` every 30 s
       (`scheduleAtFixedDelay`, `RateLimitedWarn` on failure), mirroring
@@ -111,10 +111,10 @@ two message types**, no db-sync entity, no runtime entity.
     - `SiegeFinishedRecorder` — an `OnSiegeStatusListener` whose
       `onEnd(siege, winClan, defClan)` assembles the event and publishes it.
       Registered on every castle's `Siege` via `castle.getSiege().addListener(...)`
-      in `BohptsEventsModule.onConnect` (the core's provided extension point; no
+      in the host events module's `onConnect` (the core's provided extension point; no
       engine edit). `winClan != null` → `captured` (winner = winClan); else
       `defClan != null` → `defended` (winner = defClan); else `draw` (no winner).
-    - `BohptsEventsModule` binds both publishers, schedules the snapshot tick,
+    - the host's events module binds both publishers, schedules the snapshot tick,
       registers/unregisters the recorder.
 
 - [done] R7. Consumer (nx-gameservers) ingests family `castle`:
@@ -212,8 +212,8 @@ DEFENDER}`. Idempotent on `event_id` (`ON CONFLICT DO NOTHING`).
 ## Release follow-ups (out of the three-repo scope)
 
 - nx-tenants: register the `castle` events family in the `/connect` response.
-- Kafka: create topic `bohpts.gs.events.castle` (nx-infra doc updated).
+- Kafka: create topic `<tenant>.gs.events.castle` (nx-infra doc updated).
 - nx-gs-adapter-api: cut a new `api/vX.Y.Z`; bump the pinned
-  `nx-gs-adapter-api` in `bohpts-core/core/build.gradle` so the host compiles
+  `nx-gs-adapter-api` in the host build so the host compiles
   against the new symbols (nx-gameservers uses the composite build — no bump).
 - nx-users: nothing — ingestion-only, no `CASTLES_*` permission to seed.

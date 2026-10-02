@@ -295,9 +295,9 @@ class EntityTickLoopTest {
     @Test
     void resolveTopicFromContext_shouldReadRuntimeNamespace() {
         TopicResolver runtimeOnly =
-                TopicResolver.fromSnapshot(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"));
+                TopicResolver.fromSnapshot(Collections.singletonMap("character", "acme.gs.sync.runtime.character"));
 
-        assertEquals("bohpts.gs.sync.runtime.character", runtimeOnly.resolveTopic("character"));
+        assertEquals("acme.gs.sync.runtime.character", runtimeOnly.resolveTopic("character"));
         assertNull(runtimeOnly.resolveTopic("clan"));
     }
 

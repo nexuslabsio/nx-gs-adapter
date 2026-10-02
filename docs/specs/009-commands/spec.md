@@ -14,8 +14,8 @@ platform's web side — kicks, mail sends, item operations, account punishments,
 character ↔ telegram pairings — and reply with a typed success payload or a structured
 problem.
 
-Legacy bohpts used a hand-rolled RabbitMQ surface
-(`l2e.gameserver.infrastructure.rabbitMq`) that:
+Legacy host used a hand-rolled RabbitMQ surface
+(a host-specific RabbitMQ package) that:
 
 1. Auto-acks messages BEFORE the handler runs (drops on handler failure)
 2. Runs handlers on the RabbitMQ consumer thread (races against game-state mutations)
@@ -31,7 +31,7 @@ Sibling [`messaging`](../008-messaging.md) shipped the **outbound** events surfa
 inbound wire-shape as a Javadoc placeholder. This feature owns the runtime: Kafka consumer +
 dispatch + handler SPI + reply publishing, plus the command catalog that grew on top of it.
 
-Audience: bohpts-core (and future per-tenant) command-handler authors; platform-side operators
+Audience: host (and future per-tenant) command-handler authors; platform-side operators
 who consume reply events.
 
 ## Requirements
@@ -324,7 +324,7 @@ replies-published == 0}` is visible as a failure rather than as silence
   deliberately distinct from `INVALID_STATE`: the world was never consulted, so retrying with a
   fresh deadline is meaningful whereas re-sending the same command never is. First user is
   `BuyFromPrivateStoreCommand.getDeadline()` (REQUIRED field, guards a command that sat in the
-  ~3h Kafka backlog while the game-server was down). No host emits it yet — bohpts does not read
+  ~3h Kafka backlog while the game-server was down). No host emits it yet — no host reads
   `getDeadline()` today. Rollout ordering is below.
 
 - [done] R24. `nx-gs-adapter-api.kafka.commands.CommandProblem` MUST carry the failure context of
@@ -607,7 +607,3 @@ NxCommand<Void>` is the sanctioned exception, and payload-less `CommandResult.ok
 - Sibling feature (`NxSync` / force-resync): [`docs/specs/021-force-resync.md`](../021-force-resync.md)
 - Follow-up command slice: [`docs/specs/009-commands/send-mail.md`](send-mail.md)
 - Follow-up command slice: [`docs/specs/009-commands/ban.md`](ban.md)
-- Legacy reference (RabbitMQ command surface, web side):
-  `E:/bohpts/code/bohpts-rabbitmq/src/main/java/com/bohpts/messaging/`
-- Legacy reference (RabbitMQ command surface, core side):
-  `E:/projects/bohpts/bohpts-core/core/src/main/java/l2e/gameserver/infrastructure/rabbitMq/`

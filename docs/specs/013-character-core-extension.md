@@ -23,7 +23,7 @@
   провайдеры, чьи источники не несут соответствующие колонки, оставляют
   поля `null`. `id` и `name` стали **required** (constructor throws NPE
   if name is null) — это структурно гарантируется любой L2J-схемой;
-  schema provider MUST skip dirty rows перед DTO assembly (см. bohpts
+  schema provider MUST skip dirty rows перед DTO assembly (см. reference-интеграцию:
   `CharacterMapping.mapEntity` который return'ит `null` для row'ев с null
   `char_name`, что engine трактует как «skip this pk this cycle»).
 - [done] R2. `CharacterRuntimeDto` MUST add optional field
@@ -36,12 +36,12 @@
     platform-side presence;
   - `online = true` explicit допускается, но лишний — provider должен
     предпочесть `null` для regular ONLINE.
-- [done] R3. Bohpts `CharacterMapping` MUST surface новые поля через
+- [done] R3. Host `CharacterMapping` MUST surface новые поля через
   hashed-columns `account_name`, `nobless`, `deletetime` поверх
   существующих. Source sentinel `deletetime = 0` → `null` (по
   L2J-конвенции «не помечен на удаление»). Source `nobless` (tinyint
   0/1) → Boolean.
-- [done] R4. Bohpts `CharacterRuntimeMapping` MUST держать
+- [done] R4. Host `CharacterRuntimeMapping` MUST держать
   in-memory `previousOnline: Set<Long>` идентификаторов между тиками.
   За каждый `snapshot()` mapping:
   - эмитит регулярную `CharacterRuntimeDto` (vitals + coords) для
@@ -65,10 +65,10 @@ online=false}`) для каждого id, который был в `previousOnli
   single-event family) MUST содержать `eventId: UUIDv7` (REQUIRED, для
   derive `occurredAt`), `charId: long` (REQUIRED), `online: boolean`
   (REQUIRED, `true`=login / `false`=logout), `accountName`/`ip`/`hwid`
-  (optional). Партиционирование по `charId`. Bohpts emit'ит из standard
-  packet path (`RequestEnterWorld` для login, `Player.deleteMe()` для
-  logout) через `CharacterPresencePublisher.publishLogin(player)` /
-  `publishLogout(player)`, bound в `BohptsEventsModule.onConnect`. Cheat /
+  (optional). Партиционирование по `charId`. Host emit'ит из standard
+  packet path (enter-world для login, player-delete для logout) через
+  presence-publisher (`publishLogin(player)` / `publishLogout(player)`),
+  bound в `onConnect` events-модуля host'а. Cheat /
   custom clients bypass'ят packet path → no event — fallback на runtime
   tombstones и CDC online.
 
@@ -127,13 +127,13 @@ online=false}`) для каждого id, который был в `previousOnli
 
 ### Overview
 
-Расширение существующих character DTO и bohpts mapping без новых модулей
+Расширение существующих character DTO и host mapping без новых модулей
 и без изменения engine internals. Все изменения локализованы:
 
 - `nx-gs-adapter-api`: новые поля в двух POJO DTO + Builder methods.
-- `bohpts-core` (`l2e.gameserver.l2nx.sync.db.CharacterMapping`): пара
+- host `CharacterMapping` (db sync): пара
   новых hashed columns + readers в `CharacterRow`.
-- `bohpts-core` (`l2e.gameserver.l2nx.sync.runtime.CharacterRuntimeMapping`):
+- host `CharacterRuntimeMapping` (runtime sync):
   in-memory online-set diff + tombstone-генерация.
 
 ### Wire schema deltas
@@ -179,7 +179,7 @@ Wire (offline tombstone):
 
 ### Mapping-side details
 
-#### bohpts CharacterMapping
+#### Host CharacterMapping
 
 `HASHED` extended:
 
@@ -201,7 +201,7 @@ UPDATE storm risk: account_name (changes only on `TransferCharToAccount`
 command, rare), nobless (one-time quest), deletetime (mark-for-delete
 flow, rare). Все безопасны в hashed.
 
-#### bohpts CharacterRuntimeMapping
+#### Host CharacterRuntimeMapping
 
 State:
 
@@ -229,7 +229,7 @@ return rows
 `hash(dto)` теперь mix'ит `online` в FNV-1a (если non-null).
 
 Single-instance assumption: mapping держится одним
-`BohptsRuntimeStateProvider` instance'ом, который ServiceLoader
+host `RuntimeStateProvider` instance'ом, который ServiceLoader
 инстанцирует ровно один раз на JVM. Поэтому stateful поле
 `previousOnline` корректно. Если SPI начнёт инстанцировать mapping per
 tick — feature сломается; safeguard через JUnit-тест отсутствует.
@@ -268,7 +268,7 @@ snapshot ONLINE rows для всех текущих игроков; OFFLINE-tomb
 
 `HashSet<Long>` с ~10k entries: ~640 KB (Long boxing + HashMap overhead).
 Если станет узким местом — replace на napile `LongOpenHashSet` (уже в
-classpath bohpts через napile-1.0.5b.jar — но API не доступен с
+classpath host'а через napile-1.0.5b.jar — но API не доступен с
 `LongSet`-shape). Сейчас не bottleneck.
 
 ### Integration points
@@ -276,7 +276,7 @@ classpath bohpts через napile-1.0.5b.jar — но API не доступен
 - **nx-gs-adapter-api 0.26+** — две POJO DTO с новыми полями. Wire-back-compat:
   старые consumer'ы игнорируют unknown fields (Jackson / Gson
   тренируется на `fail-on-unknown-properties=false` / `lenient`).
-- **bohpts-core** — обновление CharacterMapping + CharacterRuntimeMapping.
+- **Host-интеграция** — обновление CharacterMapping + CharacterRuntimeMapping.
   Compile-time bump nx-gs-adapter-api.
 - Platform side: `nx-gameservers` ingestit новые поля + presence (см.
   parallel feature на той стороне).

@@ -38,10 +38,10 @@ class SyncTopicsWiringTest {
     @Test
     void initKafka_shouldSurfaceSyncTopics_inConnectContext() {
         Map<String, String> dbTopics = new HashMap<String, String>();
-        dbTopics.put("clan", "bohpts.gs.sync.db.clan");
-        dbTopics.put("character", "bohpts.gs.sync.db.character");
+        dbTopics.put("clan", "acme.gs.sync.db.clan");
+        dbTopics.put("character", "acme.gs.sync.db.character");
         Map<String, String> runtimeTopics = new HashMap<String, String>();
-        runtimeTopics.put("character", "bohpts.gs.sync.runtime.character");
+        runtimeTopics.put("character", "acme.gs.sync.runtime.character");
         SyncTopics topics =
                 SyncTopics.builder().db(dbTopics).runtime(runtimeTopics).build();
 
@@ -73,7 +73,7 @@ class SyncTopicsWiringTest {
         // else heartbeat reports empty enabledModules and all sync silently stops
         NxAdapter.failEventsBootstrapForTesting(true);
         SyncTopics topics = SyncTopics.builder()
-                .db(java.util.Collections.singletonMap("character", "bohpts.gs.sync.db.character"))
+                .db(java.util.Collections.singletonMap("character", "acme.gs.sync.db.character"))
                 .build();
 
         NxAdapter.simulateInitKafkaForTesting(new KafkaInitializer(new CapturingKafkaFactory()), response(topics));
@@ -82,13 +82,13 @@ class SyncTopicsWiringTest {
         assertNotNull(ctx, "sync module.onConnect must still fire when events bootstrap fails");
         assertTrue(
                 CapturingAdapterModule.wasStarted(), "sync module.start must fire even though events bootstrap threw");
-        assertEquals("bohpts.gs.sync.db.character", ctx.getSyncTopics().getDb().get("character"));
+        assertEquals("acme.gs.sync.db.character", ctx.getSyncTopics().getDb().get("character"));
     }
 
     @Test
     void initKafka_shouldExposeUnmodifiableNamespaces_inConnectContext() {
         SyncTopics topics = SyncTopics.builder()
-                .db(java.util.Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                .db(java.util.Collections.singletonMap("clan", "acme.gs.sync.db.clan"))
                 .build();
 
         NxAdapter.simulateInitKafkaForTesting(new KafkaInitializer(new CapturingKafkaFactory()), response(topics));

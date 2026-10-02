@@ -37,7 +37,7 @@ class CdcEngineTest {
         EntityStatsTracker tracker = new EntityStatsTracker();
         TopicResolver resolver = entity -> null;
         engine = new CdcEngine(
-                "bohpts",
+                "acme",
                 Collections.singletonList(clanMapping()),
                 mock(JdbcConnectionSource.class),
                 new SnapshotStore(),
@@ -70,7 +70,7 @@ class CdcEngineTest {
         assertEquals(2, snapshot.sizeOf("clan"));
 
         engine = new CdcEngine(
-                "bohpts",
+                "acme",
                 Collections.singletonList(clanMapping()),
                 mock(JdbcConnectionSource.class),
                 snapshot,
@@ -95,7 +95,7 @@ class CdcEngineTest {
     void start_shouldBeIdempotent() {
         EntityStatsTracker tracker = new EntityStatsTracker();
         engine = new CdcEngine(
-                "bohpts",
+                "acme",
                 Collections.singletonList(clanMapping()),
                 mock(JdbcConnectionSource.class),
                 new SnapshotStore(),
@@ -125,7 +125,7 @@ class CdcEngineTest {
         SnapshotStore snapshot = new SnapshotStore();
 
         engine = new CdcEngine(
-                "bohpts",
+                "acme",
                 Collections.singletonList(clanMapping()),
                 mock(JdbcConnectionSource.class),
                 snapshot,
@@ -174,7 +174,7 @@ class CdcEngineTest {
 
         EntityStatsTracker tracker = new EntityStatsTracker();
         engine = new CdcEngine(
-                "bohpts",
+                "acme",
                 Collections.singletonList(clanMapping()),
                 mock(JdbcConnectionSource.class),
                 new SnapshotStore(),

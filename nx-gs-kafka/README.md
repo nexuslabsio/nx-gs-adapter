@@ -162,7 +162,7 @@ A JVM shutdown hook is also registered automatically.
 ```java
 NxKafka kafka = NxKafka.configure()
     .brokers("kafka1:9092,kafka2:9092")       // required
-    .clientId("bohpts-x20")                   // optional, default: nx-gs-kafka
+    .clientId("my-server-1")                   // optional, default: nx-gs-kafka
     .connectTimeout(5, TimeUnit.SECONDS)      // optional, default: 5s, max: 60s
     .reconnect(true)                          // optional, default: true
     .reconnectInterval(30, TimeUnit.SECONDS)  // optional, default: 30s, max: 5min

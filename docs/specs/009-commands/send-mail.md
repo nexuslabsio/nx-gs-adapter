@@ -4,7 +4,7 @@
 
 ## Problem
 
-Bohpts platform sends system mails to characters from two operator surfaces — the
+The platform sends system mails to characters from two operator surfaces — the
 web admin UI and the Telegram bot — using a hand-rolled RabbitMQ wire
 (`SendMailRequestV1` consumed by both `tg-to-<server>` and `admin-to-<server>`
 queues, both dispatching to `MailService.sendMailAndReply`). The legacy surface has
@@ -17,12 +17,12 @@ RabbitMQ onto the new commands rail.
 
 Per [`commands/spec.md` line 406-408](spec.md): migration is per-command
 cutover. Web side feature-flags individual commands to Kafka or RabbitMQ during
-transition; bohpts-core runs both consumer surfaces in parallel; the legacy DTO
+transition; the host runs both consumer surfaces in parallel; the legacy DTO
 case is removed only when the platform stops emitting it. This slice does NOT
 remove the `RabbitMqTgConsumer` / `RabbitMqWebAdminConsumer` SendMailRequestV1
 arms — those retire in a follow-up cleanup once the web side is fully cut over.
 
-Audience: bohpts-core operators wiring the new handler; platform-side mail-flow
+Audience: host operators wiring the new handler; platform-side mail-flow
 authors composing `SendMailCommand` records onto the commands topic.
 
 ## Requirements
@@ -30,7 +30,7 @@ authors composing `SendMailCommand` records onto the commands topic.
 > Sibling features carry the wire + dispatch plumbing:
 >
 > - [`commands`](spec.md) — Kafka topic + consumer + dispatch table + > reply path + heartbeat slot. UNCHANGED by this slice.
-> - [`adapter-modules`](../002-adapter-modules/spec.md) — Tier-1 ServiceLoader-based > `AdapterModule` discovery used by bohpts to wire its handlers via > `BohptsCommandsModule`.
+> - [`adapter-modules`](../002-adapter-modules/spec.md) — Tier-1 ServiceLoader-based > `AdapterModule` discovery used by the host to wire its handlers via > its commands module.
 
 **Must:**
 
@@ -62,7 +62,7 @@ authors composing `SendMailCommand` records onto the commands topic.
   the success-payload type carrying:
   - `List<Long> createdMailIds` — primary keys of the materialized mail rows.
     Multi-element when the host batches the inbound `items` across multiple
-    mails (host-defined cap; bohpts uses `Config.MAIL_MAX_ATTACHMENTS`).
+    mails (host-defined cap; e.g. a host config constant).
     Non-null on read; null in constructor normalized to empty list.
   - `List<ItemDeliveryError> itemErrors` — partial-failure entries when
     specific attachment lines could not be materialized. Non-null on read;
@@ -81,7 +81,7 @@ authors composing `SendMailCommand` records onto the commands topic.
   passed to the constructor is normalized to an empty string at construction
   so getters and `equals`/`hashCode`/`toString` agree.
 
-- [done] R5. `bohpts-core` MUST ship `l2e.gameserver.l2nx.commands.mail.SendMailHandler`
+- [done] R5. The host MUST ship `SendMailHandler`
   implementing `CommandHandler<SendMailCommand, SendMailResult>`:
   - Wire-path null guard on `charId` / `title` →
     `validationFailed("<title>", "<name>")` (the convenience factory puts the offending
@@ -98,13 +98,13 @@ authors composing `SendMailCommand` records onto the commands topic.
   - On success, build `SendMailResult` from the returned mail-id list +
     per-line error reasons (mapped to `ItemDeliveryError` entries).
 
-- [done] R6. `bohpts-core` MUST register the handler in `BohptsCommandsModule.onConnect`
+- [done] R6. The host MUST register the handler in `HostCommandsModule.onConnect`
   alongside the existing `DeleteItemHandler` registration.
 
 **Should:**
 
 - [partially done] R7. Idempotency cache on `correlationId`. The handler IS registered
-  through `BohptsCommandsModule.onDeduped`, so `DedupCommandHandler` + `CommandDedupStore`
+  through `HostCommandsModule.onDeduped`, so `DedupCommandHandler` + `CommandDedupStore`
   (in-memory, OK-only, 10 min TTL, lost on restart) sit in front of it. That barrier is
   currently inert for the admin surface: the platform mints a fresh correlation id per
   dispatch, so a retry never matches a cached entry. Making it effective requires the
@@ -115,7 +115,7 @@ authors composing `SendMailCommand` records onto the commands topic.
 
 - [todo] R8. Migration to a `SendMailWithReplyToCommand` variant that carries
   thread-id / reply-to mail id metadata for non-system mail. Not in scope —
-  bohpts platform only sends system mails through this surface today.
+  platform only sends system mails through this surface today.
 
 **Non-goals:**
 
@@ -160,7 +160,7 @@ authors composing `SendMailCommand` records onto the commands topic.
   `itemObjectId` for object-ids in `DeleteItemCommand`. Renaming makes the
   identity explicit.]
 - [assumed: `Long createdMailIds` (not `Integer`). Aligns with the rest of
-  the commands api which uses `Long` for primary keys; current bohpts
+  the commands api which uses `Long` for primary keys; current host
   `Message::getId` returns `int` so the host widens on the way out.]
 
 ## Links
@@ -171,10 +171,6 @@ authors composing `SendMailCommand` records onto the commands topic.
   `nx-gameservers/docs/specs/037-mail/sync.md`
 - Delivery/idempotency framework this command is expected to adopt (deadline gate, durable receipts,
   safe-set outcome rules): `nx-gameservers/docs/specs/068-critical-commands-framework.md`
-- Legacy reference (RabbitMQ command surface, core side):
-  `bohpts-core/core/src/main/java/l2e/gameserver/infrastructure/rabbitMq/`
-- Legacy reference (RabbitMQ DTO, web side):
-  `bohpts-rabbitmq/src/main/java/com/bohpts/messaging/dto/SendMailRequestV1.java`
 - Companion document: see the Technical design section below — wire layout + handler walkthrough
 
 ---
@@ -281,7 +277,7 @@ Reply payload:
 
 ### Handler walkthrough
 
-`l2e.gameserver.l2nx.commands.mail.SendMailHandler.handle(cmd, ctx)`:
+`SendMailHandler`.handle(cmd, ctx)`:
 
 1. **Wire-validate** `charId` / `title` non-null (Gson bypasses ctor).
 2. **Wire-validate** every `MailItem`: non-null entry, non-null `itemTemplateId`,
@@ -317,7 +313,7 @@ Reply payload:
      below for why typed identity is left nullable.
 8. **Reply** `CommandResult.success(payload)`.
 
-The handler IS wrapped for correlation-id dedup: `BohptsCommandsModule` registers it
+The handler IS wrapped for correlation-id dedup: the host's commands module registers it
 through `onDeduped`, so `DedupCommandHandler` + `CommandDedupStore` (in-memory,
 OK-only, 10 min TTL, lost on restart) sit in front of it. The commands consumer
 is at-most-once (offsets committed before dispatch), so Kafka redelivery is not
@@ -376,7 +372,7 @@ fields are already nullable.
 
 #### Migration sharp edge
 
-Legacy bohpts `MailService.sendMailAndReply` joined per-line failure reasons
+Legacy host `MailService.sendMailAndReply` joined per-line failure reasons
 with `"\n"` into a single `message: String` field on `SendMailResponseV1`.
 The new wire shape ships an array of `ItemDeliveryError` entries — one per
 reason. **Platform-web consumers MUST iterate `payload.itemErrors[]` and

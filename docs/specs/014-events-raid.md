@@ -148,21 +148,21 @@ host-side authors hooking raid-death paths.
   `<slug> + ".gs.events.raid"`. Adapter-side wire address comes from this
   field — no other config change.
 
-- [todo] R9. The new Kafka topic `bohpts.gs.events.raid` MUST be documented
-  in `nx-infra/komodo/l2nx/prod-kafka/tenants/bohpts.md` with 2 partitions,
+- [todo] R9. The new Kafka topic `<tenant>.gs.events.raid` MUST be documented
+  in `the nx-infra per-tenant Kafka doc` with 2 partitions,
   replication factor 1, retention 10_800_000 ms (3 hours) matching the
   platform-wide default for event topics. Long-term persistence is a
   consumer-side concern (TSDB / PostgreSQL / etc.); the Kafka topic only
   acts as a short-term replay buffer.
 
-- [todo] R10. `bohpts-core` MUST extend `l2e.gameserver.l2nx.events.BohptsEventsModule`
+- [todo] R10. The host MUST extend the host's events module
   to bind a new `RaidKillPublisher` static facade alongside the existing
   publishers (`PremiumPurchasePublisher`, `ServerOnlineSnapshotPublisher`,
   `PrivateStorePurchasePublisher`, `PrivateStoreSnapshotPublisher`,
   `CharacterPresencePublisher`). No new `AdapterModule` ServiceLoader entry —
-  rides the same `bohpts-events` module.
+  rides the same host events module.
 
-- [todo] R11. `bohpts-core` MUST ship a `RaidKillRecorder` singleton that:
+- [todo] R11. The host MUST ship a `RaidKillRecorder` singleton that:
     - Owns a `ConcurrentMap<Integer, RaidFightState>` keyed by `Attackable.getObjectId()`
       — state lazily-instantiated on the first `recordDrop` call for a given
       raid instance, GC'd after `recordKill` flushes.
@@ -185,7 +185,7 @@ host-side authors hooking raid-death paths.
       guaranteeing the game thread cannot be interrupted by any failure
       mode of the integration code.
 
-- [todo] R12. `bohpts-core` MUST modify `Attackable`:
+- [todo] R12. The host MUST modify `Attackable`:
     - Inside `rollRewards`, after the per-reward `dropItem` / `doAutoLoot`
       call, invoke `RaidKillRecorder.getInstance().recordDrop(this, drop._itemId,
       drop._count, 0)` — `enchantLevel = 0` is a safe default; rolled raid
@@ -281,7 +281,7 @@ host-side authors hooking raid-death paths.
   `EventTypeRegistry`. Per-family delivery semantics (partition key,
   ordering, family-disabled fallback) moved onto the concrete event DTO
   Javadoc + the registry. Breaking change for the api jar (host callsites
-  in bohpts migrated in lock-step). This slice bumps api 0.27.0 → 0.28.0
+  in the host migrated in lock-step). This slice bumps api 0.27.0 → 0.28.0
   and core 0.18.0 → 0.19.0 over the last released tags
   (`api/v0.27.0`, `core/v0.18.0`).]
 - [resolved: single event type `RaidKillEvent` (rejected abstract base for
@@ -316,16 +316,13 @@ host-side authors hooking raid-death paths.
   serves all three actor-ref sites (lastHit / dropOwner / each participants
   entry). One source of truth for actor shape, no nesting on the wire.
   Char / clan names dropped from the wire — platform joins on
-  `charId` / `clanId` against CDC catalogs (`bohpts.gs.sync.db.character`,
-  `bohpts.gs.sync.db.clan`). `bossName` kept for now (no NPC CDC stream
+  `charId` / `clanId` against CDC catalogs (`<tenant>.gs.sync.db.character`,
+  `<tenant>.gs.sync.db.clan`). `bossName` kept for now (no NPC CDC stream
   exists today; remove when a gamedata service lands).]
 
 ## Links
 
 - Sibling reference (host-push publisher pattern + module wiring):
   [`docs/specs/011-events-online-snapshot.md`](011-events-online-snapshot.md)
-- Legacy (decommissioned) rail emitting only START / END phase notifications
-  with a single `bossId` and no damage / drop / participant detail:
-  `bohpts-core/core/src/main/java/l2e/gameserver/feature/analytics/epicboss/EpicBossAnalyticsService.java`
     + `AnalyticsMapper.toEpicBossEventV1`. Not used at runtime any more; the new
       rail is a strict superset (does NOT coexist or replay legacy events).

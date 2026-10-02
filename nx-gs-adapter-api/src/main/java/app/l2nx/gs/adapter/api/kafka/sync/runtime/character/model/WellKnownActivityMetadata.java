@@ -21,7 +21,7 @@ public final class WellKnownActivityMetadata {
      * Raw-seconds spelling of {@link #ELAPSED}.
      *
      * @deprecated use {@link #ELAPSED} (ISO-8601). Removed once every host emits the ISO key -
-     *     for bohpts, the morning game-server restart following the core release that switched.
+     *     i.e. after the host's first game-server restart following the release that switched.
      */
     @Deprecated
     public static final String ELAPSED_SECONDS = "elapsed_seconds";

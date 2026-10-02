@@ -34,23 +34,23 @@ class ConnectResponseTest {
     @Test
     void syncTopics_shouldExposeNamespaces_whenBuilderProvidesIt() {
         SyncTopics topics = SyncTopics.builder()
-                .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
-                .runtime(Collections.singletonMap("character", "bohpts.gs.sync.runtime.character"))
+                .db(Collections.singletonMap("clan", "acme.gs.sync.db.clan"))
+                .runtime(Collections.singletonMap("character", "acme.gs.sync.runtime.character"))
                 .build();
 
         ConnectResponse response = ConnectResponse.builder().syncTopics(topics).build();
 
         assertEquals(topics, response.getSyncTopics());
-        assertEquals("bohpts.gs.sync.db.clan", response.getSyncTopics().getDb().get("clan"));
+        assertEquals("acme.gs.sync.db.clan", response.getSyncTopics().getDb().get("clan"));
         assertEquals(
-                "bohpts.gs.sync.runtime.character",
+                "acme.gs.sync.runtime.character",
                 response.getSyncTopics().getRuntime().get("character"));
     }
 
     @Test
     void syncTopics_namespacesShouldBeUnmodifiable() {
         SyncTopics topics = SyncTopics.builder()
-                .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                .db(Collections.singletonMap("clan", "acme.gs.sync.db.clan"))
                 .build();
 
         ConnectResponse response = ConnectResponse.builder().syncTopics(topics).build();
@@ -71,7 +71,7 @@ class ConnectResponseTest {
                 .kafka(KafkaCredentials.builder().bootstrap("localhost:9092").build())
                 .heartbeatTopic("acme.gs.heartbeat")
                 .syncTopics(SyncTopics.builder()
-                        .db(Collections.singletonMap("clan", "bohpts.gs.sync.db.clan"))
+                        .db(Collections.singletonMap("clan", "acme.gs.sync.db.clan"))
                         .build())
                 .messagingTopics(MessagingTopics.builder()
                         .events(Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase"))

@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 class RuntimeSyncModuleTest {
 
     private static final Map<String, String> CHARACTER_TOPIC =
-            Collections.singletonMap("character", "bohpts.gs.sync.runtime.character");
+            Collections.singletonMap("character", "acme.gs.sync.runtime.character");
 
     private static final ConnectContext CTX_WITH_TOPIC =
             ctx(SyncTopics.builder().runtime(CHARACTER_TOPIC).build());

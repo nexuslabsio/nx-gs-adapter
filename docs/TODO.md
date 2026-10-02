@@ -25,7 +25,7 @@ it is picked up, it moves to "Done / moved into a spec".
   a distinct exception), and whether `UNAVAILABLE` replies keep `error.cause=host-executor-timeout`.
 - **Why:** today the caller gets `UNAVAILABLE` and the queued task may still mutate game state later
   (kick, ban, mail, item delivery). Each non-idempotent handler would need its own claim flag;
-  bohpts `SendCaptchaHandler` sidestepped it by switching to `host().async`.
+  a host handler sidestepped it by switching to `host().async`.
 - **Related:** [`009-commands`](specs/009-commands/spec.md).
 
 ## Done / moved into a spec
