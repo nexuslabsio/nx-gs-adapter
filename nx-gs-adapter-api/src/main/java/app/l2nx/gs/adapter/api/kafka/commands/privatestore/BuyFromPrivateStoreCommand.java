@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.privatestore.model.BuyLine;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

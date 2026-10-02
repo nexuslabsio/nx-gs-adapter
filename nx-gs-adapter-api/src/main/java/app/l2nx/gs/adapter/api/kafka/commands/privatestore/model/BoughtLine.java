@@ -2,7 +2,6 @@ package app.l2nx.gs.adapter.api.kafka.commands.privatestore.model;
 
 import app.l2nx.gs.adapter.api.kafka.commands.privatestore.BuyFromPrivateStoreCommand;
 import app.l2nx.gs.adapter.api.kafka.commands.privatestore.BuyFromPrivateStoreResult;
-import app.l2nx.gs.adapter.api.kafka.commands.privatestore.BuyLine;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 

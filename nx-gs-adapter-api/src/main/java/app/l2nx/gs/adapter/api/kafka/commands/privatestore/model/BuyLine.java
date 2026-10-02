@@ -1,6 +1,8 @@
-package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
+package app.l2nx.gs.adapter.api.kafka.commands.privatestore.model;
 
 import app.l2nx.gs.adapter.api.domain.Attribute;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -80,7 +82,7 @@ public final class BuyLine {
         this.itemId = itemId;
         this.itemTemplateId = itemTemplateId;
         this.enchantLevel = enchantLevel;
-        this.attributes = PrivateStoreLists.freezeAttributes(attributes);
+        this.attributes = freezeAttributes(attributes);
         this.count = count;
         this.unitPriceAdena = unitPriceAdena;
     }
@@ -218,5 +220,12 @@ public final class BuyLine {
         public BuyLine build() {
             return new BuyLine(itemId, itemTemplateId, enchantLevel, attributes, count, unitPriceAdena);
         }
+    }
+
+    private static Map<Attribute, Integer> freezeAttributes(@Nullable Map<Attribute, Integer> src) {
+        if (src == null || src.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return Collections.unmodifiableMap(new EnumMap<Attribute, Integer>(src));
     }
 }

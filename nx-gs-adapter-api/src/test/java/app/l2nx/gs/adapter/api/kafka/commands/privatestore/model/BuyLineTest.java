@@ -1,4 +1,4 @@
-package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
+package app.l2nx.gs.adapter.api.kafka.commands.privatestore.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
