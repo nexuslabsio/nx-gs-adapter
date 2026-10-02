@@ -245,5 +245,8 @@ the drop gate are usually different events and cannot be cleared in one pass. Re
 - `docs/specs/NNN-<feature>.md` — one living spec per feature; iterations update the existing spec
   rather than adding a new number. A feature that grows companion docs becomes
   `docs/specs/NNN-<feature>/spec.md` + siblings. Populated by the `spec-authoring` skill.
+- **Commands are the exception to "one feature, one `NNN`":** every command spec lives in
+  `docs/specs/009-commands/<command>.md` (no number) next to the rail `spec.md`, `catalog.md` and
+  `guide.md`. Never open a top-level `NNN` for a command.
 - `nx-gs-adapter-api/CLAUDE.md` — the wire-contract map (packages, families, contracts worth calling
   out). Anything about DTO shape belongs there or in a spec, not in this file.

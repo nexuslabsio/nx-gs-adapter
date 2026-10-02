@@ -12,7 +12,7 @@ state lives entirely in the host's punishment engine and never leaves the JVM.
 This slice adds both halves:
 
 - a **down-channel** command pair (`BanCommand` / `UnbanCommand`) on the
-  existing `NxCommands` rail (see [`commands`](009-commands/spec.md)) so the
+  existing `NxCommands` rail (see [`commands`](spec.md)) so the
   platform can apply / clear a ban on one server, and
 - an **up-channel** sync DTO (`BanDbDto`) mirroring every persisted punishment
   row onto the db-sync stream so the platform sees the full moderation state.
@@ -28,11 +28,11 @@ schema-provider mapping.
 ## Requirements
 
 > Sibling features carry the wire + dispatch plumbing:
-> - [`commands`](009-commands/spec.md) — Kafka commands topic + consumer +
+> - [`commands`](spec.md) — Kafka commands topic + consumer +
     > dispatch table + reply path + heartbeat slot. UNCHANGED by this slice.
-> - [`db-sync`](003-db-sync/spec.md) — CDC engine + `DbSchemaProvider` SPI +
+> - [`db-sync`](../003-db-sync/spec.md) — CDC engine + `DbSchemaProvider` SPI +
     > per-entity sync topics carrying the up-channel `BanDbDto`. UNCHANGED.
-> - [`adapter-modules`](002-adapter-modules/spec.md) — Tier-1 ServiceLoader
+> - [`adapter-modules`](../002-adapter-modules/spec.md) — Tier-1 ServiceLoader
     > `AdapterModule` discovery used to wire the host handlers.
 
 ### Down-channel — apply / clear
@@ -168,6 +168,6 @@ and does not map the `ban` entity until rebuilt against the new api.
 ## Links
 
 - Sibling reference (concrete-command handler + DTO migration pattern):
-  [`docs/specs/010-commands-send-mail.md`](010-commands-send-mail.md)
-- Commands rail infrastructure: [`docs/specs/009-commands/spec.md`](009-commands/spec.md)
-- Up-channel sync infrastructure: [`docs/specs/003-db-sync/spec.md`](003-db-sync/spec.md)
+  [`docs/specs/009-commands/send-mail.md`](send-mail.md)
+- Commands rail infrastructure: [`docs/specs/009-commands/spec.md`](spec.md)
+- Up-channel sync infrastructure: [`docs/specs/003-db-sync/spec.md`](../003-db-sync/spec.md)

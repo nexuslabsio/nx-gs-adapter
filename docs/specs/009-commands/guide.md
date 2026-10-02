@@ -39,7 +39,7 @@ dispatch on the header, so they must key off the command they sent.
 field — an internal note for staff, not for the player. The host MUST NOT display it in-game and
 SHOULD log it on the audit line for the action; the platform records the whole command payload on
 `gs_command_audits.params`, which is where it surfaces staff notes back to the admin UI. See
-[`032-character-admin-commands.md`](../032-character-admin-commands.md) for the commands that
+[`character-admin.md`](character-admin.md) for the commands that
 established this convention.
 
 ## End-to-end lifecycle

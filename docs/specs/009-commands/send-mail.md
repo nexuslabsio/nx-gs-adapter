@@ -8,14 +8,14 @@ Bohpts platform sends system mails to characters from two operator surfaces — 
 web admin UI and the Telegram bot — using a hand-rolled RabbitMQ wire
 (`SendMailRequestV1` consumed by both `tg-to-<server>` and `admin-to-<server>`
 queues, both dispatching to `MailService.sendMailAndReply`). The legacy surface has
-the per-spec problems documented in [`commands/spec.md`](009-commands/spec.md):
+the per-spec problems documented in [`commands/spec.md`](spec.md):
 free-form `message` field doubling as both error string and partial-failure report,
 no structured error code, correlation id in body instead of headers, autoAck before
-handler runs, no host-thread hop. The [`commands`](009-commands/spec.md) infrastructure
+handler runs, no host-thread hop. The [`commands`](spec.md) infrastructure
 slice shipped the runtime; this slice is the first concrete-DTO migration off
 RabbitMQ onto the new commands rail.
 
-Per [`commands/spec.md` line 406-408](009-commands/spec.md): migration is per-command
+Per [`commands/spec.md` line 406-408](spec.md): migration is per-command
 cutover. Web side feature-flags individual commands to Kafka or RabbitMQ during
 transition; bohpts-core runs both consumer surfaces in parallel; the legacy DTO
 case is removed only when the platform stops emitting it. This slice does NOT
@@ -29,8 +29,8 @@ authors composing `SendMailCommand` records onto the commands topic.
 
 > Sibling features carry the wire + dispatch plumbing:
 >
-> - [`commands`](009-commands/spec.md) — Kafka topic + consumer + dispatch table + > reply path + heartbeat slot. UNCHANGED by this slice.
-> - [`adapter-modules`](002-adapter-modules/spec.md) — Tier-1 ServiceLoader-based > `AdapterModule` discovery used by bohpts to wire its handlers via > `BohptsCommandsModule`.
+> - [`commands`](spec.md) — Kafka topic + consumer + dispatch table + > reply path + heartbeat slot. UNCHANGED by this slice.
+> - [`adapter-modules`](../002-adapter-modules/spec.md) — Tier-1 ServiceLoader-based > `AdapterModule` discovery used by bohpts to wire its handlers via > `BohptsCommandsModule`.
 
 **Must:**
 
@@ -166,7 +166,7 @@ authors composing `SendMailCommand` records onto the commands topic.
 ## Links
 
 - Sibling feature (commands runtime + dispatch + reply path):
-  [`docs/specs/009-commands/spec.md`](009-commands/spec.md)
+  [`docs/specs/009-commands/spec.md`](spec.md)
 - Platform counterpart (send path, ingest, defects, planned outbox/idempotency layers):
   `nx-gameservers/docs/specs/037-mail/sync.md`
 - Delivery/idempotency framework this command is expected to adopt (deadline gate, durable receipts,

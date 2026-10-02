@@ -18,7 +18,7 @@ platform, and its outcome never leaves the game server.
 
 The answer arrives minutes after the request — a check runs several rounds with a per-round
 deadline. The commands rail replies once, synchronously, when the handler returns (see
-[`commands`](009-commands/spec.md) R6/R11), so it cannot carry a result that does not exist yet.
+[`commands`](spec.md) R6/R11), so it cannot carry a result that does not exist yet.
 This slice adds the **deferred reply** to the rail (`commands` R27) and the first command that
 uses it.
 
@@ -26,9 +26,9 @@ uses it.
 
 > Sibling features carry the plumbing:
 >
-> - [`commands`](009-commands/spec.md) — topic, dispatch, reply path; R27 (deferred reply) is added
+> - [`commands`](spec.md) — topic, dispatch, reply path; R27 (deferred reply) is added
 >   by this slice.
-> - [`ban-commands`](024-ban-commands.md) — the ban vocabulary (`WellKnownBanTypes`) a host reuses in
+> - [`ban-commands`](ban.md) — the ban vocabulary (`WellKnownBanTypes`) a host reuses in
 >   the result `metadata`.
 
 ### Wire
@@ -40,7 +40,7 @@ uses it.
   - `@Nullable String issuedBy` — who asked for the check: a staff login, or a service label such
     as `sac-sentinel`. Echoed in the result so a consumer can attribute checks it did not start.
   - `@Nullable String staffNotes` — staff-only note, never shown to the player (same convention as
-    [`character-admin-commands`](032-character-admin-commands.md) R5).
+    [`character-admin-commands`](character-admin.md) R5).
 
   Not idempotent, and needs no dedup: a second delivery while a check is open is rejected as
   `INVALID_STATE` (one open check per character), and the rail is at-most-once anyway.
@@ -78,7 +78,7 @@ uses it.
     the host, so it excludes Kafka and platform latency; `null` when the round timed out.
 
 - [done] R4. `metadata` carries what the host did about the result. Until the format is agreed
-  (see [`TODO.md`](../TODO.md) §1) no `WellKnown*` class is shipped and the keys are host-defined.
+  (see [`TODO.md`](../../TODO.md) §1) no `WellKnown*` class is shipped and the keys are host-defined.
   Hosts SHOULD align ban-like consequences with the platform ban vocabulary: `ban.type` (a value
   from `WellKnownBanTypes`), `ban.expiresAt` (ISO-8601 instant); a disconnect is `kick=true`.
   Host-internal escalation state uses unprefixed keys (bohpts: `stage`, `mode`). A host that only
@@ -117,7 +117,7 @@ uses it.
 Additive on the wire: new command, new result, new model types. `SendCaptchaCommand` is a new simple
 name — unique across the catalog. A host on an older api jar does not register the handler and the
 platform gets `UNSUPPORTED_COMMAND`. Ships in `api/v0.89.0` + `core/v0.38.0` together with R27 and the
-api package layout change ([`api-package-layout`](034-api-package-layout.md)).
+api package layout change ([`api-package-layout`](../034-api-package-layout.md)).
 
 ## Non-goals
 
@@ -130,6 +130,6 @@ api package layout change ([`api-package-layout`](034-api-package-layout.md)).
 
 ## Links
 
-- Command catalog entry: [`009-commands/catalog.md`](009-commands/catalog.md) → "Captcha commands".
-- Deferred reply mechanics: [`009-commands/spec.md`](009-commands/spec.md) R27,
-  [`009-commands/guide.md`](009-commands/guide.md) → "Deferred replies".
+- Command catalog entry: [`009-commands/catalog.md`](catalog.md) → "Captcha commands".
+- Deferred reply mechanics: [`009-commands/spec.md`](spec.md) R27,
+  [`009-commands/guide.md`](guide.md) → "Deferred replies".

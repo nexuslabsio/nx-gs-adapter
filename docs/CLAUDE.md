@@ -5,6 +5,12 @@ feature carries companion docs (`module-discovery.md`, `flow.md`, `catalog.md`, 
 a zero-padded sequential id, and one feature keeps one living spec — iterations update it instead of
 taking a new number.
 
+**Commands live in [`specs/009-commands/`](specs/009-commands/spec.md), never as a top-level `NNN`.**
+`spec.md` is the rail, `catalog.md` the wire contract of every command, `guide.md` the handler
+author's guide; a new command or command family adds a `<command>.md` there (no number) plus its
+catalog entry. A feature that also ships events keeps its event spec at the top level and links
+across.
+
 Any spec change (new spec, rename, re-scope, deletion) updates this table in the same pass. Deferred
 work lives in [`TODO.md`](TODO.md).
 
@@ -18,8 +24,7 @@ work lives in [`TODO.md`](TODO.md).
 | 006 | runtime-sync                      | 2026-05-01 | [spec](specs/006-runtime-sync.md)                      |
 | 007 | per-server-sync                   | 2026-05-02 | [spec](specs/007-per-server-sync.md)                   |
 | 008 | messaging                         | 2026-05-06 | [spec](specs/008-messaging.md)                         |
-| 009 | commands                          | 2026-05-07 | [spec](specs/009-commands/spec.md)                     |
-| 010 | commands-send-mail                | 2026-05-08 | [spec](specs/010-commands-send-mail.md)                |
+| 009 | commands (rail + every command)   | 2026-05-07 | [spec](specs/009-commands/spec.md)                     |
 | 011 | events-online-snapshot            | 2026-05-09 | [spec](specs/011-events-online-snapshot.md)            |
 | 012 | snapshot-persistence              | 2026-05-17 | [spec](specs/012-snapshot-persistence.md)              |
 | 013 | character-core-extension          | 2026-05-17 | [spec](specs/013-character-core-extension.md)          |
@@ -33,16 +38,13 @@ work lives in [`TODO.md`](TODO.md).
 | 021 | force-resync                      | 2026-06-12 | [spec](specs/021-force-resync.md)                      |
 | 022 | class-canonicalization            | 2026-06-13 | [spec](specs/022-class-canonicalization.md)            |
 | 023 | platform-sync-fixes-2026-06       | 2026-06-29 | [spec](specs/023-platform-sync-fixes-2026-06.md)       |
-| 024 | ban-commands                      | 2026-06-29 | [spec](specs/024-ban-commands.md)                      |
-| 025 | chat (events + send command)      | 2026-06-29 | [spec](specs/025-chat-events.md)                       |
+| 025 | chat events                       | 2026-06-29 | [spec](specs/025-chat-events.md)                       |
 | 026 | item-augmentation-sync            | 2026-07-18 | [spec](specs/026-item-augmentation-sync.md)            |
 | 027 | etctype-consumable-market-signals | 2026-07-22 | [spec](specs/027-etctype-consumable-market-signals.md) |
 | 028 | character-inventory-capacity      | 2026-07-26 | [spec](specs/028-character-inventory-capacity.md)      |
 | 029 | character-class-state-sync        | 2026-07-27 | [spec](specs/029-character-class-state-sync.md)        |
 | 030 | gamedata-sync                     | 2026-08-15 | [spec](specs/030-gamedata-sync.md)                     |
 | 031 | character-log-events              | 2026-09-01 | [spec](specs/031-character-log-events.md)              |
-| 032 | character-admin-commands          | 2026-09-17 | [spec](specs/032-character-admin-commands.md)          |
-| 033 | captcha-command                   | 2026-10-02 | [spec](specs/033-captcha-command.md)                   |
 | 034 | api-package-layout                | 2026-10-02 | [spec](specs/034-api-package-layout.md)                |
 
 Companion docs of the folder-form specs:
@@ -53,3 +55,5 @@ Companion docs of the folder-form specs:
 - `005-cdc-engine/flow.md` — block diagrams of the two-phase cycle.
 - `009-commands/catalog.md` — per-command wire contract (inputs, results, error statuses).
 - `009-commands/guide.md` — handler author's guide (lifecycle, threading, registration).
+- `009-commands/<command>.md` — one per command family: `send-mail`, `ban`, `send-chat-message`,
+  `character-admin`, `captcha`.

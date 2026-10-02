@@ -29,7 +29,7 @@ declared on the command's `NxCommand<R>` marker.
 > **Removed in `api/v0.87.0`.** `SendChatMessageCommand` covers this exact call with
 > `senderCharacterId: null`, `senderDisplayName: ""`, `channel: ANNOUNCEMENT`,
 > `audience: ALL_ONLINE`, so the two never coexisted as choices — see
-> [`025-chat-events.md`](../025-chat-events.md). Hosts pinned to `api/v0.86.0` or earlier still
+> [`send-chat-message.md`](send-chat-message.md). Hosts pinned to `api/v0.86.0` or earlier still
 > compile against it; anything upgrading past that sends the chat command instead. `AnnounceResult`
 > went with it.
 
@@ -141,7 +141,7 @@ client — the generic outbound counterpart of `ChatMessageEvent`. Covers
 the mini app posting into clan chat as the player's own character (the
 character may be offline), and the platform speaking under an arbitrary
 display name. Supersedes `AnnounceNowCommand`; see spec
-[`025-chat-events.md`](../025-chat-events.md) for the cutover phases.
+[`send-chat-message.md`](send-chat-message.md) for the cutover phases.
 
 Idempotent by `messageId` provided the host keeps a bounded window of
 seen ids — re-issuing after a reply timeout then converges on one message
@@ -184,7 +184,7 @@ rather than posting twice.
 the player did. **Deferred reply** ([`spec.md`](./spec.md) R27): the reply arrives when the check
 ends — minutes after the command, not within the platform's synchronous window. Not idempotent and
 not deduped: one open check per character, a second command is `INVALID_STATE`. Full contract:
-[`033-captcha-command.md`](../033-captcha-command.md).
+[`captcha.md`](captcha.md).
 
 **Inputs**
 

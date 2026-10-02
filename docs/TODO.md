@@ -14,8 +14,8 @@ it is picked up, it moves to "Done / moved into a spec".
   (`banId`) may be enough; kick has no ban vocabulary yet.
 - **Why:** consumers (nx-sac-sentinel dossier, admin UI) parse host-defined keys today, and the key
   set is explicitly unstable.
-- **Related:** [`033-captcha-command.md`](specs/033-captcha-command.md) R4,
-  [`024-ban-commands.md`](specs/024-ban-commands.md).
+- **Related:** [`009-commands/captcha.md`](specs/009-commands/captcha.md) R4,
+  [`009-commands/ban.md`](specs/009-commands/ban.md).
 
 ### 2. `HostExecutor.sync` timeout leaves the task queued
 

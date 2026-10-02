@@ -605,8 +605,8 @@ NxCommand<Void>` is the sanctioned exception, and payload-less `CommandResult.ok
 - Sibling feature (`Nx-Server-Id` header stamping):
   [`docs/specs/007-per-server-sync.md`](../007-per-server-sync.md)
 - Sibling feature (`NxSync` / force-resync): [`docs/specs/021-force-resync.md`](../021-force-resync.md)
-- Follow-up command slice: [`docs/specs/010-commands-send-mail.md`](../010-commands-send-mail.md)
-- Follow-up command slice: [`docs/specs/024-ban-commands.md`](../024-ban-commands.md)
+- Follow-up command slice: [`docs/specs/009-commands/send-mail.md`](send-mail.md)
+- Follow-up command slice: [`docs/specs/009-commands/ban.md`](ban.md)
 - Legacy reference (RabbitMQ command surface, web side):
   `E:/bohpts/code/bohpts-rabbitmq/src/main/java/com/bohpts/messaging/`
 - Legacy reference (RabbitMQ command surface, core side):

@@ -12,7 +12,7 @@ Two everyday moderation actions still require a GM client: changing a character'
 commands rail but no down-channel verb for either, so operators log into the game to do them.
 
 This slice adds two commands on the existing `NxCommands` rail (see
-[`commands`](009-commands/spec.md)):
+[`commands`](spec.md)):
 
 - `SetCharacterAccessLevelCommand` — set a character's access level to an absolute value.
 - `KickCharacterCommand` — disconnect an online character, either back to the login screen or by
@@ -25,9 +25,9 @@ shows it to the player.
 
 > Sibling features carry the wire + dispatch plumbing:
 >
-> - [`commands`](009-commands/spec.md) — Kafka commands topic + consumer + dispatch table + reply
+> - [`commands`](spec.md) — Kafka commands topic + consumer + dispatch table + reply
 >   path. UNCHANGED by this slice.
-> - [`db-sync`](003-db-sync/spec.md) — `CharacterDbDto.accessLevel` is the up-channel mirror of the
+> - [`db-sync`](../003-db-sync/spec.md) — `CharacterDbDto.accessLevel` is the up-channel mirror of the
 >   value this slice writes. UNCHANGED.
 
 ### Access level
@@ -76,7 +76,7 @@ shows it to the player.
   the player: the host MUST NOT display it in-game and SHOULD log it on the audit line for the
   action. The platform records the whole command payload on `gs_command_audits.params`, which is
   where the admin UI reads it back. New mutating admin commands follow the same convention
-  (recorded in [`009-commands/guide.md`](009-commands/guide.md)); retrofitting the existing
+  (recorded in [`009-commands/guide.md`](guide.md)); retrofitting the existing
   commands is a separate slice.
 
 ### Host (bohpts-core)
@@ -128,8 +128,8 @@ handlers.
 
 ## Links
 
-- Command catalog entries: [`009-commands/catalog.md`](009-commands/catalog.md) → "Character
+- Command catalog entries: [`009-commands/catalog.md`](catalog.md) → "Character
   commands".
 - Sibling pattern (character-scoped online/offline handler):
-  [`023-platform-sync-fixes-2026-06.md`](023-platform-sync-fixes-2026-06.md) → `UpsertCharacterLockCommand`.
-- Ban / moderation contract: [`024-ban-commands.md`](024-ban-commands.md).
+  [`023-platform-sync-fixes-2026-06.md`](../023-platform-sync-fixes-2026-06.md) → `UpsertCharacterLockCommand`.
+- Ban / moderation contract: [`ban.md`](ban.md).
