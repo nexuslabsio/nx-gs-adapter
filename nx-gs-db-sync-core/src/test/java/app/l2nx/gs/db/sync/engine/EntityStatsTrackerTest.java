@@ -2,8 +2,8 @@ package app.l2nx.gs.db.sync.engine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
-import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityState;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityStats;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

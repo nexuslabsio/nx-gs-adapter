@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.model.WellKnownServerOnlineBuckets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;

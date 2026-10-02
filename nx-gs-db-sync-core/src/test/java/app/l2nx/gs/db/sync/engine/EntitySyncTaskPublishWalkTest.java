@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 
-import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
 import app.l2nx.gs.db.sync.engine.publish.SyncEventPublisher;

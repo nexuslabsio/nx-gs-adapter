@@ -1,7 +1,7 @@
 package app.l2nx.gs.adapter.core.commands;
 
-import app.l2nx.gs.adapter.api.spi.HostExecutor;
 import app.l2nx.gs.adapter.api.spi.HostExecutorTimeoutException;
+import app.l2nx.gs.adapter.api.spi.capability.HostExecutor;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
@@ -143,7 +143,7 @@ final class HostExecutorImpl implements HostExecutor {
     /**
      * Sneaky-throw any {@code Throwable} as an unchecked exception. The
      * generic erasure trick lets us throw a checked exception without
-     * declaring it; the {@link app.l2nx.gs.adapter.api.spi.CommandHandler}
+     * declaring it; the {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}
      * contract narrows propagation to {@code RuntimeException} / {@code Error}
      * so this is fine in practice — every exception type host code throws is
      * one of those.

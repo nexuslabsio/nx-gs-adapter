@@ -2,12 +2,12 @@ package app.l2nx.gs.adapter.core.commands;
 
 import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
 import app.l2nx.gs.adapter.api.rest.MessagingTopics;
-import app.l2nx.gs.adapter.api.spi.HostExecutor;
-import app.l2nx.gs.adapter.api.spi.NxCommands;
-import app.l2nx.gs.adapter.api.spi.NxEvents;
-import app.l2nx.gs.adapter.api.spi.NxSync;
-import app.l2nx.gs.adapter.core.kafka.AdapterGson;
+import app.l2nx.gs.adapter.api.spi.capability.HostExecutor;
+import app.l2nx.gs.adapter.api.spi.capability.NxCommands;
+import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
+import app.l2nx.gs.adapter.api.spi.capability.NxSync;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
+import app.l2nx.gs.adapter.core.kafka.gson.AdapterGson;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import com.google.gson.Gson;

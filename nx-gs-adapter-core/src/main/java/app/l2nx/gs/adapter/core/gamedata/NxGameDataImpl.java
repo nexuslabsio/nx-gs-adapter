@@ -1,7 +1,7 @@
 package app.l2nx.gs.adapter.core.gamedata;
 
-import app.l2nx.gs.adapter.api.spi.NxGameData;
-import app.l2nx.gs.adapter.api.spi.NxGameDataTrigger;
+import app.l2nx.gs.adapter.api.spi.capability.NxGameData;
+import app.l2nx.gs.adapter.api.spi.capability.NxGameDataTrigger;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import java.util.concurrent.CopyOnWriteArrayList;

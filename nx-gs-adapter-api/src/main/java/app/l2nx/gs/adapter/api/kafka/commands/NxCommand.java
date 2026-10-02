@@ -40,7 +40,7 @@ package app.l2nx.gs.adapter.api.kafka.commands;
  *            {@link CommandResult#getPayload()}. Use {@link Void} for
  *            commands with no typed payload (success or error only).
  * @see CommandResult
- * @see app.l2nx.gs.adapter.api.spi.CommandHandler
- * @see app.l2nx.gs.adapter.api.spi.NxCommands
+ * @see app.l2nx.gs.adapter.api.spi.capability.CommandHandler
+ * @see app.l2nx.gs.adapter.api.spi.capability.NxCommands
  */
 public interface NxCommand<R> {}

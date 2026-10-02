@@ -1,8 +1,8 @@
 package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
-import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
-import app.l2nx.gs.adapter.api.spi.NxEvents;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityState;
+import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
 import app.l2nx.gs.commons.UUIDv7;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;

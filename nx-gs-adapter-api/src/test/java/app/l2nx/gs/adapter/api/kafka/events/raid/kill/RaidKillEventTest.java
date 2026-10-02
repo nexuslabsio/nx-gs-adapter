@@ -2,7 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.events.raid.kill;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
+import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

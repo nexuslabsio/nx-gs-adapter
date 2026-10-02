@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
 
+import app.l2nx.gs.adapter.api.kafka.commands.privatestore.model.BoughtLine;
 import java.util.List;
 import java.util.Objects;
 

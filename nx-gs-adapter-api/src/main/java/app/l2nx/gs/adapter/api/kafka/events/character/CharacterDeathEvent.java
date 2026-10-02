@@ -1,5 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.events.character;
 
+import app.l2nx.gs.adapter.api.kafka.events.character.model.WellKnownDeathMetadata;
+import app.l2nx.gs.adapter.api.kafka.events.character.model.WellKnownFarmModes;
+import app.l2nx.gs.adapter.api.kafka.events.character.model.WellKnownKillerTypes;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 

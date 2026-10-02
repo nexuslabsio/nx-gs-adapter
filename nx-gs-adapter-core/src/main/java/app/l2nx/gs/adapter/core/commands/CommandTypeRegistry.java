@@ -1,7 +1,7 @@
 package app.l2nx.gs.adapter.core.commands;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import app.l2nx.gs.adapter.api.spi.CommandHandler;
+import app.l2nx.gs.adapter.api.spi.capability.CommandHandler;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Host-populated {@code Nx-Message-Type} → handler binding table. Populated
- * via {@link app.l2nx.gs.adapter.api.spi.NxCommands#on(Class, CommandHandler)}
+ * via {@link app.l2nx.gs.adapter.api.spi.capability.NxCommands#on(Class, CommandHandler)}
  * calls from host {@code onConnect} callbacks (and any time afterwards — late
  * registration is supported).
  *
@@ -24,7 +24,7 @@ import org.jspecify.annotations.Nullable;
  * writes do not stall each other.</p>
  *
  * <p>Package-private. External callers go through
- * {@link app.l2nx.gs.adapter.api.spi.NxCommands} (registration) or do not
+ * {@link app.l2nx.gs.adapter.api.spi.capability.NxCommands} (registration) or do not
  * see this class at all (dispatch is internal).</p>
  */
 final class CommandTypeRegistry {

@@ -1,7 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.ban;
 
-import app.l2nx.gs.adapter.api.kafka.commands.ban.WellKnownBanTargetTypes;
-import app.l2nx.gs.adapter.api.kafka.commands.ban.WellKnownBanTypes;
+import app.l2nx.gs.adapter.api.kafka.commands.ban.model.WellKnownBanTargetTypes;
+import app.l2nx.gs.adapter.api.kafka.commands.ban.model.WellKnownBanTypes;
 import java.time.Instant;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;

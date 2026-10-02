@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.core.sync;
 
-import app.l2nx.gs.adapter.api.spi.NxSync;
-import app.l2nx.gs.adapter.api.spi.NxSyncResyncHandler;
-import app.l2nx.gs.adapter.api.spi.NxSyncTrigger;
+import app.l2nx.gs.adapter.api.spi.capability.NxSync;
+import app.l2nx.gs.adapter.api.spi.capability.NxSyncResyncHandler;
+import app.l2nx.gs.adapter.api.spi.capability.NxSyncTrigger;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import java.util.Collection;

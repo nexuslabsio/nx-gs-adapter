@@ -2,7 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.events.raid.respawn;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
+import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.Test;

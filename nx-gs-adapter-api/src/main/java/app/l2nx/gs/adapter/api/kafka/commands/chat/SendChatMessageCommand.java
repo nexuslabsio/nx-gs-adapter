@@ -40,7 +40,7 @@ import java.util.UUID;
  * <p><b>Idempotency.</b> {@link #getMessageId() messageId} is minted by the
  * platform and echoed as the {@code eventId} of the resulting
  * {@code ChatMessageEvent}. Delivery is at-most-once (see
- * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller
+ * {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); what repeats is a caller
  * re-issuing after a reply timeout, which the handler cannot distinguish from a
  * fresh request. A host keeping a bounded window of seen ids converges on one
  * message; without that window the field is carried but buys nothing.</p>

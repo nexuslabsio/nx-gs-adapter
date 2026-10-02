@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.core.events;
 
-import app.l2nx.gs.adapter.api.spi.NxEvents;
+import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import java.util.concurrent.atomic.AtomicReference;

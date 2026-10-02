@@ -50,7 +50,7 @@ import java.util.Objects;
  * same character.</p>
  *
  * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
- * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller re-issuing after a
+ * {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); what repeats is a caller re-issuing after a
  * reply timeout. The stack may already have been decremented, and the handler cannot tell that
  * apart from a fresh request — deciding whether the delete landed is the caller's job.</p>
  *

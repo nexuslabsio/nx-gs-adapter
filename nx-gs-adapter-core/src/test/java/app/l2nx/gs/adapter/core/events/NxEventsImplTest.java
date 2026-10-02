@@ -4,12 +4,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.model.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.raid.kill.RaidKillEvent;
+import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.serveronline.WellKnownServerOnlineBuckets;
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.model.WellKnownServerOnlineBuckets;
 import app.l2nx.gs.commons.UUIDv7;
 import app.l2nx.gs.commons.bytes.LongBytes;
 import java.util.Collections;

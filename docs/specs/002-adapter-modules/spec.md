@@ -74,7 +74,7 @@ heartbeat consumers (read enriched `enabledModules`).
   `EntityStats` types.
 
 - [done] R3. `nx-gs-adapter-api` MUST define
-  `app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus` — value type for heartbeat enrichment:
+  `app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus` — value type for heartbeat enrichment:
   - `String name()` — matches `AdapterModule.name()`
   - `String state()` — one of `ACTIVE` | `DEGRADED` | `DISABLED` | `FAILED` (string,
     not enum, on the wire — keeps platform-side consumer decoupled from JVM enum

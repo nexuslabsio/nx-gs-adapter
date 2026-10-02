@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
+import app.l2nx.gs.adapter.api.kafka.commands.mail.model.ItemDeliveryError;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;

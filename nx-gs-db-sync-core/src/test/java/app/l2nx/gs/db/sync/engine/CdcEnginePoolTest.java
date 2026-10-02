@@ -3,10 +3,10 @@ package app.l2nx.gs.db.sync.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.PoolStats;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
-import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.persist.NoopSnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
@@ -96,7 +96,7 @@ class CdcEnginePoolTest {
         long deadline = System.currentTimeMillis() + 5_000L;
         Set<String> ticked = new HashSet<>();
         while (System.currentTimeMillis() < deadline && ticked.size() < 2) {
-            for (app.l2nx.gs.adapter.api.kafka.ops.EntityStats s : tracker.currentStatuses()) {
+            for (app.l2nx.gs.adapter.api.kafka.ops.model.EntityStats s : tracker.currentStatuses()) {
                 ticked.add(s.getName());
             }
             if (ticked.size() < 2) {
@@ -122,13 +122,13 @@ class CdcEnginePoolTest {
             }
 
             @Override
-            public app.l2nx.gs.adapter.api.spi.PrimarySource<?> primary() {
+            public app.l2nx.gs.adapter.api.spi.model.PrimarySource<?> primary() {
                 return erased.primary();
             }
 
             @Override
             @SuppressWarnings("unchecked")
-            public List<app.l2nx.gs.adapter.api.spi.ChildSource<?>> children() {
+            public List<app.l2nx.gs.adapter.api.spi.model.ChildSource<?>> children() {
                 return erased.children();
             }
 

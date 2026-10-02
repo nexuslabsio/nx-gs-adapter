@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore;
 
+import app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore.model.GearScoreRuleGroup;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import app.l2nx.gs.adapter.api.rest.ConnectResponse;
 import app.l2nx.gs.adapter.api.rest.KafkaCredentials;
-import app.l2nx.gs.adapter.core.connect.ConnectFlow;
+import app.l2nx.gs.adapter.core.connect.flow.ConnectFlow;
 import app.l2nx.gs.adapter.core.kafka.CapturingKafkaFactory;
 import app.l2nx.gs.adapter.core.kafka.KafkaInitializer;
 import app.l2nx.gs.kafka.KafkaState;

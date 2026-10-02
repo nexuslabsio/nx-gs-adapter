@@ -2,8 +2,8 @@ package app.l2nx.gs.runtime.sync.engine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
-import app.l2nx.gs.adapter.api.spi.RuntimeRow;
+import app.l2nx.gs.adapter.api.spi.model.RuntimeEntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.RuntimeRow;
 import app.l2nx.gs.runtime.sync.engine.publish.KafkaSender;
 import app.l2nx.gs.runtime.sync.engine.publish.SyncEventPublisher;
 import app.l2nx.gs.runtime.sync.engine.publish.TopicResolver;

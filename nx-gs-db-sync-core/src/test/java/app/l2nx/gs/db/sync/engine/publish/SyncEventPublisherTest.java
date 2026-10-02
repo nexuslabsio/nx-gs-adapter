@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
 import app.l2nx.gs.db.sync.engine.TestMappings;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;

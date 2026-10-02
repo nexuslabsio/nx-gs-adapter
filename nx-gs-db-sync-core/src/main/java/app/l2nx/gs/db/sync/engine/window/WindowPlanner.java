@@ -1,7 +1,7 @@
 package app.l2nx.gs.db.sync.engine.window;
 
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
-import app.l2nx.gs.adapter.api.spi.PrimarySource;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.PrimarySource;
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;
 import it.unimi.dsi.fastutil.longs.LongArrayList;

@@ -139,7 +139,7 @@ import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.character.KickCommand;
 import app.l2nx.gs.adapter.api.kafka.commands.character.KickResult;
 import app.l2nx.gs.adapter.api.spi.CommandContext;
-import app.l2nx.gs.adapter.api.spi.NxCommands;
+import app.l2nx.gs.adapter.api.spi.capability.NxCommands;
 
 public final class BohptsCommandHandlers {
 
@@ -780,6 +780,6 @@ fresh `correlationId`).
   with `Tier` classification
 - `app.l2nx.gs.adapter.api.kafka.commands.CommandProblem` — RFC 9457
   problem body
-- `app.l2nx.gs.adapter.api.spi.NxCommands` — Javadoc on the registration
+- `app.l2nx.gs.adapter.api.spi.capability.NxCommands` — Javadoc on the registration
   SPI
-- `app.l2nx.gs.adapter.api.spi.NxSync` — Javadoc on the sync trigger SPI
+- `app.l2nx.gs.adapter.api.spi.capability.NxSync` — Javadoc on the sync trigger SPI

@@ -178,7 +178,7 @@ entity '<name>'"`), entity transitions to `DEGRADED`, no publishes for that
   (`E:/projects/bohpts/bohpts-core`) MUST host a `BohptsRuntimeStateProvider` class
   implementing `RuntimeStateProvider` directly (no `extends` — there is no vanilla
   `nx-gs-runtime-l2j` to inherit from in MVP), plus a
-  `META-INF/services/app.l2nx.gs.adapter.api.spi.RuntimeStateProvider` resource pointing
+  `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider` resource pointing
   to it. Provider contract:
   - `schemaName()` = `"bohpts"`
   - `mappings()` returns exactly one `RuntimeEntityMapping<CharacterRuntimeDto>` for
@@ -393,7 +393,7 @@ Bohpts-side (in `bohpts-core` repo, not this monorepo):
   [planned] — Tier-2 impl, sibling of `BohptsDbSchemaProvider`
 - `bohpts-core/core/src/main/java/l2e/gameserver/l2nx/CharacterRuntimeMapping.java`
   [planned] — `RuntimeEntityMapping<CharacterRuntimeDto>` for the `character` entity
-- `bohpts-core/core/src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.RuntimeStateProvider`
+- `bohpts-core/core/src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider`
   [planned] — ServiceLoader descriptor
 
 ### Key components
@@ -440,7 +440,7 @@ value)` / `mix(state, int)` / `mix(state, boolean)` / `mix(state, CharSequence)`
 - **RuntimeStateProvider SPI** [planned] (implements R2, R3, R4) — Tier-2 SPI on
   `nx-gs-adapter-api`. Mirror shape to `DbSchemaProvider`: `schemaName()` +
   `mappings()`. ServiceLoader descriptor expected at
-  `META-INF/services/app.l2nx.gs.adapter.api.spi.RuntimeStateProvider`.
+  `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider`.
 - **RuntimeEntityMapping<T> SPI** [planned] (implements R4) — per-entity contract:
   `entityName()`, `dtoType()`, `snapshot()`, `hash(T)`. Notice the absence of any
   `mapRow(ResultSet)` or DB-schema concepts — runtime SPI is pure-Java, host-internal.
@@ -622,7 +622,7 @@ Wire DTO (Kafka payload):
   `ConnectResponse.syncTopics.runtime[newEntityName]`.
 
 - **Add a new tenant** — implement `RuntimeStateProvider` in the tenant's host JAR with
-  a `META-INF/services/app.l2nx.gs.adapter.api.spi.RuntimeStateProvider` descriptor.
+  a `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider` descriptor.
   Same plug-in shape as `DbSchemaProvider`. No artifact published to Maven Central; the
   provider lives in the tenant's private repo.
 

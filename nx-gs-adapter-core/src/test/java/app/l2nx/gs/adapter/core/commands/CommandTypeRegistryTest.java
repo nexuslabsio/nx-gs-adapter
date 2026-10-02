@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import app.l2nx.gs.adapter.api.spi.CommandHandler;
+import app.l2nx.gs.adapter.api.spi.capability.CommandHandler;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

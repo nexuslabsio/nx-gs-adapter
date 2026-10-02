@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.core.kafka;
 
+import app.l2nx.gs.adapter.core.kafka.gson.AdapterGson;
 import app.l2nx.gs.kafka.*;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;

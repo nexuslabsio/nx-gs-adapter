@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.kafka.NxHeaders;
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
-import app.l2nx.gs.adapter.api.kafka.ops.EventsStats;
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EventsStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus;
 import app.l2nx.gs.commons.UUIDv7;
 import java.nio.ByteBuffer;
 import java.util.Collections;

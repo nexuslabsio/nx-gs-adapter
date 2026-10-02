@@ -211,7 +211,7 @@ module authors (datapack sync, metrics).
   (private; `E:/projects/bohpts/bohpts-core`) MUST host a `BohptsDbSchemaProvider`
   class implementing `DbSchemaProvider` directly (no `extends` — there is no
   vanilla `nx-gs-db-l2j` to inherit from in MVP), plus a
-  `META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider` resource
+  `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider` resource
   pointing to it. Bohpts-core declares `implementation
   'app.l2nx:nx-gs-adapter-api:0.7.0'` from Maven Central. Provider contract:
     - `schemaName()` = `"bohpts"`
@@ -486,7 +486,7 @@ design end-to-end.
     - `<bohpts-package>/mapping/ClanMapping.java` [planned] — only `EntityMapping`
       in MVP; `entityName="clan"`, `tableName="clan_data"`. Applies the
       zero-as-null convention to `leader_id` / `ally_id` (`0L` → `null`) in `mapRow`
-    - `src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider`
+    - `src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider`
       [planned] — service descriptor pointing to `BohptsDbSchemaProvider`
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/`
     - `spi/AdapterModule.java` — Tier-1 SPI (declared by `adapter-modules`; listed
@@ -699,7 +699,7 @@ NxAdapter.shutdown()
   `implementation 'app.l2nx:nx-gs-adapter-api:0.7.0'` (Tier-2 SPI lives in api;
   bohpts-core does NOT need a runtime dep on `nx-gs-db-sync-core`), hosts
   `BohptsDbSchemaProvider` + `ClanMapping` classes inline in its source tree, and
-  ships `META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider` in its
+  ships `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider` in its
   resources. NO separate `nx-gs-db-bohpts` artifact is published.
 - **`jdbc-connection-source` feature** (R2) — Tier-3 SPI feature delivering
   `JdbcConnectionSource` + the bundled-Hikari fallback. `nx-gs-db-sync-core` consumes

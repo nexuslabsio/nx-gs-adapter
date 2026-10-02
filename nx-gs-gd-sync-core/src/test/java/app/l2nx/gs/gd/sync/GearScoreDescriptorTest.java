@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityStats;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.GameDataSyncEvent;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore.GearScoreRuleset;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;

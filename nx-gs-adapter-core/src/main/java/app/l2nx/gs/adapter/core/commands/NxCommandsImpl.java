@@ -1,8 +1,8 @@
 package app.l2nx.gs.adapter.core.commands;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
-import app.l2nx.gs.adapter.api.spi.CommandHandler;
-import app.l2nx.gs.adapter.api.spi.NxCommands;
+import app.l2nx.gs.adapter.api.spi.capability.CommandHandler;
+import app.l2nx.gs.adapter.api.spi.capability.NxCommands;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import java.util.concurrent.atomic.AtomicReference;

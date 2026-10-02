@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.core.events;
 
-import app.l2nx.gs.adapter.api.spi.NxEvents;
+import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 

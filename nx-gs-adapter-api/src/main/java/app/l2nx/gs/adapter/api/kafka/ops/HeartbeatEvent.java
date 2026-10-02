@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.ops;
 
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;

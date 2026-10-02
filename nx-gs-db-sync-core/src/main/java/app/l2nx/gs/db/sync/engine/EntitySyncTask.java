@@ -1,9 +1,11 @@
 package app.l2nx.gs.db.sync.engine;
 
-import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
-import app.l2nx.gs.adapter.api.spi.ChildSource;
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
-import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityState;
+import app.l2nx.gs.adapter.api.spi.model.ChildSource;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource;
+import app.l2nx.gs.db.sync.engine.jdbc.JdbcDialect;
+import app.l2nx.gs.db.sync.engine.jdbc.StatementRegistry;
 import app.l2nx.gs.db.sync.engine.phase.ChangeSet;
 import app.l2nx.gs.db.sync.engine.phase.ConsistentSnapshotTxn;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;

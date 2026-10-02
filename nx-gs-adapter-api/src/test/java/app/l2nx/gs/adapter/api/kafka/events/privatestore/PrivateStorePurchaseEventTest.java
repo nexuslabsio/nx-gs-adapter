@@ -2,6 +2,8 @@ package app.l2nx.gs.adapter.api.kafka.events.privatestore;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.model.PrivateStoreSide;
+import app.l2nx.gs.adapter.api.kafka.events.privatestore.model.TradeLine;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 

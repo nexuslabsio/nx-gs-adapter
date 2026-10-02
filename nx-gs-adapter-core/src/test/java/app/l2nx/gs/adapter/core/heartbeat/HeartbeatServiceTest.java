@@ -3,7 +3,7 @@ package app.l2nx.gs.adapter.core.heartbeat;
 import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent;
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus;
 import app.l2nx.gs.adapter.core.concurrent.CapturingScheduler;
 import java.time.Duration;
 import java.time.Instant;

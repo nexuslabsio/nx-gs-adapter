@@ -1,8 +1,8 @@
 package app.l2nx.gs.db.sync.engine;
 
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
-import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
-import app.l2nx.gs.adapter.api.spi.NxEvents;
+import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource;
 import app.l2nx.gs.commons.concurrent.DaemonThreadFactory;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.db.sync.engine.persist.SnapshotPersistence;

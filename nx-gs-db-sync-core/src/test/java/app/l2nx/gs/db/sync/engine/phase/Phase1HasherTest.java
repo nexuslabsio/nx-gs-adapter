@@ -4,9 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-import app.l2nx.gs.adapter.api.spi.ChildSource;
-import app.l2nx.gs.adapter.api.spi.PrimarySource;
-import app.l2nx.gs.db.sync.engine.JdbcDialect;
+import app.l2nx.gs.adapter.api.spi.model.ChildSource;
+import app.l2nx.gs.adapter.api.spi.model.PrimarySource;
+import app.l2nx.gs.db.sync.engine.jdbc.JdbcDialect;
 import app.l2nx.gs.db.sync.engine.window.Window;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;

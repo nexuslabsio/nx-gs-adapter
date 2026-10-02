@@ -99,7 +99,7 @@ quoted names are rejected at engine start (see
 [ServiceLoader.load(DbSchemaProvider.class)]   ◄─── Tier-2 discovery point
        │
        │   Same JDK machinery as Tier 1; descriptor file is:
-       │     META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider
+       │     META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider
        ▼
    ┌────────────────────────┐
    │  providers.size()      │
@@ -128,7 +128,7 @@ quoted names are rejected at engine start (see
 ```
 META-INF/
 └── services/
-    └── app.l2nx.gs.adapter.api.spi.DbSchemaProvider
+    └── app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider
 ```
 
 Content (single fully-qualified class name — package up to bohpts-core owner per spec
@@ -155,8 +155,8 @@ existing Gradle build produces the JAR that already contains the schema-provider
 ```java
 package l2e.gameserver.nx.db;   // example — package decision in spec Open question
 
-import app.l2nx.gs.adapter.api.spi.DbSchemaProvider;
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
 
 import java.util.Collections;
 import java.util.List;
@@ -343,7 +343,7 @@ own:
 ```kotlin
 // nx-gs-db-bohpts/build.gradle.kts
 shadowJar {
-    exclude("META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider")
+    exclude("META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider")
     // own descriptor lives in src/main/resources/META-INF/services/...
 }
 ```

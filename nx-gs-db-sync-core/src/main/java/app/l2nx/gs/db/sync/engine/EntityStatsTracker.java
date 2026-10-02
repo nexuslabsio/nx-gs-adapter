@@ -1,8 +1,8 @@
 package app.l2nx.gs.db.sync.engine;
 
-import app.l2nx.gs.adapter.api.kafka.ops.ChangesSummary;
-import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
-import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ChangesSummary;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityState;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityStats;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

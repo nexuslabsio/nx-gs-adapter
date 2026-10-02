@@ -1,7 +1,7 @@
 package app.l2nx.gs.runtime.sync.engine;
 
-import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
-import app.l2nx.gs.adapter.api.spi.RuntimeRow;
+import app.l2nx.gs.adapter.api.spi.model.RuntimeEntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.RuntimeRow;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;

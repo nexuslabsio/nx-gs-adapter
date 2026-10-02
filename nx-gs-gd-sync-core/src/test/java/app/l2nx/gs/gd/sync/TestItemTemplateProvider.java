@@ -1,7 +1,7 @@
 package app.l2nx.gs.gd.sync;
 
 import app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate.ItemTemplate;
-import app.l2nx.gs.adapter.api.spi.ItemTemplateProvider;
+import app.l2nx.gs.adapter.api.spi.provider.ItemTemplateProvider;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;

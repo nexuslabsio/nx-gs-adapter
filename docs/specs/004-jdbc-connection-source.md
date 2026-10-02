@@ -116,7 +116,7 @@ future DB-reading modules) consume the resolved `JdbcConnectionSource` transpare
   repo; `E:/bohpts/code/bohpts-core`) hosts a `BohptsJdbcConnectionSource` class
   implementing `JdbcConnectionSource`, returning
   `DatabaseFactory.getInstance().getConnection()`, plus a
-  `META-INF/services/app.l2nx.gs.adapter.api.spi.JdbcConnectionSource` resource
+  `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource` resource
   pointing to it. Bohpts-core declares `implementation 'app.l2nx:nx-gs-adapter-api:X.Y.Z'`
   (Maven Central) — that artifact carries the Tier-3 SPI interface. The package for
   `BohptsJdbcConnectionSource` inside bohpts-core is operator-chosen — see Open
@@ -265,7 +265,7 @@ field at all.
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/` — Tier-3 SPI
   alongside Tier-1 SPI types (single api package for every SPI tier)
   - `JdbcConnectionSource.java` — the SPI interface (R1, R7, R8); imports
-    `app.l2nx.gs.adapter.api.kafka.ops.PoolStats` for the optional `stats()` method
+    `app.l2nx.gs.adapter.api.kafka.ops.model.PoolStats` for the optional `stats()` method
 - `nx-gs-db-sync-core/src/main/java/app/l2nx/gs/db/sync/`
   - `DbSyncModule.java` — Phase 1 owns the R2 resolution chain inline in
     `onConnect()` (ServiceLoader load + 0/>1 → fail-loud); a separate
@@ -284,7 +284,7 @@ field at all.
     wraps `DatabaseFactory.getInstance().getConnection()`, sets `readOnly=true`
     per-borrow as defense-in-depth; package follows bohpts convention
     (`l2e.gameserver.l2nx` houses all l2nx-related plumbing)
-  - `core/src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.JdbcConnectionSource`
+  - `core/src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource`
     — service descriptor pointing to `BohptsJdbcConnectionSource`
 
 ### Key components
@@ -509,7 +509,7 @@ If the host's `JdbcConnectionSource` doesn't override `stats()`, the heartbeat r
 ### Extension points
 
 - **New host-side pool wrapper** — implement `JdbcConnectionSource`, drop a
-  `META-INF/services/app.l2nx.gs.adapter.api.spi.JdbcConnectionSource` resource pointing to
+  `META-INF/services/app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource` resource pointing to
   it, ensure exactly one descriptor on classpath. No code change in
   `nx-gs-db-sync-core`. Works for HikariCP, DBCP2, c3p0, Tomcat JDBC, custom singletons,
   even raw `DriverManager` for tests.

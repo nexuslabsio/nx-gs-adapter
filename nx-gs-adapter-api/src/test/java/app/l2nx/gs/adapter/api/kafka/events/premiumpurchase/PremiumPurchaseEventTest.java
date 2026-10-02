@@ -2,6 +2,10 @@ package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.model.Payment;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.model.PurchaseItem;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.model.PurchaseService;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.model.WellKnownServices;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 

@@ -2,7 +2,7 @@ package app.l2nx.gs.adapter.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import app.l2nx.gs.adapter.core.connect.ConnectFlow;
+import app.l2nx.gs.adapter.core.connect.flow.ConnectFlow;
 import java.util.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -3,6 +3,7 @@ package app.l2nx.gs.adapter.api.kafka.commands.mail;
 import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.mail.model.MailItem;
 import java.util.Arrays;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;

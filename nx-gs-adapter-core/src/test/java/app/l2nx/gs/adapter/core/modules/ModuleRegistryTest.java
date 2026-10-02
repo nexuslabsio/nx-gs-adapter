@@ -2,8 +2,8 @@ package app.l2nx.gs.adapter.core.modules;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
-import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus;
+import app.l2nx.gs.adapter.api.kafka.ops.model.PoolStats;
 import app.l2nx.gs.adapter.api.spi.AdapterModule;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import java.util.Arrays;

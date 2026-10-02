@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.kill;
 
-import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
+import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 

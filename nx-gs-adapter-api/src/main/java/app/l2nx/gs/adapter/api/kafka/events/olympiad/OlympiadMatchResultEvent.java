@@ -1,6 +1,9 @@
 package app.l2nx.gs.adapter.api.kafka.events.olympiad;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
+import app.l2nx.gs.adapter.api.kafka.events.olympiad.model.OlympiadGameType;
+import app.l2nx.gs.adapter.api.kafka.events.olympiad.model.OlympiadMatchReason;
+import app.l2nx.gs.adapter.api.kafka.events.olympiad.model.OlympiadMatchResult;
 import java.time.Instant;
 import java.util.*;
 import org.jspecify.annotations.Nullable;

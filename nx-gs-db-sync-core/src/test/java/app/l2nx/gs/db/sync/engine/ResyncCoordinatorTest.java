@@ -3,7 +3,7 @@ package app.l2nx.gs.db.sync.engine;
 import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
-import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityState;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.time.Instant;

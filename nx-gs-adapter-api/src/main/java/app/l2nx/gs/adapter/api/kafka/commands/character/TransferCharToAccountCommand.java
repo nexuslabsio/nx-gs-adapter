@@ -43,7 +43,7 @@ import java.util.Objects;
  * the same character.</p>
  *
  * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
- * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller re-issuing after a
+ * {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); what repeats is a caller re-issuing after a
  * reply timeout, where the transfer may already have landed. If the character's
  * {@code account_name} already matches {@link #getAccountTo() accountTo}, the handler SHOULD treat
  * the call as a no-op success rather than re-issuing the UPDATE.</p>

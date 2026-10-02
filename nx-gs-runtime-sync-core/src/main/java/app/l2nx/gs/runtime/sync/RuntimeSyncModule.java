@@ -1,12 +1,12 @@
 package app.l2nx.gs.runtime.sync;
 
-import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStates;
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStates;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus;
 import app.l2nx.gs.adapter.api.spi.AdapterModule;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
-import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
-import app.l2nx.gs.adapter.api.spi.RuntimeStateProvider;
+import app.l2nx.gs.adapter.api.spi.model.RuntimeEntityMapping;
+import app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider;
 import app.l2nx.gs.kafka.NxKafka;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
@@ -90,7 +90,7 @@ public final class RuntimeSyncModule implements AdapterModule {
         List<RuntimeStateProvider> providers = providerDiscoverer.get();
         if (providers.isEmpty()) {
             log.warn("No RuntimeStateProvider SPI registered — runtime-sync DISABLED. "
-                    + "Register one via META-INF/services/app.l2nx.gs.adapter.api.spi.RuntimeStateProvider "
+                    + "Register one via META-INF/services/app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider "
                     + "to enable runtime sync.");
             state = STATE_DISABLED;
             return;

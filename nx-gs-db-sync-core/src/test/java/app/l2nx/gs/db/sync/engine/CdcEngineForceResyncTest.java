@@ -5,10 +5,10 @@ import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 
 import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
-import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
-import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
-import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
-import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityState;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.PoolStats;
+import app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.persist.SnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;

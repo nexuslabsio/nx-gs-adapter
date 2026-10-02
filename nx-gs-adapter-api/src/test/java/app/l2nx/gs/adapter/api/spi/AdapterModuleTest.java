@@ -3,7 +3,7 @@ package app.l2nx.gs.adapter.api.spi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus;
 import org.junit.jupiter.api.Test;
 
 class AdapterModuleTest {

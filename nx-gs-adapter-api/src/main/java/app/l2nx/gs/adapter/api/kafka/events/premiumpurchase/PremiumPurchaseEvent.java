@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase;
 
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.model.PurchaseItem;
+import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.model.PurchaseService;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 

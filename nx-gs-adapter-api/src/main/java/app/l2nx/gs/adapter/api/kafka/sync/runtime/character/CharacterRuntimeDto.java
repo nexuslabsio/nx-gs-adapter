@@ -1,6 +1,10 @@
 package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.Activity;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownActivities;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownActivityMetadata;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownAiStatuses;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

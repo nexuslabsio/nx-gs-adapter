@@ -1,6 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.commands.ban;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.ban.model.WellKnownBanTargetTypes;
+import app.l2nx.gs.adapter.api.kafka.commands.ban.model.WellKnownBanTypes;
 import java.util.Objects;
 
 /**

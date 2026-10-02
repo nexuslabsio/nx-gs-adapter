@@ -1,9 +1,9 @@
 package app.l2nx.gs.adapter.core.commands;
 
 import app.l2nx.gs.adapter.api.spi.CommandContext;
-import app.l2nx.gs.adapter.api.spi.HostExecutor;
-import app.l2nx.gs.adapter.api.spi.NxEvents;
-import app.l2nx.gs.adapter.api.spi.NxSync;
+import app.l2nx.gs.adapter.api.spi.capability.HostExecutor;
+import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
+import app.l2nx.gs.adapter.api.spi.capability.NxSync;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 

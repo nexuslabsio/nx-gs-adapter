@@ -1,6 +1,8 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.spi.capability.CommandHandler;
+import app.l2nx.gs.adapter.api.spi.capability.NxCommands;
 
 /**
  * Default {@link NxCommands} implementation used when {@link ConnectContext}

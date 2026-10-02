@@ -5,7 +5,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
 import app.l2nx.gs.db.sync.engine.TestMappings;
 import it.unimi.dsi.fastutil.longs.LongList;

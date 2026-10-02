@@ -152,7 +152,7 @@ command-handler authors across `char` / `clan` / `mail` / `account` domains.
   when `messagingTopics.events` is empty / absent, the facade is a no-op
   implementation that logs DEBUG on every publish call ("events disabled").
 
-- [todo] R7. `app.l2nx.gs.adapter.api.spi.NxEvents` interface (new SPI, package
+- [todo] R7. `app.l2nx.gs.adapter.api.spi.capability.NxEvents` interface (new SPI, package
   `spi` to align with existing tier-1 SPIs) MUST expose:
   - `void publishPremiumPurchase(PremiumPurchaseEvent event)` — Phase 1 family entrypoint.
     Future families add sibling methods (`publishCharacter`, `publishClan`,

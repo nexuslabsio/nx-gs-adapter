@@ -5,12 +5,21 @@ import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncEntitiesCommand;
 import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncEntitiesResult;
 import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncRowsCommand;
 import app.l2nx.gs.adapter.api.kafka.commands.sync.ResyncRowsResult;
-import app.l2nx.gs.adapter.api.kafka.ops.EntityStats;
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStates;
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
-import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityStats;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStates;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus;
+import app.l2nx.gs.adapter.api.kafka.ops.model.PoolStats;
 import app.l2nx.gs.adapter.api.spi.*;
+import app.l2nx.gs.adapter.api.spi.capability.NxCommands;
+import app.l2nx.gs.adapter.api.spi.capability.NxSync;
+import app.l2nx.gs.adapter.api.spi.model.ChildSource;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.ParentRef;
+import app.l2nx.gs.adapter.api.spi.model.PrimarySource;
+import app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider;
+import app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.*;
+import app.l2nx.gs.db.sync.engine.jdbc.SqlIdent;
 import app.l2nx.gs.db.sync.engine.persist.FileSnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.persist.SnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
@@ -131,7 +140,7 @@ public final class DbSyncModule implements AdapterModule {
         List<JdbcConnectionSource> jdbcImpls = jdbcDiscoverer.get();
         if (jdbcImpls.isEmpty()) {
             log.error("No JdbcConnectionSource SPI registered — register one via "
-                    + "META-INF/services/app.l2nx.gs.adapter.api.spi.JdbcConnectionSource. "
+                    + "META-INF/services/app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource. "
                     + "db-sync FAILED.");
             state = STATE_FAILED;
             return;
@@ -150,7 +159,7 @@ public final class DbSyncModule implements AdapterModule {
         List<DbSchemaProvider> schemaImpls = schemaDiscoverer.get();
         if (schemaImpls.isEmpty()) {
             log.warn("No DbSchemaProvider SPI registered — db-sync DISABLED. "
-                    + "Register one via META-INF/services/app.l2nx.gs.adapter.api.spi.DbSchemaProvider "
+                    + "Register one via META-INF/services/app.l2nx.gs.adapter.api.spi.provider.DbSchemaProvider "
                     + "to enable CDC sync.");
             state = STATE_DISABLED;
             return;

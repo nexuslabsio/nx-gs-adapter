@@ -1,6 +1,6 @@
 package app.l2nx.gs.runtime.sync.engine;
 
-import app.l2nx.gs.adapter.api.kafka.ops.EntityState;
+import app.l2nx.gs.adapter.api.kafka.ops.model.EntityState;
 import java.util.Objects;
 
 /**

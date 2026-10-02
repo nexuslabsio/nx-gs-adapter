@@ -1,9 +1,9 @@
 package app.l2nx.gs.db.sync.engine.phase;
 
-import app.l2nx.gs.adapter.api.spi.ChildSource;
-import app.l2nx.gs.adapter.api.spi.PrimarySource;
-import app.l2nx.gs.db.sync.engine.JdbcDialect;
-import app.l2nx.gs.db.sync.engine.StatementRegistry;
+import app.l2nx.gs.adapter.api.spi.model.ChildSource;
+import app.l2nx.gs.adapter.api.spi.model.PrimarySource;
+import app.l2nx.gs.db.sync.engine.jdbc.JdbcDialect;
+import app.l2nx.gs.db.sync.engine.jdbc.StatementRegistry;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;

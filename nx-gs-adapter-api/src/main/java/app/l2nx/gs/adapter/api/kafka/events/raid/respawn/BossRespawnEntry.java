@@ -1,6 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.respawn;
 
-import app.l2nx.gs.adapter.api.kafka.events.raid.RaidBossKind;
+import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import app.l2nx.gs.adapter.api.kafka.events.schedule.RecurringSchedule;
 import java.time.Instant;
 import java.util.Collections;

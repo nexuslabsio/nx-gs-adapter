@@ -3,10 +3,10 @@ package app.l2nx.gs.db.sync;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import app.l2nx.gs.adapter.api.spi.ChildSource;
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
-import app.l2nx.gs.adapter.api.spi.ParentRef;
-import app.l2nx.gs.adapter.api.spi.PrimarySource;
+import app.l2nx.gs.adapter.api.spi.model.ChildSource;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.ParentRef;
+import app.l2nx.gs.adapter.api.spi.model.PrimarySource;
 import java.sql.ResultSet;
 import java.util.Arrays;
 import java.util.Collections;

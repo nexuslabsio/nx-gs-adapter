@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.model.WellKnownServerStartMetadata;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 

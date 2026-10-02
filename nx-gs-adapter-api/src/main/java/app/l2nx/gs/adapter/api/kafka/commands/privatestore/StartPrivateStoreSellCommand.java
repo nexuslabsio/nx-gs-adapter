@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.privatestore.model.SellLine;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;

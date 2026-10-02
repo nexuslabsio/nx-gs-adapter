@@ -1,7 +1,7 @@
 package app.l2nx.gs.db.sync.engine.publish;
 
 import app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent;
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.clients.producer.RecordMetadata;

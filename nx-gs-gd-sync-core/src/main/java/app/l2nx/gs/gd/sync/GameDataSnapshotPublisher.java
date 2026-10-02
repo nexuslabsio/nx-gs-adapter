@@ -45,7 +45,7 @@ public final class GameDataSnapshotPublisher {
     /**
      * How long a provider may keep answering {@code null} before it stops being "the host is still
      * booting" and becomes an alarm. Applies only to hosts without a
-     * {@link app.l2nx.gs.adapter.api.spi.GameDataReadinessProvider} — a host that has one is gated by
+     * {@link app.l2nx.gs.adapter.api.spi.provider.GameDataReadinessProvider} — a host that has one is gated by
      * {@link GameDataSyncModule} and never reaches the null path.
      */
     static final long NOT_READY_GRACE_MS = 15L * 60L * 1000L;

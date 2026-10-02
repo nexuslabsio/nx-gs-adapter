@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.events.character;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.kafka.events.character.model.WellKnownPresenceMetadata;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 

@@ -1,5 +1,7 @@
 package app.l2nx.gs.adapter.api.spi;
 
+import app.l2nx.gs.adapter.api.spi.capability.HostExecutor;
+
 /**
  * Thrown by {@link HostExecutor#sync(Runnable)} /
  * {@link HostExecutor#sync(java.util.function.Supplier)} when the host's

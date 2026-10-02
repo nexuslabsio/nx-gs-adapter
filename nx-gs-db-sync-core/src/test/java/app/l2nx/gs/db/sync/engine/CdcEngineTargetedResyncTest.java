@@ -9,8 +9,8 @@ import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import app.l2nx.gs.adapter.api.kafka.ops.PoolStats;
-import app.l2nx.gs.adapter.api.spi.JdbcConnectionSource;
+import app.l2nx.gs.adapter.api.kafka.ops.model.PoolStats;
+import app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource;
 import app.l2nx.gs.db.sync.engine.persist.SnapshotPersistence;
 import app.l2nx.gs.db.sync.engine.phase.Phase1Hasher;
 import app.l2nx.gs.db.sync.engine.phase.Phase2Fetcher;

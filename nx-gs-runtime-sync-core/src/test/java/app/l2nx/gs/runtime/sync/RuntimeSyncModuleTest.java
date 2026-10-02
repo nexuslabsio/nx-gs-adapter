@@ -2,12 +2,12 @@ package app.l2nx.gs.runtime.sync;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import app.l2nx.gs.adapter.api.kafka.ops.ModuleStatus;
+import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
 import app.l2nx.gs.adapter.api.spi.ConnectContext;
-import app.l2nx.gs.adapter.api.spi.RuntimeEntityMapping;
-import app.l2nx.gs.adapter.api.spi.RuntimeRow;
-import app.l2nx.gs.adapter.api.spi.RuntimeStateProvider;
+import app.l2nx.gs.adapter.api.spi.model.RuntimeEntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.RuntimeRow;
+import app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider;
 import app.l2nx.gs.runtime.sync.engine.publish.KafkaSender;
 import java.util.*;
 import java.util.function.Function;

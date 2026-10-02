@@ -1,5 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.serveronline;
 
+import app.l2nx.gs.adapter.api.kafka.events.serveronline.model.WellKnownServerStartMetadata;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;

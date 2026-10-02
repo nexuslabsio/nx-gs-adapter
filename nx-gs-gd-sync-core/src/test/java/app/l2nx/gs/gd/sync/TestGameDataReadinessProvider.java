@@ -1,6 +1,6 @@
 package app.l2nx.gs.gd.sync;
 
-import app.l2nx.gs.adapter.api.spi.GameDataReadinessProvider;
+import app.l2nx.gs.adapter.api.spi.provider.GameDataReadinessProvider;
 
 /**
  * ServiceLoader-discovered {@link GameDataReadinessProvider} test double, mirroring

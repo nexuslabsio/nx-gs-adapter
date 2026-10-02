@@ -3,6 +3,7 @@ package app.l2nx.gs.db.sync.engine;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
+import app.l2nx.gs.db.sync.engine.jdbc.StatementRegistry;
 import java.sql.SQLException;
 import java.sql.Statement;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.commands.mail;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.mail.model.MailItem;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -49,7 +50,7 @@ import org.jspecify.annotations.Nullable;
  * same recipient.</p>
  *
  * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
- * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller re-issuing after a
+ * {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); what repeats is a caller re-issuing after a
  * reply timeout, which the handler cannot tell from a fresh send: the mail lands twice, granting
  * the attachments twice. For paid deliveries from the platform's commerce flows that is a
  * real-money bug, so the caller MUST establish whether the first send landed before re-issuing.</p>

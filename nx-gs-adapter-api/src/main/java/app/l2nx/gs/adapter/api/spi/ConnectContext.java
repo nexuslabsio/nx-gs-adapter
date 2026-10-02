@@ -1,6 +1,11 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
+import app.l2nx.gs.adapter.api.spi.capability.NxCommands;
+import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
+import app.l2nx.gs.adapter.api.spi.capability.NxGameData;
+import app.l2nx.gs.adapter.api.spi.capability.NxSync;
+import app.l2nx.gs.adapter.api.spi.capability.NxSyncTrigger;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Executor;

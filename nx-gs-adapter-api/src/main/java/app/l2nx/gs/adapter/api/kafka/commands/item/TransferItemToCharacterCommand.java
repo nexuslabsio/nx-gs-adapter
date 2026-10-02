@@ -59,7 +59,7 @@ import java.util.Objects;
  * exclusive access to the target.</p>
  *
  * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
- * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller re-issuing after a
+ * {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); what repeats is a caller re-issuing after a
  * reply timeout. The items may already have moved, and the handler cannot tell that apart from a
  * fresh request — deciding whether the transfer landed is the caller's job.</p>
  *

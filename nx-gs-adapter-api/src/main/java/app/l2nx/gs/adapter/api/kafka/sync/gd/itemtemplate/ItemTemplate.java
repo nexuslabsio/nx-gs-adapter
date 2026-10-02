@@ -5,7 +5,7 @@ import app.l2nx.gs.adapter.api.domain.item.ArmorType;
 import app.l2nx.gs.adapter.api.domain.item.EtcItemType;
 import app.l2nx.gs.adapter.api.domain.item.ItemClass;
 import app.l2nx.gs.adapter.api.domain.item.ItemEquipSlot;
-import app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore.WellKnownGearScoreEnchantProfiles;
+import app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore.model.WellKnownGearScoreEnchantProfiles;
 import app.l2nx.gs.adapter.api.localization.LocalizedText;
 import java.util.ArrayList;
 import java.util.Collections;

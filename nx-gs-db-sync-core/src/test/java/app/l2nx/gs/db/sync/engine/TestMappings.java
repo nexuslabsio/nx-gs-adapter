@@ -2,9 +2,9 @@ package app.l2nx.gs.db.sync.engine;
 
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanDbDto;
 import app.l2nx.gs.adapter.api.kafka.sync.db.clan.ClanSkillDbDto;
-import app.l2nx.gs.adapter.api.spi.ChildSource;
-import app.l2nx.gs.adapter.api.spi.EntityMapping;
-import app.l2nx.gs.adapter.api.spi.PrimarySource;
+import app.l2nx.gs.adapter.api.spi.model.ChildSource;
+import app.l2nx.gs.adapter.api.spi.model.EntityMapping;
+import app.l2nx.gs.adapter.api.spi.model.PrimarySource;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;

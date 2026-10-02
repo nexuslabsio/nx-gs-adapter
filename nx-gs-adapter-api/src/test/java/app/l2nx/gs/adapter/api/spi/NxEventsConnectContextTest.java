@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.PremiumPurchaseEvent;
 import app.l2nx.gs.adapter.api.rest.SyncTopics;
+import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;

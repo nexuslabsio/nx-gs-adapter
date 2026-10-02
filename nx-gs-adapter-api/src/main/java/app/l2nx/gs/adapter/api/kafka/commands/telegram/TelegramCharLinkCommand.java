@@ -40,7 +40,7 @@ import java.util.Objects;
  * user sequential. The adapter never reads the key.</p>
  *
  * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
- * {@link app.l2nx.gs.adapter.api.spi.CommandHandler}); what repeats is a caller re-issuing after a
+ * {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); what repeats is a caller re-issuing after a
  * reply timeout, which the handler cannot tell from a fresh request: the verification mail is sent
  * twice — a player-facing defect (duplicate mails in the inbox).</p>
  *

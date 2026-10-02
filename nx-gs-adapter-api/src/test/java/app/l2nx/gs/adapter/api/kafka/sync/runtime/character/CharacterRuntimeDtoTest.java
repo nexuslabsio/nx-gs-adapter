@@ -3,6 +3,9 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.Activity;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownActivities;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownActivityMetadata;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

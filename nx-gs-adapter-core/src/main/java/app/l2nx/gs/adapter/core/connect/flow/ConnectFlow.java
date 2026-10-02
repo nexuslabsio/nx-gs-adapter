@@ -1,0 +1,238 @@
+package app.l2nx.gs.adapter.core.connect.flow;
+
+import app.l2nx.gs.adapter.core.connect.backoff.BackoffSchedule;
+import app.l2nx.gs.adapter.core.connect.model.TypedConnectOutcome;
+import app.l2nx.gs.log.NxLog;
+import app.l2nx.gs.log.NxLogFactory;
+import java.net.HttpURLConnection;
+import java.time.Duration;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.regex.Pattern;
+
+/**
+ * Drives the platform-side connect lifecycle through a host-type-specific
+ * {@link HostConnectFlow} strategy and emits an {@link Outcome} per logical
+ * state transition. The strategy owns the endpoint URL + typed response
+ * deserialization; this class owns retry / backoff / state-machine semantics.
+ *
+ * <p>Status-code dispatch:</p>
+ * <ul>
+ *   <li>{@code 200} → {@link Outcome#ACTIVE}</li>
+ *   <li>{@code 401} → {@link Outcome#FAILED} (terminal, no retry)</li>
+ *   <li>{@code 403} + {@code code=GAME_SERVER_DEACTIVATED} →
+ *       {@link Outcome#REJECTED} (terminal, no retry)</li>
+ *   <li>{@code 409} + {@code code=KAFKA_CREDENTIALS_MISSING} → {@link Outcome#TRANSIENT}
+ *       (retry via {@link BackoffSchedule})</li>
+ *   <li>{@code 5xx} / {@link java.io.IOException} → {@link Outcome#TRANSIENT}
+ *       (retry via {@link BackoffSchedule})</li>
+ *   <li>any other status → {@link Outcome#FAILED} (treated as terminal so we don't
+ *       hammer the platform on an unexpected response shape)</li>
+ * </ul>
+ *
+ * <p>{@link Outcome#STARTING} is emitted at the top of every run (initial submit
+ * and every retry) so the orchestrator can drive the {@code REGISTERING} transition.</p>
+ */
+public final class ConnectFlow implements Runnable {
+
+    private static final NxLog log = NxLogFactory.getLogger(ConnectFlow.class);
+
+    private static final String CODE_GAME_SERVER_DEACTIVATED = "GAME_SERVER_DEACTIVATED";
+    private static final String CODE_KAFKA_CREDENTIALS_MISSING = "KAFKA_CREDENTIALS_MISSING";
+
+    /**
+     * Strips bearer tokens from any text routed through {@link NxLog}.
+     */
+    private static final Pattern BEARER_PATTERN = Pattern.compile("Bearer\\s+\\S+");
+
+    private final HostConnectFlow<?> flow;
+    private final BackoffSchedule backoff;
+    private final ScheduledExecutorService scheduler;
+    private final Consumer<Outcome> onOutcome;
+    /**
+     * Invoked exactly once, immediately before {@link Outcome#ACTIVE}, with the
+     * flow whose accessors expose the platform handshake result. Lets the
+     * orchestrator (e.g. {@code NxAdapter}) bootstrap the Kafka client before
+     * the {@code ACTIVE} state is observed by registered state-change callbacks.
+     * {@code null} = the response is not needed.
+     */
+    private final Consumer<HostConnectFlow<?>> onActiveFlow;
+
+    private final AtomicInteger attempt = new AtomicInteger(0);
+
+    public ConnectFlow(
+            HostConnectFlow<?> flow,
+            BackoffSchedule backoff,
+            ScheduledExecutorService scheduler,
+            Consumer<Outcome> onOutcome) {
+        this(flow, backoff, scheduler, onOutcome, null);
+    }
+
+    public ConnectFlow(
+            HostConnectFlow<?> flow,
+            BackoffSchedule backoff,
+            ScheduledExecutorService scheduler,
+            Consumer<Outcome> onOutcome,
+            Consumer<HostConnectFlow<?>> onActiveFlow) {
+        this.flow = flow;
+        this.backoff = backoff;
+        this.scheduler = scheduler;
+        this.onOutcome = onOutcome;
+        this.onActiveFlow = onActiveFlow;
+    }
+
+    @Override
+    public void run() {
+        emit(Outcome.STARTING);
+        TypedConnectOutcome<?> outcome;
+        try {
+            outcome = flow.connect();
+        } catch (Throwable t) {
+            // Defensive: HostConnectFlow.connect is contracted not to throw, but a
+            // faulty impl (or downstream wiring bug) must not bring down the
+            // daemon thread. Log only the exception class — message may carry the
+            // bearer token if the JDK threw IllegalArgumentException from
+            // setRequestProperty.
+            log.error("Connect attempt threw {}", t.getClass().getName(), t);
+            emit(Outcome.TRANSIENT);
+            scheduleRetry();
+            return;
+        }
+        dispatch(outcome);
+    }
+
+    private void dispatch(TypedConnectOutcome<?> result) {
+        if (result.isIoFailure()) {
+            String msg =
+                    sanitize(result.getIoException().map(Throwable::getMessage).orElse(null));
+            log.warn("Connect IO failure: {} — retrying with backoff", msg);
+            emit(Outcome.TRANSIENT);
+            scheduleRetry();
+            return;
+        }
+
+        int status = result.getStatusCode();
+        if (status == HttpURLConnection.HTTP_OK) {
+            log.info("Connect succeeded — platform handshake passed");
+            attempt.set(0);
+            if (onActiveFlow != null) {
+                if (result.getResponse().isPresent()) {
+                    try {
+                        onActiveFlow.accept(flow);
+                    } catch (Throwable t) {
+                        log.error("ConnectFlow onActiveFlow threw: {}", t.getMessage(), t);
+                    }
+                    // Ownership transferred — orchestrator drives the final post-200 state
+                    // (e.g. ACTIVE if Kafka up, DEGRADED if Kafka down). Re-emitting
+                    // Outcome.ACTIVE here would clobber a legitimate DEGRADED.
+                    return;
+                }
+                log.error("HostConnectFlow returned 200 with no parsed body — falling back to bare ACTIVE outcome");
+            }
+            emit(Outcome.ACTIVE);
+            return;
+        }
+        if (status == HttpURLConnection.HTTP_UNAUTHORIZED) {
+            log.error("Connect rejected with 401 — server-key invalid (terminal)");
+            emit(Outcome.FAILED);
+            return;
+        }
+        if (status == HttpURLConnection.HTTP_FORBIDDEN && hasCode(result, CODE_GAME_SERVER_DEACTIVATED)) {
+            log.error("Connect rejected with 403 GAME_SERVER_DEACTIVATED (terminal)");
+            emit(Outcome.REJECTED);
+            return;
+        }
+        if (status == HttpURLConnection.HTTP_CONFLICT && hasCode(result, CODE_KAFKA_CREDENTIALS_MISSING)) {
+            log.warn("Connect 409 KAFKA_CREDENTIALS_MISSING — retrying with backoff");
+            emit(Outcome.TRANSIENT);
+            scheduleRetry();
+            return;
+        }
+        if (status >= 500 && status < 600) {
+            log.warn("Connect {} — retrying with backoff", status);
+            emit(Outcome.TRANSIENT);
+            scheduleRetry();
+            return;
+        }
+        log.error("Connect unexpected status {} — treating as terminal failure", status);
+        emit(Outcome.FAILED);
+    }
+
+    private void emit(Outcome o) {
+        try {
+            onOutcome.accept(o);
+        } catch (Throwable t) {
+            log.error("ConnectFlow outcome consumer threw on {}: {}", o, t.getMessage(), t);
+        }
+    }
+
+    private void scheduleRetry() {
+        // attempt is reset on success; absent that, cap it so a long-running
+        // outage doesn't accumulate an unbounded counter.
+        int n = attempt.updateAndGet(prev -> Math.min(prev + 1, Integer.MAX_VALUE - 1));
+        Duration delay = backoff.next(n);
+        try {
+            scheduler.schedule(this, delay.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (Throwable t) {
+            // Scheduler is shutting down — can't retry. Surface as terminal so
+            // upstream stops waiting in REGISTERING / DEGRADED forever.
+            log.error(
+                    "Failed to schedule connect retry attempt {}: {}",
+                    n,
+                    t.getClass().getName(),
+                    t);
+            emit(Outcome.FAILED);
+        }
+    }
+
+    private static boolean hasCode(TypedConnectOutcome<?> result, String code) {
+        return result.getError().map(e -> code.equals(e.getCode())).orElse(false);
+    }
+
+    /**
+     * {@link app.l2nx.gs.adapter.core.config.ConfigResolver} normalizes {@code platformUrl}
+     * to a https URL with no trailing slash, query, or fragment, so the connect URL is
+     * just the base + path. Defensive trailing-slash strip is kept for tests that
+     * bypass the resolver via fixtures.
+     */
+    static String buildUrl(String platformUrl, String connectPath) {
+        String base = platformUrl.endsWith("/") ? platformUrl.substring(0, platformUrl.length() - 1) : platformUrl;
+        return base + connectPath;
+    }
+
+    static String sanitize(String text) {
+        if (text == null) {
+            return "(no message)";
+        }
+        return BEARER_PATTERN.matcher(text).replaceAll("Bearer ***");
+    }
+
+    /**
+     * Coarse-grained connect-flow events surfaced to the orchestrator
+     * ({@link app.l2nx.gs.adapter.core.NxAdapter}).
+     */
+    public enum Outcome {
+        /**
+         * A connect attempt is about to be executed (initial submit or retry).
+         */
+        STARTING,
+        /**
+         * 200 — adapter is connected.
+         */
+        ACTIVE,
+        /**
+         * Transient failure — retry scheduled.
+         */
+        TRANSIENT,
+        /**
+         * Terminal non-recoverable failure — no further retries.
+         */
+        FAILED,
+        /**
+         * Terminal — server deactivated by tenant.
+         */
+        REJECTED
+    }
+}
