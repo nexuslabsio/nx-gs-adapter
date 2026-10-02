@@ -21,4 +21,9 @@ subprojects {
             palantirJavaFormat(palantirVersion)
         }
     }
+
+    // Publishing builds the javadoc jar; failing it here keeps a broken doc from reaching a release tag.
+    plugins.withId("java") {
+        tasks.named("check") { dependsOn("javadoc") }
+    }
 }
