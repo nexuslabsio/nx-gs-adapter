@@ -31,7 +31,6 @@ public final class DeferredReplies {
 
     private static final long SHUTDOWN_FLUSH_MS = 2_000L;
 
-    /** Bridge to the reply publisher of the consumer that dispatched the command. */
     @FunctionalInterface
     interface Publisher {
         void publish(UUID correlationId, byte[] replyMessageTypeBytes, CommandResult<?> result);

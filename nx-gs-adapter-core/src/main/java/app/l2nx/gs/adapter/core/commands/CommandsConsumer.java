@@ -36,26 +36,9 @@ import org.apache.kafka.common.header.Headers;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inbound commands consumer + dispatcher. Single Kafka consumer on the
- * {@code nx-commands-consumer} daemon thread; {@link CommandHandler#handle}
- * runs synchronously on it, so game-state mutations MUST hop via
- * {@link HostExecutor#sync(Runnable)} (bounded by
- * {@code l2nx.commands.host-sync-timeout-ms}).
- *
- * <p><b>At-most-once.</b> {@code commitSync} runs BEFORE dispatch — a
- * crash or commit failure mid-batch drops the in-flight records (no
- * redelivery). Caller times out, operator re-issues. Handlers do NOT
- * need to be idempotent. Reply sends are fire-and-forget. A handler that takes a
- * {@link CommandContext#deferReply() deferred reply} replies later from any thread; the
- * handle outlives this consumer in {@link DeferredReplies}.</p>
- *
- * <p>Error boundaries: unknown {@code Nx-Message-Type} →
- * {@link CommandStatus#UNSUPPORTED_COMMAND}; Gson failure →
- * {@link CommandStatus#VALIDATION_FAILED}; {@link HostExecutorTimeoutException}
- * → {@link CommandStatus#UNAVAILABLE}; other {@code RuntimeException} or
- * {@code null} return → {@link CommandStatus#INTERNAL_ERROR}; an {@code Error}
- * (OOM) unwinds the poll loop, which stops the consumer and drops the module to
- * {@code DISABLED}.</p>
+ * Single Kafka consumer on {@code nx-commands-consumer}; handlers run on it synchronously, so game-state
+ * mutations hop via {@link HostExecutor}. At-most-once: {@code commitSync} runs before dispatch, a crash
+ * mid-batch drops the in-flight records. An {@code Error} unwinds the poll loop and disables the module.
  */
 public final class CommandsConsumer {
 

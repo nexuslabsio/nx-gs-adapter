@@ -3,9 +3,6 @@ package app.l2nx.gs.adapter.api.kafka.commands.captcha.model;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * One picture shown to the player during a captcha check.
- */
 public final class CaptchaRoundResult {
 
     private final int index;
