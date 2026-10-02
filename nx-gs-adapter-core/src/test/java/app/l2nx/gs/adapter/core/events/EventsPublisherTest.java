@@ -287,4 +287,24 @@ class EventsPublisherTest {
             // never invoke callback — keeps publishedTotal at 0 in queue-only tests
         };
     }
+
+    @Test
+    void drainOnShutdown_shouldSendQueuedEnvelopesAndStop_whenQueueEmpties() {
+        ConcurrentLinkedQueue<Long> sent = new ConcurrentLinkedQueue<Long>();
+        EventsPublisher.Sender sender = (record, callback) -> {
+            sent.add(ByteBuffer.wrap(record.key()).getLong());
+            callback.onCompletion(null, null);
+        };
+        Map<String, String> topics = Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase");
+        EventTypeRegistry registry = new EventTypeRegistry();
+        EventsPublisher drained =
+                new EventsPublisher(topics, sender, cfg(10, EventsPublisher.DropPolicy.NEWEST, 5_000L), registry);
+        EventTypeBinding binding = registry.lookup(PremiumPurchaseEvent.class);
+        drained.enqueue(envelope(1L, binding));
+        drained.enqueue(envelope(2L, binding));
+
+        assertDoesNotThrow(drained::drainOnShutdown);
+        assertEquals(2, sent.size());
+        assertEquals(0L, drained.droppedTotal());
+    }
 }

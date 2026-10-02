@@ -211,7 +211,8 @@ public final class EventsPublisher {
         drainOnShutdown();
     }
 
-    private void drainOnShutdown() {
+    // package-visible for unit tests
+    void drainOnShutdown() {
         long deadline = System.currentTimeMillis() + shutdownDrainMs;
         while (System.currentTimeMillis() < deadline) {
             EventEnvelope envelope = queue.poll();
