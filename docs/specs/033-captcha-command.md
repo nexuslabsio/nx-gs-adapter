@@ -88,11 +88,11 @@ uses it.
 ### Rail behaviour
 
 - [done] R5. The handler uses the deferred reply (`commands` R27): it takes `ctx.deferReply()`
-  before starting the check, returns the deferred marker, and every answer — the outcome or a
-  refusal to start — goes through the handle, first one wins. Taking the handle first matters: the
-  start can end the check it is creating, and a start that outlives the host-executor timeout still
-  runs later on the game thread. Validation that needs no host state (R6 `VALIDATION_FAILED`,
-  `NOT_FOUND` for an absent character) may return directly before the handle is taken.
+  before starting the check, posts the start to the game thread without waiting
+  (`ctx.host().async`), returns the deferred marker, and every answer — the outcome or a refusal to
+  start — goes through the handle, first one wins. Taking the handle first matters: the start can
+  end the check it is creating. Validation that needs no host state (R6 `VALIDATION_FAILED`) may
+  return directly before the handle is taken.
 
 - [done] R6. Immediate errors (statuses are `commands` R23):
   - `VALIDATION_FAILED` — `characterId` missing / out of the host's id range.

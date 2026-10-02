@@ -581,12 +581,14 @@ for them: take a deferred reply and complete it later (spec R27).
 
 ```java
 nx.commands().on(SendCaptchaCommand.class, (cmd, ctx) -> {
-    StartResult started = ctx.host().sync(() -> captcha.start(cmd.getCharacterId(), listener));
-    if (started != StartResult.STARTED) {
-        return toError(started);              // immediate reply, no handle taken
-    }
     DeferredReply<SendCaptchaResult> reply = ctx.deferReply();
-    listener.onFinish(outcome -> reply.complete(CommandResult.ok(toResult(outcome))));
+    ctx.host().async(() -> {                  // no wait on the game pool
+        StartResult started = captcha.start(cmd.getCharacterId(),
+                outcome -> reply.complete(CommandResult.ok(toResult(outcome))));
+        if (started != StartResult.STARTED) {
+            reply.complete(toError(started)); // a refusal goes through the handle too
+        }
+    });
     return reply.pending();
 });
 ```
@@ -595,8 +597,11 @@ nx.commands().on(SendCaptchaCommand.class, (cmd, ctx) -> {
   publishes from its own thread. The first call wins, later calls return `false`.
 - Do not keep the `ctx` after the handler returns: `deferReply()` on a
   finished command throws.
-- Take the handle only once the work has really started — every early
-  rejection is a plain immediate result.
+- Take the handle before starting the work and send every answer through
+  it, refusals included: the start may end the work it creates, and a
+  start posted with `host().async` answers from the game thread. Checks
+  that need no host state may still return a plain result before the
+  handle is taken.
 - Make sure every path that ends the work completes the handle. A handle
   left open is closed by the adapter after `l2nx.commands.deferred-reply-max-ms`
   with `INTERNAL_ERROR`, and the real outcome is lost.

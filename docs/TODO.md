@@ -17,6 +17,17 @@ it is picked up, it moves to "Done / moved into a spec".
 - **Related:** [`033-captcha-command.md`](specs/033-captcha-command.md) R4,
   [`024-ban-commands.md`](specs/024-ban-commands.md).
 
+### 2. `HostExecutor.sync` timeout leaves the task queued
+
+- **Want:** a `sync` timeout that means the task will not run: a task the game pool has not started
+  yet is skipped, one already running is reported as such instead of as a timeout.
+- **To decide:** the shape of the "already started" signal (return normally after waiting it out, or
+  a distinct exception), and whether `UNAVAILABLE` replies keep `error.cause=host-executor-timeout`.
+- **Why:** today the caller gets `UNAVAILABLE` and the queued task may still mutate game state later
+  (kick, ban, mail, item delivery). Each non-idempotent handler would need its own claim flag;
+  bohpts `SendCaptchaHandler` sidestepped it by switching to `host().async`.
+- **Related:** [`009-commands`](specs/009-commands/spec.md).
+
 ## Done / moved into a spec
 
 —
