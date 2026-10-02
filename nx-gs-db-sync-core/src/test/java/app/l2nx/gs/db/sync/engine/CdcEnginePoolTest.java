@@ -46,9 +46,7 @@ class CdcEnginePoolTest {
 
     @Test
     void sharedPool_shouldTickAllEntitiesWithoutStarvation() throws Exception {
-        // Two entities sharing the same pool: both ticks must complete (recorded
-        // as DEGRADED because the borrow fails). Without a shared pool with
-        // worker capacity for both, the second entity would never tick.
+        // Both ticks must complete on the shared pool (DEGRADED because the borrow fails).
         EntityMapping<ClanDbDto> mapping1 = TestMappings.clanOnly();
         EntityMapping<?> mapping2 = renameEntity(TestMappings.clanOnly(), "alpha");
 

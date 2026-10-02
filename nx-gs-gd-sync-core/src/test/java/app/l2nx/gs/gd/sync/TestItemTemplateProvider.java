@@ -6,12 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * ServiceLoader-discovered {@link ItemTemplateProvider} test double, mirroring
- * {@link TestGearScoreRulesetProvider}. Used by {@link GameDataReadinessTest} to prove the
- * readiness gate never touches a Tier-2 provider while the host is unready — {@link #callCount}
- * tracks {@link #snapshot()} invocations for that assertion.
- */
+/** {@link #callCount} tracks {@link #snapshot()} invocations to prove the readiness gate never touches the provider. */
 public final class TestItemTemplateProvider implements ItemTemplateProvider {
 
     static volatile Collection<ItemTemplate> snapshot = Collections.emptyList();

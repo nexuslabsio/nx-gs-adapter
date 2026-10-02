@@ -71,7 +71,7 @@ class MessagingTopicsTest {
         source.put("premiumpurchase", "acme.gs.events.premiumpurchase");
 
         MessagingTopics topics = new MessagingTopics(source, null, null);
-        source.put("character", "acme.gs.events.character"); // mutate after construction
+        source.put("character", "acme.gs.events.character");
 
         assertEquals(1, topics.getEvents().size());
     }

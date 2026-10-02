@@ -168,7 +168,6 @@ class AccountAuthAttemptEventTest {
 
     @Test
     void getOutcome_shouldAcceptUnknownString() {
-        // Consumers MUST handle unknown values gracefully — the wire is free-form.
         AccountAuthAttemptEvent event =
                 minimal().outcome("CORE_VERSION_MISMATCH").build();
 

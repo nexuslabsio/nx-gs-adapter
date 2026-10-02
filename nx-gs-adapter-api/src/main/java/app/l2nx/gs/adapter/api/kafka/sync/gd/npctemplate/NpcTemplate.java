@@ -8,36 +8,12 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic NPC-template wire DTO — the common L2 denominator for static NPC
- * data, carried as the payload of {@code GameDataSyncEvent} on the {@code gd}
- * (game-data) sync stream's {@code npc} entity topic. Each host build supplies its
- * own provider mapping its core's internal NPC representation into this shape;
- * nothing here names a specific core.
+ * Wire DTO for static NPC data, payload of {@code GameDataSyncEvent} on the {@code npc} topic. Only
+ * {@link #getId()} and {@link #getType()} are non-null; elsewhere {@code null} means the build did not
+ * supply it, and behaviour flags are emitted only when {@code true} ({@code null} reads as false).
  *
- * <p><b>Nullability:</b> only {@link #getId()} and {@link #getType()} are non-null.
- * Every other field is {@link Nullable} (former primitives boxed) so {@code null}
- * means "this build did not supply it". {@code type} is the host's server-side NPC
- * type (e.g. {@code MONSTER} / {@code RAID_BOSS}); kept as an open string since the
- * set is large and fork-dependent. Behaviour flags ({@link #getLethalImmune()},
- * {@link #getNoRandomWalk()}, …) are emitted only when {@code true} — {@code null}
- * reads as {@code false}/unknown.</p>
- *
- * <p><b>Stats:</b> every numeric stat rides {@link #getStats()} — a single map keyed
- * by the canonical {@link Stat} token names (vitals, combat numbers, movement
- * speeds, base attributes, elemental power/resist, aggro range). The attack type is
- * not a magnitude and rides {@link #getAtkType()} as a {@link WeaponType} token.
- * Rewards are not stats and stay top-level ({@link #getRewardExp()} /
- * {@link #getRewardSp()} / {@link #getRewardRp()}).</p>
- *
- * <p>The list-collections ({@link #getSkills()}, {@link #getDrops()},
- * {@link #getMinions()}, {@link #getAbsorbs()}, {@link #getSpawns()}) ride the same
- * message and are fanned out into child rows on the consumer side.</p>
- *
- * <p>Sourced from the host's already-parsed in-memory templates only — client-patch
- * visual fields (client npc type, mesh, icon, class name, draw scale, nick colour)
- * are owned by the patch ingester and intentionally absent here. The race-marker
- * skill (id {@code 4416} on most cores) is consumed into {@link #getRace()} and not
- * repeated in {@link #getSkills()}.</p>
+ * <p>Numeric stats ride {@link #getStats()} keyed by {@link Stat} token; the attack type is a
+ * {@link WeaponType} token. Client-patch visual fields are owned by the patch ingester and absent here.</p>
  */
 public final class NpcTemplate {
 
@@ -161,14 +137,14 @@ public final class NpcTemplate {
     }
 
     /**
-     * Server-side NPC type (open string, e.g. {@code MONSTER} / {@code RAID_BOSS}).
+     * Open string (e.g. {@code MONSTER} / {@code RAID_BOSS}); the set is fork-dependent.
      */
     public String getType() {
         return type;
     }
 
     /**
-     * Visual-template id (NPC renders as another); {@code null} = renders as itself.
+     * Template whose visuals this NPC renders as; {@code null} = itself.
      */
     public @Nullable Integer getDisplayId() {
         return displayId;
@@ -182,82 +158,55 @@ public final class NpcTemplate {
         return race;
     }
 
-    /**
-     * AI behaviour type (open string, e.g. {@code FIGHTER}).
-     */
     public @Nullable String getAiType() {
         return aiType;
     }
 
-    /**
-     * Shot grade the NPC uses (open string, e.g. {@code NONE} / {@code SOUL} / {@code SPIRIT}).
-     */
     public @Nullable String getShots() {
         return shots;
     }
 
     /**
-     * Whether the NPC's minions spawn from a random pool (vs the fixed minion list).
+     * Minions spawn from a random pool (vs the fixed minion list).
      */
     public @Nullable Boolean getRandomMinions() {
         return randomMinions;
     }
 
-    /**
-     * Immune to lethal-strike effects; emitted only when {@code true}.
-     */
     public @Nullable Boolean getLethalImmune() {
         return lethalImmune;
     }
 
     /**
-     * Whether the npc can roll as a champion mob. Carried only when {@code false} — the
-     * datapack's explicit {@code noChampion} exclusions; {@code null} reads as eligible.
+     * Emitted only when {@code false} (datapack {@code noChampion}); {@code null} reads as eligible.
      */
     public @Nullable Boolean getChampionEligible() {
         return championEligible;
     }
 
-    /**
-     * Does not wander away from its spawn point; emitted only when {@code true}.
-     */
     public @Nullable Boolean getNoRandomWalk() {
         return noRandomWalk;
     }
 
-    /**
-     * Cannot move at all; emitted only when {@code true}.
-     */
     public @Nullable Boolean getMovementDisabled() {
         return movementDisabled;
     }
 
     /**
-     * Maximum pursuit distance from the spawn point, world units. Carried only when the
-     * template sets it explicitly — server-config defaults are not materialized.
+     * World units; {@code null} when the template sets none (server-config default not materialized).
      */
     public @Nullable Integer getMaxPursueRange() {
         return maxPursueRange;
     }
 
-    /**
-     * Detects players sneaking with Silent Move; emitted only when {@code true}.
-     */
     public @Nullable Boolean getCanSeeInSilentMove() {
         return canSeeInSilentMove;
     }
 
-    /**
-     * Aggroes regardless of distance (global aggro); emitted only when {@code true}.
-     */
     public @Nullable Boolean getGlobalAggro() {
         return globalAggro;
     }
 
-    /**
-     * Icon of the NPC's race marker (resolved from the race-marker skill's per-level icon);
-     * {@code null} if the NPC has no race marker.
-     */
     public @Nullable String getRaceIcon() {
         return raceIcon;
     }
@@ -271,25 +220,21 @@ public final class NpcTemplate {
     }
 
     /**
-     * Attack weapon kind as a canonical {@link WeaponType} token
-     * ({@code SWORD} / {@code BOW} / {@code DUAL_FIST} / …).
+     * Canonical {@link WeaponType} token.
      */
     public @Nullable String getAtkType() {
         return atkType;
     }
 
     /**
-     * Every numeric stat the NPC carries, keyed by the canonical {@link Stat} token name
-     * (e.g. {@code MAX_HP}, {@code P_ATK}, {@code AGGRO_RANGE}, {@code FIRE_RES}). Zero
-     * values are dropped by the producer ("not applicable"); {@code null} when the build
-     * supplied no stats.
+     * Keyed by canonical {@link Stat} token name; zero values are dropped by the producer.
      */
     public @Nullable Map<String, Double> getStats() {
         return stats;
     }
 
     /**
-     * Experience reward on kill — raw template value, no server rates applied.
+     * Raw template value, no server rates applied.
      */
     public @Nullable Long getRewardExp() {
         return rewardExp;
@@ -303,41 +248,25 @@ public final class NpcTemplate {
         return rewardRp;
     }
 
-    /**
-     * Social clan — same-faction NPCs within the faction range assist each other;
-     * {@code null} when the NPC belongs to no faction.
-     */
     public @Nullable NpcFaction getFaction() {
         return faction;
     }
 
-    /**
-     * NPC template this one transforms into on death; {@code null} when it does not
-     * transform.
-     */
     public @Nullable Integer getTransformOnDeadNpcTemplateId() {
         return transformOnDeadNpcTemplateId;
     }
 
-    /**
-     * Chance of the on-death transform, percent; carried only alongside
-     * {@link #getTransformOnDeadNpcTemplateId()}.
-     */
     public @Nullable Integer getTransformChancePercent() {
         return transformChancePercent;
     }
 
     /**
-     * Number of extra NPCs spawned on death. The spawned template id lives in the host's
-     * AI script, not in the template, and is not carried.
+     * The spawned template id lives in the host's AI script and is not carried.
      */
     public @Nullable Integer getSpawnOnDeathCount() {
         return spawnOnDeathCount;
     }
 
-    /**
-     * Chance of the on-death extra spawn, percent.
-     */
     public @Nullable Integer getSpawnOnDeathChancePercent() {
         return spawnOnDeathChancePercent;
     }
@@ -346,59 +275,37 @@ public final class NpcTemplate {
         return name;
     }
 
-    /**
-     * Localized title / nick shown under the name; {@code null} if none.
-     */
     public @Nullable LocalizedText getTitle() {
         return title;
     }
 
-    /**
-     * Item id equipped in the right hand; {@code null} if unarmed.
-     */
     public @Nullable Integer getRightHand() {
         return rightHand;
     }
 
-    /**
-     * Item id equipped in the left hand; {@code null} if none.
-     */
     public @Nullable Integer getLeftHand() {
         return leftHand;
     }
 
     /**
-     * Skills the NPC has ({@code id}+{@code level} refs); {@code null} if none.
-     * Excludes the race-marker skill (consumed into {@link #getRace()}).
+     * Excludes the race-marker skill, which is consumed into {@link #getRace()}.
      */
     public @Nullable List<NpcSkillRef> getSkills() {
         return skills;
     }
 
-    /**
-     * Drop / spoil reward groups; {@code null} if none.
-     */
     public @Nullable List<NpcDropGroup> getDrops() {
         return drops;
     }
 
-    /**
-     * Leader→minion relationships; {@code null} if none.
-     */
     public @Nullable List<NpcMinionRef> getMinions() {
         return minions;
     }
 
-    /**
-     * Soul-absorb rules; {@code null} if none.
-     */
     public @Nullable List<NpcAbsorb> getAbsorbs() {
         return absorbs;
     }
 
-    /**
-     * Spawn definitions placing this NPC in the world; {@code null} if none.
-     */
     public @Nullable List<NpcSpawn> getSpawns() {
         return spawns;
     }

@@ -6,16 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Heartbeat slot reporting health of the built-in {@code events} module —
- * the bounded-queue + daemon-thread fan-out used for outbound discrete-fact
- * events ({@code events.premium}, future {@code events.character} / etc.).
- *
- * <p>Lives inside {@link ModuleStatus.Stats} alongside {@code pool} (for
- * DB-reading sync modules) and {@code entities} (for per-entity sync
- * progress). Producer side: {@code nx-gs-adapter-core}'s
- * {@code EventsPublisher.currentStatus()}.</p>
- */
+/** Heartbeat slot for the built-in {@code events} module (bounded queue + daemon publisher). */
 public final class EventsStats {
 
     private final int queueDepth;
@@ -40,48 +31,29 @@ public final class EventsStats {
         this.disabledFamilies = freeze(disabledFamilies);
     }
 
-    /**
-     * Current depth of the bounded publish queue at snapshot time.
-     */
     public int getQueueDepth() {
         return queueDepth;
     }
 
-    /**
-     * Configured queue capacity ({@code l2nx.events.queue-capacity}).
-     */
     public int getQueueCapacity() {
         return queueCapacity;
     }
 
-    /**
-     * Total events successfully ack'd by the broker since adapter start.
-     */
     public long getPublishedTotal() {
         return publishedTotal;
     }
 
-    /**
-     * Total events dropped — sum of queue-overflow drops and shutdown drops
-     * since adapter start.
-     */
+    /** Queue-overflow drops plus shutdown drops. */
     public long getDroppedTotal() {
         return droppedTotal;
     }
 
-    /**
-     * Total events that reached Kafka but the broker callback returned an
-     * error (network, NotLeaderForPartition, etc.).
-     */
+    /** Events the broker callback reported as failed. */
     public long getFailedTotal() {
         return failedTotal;
     }
 
-    /**
-     * Event families with no topic configured in
-     * {@code MessagingTopics.events} — every {@code NxEvents.publish(...)}
-     * for these families is a no-op. Empty when all known families are wired.
-     */
+    /** Families with no topic in {@code MessagingTopics.events}; publishing them is a no-op. */
     public List<String> getDisabledFamilies() {
         return disabledFamilies == null ? Collections.emptyList() : disabledFamilies;
     }

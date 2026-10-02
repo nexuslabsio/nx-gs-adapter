@@ -7,37 +7,13 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Discrete death fact — one event per character death that the host chooses to
- * report. bohpts emits this <b>only</b> when the dying character was unattended
- * at the moment of death — on autofarm or on an auto-macro (the legacy-bot
- * "your unattended character died" signal); the {@code farm_mode} metadata key
- * carries which mode. Attended deaths produce no event.
- *
- * <p>Second message type on the {@code character} family
- * ({@code <tenant>.gs.events.character}), alongside {@link CharacterPresenceEvent};
- * the two share a topic and are dispatched by the {@code Nx-Message-Type} header.
- * Partitioned by {@link #getCharId() charId} — same key as presence — so a
- * character's presence and death history land on one partition in occurrence
- * order.</p>
- *
- * <p>Fields:
- * <ul>
- *   <li>{@link #getEventId() eventId} — UUIDv7, REQUIRED. Idempotency key for
- *   at-least-once delivery; platform extracts {@code occurredAt} from the
- *   time-ordered prefix.</li>
- *   <li>{@link #getCharId() charId} — REQUIRED. The character that died; also
- *   the Kafka partition key.</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic attributes about the death. {@code null} when absent.
- *   Canonical keys in {@link WellKnownDeathMetadata}: {@code killer_type}
- *   (a {@link WellKnownKillerTypes} value) and {@code killer_id} (the killer's
- *   character object-id for a {@code player} killer, or the killer's NPC
- *   template-id for a {@code monster} / {@code boss} killer), plus {@code farm_mode}
- *   (a {@link WellKnownFarmModes} value classifying the unattended mode). The
- *   platform resolves the killer's display name from those ids against its own
- *   catalogs; no killer name is carried on the wire. Hosts MAY publish arbitrary
- *   non-canonical keys; consumers ignore keys they do not understand.</li>
- * </ul>
+ * Death of a character the host chooses to report; bohpts emits it only for unattended deaths (autofarm or auto-macro,
+ * mode in the {@code farm_mode} metadata key). Shares the {@code character} topic with {@link CharacterPresenceEvent}
+ * (dispatched by {@code Nx-Message-Type}) and the {@code charId} partition key.
+ * {@code eventId} is a UUIDv7 idempotency key (at-least-once). {@code metadata} is an open map; canonical keys in
+ * {@link WellKnownDeathMetadata}: {@code killer_type} ({@link WellKnownKillerTypes}), {@code killer_id} (character
+ * object-id for {@code player}, NPC template-id for {@code monster}/{@code boss}), {@code farm_mode}
+ * ({@link WellKnownFarmModes}). No killer name on the wire; the platform resolves it from the ids.
  */
 public final class CharacterDeathEvent {
 

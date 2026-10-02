@@ -7,40 +7,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inbound command instructing the game-server to open a regular
- * ("sell one by one") private store on behalf of a character, listing the
- * given inventory stacks at their asked prices. Executed by the host's
- * private-store subsystem on the character's game thread.
- *
- * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link StartPrivateStoreResult}{@code >}
- * — {@code success(payload)} carries the accepted-line count plus any lines
- * the host rejected (see {@link StartPrivateStoreResult}). Common error
- * replies:</p>
- * <ul>
- *     <li>{@code NOT_FOUND} — {@code charId} does not exist / is not online
- *     on this server.</li>
- *     <li>{@code VALIDATION_FAILED} — {@code lines} missing/empty, or any
- *     {@link SellLine} entry is malformed.</li>
- *     <li>{@code INVALID_STATE} — the character cannot open a store right
- *     now (in combat, already trading, dead, …).</li>
- * </ul>
- *
- * <p><b>Required fields.</b> {@link #getCharId() charId} and a non-empty
- * {@link #getLines() lines} are REQUIRED — the constructor enforces this via
- * {@link IllegalArgumentException} for programmatic construction. Wire-path
- * deserialization bypasses the constructor — the handler re-checks and emits
- * {@code VALIDATION_FAILED}. {@link #getTitle() title} is OPTIONAL —
- * {@code null} falls back to the host's default store banner text.</p>
- *
- * <p><b>Partial acceptance.</b> The host MAY reject individual lines (item no
- * longer in inventory, not tradeable, …) while still opening the store with
- * the remaining lines; rejected lines are reported in
- * {@link StartPrivateStoreResult#getDropped() dropped} on the success
- * envelope. Only {@code VALIDATION_FAILED} on the whole command halts the
- * store from opening at all.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Opens a regular private store for a character; executed on the character's game thread.
+ * Reply: {@code success(StartPrivateStoreResult)}; errors: {@code NOT_FOUND} (char not online),
+ * {@code VALIDATION_FAILED} (lines missing/empty or malformed), {@code INVALID_STATE} (cannot open a store now).
+ * The host may reject individual lines and still open the store with the rest (see {@link StartPrivateStoreResult#getDropped()}).
  */
 public final class StartPrivateStoreSellCommand implements NxCommand<StartPrivateStoreResult> {
 
@@ -61,17 +31,11 @@ public final class StartPrivateStoreSellCommand implements NxCommand<StartPrivat
         return charId;
     }
 
-    /**
-     * Store banner text shown above the seller. OPTIONAL — {@code null}
-     * falls back to the host's default.
-     */
+    /** {@code null} falls back to the host's default banner. */
     public @Nullable String getTitle() {
         return title;
     }
 
-    /**
-     * Offered stacks. REQUIRED, non-empty. Immutable on read.
-     */
     public List<SellLine> getLines() {
         return lines;
     }

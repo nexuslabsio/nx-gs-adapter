@@ -6,32 +6,11 @@ import app.l2nx.gs.adapter.api.kafka.commands.ban.model.WellKnownBanTypes;
 import java.util.Objects;
 
 /**
- * Inbound command instructing the game-server to lift a previously applied ban.
- * The inverse of {@link BanCommand}: it names the same target dimension and
- * ban kind and asks the host to clear the matching ban(s).
+ * Lifts a ban applied by {@link BanCommand}: same target dimension and ban kind, clears the matching ban(s).
  *
- * <p>Reply:
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link UnbanResult}{@code >}
- * — reports whether anything was removed and the ids of the cleared ban
- * rows. Common error replies:</p>
- * <ul>
- *     <li>{@code VALIDATION_FAILED} — wire payload missing {@code targetType},
- *     {@code targetValue}, or {@code banType}.</li>
- *     <li>{@code FORBIDDEN} — operation rejected on host policy grounds.</li>
- * </ul>
- *
- * <p>Clearing a ban that is not present is a no-op success ({@code removed =
- * false}), not an error — the post-condition (no such ban) already holds.</p>
- *
- * <p><b>Target.</b> {@link #getTargetType() targetType}
- * ({@link WellKnownBanTargetTypes}) + {@link #getTargetValue() targetValue}
- * identify the subject; {@link #getBanType() banType}
- * ({@link WellKnownBanTypes}) names which ban kind to clear. All
- * REQUIRED. A {@code HARD} target clears every concrete dimension for the
- * subject.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * <p>Reply: {@code CommandResult<UnbanResult>}. {@code VALIDATION_FAILED} on missing fields, {@code FORBIDDEN} on host
+ * policy. Clearing a ban that is not present is a no-op success ({@code removed = false}), not an error.
+ * A {@code HARD} target clears every concrete dimension for the subject.</p>
  */
 public final class UnbanCommand implements NxCommand<UnbanResult> {
 
@@ -54,24 +33,16 @@ public final class UnbanCommand implements NxCommand<UnbanResult> {
         this.banType = banType;
     }
 
-    /**
-     * Ban target dimension to clear — a {@link WellKnownBanTargetTypes} value.
-     * REQUIRED.
-     */
+    /** A {@link WellKnownBanTargetTypes} value. */
     public String getTargetType() {
         return targetType;
     }
 
-    /**
-     * The keyed datum for {@link #getTargetType() targetType}. REQUIRED.
-     */
     public String getTargetValue() {
         return targetValue;
     }
 
-    /**
-     * Ban kind to clear — a {@link WellKnownBanTypes} value. REQUIRED.
-     */
+    /** A {@link WellKnownBanTypes} value. */
     public String getBanType() {
         return banType;
     }

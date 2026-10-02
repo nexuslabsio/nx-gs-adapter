@@ -4,11 +4,7 @@ import app.l2nx.gs.adapter.api.domain.Attribute;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Plain data holder for {@link PrivateStoreOfferHasher}. Mirrors the wire
- * {@code Offer} field set; public final fields, no defensive copying —
- * caller must not mutate the row after handing it to the hasher.
- */
+/** Callers must not mutate a row after handing it to the hasher (no defensive copying). */
 public final class OfferRow {
 
     public final long itemId;

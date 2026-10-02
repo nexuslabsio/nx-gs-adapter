@@ -4,39 +4,12 @@ import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Public factory for the events publish subsystem. {@code NxAdapter} calls
- * {@link #start(Map, EventsPublisher.Sender, EventsPublisher.ProducerFlusher, EventsConfig)}
- * once per connect
- * cycle to wire up the bounded queue + daemon thread + registry, returning a
- * {@link Started} bundle with the {@link EventsPublisher} (for shutdown +
- * heartbeat status) and the {@link NxEvents} façade (for
- * {@code ConnectContext.events()}).
- *
- * <p>Hides {@code EventTypeRegistry} and {@code NxEventsImpl} — those are
- * package-private implementation details. Callers depend only on the public
- * {@link NxEvents} interface and the {@link EventsPublisher} class.</p>
- */
+/** Public entry point; {@code EventTypeRegistry} and {@code NxEventsImpl} stay package-private. */
 public final class EventsBootstrap {
 
     private EventsBootstrap() {}
 
-    /**
-     * Materializes the registry, instantiates the publisher, starts its daemon
-     * thread, and wraps the publisher in an {@link NxEvents} façade.
-     *
-     * @param familyTopics    per-family Kafka topic map from
-     *                        {@code MessagingTopics.events}; {@code null} or
-     *                        empty disables every publish call (no-op +
-     *                        DEBUG log).
-     * @param sender          Kafka send bridge — production wires this to
-     *                        {@code NxKafka.instance()::sendBytesKeyRecord}.
-     * @param producerFlusher synchronous producer-flush bridge — production
-     *                        wires this to {@code NxKafka.instance()::flush};
-     *                        backs {@code NxEvents.flush(timeoutMs)}.
-     * @param config          operator-tunable knobs (queue capacity, drop policy,
-     *                        shutdown drain).
-     */
+    /** Null or empty {@code familyTopics} disables every publish call (no-op + DEBUG log). */
     public static Started start(
             @Nullable Map<String, String> familyTopics,
             EventsPublisher.Sender sender,
@@ -49,12 +22,7 @@ public final class EventsBootstrap {
         return new Started(publisher, events);
     }
 
-    /**
-     * Rebuild the publisher in-place behind a stable {@link NxEvents} façade.
-     * Used on reconnect — modules that captured {@code ctx.events()} from an
-     * earlier {@code onConnect} keep publishing into the new publisher with
-     * no re-registration.
-     */
+    /** Rebuilds the publisher behind a stable façade so modules holding {@code ctx.events()} survive reconnect. */
     public static EventsPublisher swap(
             NxEvents facade,
             @Nullable Map<String, String> familyTopics,
@@ -72,11 +40,7 @@ public final class EventsBootstrap {
         return publisher;
     }
 
-    /**
-     * Tuple of the wired-up publisher and its {@link NxEvents} façade.
-     * {@code NxAdapter} keeps a reference to the publisher for shutdown and
-     * heartbeat status; the façade goes into {@code ConnectContext.events()}.
-     */
+    /** Publisher is kept for shutdown and heartbeat status; the façade goes into {@code ConnectContext.events()}. */
     public static final class Started {
 
         private final EventsPublisher publisher;

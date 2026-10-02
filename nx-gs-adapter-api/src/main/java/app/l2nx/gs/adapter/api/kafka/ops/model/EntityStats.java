@@ -3,15 +3,8 @@ package app.l2nx.gs.adapter.api.kafka.ops.model;
 import java.util.Objects;
 
 /**
- * Per-entity operational snapshot populated by the CDC engine on every cycle and
- * surfaced inside {@link ModuleStatus.Stats#getEntities()}. One {@code EntityStats}
- * per synced entity (clan, character, item, …); the engine rebuilds the list per
- * cycle.
- *
- * <p>{@code name} is the entity name (e.g. {@code "clan"}, {@code "character"}) —
- * NOT the source SQL table. Counters are nullable so a partial cycle (e.g. engine
- * never finished its first tick) can still produce a status row with {@code state}
- * and {@code consecutiveErrors} set.</p>
+ * Per-entity CDC snapshot inside {@link ModuleStatus.Stats#getEntities()}.
+ * {@code name} is the entity name (e.g. {@code "clan"}), not the SQL table. Counters are nullable: a partial first cycle still reports {@code state} and {@code consecutiveErrors}.
  */
 public final class EntityStats {
 

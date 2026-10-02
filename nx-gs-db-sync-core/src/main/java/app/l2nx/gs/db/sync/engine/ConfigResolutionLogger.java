@@ -6,21 +6,7 @@ import app.l2nx.gs.log.NxLog;
 import java.util.List;
 import java.util.function.Function;
 
-/**
- * Emits a single startup log block summarizing engine globals + per-entity
- * topic resolution. Operators read this once at adapter start to verify
- * what the engine actually picked up.
- *
- * <p>Format:</p>
- * <pre>
- * cdc-engine config: tickInterval=60s [default], rowsPerWindow=500000 [default],
- *                    queryTimeout=10s [default], publishFlush=5s [default]
- * cdc-engine entities:
- *     clan        → bohpts.gs.sync.clans
- *     character   → bohpts.gs.sync.characters
- *     item        → topic=&lt;missing — entity DEGRADED&gt;
- * </pre>
- */
+/** One startup log block summarizing engine globals and per-entity topic resolution. */
 public final class ConfigResolutionLogger {
 
     private ConfigResolutionLogger() {}

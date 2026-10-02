@@ -1,10 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.commands;
 
 /**
- * Outcome of an inbound {@link NxCommand}. Wire form: enum constant name.
- * Consumers SHOULD treat unknown values as a generic failure for
- * forward-compat. See the commands guide for picking the right status;
- * {@link #UNSUPPORTED_COMMAND} is adapter-emitted only.
+ * Outcome of an inbound {@link NxCommand}; wire form is the constant name. Consumers should treat unknown
+ * values as a generic failure. {@link #UNSUPPORTED_COMMAND} is adapter-emitted only.
  */
 public enum CommandStatus {
     OK(Tier.OK),
@@ -16,10 +14,8 @@ public enum CommandStatus {
     RATE_LIMITED(Tier.CLIENT_ERROR),
     UNSUPPORTED_COMMAND(Tier.CLIENT_ERROR),
     /**
-     * The command carried an execution deadline that had already passed when the host picked it up,
-     * so it was refused without running — nothing was read, charged, or moved. Distinct from
-     * {@link #INVALID_STATE}: the world was never consulted, so a retry with a fresh deadline is
-     * meaningful, whereas re-sending this exact command never is.
+     * Deadline had already passed on pickup, so nothing ran. Unlike {@link #INVALID_STATE}, a retry with a
+     * fresh deadline is meaningful.
      */
     COMMAND_EXPIRED(Tier.CLIENT_ERROR),
 
@@ -40,10 +36,6 @@ public enum CommandStatus {
         return tier == Tier.OK;
     }
 
-    /**
-     * Coarse HTTP-aligned classification for callers routing on
-     * retry / surface-to-user / alert-ops.
-     */
     public enum Tier {
         OK,
         CLIENT_ERROR,

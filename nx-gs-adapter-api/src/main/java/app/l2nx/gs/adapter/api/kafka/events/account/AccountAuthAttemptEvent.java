@@ -8,40 +8,11 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Discrete account-authentication attempt fact — one event per credential-entry
- * outcome on the login server. Covers success and every failure mode (wrong
- * password, banned, IP-restricted, etc.). Emitted independently of whether the
- * account proceeds to character selection / world entry.
- *
- * <p>Partition key on the wire is {@code accountName.toLowerCase(Locale.ROOT)}
- * so per-account attempt history lands in one partition in occurrence order.
- * The platform consumes this stream into account-watchlist alerts.</p>
- *
- * <p>Fields:
- * <ul>
- *   <li>{@link #getEventId() eventId} — UUIDv7 String. Idempotency key for
- *   at-least-once delivery; platform extracts {@code occurredAt} from the
- *   time-ordered prefix.</li>
- *   <li>{@link #getServerId() serverId} — Login-server UUID String. Identifies
- *   the originating LS instance.</li>
- *   <li>{@link #getAccountName() accountName} — REQUIRED. Lowercased and
- *   trimmed by the producer.</li>
- *   <li>{@link #getClientIp() clientIp} — REQUIRED. Client IP captured at the
- *   moment credentials were submitted.</li>
- *   <li>{@link #getHwid() hwid} — optional hardware-id (build-specific
- *   format); always {@code null} on bohpts current protocol — reserved for
- *   cores that carry HWID on the login flow.</li>
- *   <li>{@link #getOutcome() outcome} — REQUIRED. See javadoc on the
- *   accessor.</li>
- *   <li>{@link #getAttemptedAt() attemptedAt} — REQUIRED. UTC wall-clock at
- *   the moment the attempt was evaluated.</li>
- *   <li>{@link #getFailureDetail() failureDetail} — optional free-form
- *   diagnostic string. Never carries secrets (no password, no hash).</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic attributes about this attempt. {@code null} when absent.
- *   Hosts MAY publish arbitrary keys without an API release;
- *   consumers ignore keys they do not understand.</li>
- * </ul>
+ * One event per credential-entry outcome on the login server, success or any failure, independent of whether the
+ * account proceeds to world entry. Partition key is {@code accountName.toLowerCase(Locale.ROOT)} (per-account order).
+ * {@code eventId} is a UUIDv7 idempotency key (at-least-once). {@code accountName} is lowercased and trimmed by the
+ * producer. {@code hwid} is always {@code null} on bohpts; {@code failureDetail} never carries secrets.
+ * {@code metadata} is an open map; hosts MAY add keys without an API release, consumers ignore unknown ones.
  */
 public final class AccountAuthAttemptEvent {
 
@@ -97,11 +68,7 @@ public final class AccountAuthAttemptEvent {
         return hwid;
     }
 
-    /**
-     * Free-form String; see {@link AuthOutcomes} for known values. Consumers
-     * MUST handle unknown values gracefully — unknown outcomes don't match
-     * any rule and are not an error.
-     */
+    /** Free-form; see {@link AuthOutcomes}. Consumers MUST tolerate unknown values (they match no rule, not an error). */
     public String getOutcome() {
         return outcome;
     }

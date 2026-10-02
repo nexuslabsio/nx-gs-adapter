@@ -4,15 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Cohesive cluster of a {@link Skill}'s boolean classification flags — "what kind of
- * skill is this". Grouped (the same way {@code ItemRestrictions} groups an item's
- * permission flags) so the header surface is one object instead of a scatter of
- * booleans; the consumer unwraps it flat into queryable columns.
- *
- * <p>All fields are tri-state {@link Nullable Boolean} ({@code true}/{@code false}/
- * unknown) and carry no {@code is}-prefix (gd-DTO convention — accessor name is
- * {@code getMagic()} etc.). These flags are level-invariant; the provider reads them
- * from the skill's canonical level.</p>
+ * Boolean classification flags of a {@link Skill}, level-invariant (read from the canonical level). All fields
+ * are tri-state {@link Nullable Boolean}: {@code true} / {@code false} / unknown.
  */
 public final class SkillFlags {
 
@@ -65,9 +58,6 @@ public final class SkillFlags {
         this.stayAfterDeath = stayAfterDeath;
     }
 
-    /**
-     * Magic skill (vs physical) — drives m.def mitigation and cast interruption rules.
-     */
     public @Nullable Boolean getMagic() {
         return magic;
     }
@@ -76,9 +66,6 @@ public final class SkillFlags {
         return debuff;
     }
 
-    /**
-     * Hostile skill (targets enemies) — drives flagging / PvP rules.
-     */
     public @Nullable Boolean getOffensive() {
         return offensive;
     }
@@ -91,10 +78,7 @@ public final class SkillFlags {
         return toggle;
     }
 
-    /**
-     * Static skill — does not scale with the caster's stats. Field is
-     * {@code staticSkill} ({@code static} is a Java keyword); DB column {@code static_skill}.
-     */
+    /** Does not scale with the caster's stats; named {@code staticSkill} because {@code static} is a keyword. */
     public @Nullable Boolean getStaticSkill() {
         return staticSkill;
     }
@@ -103,9 +87,7 @@ public final class SkillFlags {
         return blockedInOlympiad;
     }
 
-    /**
-     * Can over-hit (excess damage carries to exp reward on the killing blow).
-     */
+    /** Excess damage carries to exp reward on the killing blow. */
     public @Nullable Boolean getOverHit() {
         return overHit;
     }
@@ -114,44 +96,26 @@ public final class SkillFlags {
         return ignoreShield;
     }
 
-    /**
-     * Whether the character auto-attacks the target after this skill resolves.
-     */
     public @Nullable Boolean getNextActionAttack() {
         return nextActionAttack;
     }
 
-    /**
-     * Granted by hero status (monthly olympiad winner), not learned.
-     */
     public @Nullable Boolean getHeroSkill() {
         return heroSkill;
     }
 
-    /**
-     * Granted through clan membership / clan level, not learned individually.
-     */
     public @Nullable Boolean getClanSkill() {
         return clanSkill;
     }
 
-    /**
-     * Whether the applied buff/debuff can be removed by dispel/cleanse effects.
-     */
     public @Nullable Boolean getDispellable() {
         return dispellable;
     }
 
-    /**
-     * Whether the skill can bounce back to the caster via reflect effects.
-     */
     public @Nullable Boolean getReflectable() {
         return reflectable;
     }
 
-    /**
-     * Whether the applied effect persists on the target after death.
-     */
     public @Nullable Boolean getStayAfterDeath() {
         return stayAfterDeath;
     }

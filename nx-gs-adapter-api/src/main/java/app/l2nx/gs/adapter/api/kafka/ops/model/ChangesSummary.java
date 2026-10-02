@@ -2,10 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.ops.model;
 
 import java.util.Objects;
 
-/**
- * Per-entity change counts for the last completed CDC cycle. Surfaced inside
- * {@link EntityStats#getLastCycleChanges()}.
- */
+/** Change counts for the last completed CDC cycle. */
 public final class ChangesSummary {
 
     private final long created;

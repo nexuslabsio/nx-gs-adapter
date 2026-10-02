@@ -3,13 +3,8 @@ package app.l2nx.gs.adapter.api.rest;
 import java.util.Objects;
 
 /**
- * Kafka credentials and bootstrap addressing returned in {@link ConnectResponse} /
- * {@link LoginServerConnectResponse}.
- *
- * <p>{@code saslPassword} travels in plaintext within this DTO — wire-level confidentiality
- * is the transport's responsibility, not this contract's.</p>
- *
- * <p>{@link #toString()} redacts {@code saslPassword}.</p>
+ * Kafka credentials and bootstrap addressing from the connect responses.
+ * {@code saslPassword} is plaintext here (transport secures it); {@link #toString()} redacts it.
  */
 public final class KafkaCredentials {
 

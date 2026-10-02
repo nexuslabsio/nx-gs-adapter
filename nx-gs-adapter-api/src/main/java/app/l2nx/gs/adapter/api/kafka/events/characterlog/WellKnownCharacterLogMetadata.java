@@ -14,8 +14,9 @@ public final class WellKnownCharacterLogMetadata {
     /** Class held after the fact; on {@code SUBCLASS_ADDED}, the added subclass. */
     public static final String CLASS_ID = "class_id";
 
-    /** Tier reached, {@code 1} / {@code 2} / {@code 3}. Redundant with the type token by design —
-     * it survives a consumer that does not recognise the token. */
+    /**
+     * Tier reached, {@code 1} / {@code 2} / {@code 3}. Redundant with the type token so it survives an unrecognised token.
+     */
     public static final String CLASS_LEVEL = "class_level";
 
     /**

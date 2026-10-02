@@ -45,7 +45,6 @@ class ResyncCoordinatorTest {
         coordinator.enqueueAll(RESYNC_B, "clan");
         coordinator.drainAndInvalidate("clan", snapshot);
 
-        // Whole-entity invalidation perturbs in place — no sentinel inserts.
         assertEquals(2, snapshot.sizeOf("clan"));
         assertNotEquals(100, snapshot.getCrc("clan", 1L));
         assertNotEquals(200, snapshot.getCrc("clan", 2L));
@@ -59,7 +58,6 @@ class ResyncCoordinatorTest {
         coordinator.enqueuePks(RESYNC_B, "clan", pks(999L));
         coordinator.drainAndInvalidate("clan", snapshot);
 
-        // The whole-entity request wins: no sentinel insert for pk 999.
         assertFalse(snapshot.containsCrc("clan", 999L));
         assertNotEquals(100, snapshot.getCrc("clan", 1L));
     }
@@ -144,7 +142,7 @@ class ResyncCoordinatorTest {
         coordinator.onCycleResult("clan", withPublishOutcome(1L, 0L));
         assertTrue(published.isEmpty());
 
-        coordinator.drainAndInvalidate("clan", snapshot); // nothing pending — no-op
+        coordinator.drainAndInvalidate("clan", snapshot);
         coordinator.onCycleResult("clan", healthy());
         assertEquals(1, published.size());
         assertEquals(RESYNC_A, ((ResyncCompletedEvent) published.get(0)).getResyncId());
@@ -161,16 +159,14 @@ class ResyncCoordinatorTest {
 
         Thread.sleep(5L);
         Instant beforeSecondDrain = Instant.now();
-        // Same resyncId re-enqueued (command redelivery) and re-drained.
         coordinator.enqueuePks(RESYNC_A, "clan", pks(1L));
         coordinator.drainAndInvalidate("clan", snapshot);
         coordinator.onCycleResult("clan", healthy());
 
         assertEquals(1, published.size());
         ResyncCompletedEvent completed = (ResyncCompletedEvent) published.get(0);
-        // cycleStartedAt anchors the platform sweep — must stay the FIRST drain
-        // time so rows published by the first (partially failed) cycle are not
-        // swept as ghosts.
+        // cycleStartedAt must stay the first drain time so rows from the first partially failed cycle aren't swept as
+        // ghosts.
         assertTrue(completed.getCycleStartedAt().isBefore(beforeSecondDrain));
     }
 
@@ -201,9 +197,7 @@ class ResyncCoordinatorTest {
         coordinator.enqueueNoEventPks("clan", pks(1L));
         coordinator.drainAndInvalidate("clan", snapshot);
 
-        // PK is invalidated on the snapshot so the next cycle re-publishes it...
         assertNotEquals(100, snapshot.getCrc("clan", 1L));
-        // ...but no resyncId was tracked, so a fully successful cycle emits nothing.
         coordinator.onCycleResult("clan", healthy());
         assertTrue(published.isEmpty(), "no-event channel must never emit a completion event");
     }
@@ -217,7 +211,6 @@ class ResyncCoordinatorTest {
         coordinator.enqueueNoEventPks("clan", pks(2L));
         coordinator.drainAndInvalidate("clan", snapshot);
 
-        // Both the tracked and the no-event PK are invalidated for re-publication.
         assertNotEquals(100, snapshot.getCrc("clan", 1L));
         assertNotEquals(200, snapshot.getCrc("clan", 2L));
 
@@ -229,8 +222,7 @@ class ResyncCoordinatorTest {
 
     @Test
     void enqueueAll_shouldAbsorbQueuedNoEventPks() {
-        // A ghost PK the snapshot never had: if the no-event channel were drained
-        // separately it would insert a sentinel; whole-entity absorb must not.
+        // Ghost PK the snapshot never had: whole-entity absorb must not insert a sentinel.
         coordinator.enqueueNoEventPks("clan", pks(999L));
         coordinator.enqueueAll(RESYNC_A, "clan");
         coordinator.drainAndInvalidate("clan", snapshot);

@@ -5,31 +5,15 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Discrete server-lifecycle fact — emitted once on the graceful-shutdown path,
- * before the server stops accepting logins. Joins {@link ServerOnlineSnapshotEvent}
- * and {@link ServerStartedEvent} on the {@code serveronline} family
- * ({@code <tenant>.gs.events.serveronline}); dispatched by the
- * {@code Nx-Message-Type} header.
+ * Emitted once on graceful shutdown, before the server stops accepting logins; shares the
+ * {@code serveronline} topic with {@link ServerOnlineSnapshotEvent} and {@link ServerStartedEvent}.
  *
- * <p>Covers <b>graceful</b> shutdown only — a hard crash leaves no JVM to emit
- * anything, so server-down detection for crashes falls to the platform's
- * heartbeat-timeout mechanism (separate, existing). The host suppresses this
- * event during its scheduled maintenance restart window (see
- * {@link ServerStartedEvent}).</p>
+ * <p>Graceful only: a crash emits nothing and is caught by the platform's heartbeat timeout. The host
+ * suppresses it during scheduled restarts. {@code eventId} is a UUIDv7 idempotency key. {@code metadata}
+ * carries {@link WellKnownServerStartMetadata#GM_ONLY}; the host always reports it and the platform decides
+ * whether to suppress the notification.</p>
  *
- * <p>Fields:
- * <ul>
- *   <li>{@link #getEventId() eventId} — UUIDv7, REQUIRED. Idempotency key; the
- *   platform extracts {@code occurredAt} from the time-ordered prefix.</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map; same
- *   canonical key as {@link ServerStartedEvent}: {@code gm_only} ("true"/"false")
- *   via {@link WellKnownServerStartMetadata#GM_ONLY}. The host always reports the
- *   server's GM-only state; the <b>platform</b> decides whether to suppress the
- *   "server is stopping" notification when {@code gm_only=true} (GM-only runs are
- *   operator tests, often several restarts in a row).</li>
- * </ul>
- *
- * <p>Partition key: {@code null} (round-robin).</p>
+ * <p>Partition key is {@code null} (round-robin).</p>
  */
 public final class ServerStoppingEvent {
 

@@ -5,57 +5,20 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Inbound command putting one line of text into game chat — the outbound
- * counterpart of {@link app.l2nx.gs.adapter.api.kafka.events.chat.ChatMessageEvent}.
- * Covers a player speaking from outside the game client (mini app writing to
- * clan chat, including while his character is offline) and the platform itself
- * speaking under an arbitrary display name.
+ * Puts one line of text into game chat: a player speaking from outside the client (even while offline) or the
+ * platform under any display name. Counterpart of {@link app.l2nx.gs.adapter.api.kafka.events.chat.ChatMessageEvent}.
  *
- * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link SendChatMessageResult}{@code >}.
- * Common error replies:</p>
- * <ul>
- *     <li>{@code NOT_FOUND} — {@link #getSenderCharacterId() senderCharacterId}
- *     or {@link #getAudienceId() audienceId} resolves to nothing on this
- *     server.</li>
- *     <li>{@code FORBIDDEN} — host policy refuses: chat ban, shadow ban, block
- *     list, or a channel-specific floor such as the academy level gate.</li>
- *     <li>{@code VALIDATION_FAILED} — missing field, a {@link #getChannel()
- *     channel} outside the host's accepted whitelist, an unknown
- *     {@link #getAudience() audience}, or an {@code audienceId} absent where the
- *     audience requires one.</li>
- *     <li>{@code INTERNAL_ERROR} — the broadcast mechanism failed host-side.</li>
- * </ul>
+ * <p>{@code NOT_FOUND}: unknown sender or audience. {@code FORBIDDEN}: chat/shadow ban, block list, channel floor.
+ * {@code VALIDATION_FAILED}: missing field, channel outside the host whitelist, unknown audience, audienceId
+ * missing or (for ALL_ONLINE) present. {@code INTERNAL_ERROR}: broadcast failed host-side.</p>
  *
- * <p><b>Sender is two independent things.</b> {@link #getSenderCharacterId()}
- * is who speaks legally — it drives the host's gates, the chat packet's object
- * id and the platform's attribution — while {@link #getSenderDisplayName()} is
- * only what the client renders. A mini-app message carries both; a persona
- * announcement carries a display name and no character at all.</p>
+ * <p>{@link #getSenderCharacterId()} is who speaks legally (host gates, packet object id, attribution);
+ * {@link #getSenderDisplayName()} is only what the client renders. A persona announcement has a name and no character.</p>
  *
- * <p><b>The display name arrives composed in full.</b> The host writes it
- * verbatim, so the suffix convention ({@code "Vasya (TMA)"}) changes without an
- * adapter or game-core release. An empty string reproduces the nameless
- * announcement line.</p>
+ * <p>Delivery is at-most-once (see {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); a re-issue after a reply timeout looks like a fresh
+ * request, so {@code messageId} dedup works only if the host keeps a window of seen ids.</p>
  *
- * <p><b>Idempotency.</b> {@link #getMessageId() messageId} is minted by the
- * platform and echoed as the {@code eventId} of the resulting
- * {@code ChatMessageEvent}. Delivery is at-most-once (see
- * {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); what repeats is a caller
- * re-issuing after a reply timeout, which the handler cannot distinguish from a
- * fresh request. A host keeping a bounded window of seen ids converges on one
- * message; without that window the field is carried but buys nothing.</p>
- *
- * <p><b>Required fields.</b> {@link #getMessageId() messageId},
- * {@link #getChannel() channel}, {@link #getAudience() audience},
- * {@link #getSenderDisplayName() senderDisplayName}, {@link #getSource() source} and
- * {@link #getText() text} are REQUIRED; {@code audienceId} is required for every audience except
- * {@link ChatAudiences#ALL_ONLINE}, which forbids it. The constructor enforces
- * this via {@link IllegalArgumentException} for programmatic construction.
- * Wire-path Gson bypasses the constructor — handler-side null-checking is the
- * wire-validation gate.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * <p>Gson bypasses the constructor, so the handler must re-validate required fields.</p>
  */
 public final class SendChatMessageCommand implements NxCommand<SendChatMessageResult> {
 
@@ -105,68 +68,50 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
     }
 
     /**
-     * UUIDv7 minted by the platform, reused as the {@code eventId} of the echo
-     * event and as the host's deduplication key.
+     * UUIDv7 minted by the platform; echoed as the echo event's {@code eventId} and used as dedup key.
      */
     public UUID getMessageId() {
         return messageId;
     }
 
-    /**
-     * {@link app.l2nx.gs.adapter.api.kafka.events.chat.WellKnownChatChannels}
-     * code. Which codes a host accepts is its own whitelist — anything outside
-     * it is answered {@code VALIDATION_FAILED} rather than silently rerouted.
-     */
+    /** Host rejects codes outside its whitelist with {@code VALIDATION_FAILED} rather than rerouting. */
     public String getChannel() {
         return channel;
     }
 
-    /** {@link ChatAudiences} code naming the recipient set. */
     public String getAudience() {
         return audience;
     }
 
     /**
-     * Keyed subject of {@link #getAudience() audience} — character id for
-     * {@code CHARACTER}, clan id for {@code CLAN}. {@code null} iff the audience
-     * is {@code ALL_ONLINE}.
+     * Character id for {@code CHARACTER}, clan id for {@code CLAN}; {@code null} iff {@code ALL_ONLINE}.
      */
     public Long getAudienceId() {
         return audienceId;
     }
 
-    /**
-     * Character the message is attributed to and whose chat restrictions gate
-     * it. {@code null} means the platform itself speaks — no gates apply and
-     * the chat packet carries no object id.
-     */
+    /** {@code null} means the platform speaks: no gates apply and the packet carries no object id. */
     public Long getSenderCharacterId() {
         return senderCharacterId;
     }
 
     /**
-     * Sender name as the client should render it, already composed by the
-     * platform. Never {@code null}; empty means the nameless announcement form.
+     * Composed in full by the platform and written verbatim by the host; never {@code null}, empty means nameless announcement.
      */
     public String getSenderDisplayName() {
         return senderDisplayName;
     }
 
     /**
-     * Where the message originates, e.g. {@code TMA} or {@code AUTO_ANNOUNCEMENT}. Required: a
-     * message arriving through this command always came from somewhere on the platform, and the host
-     * cannot infer which surface. Echoed verbatim into the event metadata under
-     * {@link app.l2nx.gs.adapter.api.kafka.events.chat.ChatMetadataKeys#SOURCE}, which is what lets
-     * analysis separate platform traffic from what players typed in-game.
+     * Origin surface, e.g. {@code TMA} or {@code AUTO_ANNOUNCEMENT}; echoed into event metadata under
+     * {@link app.l2nx.gs.adapter.api.kafka.events.chat.ChatMetadataKeys#SOURCE} so analysis can separate platform traffic from in-game typing.
      */
     public String getSource() {
         return source;
     }
 
     /**
-     * Body in the neutral chat micro-format: plain text, literal {@code \n}
-     * hard line breaks, bare {@code http(s)://} URLs for auto-linking.
-     * Translating those into build-specific wire tokens is a host concern.
+     * Neutral micro-format: plain text, literal {@code \n} line breaks, bare {@code http(s)://} URLs; the host translates to wire tokens.
      */
     public String getText() {
         return text;

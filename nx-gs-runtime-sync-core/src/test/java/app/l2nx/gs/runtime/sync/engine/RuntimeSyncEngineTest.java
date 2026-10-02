@@ -51,7 +51,6 @@ class RuntimeSyncEngineTest {
 
     @Test
     void start_shouldDispatchTicks_forMultipleEntitiesOnSharedPool() throws Exception {
-        // 2s tick interval — fast enough for one tick to fire inside the test budget.
         Map<Long, Long> emptyHashes = Collections.emptyMap();
         StubMapping a = new StubMapping("character", emptyHashes);
         StubMapping b = new StubMapping("party", emptyHashes);
@@ -92,8 +91,7 @@ class RuntimeSyncEngineTest {
 
     @Test
     void tickGuard_shouldSkip_whenPreviousTickStillRunning() throws Exception {
-        // First tick blocks in snapshot(); a second scheduled tick must skip with a WARN
-        // (verified indirectly: the snapshot counter does not increment).
+        // the second scheduled tick must skip: the snapshot counter does not increment
         CountDownLatch holdInside = new CountDownLatch(1);
         CountDownLatch entered = new CountDownLatch(1);
         AtomicInteger snapshotCalls = new AtomicInteger(0);
@@ -118,7 +116,6 @@ class RuntimeSyncEngineTest {
         try {
             engine.start();
             assertTrue(entered.await(5L, TimeUnit.SECONDS), "first tick must have entered snapshot()");
-            // Let the scheduler attempt at least one more dispatch while we hold tick #1.
             Thread.sleep(1500L);
             assertEquals(1, snapshotCalls.get(), "overlapping scheduled tick must be skipped by the tick guard");
         } finally {
@@ -129,8 +126,7 @@ class RuntimeSyncEngineTest {
 
     @Test
     void stop_shouldCleanShutdown_whileTickMidWalk() throws Exception {
-        // Sender never invokes callback → publish future hangs → walk-in-flight enters
-        // deadline wait; stop() must interrupt it and terminate within shutdownTimeoutSeconds.
+        // hanging publish future: stop() must interrupt the deadline wait
         Map<Long, Long> hashes = new HashMap<Long, Long>();
         hashes.put(1L, 100L);
         StubMapping mapping = new StubMapping("character", hashes);
@@ -148,14 +144,12 @@ class RuntimeSyncEngineTest {
         mapping.snapshotLatch = new CountDownLatch(1);
         engine.start();
         assertTrue(mapping.snapshotLatch.await(5L, TimeUnit.SECONDS), "first tick must enter snapshot before stop()");
-        // Give the loop a moment to advance into the ack-walk.
         Thread.sleep(500L);
 
         long t0 = System.nanoTime();
         engine.stop();
         long elapsedMs = (System.nanoTime() - t0) / 1_000_000L;
-        // publish-flush-seconds=30 → awaitTermination budget is 31s; clean stop should
-        // interrupt the futures and return immediately, not wait the full budget.
+        // clean stop must not wait out the 31s awaitTermination budget
         assertTrue(
                 elapsedMs < 5_000L, "stop() should not wait the full publish-flush budget (took " + elapsedMs + "ms)");
     }

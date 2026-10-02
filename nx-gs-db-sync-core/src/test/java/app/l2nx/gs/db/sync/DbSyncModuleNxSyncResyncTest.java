@@ -37,13 +37,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * End-to-end wiring of {@code NxSync.requestResync} through {@link DbSyncModule}:
- * the registered {@link NxSyncResyncHandler} resolves cascade children via
- * {@link EntityMapping#parentRefs()} and force-republishes the parent + each
- * cascaded child on the engine's no-event path — emitting NO
- * {@link ResyncCompletedEvent}.
- */
+/** End-to-end {@code NxSync.requestResync} wiring: cascade children are force-republished on the no-event path with no {@link ResyncCompletedEvent}. */
 class DbSyncModuleNxSyncResyncTest {
 
     private static final RecordMetadata META = new RecordMetadata(new TopicPartition("t", 0), 0L, 0, 0L, 0, 0);
@@ -67,15 +61,12 @@ class DbSyncModuleNxSyncResyncTest {
     void requestResync_shouldForceRepublishCharacterAndItems_withoutCompletionEvent_whenCascade() throws Exception {
         module = startedModule(cascadeJdbc(100L, 101L));
 
-        // Caller-side fire-and-forget: route a per-command resync for character 1.
         sync.requestResync("character", Collections.singletonList(1L), true);
 
-        // The forced cycle borrows the (empty) DB and diffs the invalidated
-        // sentinels to DELETED publishes on both topics.
+        // Empty DB: invalidated sentinels diff to DELETED on both topics.
         awaitTopic("test.gs.sync.characters");
         awaitTopic("test.gs.sync.items");
 
-        // No tracked admin resync → no completion event ever published.
         for (Object e : events) {
             assertTrue(
                     !(e instanceof ResyncCompletedEvent),
@@ -204,12 +195,7 @@ class DbSyncModuleNxSyncResyncTest {
         };
     }
 
-    /**
-     * Connection returning child PKs only for the cascade {@code SELECT obj_id
-     * FROM items WHERE owner_id IN (...)}; every other statement the cycle runs
-     * (window MIN/MAX, page scans) gets a deep-stubbed empty result, so the
-     * snapshot's invalidation sentinels diff to DELETED against an empty DB.
-     */
+    /** Returns child PKs only for the cascade SELECT; every other statement gets an empty result, so sentinels diff to DELETED. */
     private JdbcConnectionSource cascadeJdbc(long... childPks) {
         return new JdbcConnectionSource() {
             @Override
@@ -248,12 +234,7 @@ class DbSyncModuleNxSyncResyncTest {
         };
     }
 
-    /**
-     * Real {@link NxSync} routing under test for {@code requestResync}: invokes
-     * the registered {@link NxSyncResyncHandler} synchronously (handler hops its
-     * own IO via {@code ctx.io()}, wired to direct-run here). Trigger
-     * registration is captured but unused.
-     */
+    /** Invokes the registered handler synchronously (its IO hop is wired direct-run); trigger registration is captured but unused. */
     private static final class RecordingSync implements NxSync {
         private volatile NxSyncResyncHandler handler;
 

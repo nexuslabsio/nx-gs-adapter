@@ -4,14 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic soul-crystal wire DTO — one node of the soul-crystal leveling chain,
- * carried as the payload of {@code GameDataSyncEvent} on the {@code gd} (game-data) sync
- * stream's {@code soulcrystaltemplate} entity topic. A soul crystal is an item that levels
- * up; {@link #getNextItemTemplateId()} points at the next-level crystal and
- * {@link #getCursedNextItemTemplateId()} at the cursed variant after a failed level-up.
- *
- * <p>Flat aggregate (no children) keyed by the crystal's own item id. Item references use
- * the canonical {@code itemTemplateId} name. Only {@link #getId()} is non-null.</p>
+ * One node of the soul-crystal leveling chain; the next-level crystal is {@code null} at the top, and the cursed
+ * variant is what a failed level-up yields.
  */
 public final class SoulCrystalTemplate {
 
@@ -35,23 +29,14 @@ public final class SoulCrystalTemplate {
         return id;
     }
 
-    /**
-     * Crystal level within the leveling chain.
-     */
     public @Nullable Integer getLevel() {
         return level;
     }
 
-    /**
-     * Next-level crystal item this one upgrades into; {@code null} at the top of the chain.
-     */
     public @Nullable Integer getNextItemTemplateId() {
         return nextItemTemplateId;
     }
 
-    /**
-     * Cursed crystal item produced on a failed level-up; {@code null} if not applicable.
-     */
     public @Nullable Integer getCursedNextItemTemplateId() {
         return cursedNextItemTemplateId;
     }

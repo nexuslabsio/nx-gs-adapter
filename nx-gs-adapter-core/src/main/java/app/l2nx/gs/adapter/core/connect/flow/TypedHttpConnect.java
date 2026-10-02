@@ -12,18 +12,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/**
- * Generic single-attempt HTTP POST + JSON-deserialize helper used by the
- * host-type {@link HostConnectFlow} implementations. Parameterized on the
- * response type so the same code path serves both gameserver and login-server
- * handshakes. Stateless; instantiate per call or reuse — no shared mutable
- * state.
- *
- * <p>Transport invariants: 5s connect timeout, 10s read timeout,
- * {@code Connection: close}, 1 MiB response body char cap.</p>
- *
- * @param <R> JSON DTO type Gson deserializes the 200 body into
- */
+/** Stateless single-attempt POST shared by the {@link HostConnectFlow} implementations. */
 final class TypedHttpConnect<R> {
 
     private static final NxLog log = NxLogFactory.getLogger(TypedHttpConnect.class);

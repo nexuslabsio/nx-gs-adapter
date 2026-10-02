@@ -1,11 +1,6 @@
 package app.l2nx.gs.adapter.api.kafka.events.account;
 
-/**
- * Non-binding catalog of well-known {@link AccountAuthAttemptEvent#getOutcome()}
- * values produced by hosted login servers. Consumers MUST treat unknown
- * outcomes as valid (free-form on the wire) — adding a constant here is
- * documentation, not a runtime gate.
- */
+/** Well-known {@link AccountAuthAttemptEvent#getOutcome()} values; documentation only, consumers MUST accept unknown outcomes. */
 public final class AuthOutcomes {
 
     public static final String SUCCESS = "SUCCESS";

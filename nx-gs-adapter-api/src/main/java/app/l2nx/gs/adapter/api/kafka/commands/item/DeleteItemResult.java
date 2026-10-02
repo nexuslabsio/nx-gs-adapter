@@ -3,13 +3,7 @@ package app.l2nx.gs.adapter.api.kafka.commands.item;
 import java.util.Objects;
 
 /**
- * Success payload of {@link DeleteItemCommand}. Echoes what was actually
- * deleted so the platform can confirm the requested action against host
- * reality (the host may delete LESS than requested if the live stack size
- * fell below {@code count} between command issue and handler execution).
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Echoes what was actually deleted; may be less than requested if the live stack shrank before execution.
  */
 public final class DeleteItemResult {
 
@@ -32,27 +26,16 @@ public final class DeleteItemResult {
         this.fullyDeleted = fullyDeleted;
     }
 
-    /**
-     * L2 object-id of the item instance that was deleted (or decremented).
-     */
     public Long getItemId() {
         return itemId;
     }
 
-    /**
-     * Number of items actually removed from the stack. MAY be less than the
-     * inbound {@link DeleteItemCommand#getCount()} when the live stack size
-     * was smaller at execution time (the handler clamps to available).
-     */
+    /** May be less than the requested count: the handler clamps to the live stack. */
     public Long getCountDeleted() {
         return countDeleted;
     }
 
-    /**
-     * {@code true} when the entire stack was destroyed and the item instance
-     * is gone; {@code false} when the stack was decremented (the item
-     * instance still exists with a smaller count).
-     */
+    /** {@code true} when the instance is gone, {@code false} when it was only decremented. */
     public boolean isFullyDeleted() {
         return fullyDeleted;
     }

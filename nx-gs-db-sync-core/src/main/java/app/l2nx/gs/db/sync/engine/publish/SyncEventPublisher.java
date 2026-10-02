@@ -7,25 +7,9 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.clients.producer.RecordMetadata;
 
 /**
- * Builds {@link SyncEvent} payloads for created / updated / deleted PKs and
- * forwards them to a {@link KafkaSender}, returning a per-PK
- * {@link CompletableFuture} so the engine can walk publish results at end of
- * cycle and only advance the snapshot for PKs whose publish actually
- * succeeded.
- *
- * <p>Wire-shape choices:</p>
- * <ul>
- *     <li>Kafka key = 8-byte big-endian encoding of the PK ({@code long}) —
- *     identical to {@code LongSerializer.serialize(...)} for any external
- *     producer that wants to write the same row. Per-PK partition assignment
- *     stays consistent across writers.</li>
- *     <li>{@code DELETED} events carry a non-null {@link SyncEvent} envelope
- *     with {@code payload=null}: the consumer still sees {@code entityName},
- *     {@code op="DELETED"}, and {@code timestampEpochMs} for audit, while the
- *     payload slot is explicitly null. Topics in this slice run with bounded
- *     retention (≤1 day) instead of log compaction, so the value-null
- *     tombstone optimization is intentionally not used.</li>
- * </ul>
+ * Builds {@link SyncEvent}s and forwards them to a {@link KafkaSender}, returning a per-PK future so the snapshot advances only for acked PKs.
+ * Key is the 8-byte big-endian PK (equals {@code LongSerializer}); DELETED carries an envelope with {@code payload=null}, not a tombstone,
+ * because topics use bounded retention (at most 1 day) instead of compaction.
  */
 public final class SyncEventPublisher {
 
@@ -63,11 +47,7 @@ public final class SyncEventPublisher {
         return future;
     }
 
-    /**
-     * 8-byte big-endian encoding — matches Kafka's {@code LongSerializer.serialize}
-     * exactly. Allocates a fresh array per call (cheap, 8 bytes); pooling isn't
-     * worthwhile because the buffer escapes into the Kafka producer's send queue.
-     */
+    /** Matches {@code LongSerializer.serialize}; not pooled because the buffer escapes into the producer queue. */
     static byte[] encodeKey(long pk) {
         return ByteBuffer.allocate(Long.BYTES).putLong(pk).array();
     }

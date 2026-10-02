@@ -6,41 +6,17 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Per-entity completion signal of a forced db-sync resync. The single message
- * type of the {@code sync} family ({@code <tenant>.gs.events.sync}). Emitted
- * by the db-sync engine after the first FULLY successful post-invalidation
- * CDC cycle for an entity — no degraded window, zero failed and zero
- * still-pending publishes — once per {@code resyncId} drained into that
- * cycle.
+ * Completion signal of a forced db-sync resync for one entity; the only message type of the {@code sync}
+ * family. Emitted once per drained {@code resyncId} after the first fully successful post-invalidation CDC
+ * cycle (no degraded window, zero failed or pending publishes).
  *
- * <p>Both timestamps are stamped on the adapter clock — the same clock that
- * stamps {@code SyncEvent.timestampEpochMs} on the re-published rows — so
- * the platform sweep compares {@link #getCycleStartedAt() cycleStartedAt}
- * against {@code db_synced_at} without cross-host clock skew: every live row
- * carries {@code db_synced_at >= cycleStartedAt} after the forced cycle,
- * ghost rows keep an older stamp and get swept.</p>
+ * <p>Both timestamps use the adapter clock, the same one stamping {@code SyncEvent.timestampEpochMs}, so the
+ * platform sweep can compare {@code cycleStartedAt} to {@code db_synced_at} without clock skew: live rows end
+ * up with {@code db_synced_at >= cycleStartedAt}, ghost rows keep an older stamp and are swept.</p>
  *
- * <p>Fields (all REQUIRED):
- * <ul>
- *   <li>{@link #getEventId() eventId} — UUIDv7. Idempotency / ordering key;
- *   platform extracts {@code occurredAt} from the time-ordered prefix.</li>
- *   <li>{@link #getResyncId() resyncId} — the platform-issued operation id
- *   echoed from the originating resync command.</li>
- *   <li>{@link #getEntityName() entityName} — the completed entity.</li>
- *   <li>{@link #getCycleStartedAt() cycleStartedAt} — when the invalidations
- *   were applied (start of the first cycle that carried them); sweep
- *   cutoff.</li>
- *   <li>{@link #getCompletedAt() completedAt} — when the fully successful
- *   cycle finished publishing.</li>
- * </ul>
- *
- * <p>Emission is retried across cycles (a non-successful cycle defers, the
- * first fully successful one emits — the platform sweep is idempotent against
- * duplicates), but delivery itself is best-effort: the event rides the
- * adapter's bounded events queue, where an overflow drop or a failed send is
- * not retried. A lost completion is covered by the platform operation TTL.
- * Partition key: {@code null} (round-robin — low volume, no ordering
- * need).</p>
+ * <p>Emission is retried across cycles (the sweep is idempotent), but delivery is best-effort: an overflow
+ * drop or failed send on the bounded events queue is not retried, and a lost completion is covered by the
+ * platform operation TTL. Partition key is {@code null} (round-robin).</p>
  */
 public final class ResyncCompletedEvent {
 

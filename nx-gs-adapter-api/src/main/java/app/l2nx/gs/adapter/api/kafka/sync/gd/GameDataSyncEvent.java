@@ -5,34 +5,14 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Self-contained wire envelope for the {@code gd} (game-data) sync stream — the
- * gd analogue of db-sync's {@link app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent}.
- * One envelope per Kafka record on {@code <tenant>.gd.sync.<entity>}; the
- * consumer dispatches on {@link #getOp()}.
+ * Wire envelope for the {@code gd} sync stream, one per record on {@code <tenant>.gd.sync.<entity>}; mirrors
+ * {@link app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent} except {@code pk} is nullable (the marker has no row key).
+ * {@code serverId} rides the {@code Nx-Server-Id} header and the tenant comes from the topic slug, not the body.
  *
- * <p>Field names mirror {@code SyncEvent} so the two envelopes stay consistent:
- * {@code entityName}, {@code op} (string, not enum — decouples consumers from JVM
- * ordinals; producing module defines the constants), {@code pk}, {@code payload},
- * {@code timestampEpochMs}. gd adds {@code syncId} (snapshot id) and {@code count}
- * (on the terminal marker). Unlike {@code SyncEvent.pk} ({@code long}), gd's
- * {@code pk} is a nullable {@link Long} because the {@code SNAPSHOT_COMPLETE}
- * marker carries no row key.</p>
+ * <p>A snapshot is a burst of {@code UPSERT}s then one {@code SNAPSHOT_COMPLETE}, keyed by server id so they
+ * stay ordered in one partition; on the marker the consumer deletes rows whose stored {@code syncId} differs.</p>
  *
- * <p><b>Identity is NOT in the body</b> — exactly like db/runtime sync: the owning
- * {@code serverId} rides the {@code Nx-Server-Id} Kafka header, and the owning
- * tenant is resolved from the topic-name slug.</p>
- *
- * <p>A snapshot is a stateless burst: the adapter generates a {@code syncId}
- * (UUIDv7), publishes one {@code UPSERT} record per entity ({@code pk} +
- * {@code payload}), then a single {@code SNAPSHOT_COMPLETE} record
- * ({@code count}). Records are keyed (Kafka partition key) by the server id so the
- * whole burst lands in one partition in order — the complete marker is processed
- * after every UPSERT. The consumer upserts each payload (stamping {@code syncId})
- * and, on the marker, deletes the server's rows whose stored {@code syncId}
- * differs.</p>
- *
- * @param <T> payload type ({@link app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate.ItemTemplate}
- *            for the {@code itemtemplate} entity)
+ * @param <T> entity payload type
  */
 public final class GameDataSyncEvent<T> {
 
@@ -61,43 +41,40 @@ public final class GameDataSyncEvent<T> {
         this.timestampEpochMs = timestampEpochMs;
     }
 
-    /**
-     * Entity name in singular form, e.g. {@code "itemtemplate"} (matches the db-sync entity-name style).
-     */
     public String getEntityName() {
         return entityName;
     }
 
     /**
-     * Operation: {@code "UPSERT"} or {@code "SNAPSHOT_COMPLETE"} (producing module owns the constants).
+     * {@code UPSERT} or {@code SNAPSHOT_COMPLETE}; a string so consumers do not depend on JVM ordinals.
      */
     public String getOp() {
         return op;
     }
 
     /**
-     * Monotonic snapshot id (UUIDv7); shared by every record of one snapshot.
+     * UUIDv7 shared by every record of one snapshot.
      */
     public UUID getSyncId() {
         return syncId;
     }
 
     /**
-     * Entity primary key on an {@code UPSERT}; {@code null} on the marker.
+     * {@code null} on the marker.
      */
     public @Nullable Long getPk() {
         return pk;
     }
 
     /**
-     * Entity payload on an {@code UPSERT}; {@code null} on the marker.
+     * {@code null} on the marker.
      */
     public @Nullable T getPayload() {
         return payload;
     }
 
     /**
-     * Item count on a {@code SNAPSHOT_COMPLETE} marker; {@code null} otherwise.
+     * Set only on {@code SNAPSHOT_COMPLETE}.
      */
     public @Nullable Integer getCount() {
         return count;

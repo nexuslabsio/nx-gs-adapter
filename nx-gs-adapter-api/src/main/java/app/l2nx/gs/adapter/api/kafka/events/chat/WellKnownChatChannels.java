@@ -1,44 +1,13 @@
 package app.l2nx.gs.adapter.api.kafka.events.chat;
 
 /**
- * Canonical chat-channel codes used as the {@link ChatMessageEvent#getChannel()
- * channel} value of a {@link ChatMessageEvent}. Open-string vocabulary
- * ({@code UPPER_SNAKE_CASE}): a host maps its build-specific numeric chat type
- * to one of these codes. A channel a given build exposes but this catalog does
- * not yet name is published as the raw string {@code UNKNOWN_<int>} — the
- * platform still sees it and routes it, but cannot aggregate it canonically.
- *
- * <p>Adding a new constant is a non-breaking minor-version change in
- * {@code nx-gs-adapter-api}.</p>
+ * Canonical {@link ChatMessageEvent#getChannel() channel} codes ({@code UPPER_SNAKE_CASE}). A channel a build exposes
+ * but this catalog does not name is published as {@code UNKNOWN_<int>}: routable, but not canonically aggregable.
  *
  * <ul>
- *   <li>{@link #GENERAL} — local/all-range say.</li>
- *   <li>{@link #SHOUT} — region-wide shout.</li>
- *   <li>{@link #WHISPER} — private tell to one player
- *   ({@link ChatMessageEvent#getTargetCharId() targetCharId} /
- *   {@link ChatMessageEvent#getTargetCharName() targetCharName} set).</li>
- *   <li>{@link #PARTY} — party channel.</li>
- *   <li>{@link #CLAN} — clan channel.</li>
- *   <li>{@link #ALLIANCE} — alliance channel.</li>
- *   <li>{@link #TRADE} — trade channel.</li>
- *   <li>{@link #WORLD} — global world chat.</li>
- *   <li>{@link #HERO} — hero-voice broadcast.</li>
- *   <li>{@link #GM} — GM channel.</li>
- *   <li>{@link #PETITION} — player side of a support petition.</li>
- *   <li>{@link #PETITION_GM} — GM side of a support petition.</li>
- *   <li>{@link #ANNOUNCEMENT} — server announcement.</li>
- *   <li>{@link #CRITICAL_ANNOUNCEMENT} — critical (highlighted) announcement.</li>
- *   <li>{@link #SCREEN_ANNOUNCEMENT} — on-screen announcement.</li>
- *   <li>{@link #BATTLEFIELD} — battlefield / instanced-event channel.</li>
- *   <li>{@link #BOAT} — boat / vehicle channel.</li>
- *   <li>{@link #FRIEND} — friend-list private message.</li>
- *   <li>{@link #MSN} — external IM relay channel.</li>
- *   <li>{@link #PARTY_ROOM} — party matching room.</li>
- *   <li>{@link #COMMAND_CHANNEL} — command-channel broadcast.</li>
- *   <li>{@link #COMMAND_CHANNEL_COMMANDER} — command-channel leaders-only.</li>
- *   <li>{@link #NPC_GENERAL} — NPC local say.</li>
- *   <li>{@link #NPC_SHOUT} — NPC shout.</li>
- *   <li>{@link #NPC_WHISPER} — NPC private message.</li>
+ *   <li>{@link #WHISPER} - private tell; {@code targetCharId} / {@code targetCharName} are set.</li>
+ *   <li>{@link #MSN} - external IM relay.</li>
+ *   <li>{@link #COMMAND_CHANNEL_COMMANDER} - command-channel leaders only.</li>
  * </ul>
  */
 public final class WellKnownChatChannels {

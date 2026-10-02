@@ -4,14 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one item's augmentation (life-stone result), carried inside
- * {@link ItemDbDto#getAugmentation()}.
- *
- * <p>Carries the two source-side option ids that resolve against the
- * platform gd option catalog to stat bonuses or a granted skill.
- * {@code null} {@code augmentation} on {@link ItemDbDto} means the item is
- * not augmented; a {@code null} {@link #getOption2Id()} means the item
- * carries only a single option (the low slot).</p>
+ * Wire DTO for an item's augmentation, carried in {@link ItemDbDto#getAugmentation()}.
+ * Option ids resolve against the platform gd option catalog.
  */
 public final class ItemAugmentationDbDto {
 
@@ -23,18 +17,11 @@ public final class ItemAugmentationDbDto {
         this.option2Id = option2Id;
     }
 
-    /**
-     * Low-slot augment option id. Always present ({@code > 0}) on an
-     * augmented item.
-     */
     public int getOption1Id() {
         return option1Id;
     }
 
-    /**
-     * High-slot augment option id. {@code null} when the item carries only
-     * a single option (the low slot).
-     */
+    /** Null when the item has only the low-slot option. */
     public @Nullable Integer getOption2Id() {
         return option2Id;
     }

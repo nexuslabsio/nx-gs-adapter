@@ -4,18 +4,8 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Wire DTO for one row of {@code character_instance_time} (or its tenant
- * equivalent), carried inside {@link CharacterDbDto#getInstanceCooldowns()}.
- *
- * <p>Surfaces the per-instance re-entry cooldown: {@code instanceId} (which
- * instance/reflection) and {@code reentryAt} — the absolute UTC moment the
- * character may re-enter. The source column is an absolute epoch-millis
- * deadline (not a duration); schema providers map it via
- * {@code Instant.ofEpochMilli(time)}.</p>
- *
- * <p>An expired cooldown (a {@code reentryAt} in the past) may linger on the
- * source side until the game server prunes it at character login — platform
- * consumers treat a past {@code reentryAt} as "no active cooldown".</p>
+ * Wire DTO for one instance re-entry cooldown, carried in {@link CharacterDbDto#getInstanceCooldowns()}.
+ * {@code reentryAt} is an absolute deadline; a past value may linger until login pruning and means no active cooldown.
  */
 public final class CharacterInstanceCooldownDbDto {
 
@@ -27,19 +17,11 @@ public final class CharacterInstanceCooldownDbDto {
         this.reentryAt = Objects.requireNonNull(reentryAt, "reentryAt");
     }
 
-    /**
-     * Instance / reflection identifier — {@code NOT NULL} on the source side.
-     * Resolved to a readable name on the platform via the {@code gd_instances}
-     * catalog (gd-sync {@code instance} entity).
-     */
+    /** Resolved to a name via the {@code gd_instances} catalog. */
     public int getInstanceId() {
         return instanceId;
     }
 
-    /**
-     * Absolute UTC re-entry deadline — derived from the source absolute
-     * epoch-millis {@code time} column via {@code Instant.ofEpochMilli(time)}.
-     */
     public Instant getReentryAt() {
         return reentryAt;
     }

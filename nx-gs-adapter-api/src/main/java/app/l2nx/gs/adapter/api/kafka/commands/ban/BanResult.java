@@ -5,18 +5,9 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Success payload of {@link BanCommand}. Carries the ids of the ban rows
- * the host created or matched while applying the ban, so the platform can
- * correlate the request with the rows that subsequently arrive on the db-sync
- * stream.
- *
- * <p>A {@code HARD} fan-out returns one id per concrete dimension. A ban kind
- * that the host does not persist as an id-bearing ban row (e.g. a
- * char-variable-backed shadow chat ban) returns an empty list — the host still
- * surfaces it on the sync stream through its own entity.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Success payload of {@link BanCommand}: ids of the ban rows the host created or matched, so the platform can
+ * correlate the request with rows arriving on the db-sync stream. A {@code HARD} fan-out returns one id per
+ * dimension; a ban kind not persisted as an id-bearing row (e.g. shadow chat ban) returns an empty list.
  */
 public final class BanResult {
 
@@ -26,11 +17,6 @@ public final class BanResult {
         this.banIds = banIds == null ? Collections.<Long>emptyList() : Collections.unmodifiableList(banIds);
     }
 
-    /**
-     * Ids of the ban rows created or matched by this ban. Never
-     * {@code null}; empty when the ban kind is not persisted as an id-bearing
-     * row.
-     */
     public List<Long> getBanIds() {
         return banIds;
     }

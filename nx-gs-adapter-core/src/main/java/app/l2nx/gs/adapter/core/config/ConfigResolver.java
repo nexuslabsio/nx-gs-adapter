@@ -15,28 +15,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * Resolves adapter configuration from a two-source chain (per key), file-first:
- * <ol>
- *   <li>Properties file — either the path given by {@code -Dl2nx.config-file=<path>}
- *       (operator-preferred; absolute or relative to the JVM working directory), or
- *       {@code l2nx.properties} in the JVM working directory of the host application
- *       as a fallback when {@code l2nx.config-file} is unset.</li>
- *   <li>JVM system property (e.g. {@code -Dl2nx.gs-key=...}) — consulted only when the
- *       file does not provide the key.</li>
- * </ol>
- * Pure JDK — no Spring, no SnakeYAML, no third-party config library. Environment-variable
- * resolution is intentionally absent; file is the preferred medium and is authoritative
- * when present. The file is read as UTF-8.
- *
- * <p>Missing-file semantics:</p>
- * <ul>
- *   <li>{@code -Dl2nx.config-file} explicitly set but missing / unreadable / malformed
- *       path → fail loud with {@link IllegalStateException}; the operator's intent is
- *       clear.</li>
- *   <li>{@code -Dl2nx.config-file} unset and {@code l2nx.properties} not present in the
- *       JVM working directory → empty {@link Properties} (graceful — sysprop fallback
- *       may still provide the keys).</li>
- * </ul>
+ * Per-key chain, file first: {@code -Dl2nx.config-file} path, else {@code l2nx.properties} in the working dir; JVM sysprops only fill keys the file lacks. UTF-8, no env vars.
+ * An explicit but missing/unreadable config-file fails loud; an absent default file yields empty Properties.
  */
 public final class ConfigResolver {
 
@@ -114,13 +94,6 @@ public final class ConfigResolver {
                 hostType);
     }
 
-    /**
-     * Host-type — selects which connect endpoint the adapter targets and
-     * which server-key property name is required. Values: {@code gs} (game
-     * server) or {@code ls} (login server). Defaults to {@code gs} for
-     * back-compat with existing deployments that pre-date the host-type
-     * config key.
-     */
     public String resolveHostType() {
         Optional<String> raw = resolveString(KEY_HOST_TYPE);
         if (!raw.isPresent()) {
@@ -199,7 +172,7 @@ public final class ConfigResolver {
                 }
             }
         }
-        // File wins where keys collide — only fill in sysprop-only keys here.
+        // File wins where keys collide; only sysprop-only keys are filled here
         for (String name : enumerateSyspropNames()) {
             if (!name.startsWith(KEY_COMMANDS_KAFKA_PREFIX) || name.length() == KEY_COMMANDS_KAFKA_PREFIX.length()) {
                 continue;
@@ -301,17 +274,7 @@ public final class ConfigResolver {
         return resolveServerKey(DEFAULT_HOST_TYPE);
     }
 
-    /**
-     * Resolve the server key matching the host-type. Validation:
-     * <ul>
-     *   <li>{@code host-type=gs} → exactly {@code l2nx.gs-key} must be
-     *   present; setting {@code l2nx.ls-key} alongside is a fatal
-     *   misconfiguration.</li>
-     *   <li>{@code host-type=ls} → exactly {@code l2nx.ls-key} must be
-     *   present; setting {@code l2nx.gs-key} alongside is a fatal
-     *   misconfiguration.</li>
-     * </ul>
-     */
+    /** Exactly the key matching host-type must be set; the other one alongside is a fatal misconfiguration. */
     public String resolveServerKey(String hostType) {
         boolean isGs = HOST_TYPE_GS.equals(hostType);
         String expectedKey = isGs ? KEY_SERVER_KEY : KEY_LS_KEY;
@@ -352,7 +315,7 @@ public final class ConfigResolver {
             throw new IllegalStateException("Invalid '" + KEY_PLATFORM_URL + "' value '" + raw
                     + "': must not contain a query string or fragment");
         }
-        // Normalize: drop trailing slash so callers can append paths without ambiguity.
+        // Drop trailing slash so callers can append paths unambiguously
         return raw.endsWith("/") ? raw.substring(0, raw.length() - 1) : raw;
     }
 
@@ -381,10 +344,7 @@ public final class ConfigResolver {
         return loadFileProperties(sysprops, Paths.get(DEFAULT_FILE_NAME));
     }
 
-    /**
-     * Test seam — lets {@code ConfigResolverTest} aim the cwd-default branch at a
-     * temp-directory file without mutating the JVM's {@code user.dir}.
-     */
+    /** Test seam: aims the cwd-default branch at a temp dir without mutating user.dir. */
     static Properties loadFileProperties(Function<String, String> sysprops, Path defaultPath) {
         String explicitPath = sysprops.apply(CONFIG_FILE_KEY);
         if (isPresent(explicitPath)) {

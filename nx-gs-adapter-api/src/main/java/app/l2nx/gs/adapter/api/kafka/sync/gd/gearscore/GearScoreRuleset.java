@@ -8,15 +8,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic gear-score ruleset wire DTO — the global "what earns gear score and
- * how much" reference, carried as the payload of {@code GameDataSyncEvent} on the
- * {@code gd} sync stream's {@code gearscore} entity topic. A singleton per
- * {@code (tenant, server)}; the platform stores it as a document and the wiki renders
- * its {@link #getGroups() groups} as tables.
- *
- * <p>{@link #isEnabled() enabled} reflects whether the host build actually computes
- * gear score — a build that ships the ruleset entity but has gear score turned off
- * publishes {@code enabled=false} with whatever groups it knows.</p>
+ * Singleton per {@code (tenant, server)} describing what earns gear score; the wiki renders groups as tables.
+ * {@code enabled=false} when the build ships the entity but has gear score turned off.
  */
 public final class GearScoreRuleset {
 
@@ -30,15 +23,12 @@ public final class GearScoreRuleset {
                 : Collections.unmodifiableList(new ArrayList<GearScoreRuleGroup>(groups));
     }
 
-    /**
-     * Whether the host build computes gear score.
-     */
     public boolean isEnabled() {
         return enabled;
     }
 
     /**
-     * Rule groups by category; never {@code null} (empty when none supplied).
+     * Never {@code null}.
      */
     public List<GearScoreRuleGroup> getGroups() {
         return groups;

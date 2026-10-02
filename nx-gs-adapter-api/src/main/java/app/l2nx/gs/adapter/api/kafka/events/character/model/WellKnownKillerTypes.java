@@ -3,24 +3,14 @@ package app.l2nx.gs.adapter.api.kafka.events.character.model;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterDeathEvent;
 
 /**
- * Canonical values for the {@code killer_type} metadata key of
- * {@link CharacterDeathEvent} (see {@link WellKnownDeathMetadata#KILLER_TYPE}).
- * The value is an <b>open string</b> so a core with a divergent death model is not
- * a breaking contract change; every standard L2 death maps onto one of the
- * constants below.
- *
- * <p>Mirrors the {@code WellKnown*} pattern on the other event DTOs
- * ({@code WellKnownSiegeOutcomes}, {@code WellKnownPresenceMetadata}). The set is
- * non-exhaustive: a host MAY emit a non-canonical killer-type string without an
- * API release, and consumers treat unknown values as opaque (display / route no
- * behaviour on it). Adding a constant here is a non-breaking minor-version
- * change. Values are {@code lower_snake_case}.</p>
+ * Values of the {@code killer_type} key ({@link WellKnownDeathMetadata#KILLER_TYPE}) of {@link CharacterDeathEvent}.
+ * Open lower_snake_case string: a host MAY emit other values, consumers treat unknown ones as opaque.
  *
  * <ul>
- *   <li>{@link #MONSTER} — killed by a non-boss NPC (PvE).</li>
- *   <li>{@link #PLAYER} — killed by another player (PvP).</li>
- *   <li>{@link #BOSS} — killed by a raid / grand boss.</li>
- *   <li>{@link #SELF} — self-inflicted (e.g. suicide skill, fall, environment).</li>
+ *   <li>{@link #MONSTER} - non-boss NPC (PvE).</li>
+ *   <li>{@link #PLAYER} - another player (PvP).</li>
+ *   <li>{@link #BOSS} - raid / grand boss.</li>
+ *   <li>{@link #SELF} - self-inflicted (suicide skill, fall, environment).</li>
  * </ul>
  */
 public final class WellKnownKillerTypes {

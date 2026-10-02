@@ -6,12 +6,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-/**
- * Wraps an SQL action in {@code START TRANSACTION WITH CONSISTENT SNAPSHOT,
- * READ ONLY}. Saves and restores the connection's prior autoCommit; rolls
- * back on any {@link Throwable} from the action and rethrows the original;
- * commits otherwise.
- */
+/** Runs an action in {@code START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY}; restores prior autoCommit, rolls back and rethrows the original on failure. */
 public final class ConsistentSnapshotTxn {
 
     private static final NxLog log = NxLogFactory.getLogger(ConsistentSnapshotTxn.class);
@@ -36,7 +31,7 @@ public final class ConsistentSnapshotTxn {
             try {
                 conn.rollback();
             } catch (Exception rollbackError) {
-                // Swallow rollback failure to preserve the original exception's type and cause chain.
+                // Keep the original exception's type and cause chain.
             }
             if (t instanceof SQLException) {
                 throw (SQLException) t;
@@ -47,7 +42,6 @@ public final class ConsistentSnapshotTxn {
             if (t instanceof Error) {
                 throw (Error) t;
             }
-            // Checked non-SQLException — wrap to satisfy the signature.
             throw new SQLException(t);
         } finally {
             try {

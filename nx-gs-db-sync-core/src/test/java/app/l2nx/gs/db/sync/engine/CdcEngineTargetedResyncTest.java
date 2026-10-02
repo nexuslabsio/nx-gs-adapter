@@ -33,16 +33,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/**
- * Engine-level routing of the targeted force-resync fast-path: a triggered
- * per-PK resync must issue an {@code IN}-list Phase-1 query (hash only the
- * targeted rows), while a scheduled tick and a whole-entity resync must full-
- * scan ({@code BETWEEN}). The empty host DB makes invalidated snapshot entries
- * diff to DELETE, so the published op/PK doubles as a behavioral check.
- *
- * <p>The connection is a deep-stub that records every prepared Phase-1 SQL,
- * mirroring {@code CdcEngineForceResyncTest} but capturing the query shape.</p>
- */
+/** Targeted fast-path routing: a triggered per-PK resync issues an {@code IN}-list Phase-1 query; scheduled ticks and whole-entity resyncs full-scan ({@code BETWEEN}). */
 class CdcEngineTargetedResyncTest {
 
     private static final RecordMetadata META = new RecordMetadata(new TopicPartition("t", 0), 0L, 0, 0L, 0, 0);
@@ -76,10 +67,8 @@ class CdcEngineTargetedResyncTest {
             engine.requestPkRepublishNoEvent("clan", pks(2L));
 
             await(() -> source.primaryInSql() != null);
-            // Targeted Phase-1: IN-list carrying only the targeted PK, never a range scan.
             assertTrue(source.primaryInSql().contains("clan_id IN (?)"));
             assertFalse(source.anyPrimaryBetween(), "a triggered per-PK resync must NOT range-scan");
-            // Empty host DB → only the targeted, invalidated PK 2 diffs to DELETE.
             await(() -> published.size() == 1);
             assertEquals("DELETED", opOf(published.get(0)));
             assertEquals(2L, pkOf(published.get(0)));
@@ -96,7 +85,6 @@ class CdcEngineTargetedResyncTest {
             engine.start();
             source.clear();
 
-            // tickOnceSynchronously runs the scheduled (full-scan) path.
             for (java.util.concurrent.Future<?> f : engine.tickOnceSynchronously()) {
                 f.get();
             }
@@ -105,15 +93,7 @@ class CdcEngineTargetedResyncTest {
             assertNull(source.primaryInSql(), "a scheduled tick must never use an IN-list");
         }
 
-        /**
-         * The central spec invariant end-to-end: a SCHEDULED tick must NEVER
-         * take the targeted fast-path, even while a per-PK resync is pending.
-         * Drives the REAL {@code runGuardedCycle(entity, slot, triggered=false)}
-         * routing (not {@code task.runCycle()} directly) with a pending no-event
-         * PK set staged WITHOUT an immediate trigger, and asserts the cycle
-         * still full-scans (BETWEEN, not IN) — i.e. the scheduled tick drains
-         * the pending set into the snapshot but ignores it for query narrowing.
-         */
+        /** A scheduled tick must never take the targeted fast-path even with a per-PK resync pending: it drains the set but still full-scans. */
         @Test
         void scheduledTick_shouldFullScan_evenWhenPerPkResyncPending() throws Exception {
             snapshot.putCrc("clan", 7L, 700);
@@ -121,8 +101,7 @@ class CdcEngineTargetedResyncTest {
             engine.start();
             source.clear();
 
-            // Stage a pending per-PK resync but do NOT trigger an immediate cycle,
-            // so the targeted set is still pending when the scheduled tick runs.
+            // Pending targeted set, no immediate trigger.
             engine.enqueueNoEventPksWithoutTrigger("clan", pks(7L));
 
             engine.runScheduledTickNow("clan").get();
@@ -221,11 +200,7 @@ class CdcEngineTargetedResyncTest {
         fail("condition not met within 10s");
     }
 
-    /**
-     * Deep-stub JDBC source that records every Phase-1 primary SQL string a
-     * cycle prepares (the {@code clan_data} hash query) and answers an empty
-     * result set so invalidated snapshot rows diff to DELETE.
-     */
+    /** Records every Phase-1 primary SQL and answers an empty result set. */
     private static final class RecordingSource implements JdbcConnectionSource {
         private final List<String> primarySql = new CopyOnWriteArrayList<String>();
 
@@ -263,8 +238,7 @@ class CdcEngineTargetedResyncTest {
             when(conn.prepareStatement(org.mockito.ArgumentMatchers.anyString()))
                     .thenAnswer(inv -> {
                         String sql = inv.getArgument(0);
-                        // Only the primary hash query carries clan_id without BIT_XOR; both
-                        // primary and child hash queries route here, record any clan_id one.
+                        // Primary hash query is the clan_id one without BIT_XOR.
                         if (sql.contains("clan_id")) {
                             primarySql.add(sql);
                         }

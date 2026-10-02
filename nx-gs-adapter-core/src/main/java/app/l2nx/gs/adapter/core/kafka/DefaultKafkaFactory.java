@@ -8,12 +8,7 @@ import com.google.gson.Gson;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/**
- * Default {@link KafkaFactory} that bridges to {@code NxKafka.configure().build()}.
- *
- * <p>Shuts down any live singleton before init so a reconnect cycle that re-fetches
- * Kafka credentials produces a fresh client.</p>
- */
+/** Shuts down any live singleton before init so a reconnect that re-fetches credentials gets a fresh client. */
 public final class DefaultKafkaFactory implements KafkaFactory {
 
     private static final NxLog log = NxLogFactory.getLogger(DefaultKafkaFactory.class);
@@ -48,7 +43,6 @@ public final class DefaultKafkaFactory implements KafkaFactory {
         try {
             existing = NxKafka.instance();
         } catch (KafkaException notConfigured) {
-            // First init — nothing to shut down.
             return;
         }
         if (existing.state() != KafkaState.CLOSED) {
@@ -56,8 +50,7 @@ public final class DefaultKafkaFactory implements KafkaFactory {
             try {
                 existing.shutdown();
             } catch (Throwable t) {
-                // shutdown() is internally guarded but a faulty consumer/producer close
-                // still must not bubble into the connect-scheduler thread.
+                // A faulty consumer/producer close must not bubble into the connect-scheduler thread
                 log.error("NxKafka.shutdown() threw during re-init: {}", t.getMessage(), t);
             }
         }

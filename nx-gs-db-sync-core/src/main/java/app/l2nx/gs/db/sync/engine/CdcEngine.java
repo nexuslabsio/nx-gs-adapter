@@ -20,10 +20,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 /**
- * Top-level orchestrator. Maintains one shared scheduler pool sized by
- * {@code l2nx.cdc-engine.workers}; schedules one tick per entity at
- * {@link EngineConfig#tickIntervalSeconds()}. A per-entity {@code ticking}
- * guard prevents overlapping ticks when a previous one ran long.
+ * One shared scheduler pool ({@code l2nx.cdc-engine.workers}), one tick per entity; a per-entity
+ * {@code ticking} guard prevents overlapping ticks.
  */
 public final class CdcEngine {
 
@@ -126,9 +124,7 @@ public final class CdcEngine {
             final String entity = mapping.entityName();
             final EntitySlot slot = new EntitySlot(task);
             slotsByEntity.put(entity, slot);
-            // Scheduled tick: triggered=false → never takes the targeted fast-path,
-            // so it full-scans and catches external deletes/changes the resync set
-            // does not know about.
+            // triggered=false never takes the targeted fast-path, so it full-scans and catches external deletes.
             Runnable tick = SafeRunnable.wrap(() -> runGuardedCycle(entity, slot, false), log);
 
             ScheduledFuture<?> handle = pool.scheduleWithFixedDelay(
@@ -139,30 +135,8 @@ public final class CdcEngine {
     }
 
     /**
-     * Out-of-band trigger: submit an immediate cycle for the named entity
-     * onto the engine's pool, bypassing the fixed-delay timer. Used by
-     * {@code NxSync.requestNow} so command handlers can request fresh
-     * sync state right after mutating an entity (e.g. after item transfer)
-     * instead of waiting for the next scheduled tick.
-     *
-     * <p>Honors the same per-entity {@code ticking} guard as scheduled
-     * runs. If a tick is already running for this entity the submitted
-     * cycle CASes the guard and returns as a no-op — but the trigger is
-     * NOT lost: it sets a per-entity pending-immediate flag BEFORE
-     * submitting, which the in-flight cycle's {@code finally} observes and
-     * re-submits, guaranteeing one full cycle starts strictly after this
-     * trigger. The flag is consumed at the start of a cycle (before the
-     * consistent-snapshot read opens), so a trigger landing after the read
-     * re-sets it and forces yet another cycle rather than racing the read.
-     * Multiple triggers during one cycle coalesce into a single re-run.
-     * Unknown entity names log at WARN and drop.</p>
-     *
-     * <p>Engine must be {@link #start()}ed and not {@link #stop()}ped;
-     * pre-start and post-stop calls log at WARN and drop. Calling thread
-     * does NOT block — submission only.</p>
-     *
-     * @param entityName entity name as declared by
-     *                   {@link EntityMapping#entityName()}
+     * Immediate out-of-band cycle; if one is already running, a pending flag (set before submit) makes it re-submit
+     * at its end, so a full cycle starts after this trigger. Non-blocking; WARN-and-drop if unknown entity or engine not running.
      */
     public void triggerEntityNow(String entityName) {
         if (!started.get() || stopped.get()) {
@@ -178,9 +152,7 @@ public final class CdcEngine {
         if (pool == null) {
             return;
         }
-        // Mark BEFORE submit so a trigger racing the ticking guard is recorded:
-        // if the submitted cycle loses the CAS, the running cycle's finally still
-        // sees this and re-submits — the request is never silently dropped.
+        // Mark before submit: if the cycle loses the CAS, the running cycle's finally re-submits.
         slot.pendingImmediate.set(true);
         try {
             pool.execute(SafeRunnable.wrap(() -> runGuardedCycle(entityName, slot, true), log));
@@ -194,15 +166,8 @@ public final class CdcEngine {
     }
 
     /**
-     * Force-resync request for a whole entity: every snapshot hash is
-     * invalidated on the entity's next cycle, re-publishing every live row
-     * and re-emitting DELETED for snapshot-known ghosts. Thread-safe,
-     * non-blocking — enqueues the request and submits an immediate cycle;
-     * never mutates {@link SnapshotStore} on the calling thread.
-     *
-     * @return {@code false} when the entity is unknown or the engine is not
-     * running (callers map this to their own error reply); the
-     * request is dropped in that case
+     * Invalidates every snapshot hash on the entity's next cycle; enqueue-only, never touches {@link SnapshotStore} on the caller thread.
+     * Returns {@code false} (request dropped) when the entity is unknown or the engine is not running.
      */
     public boolean requestForceResync(UUID resyncId, String entityName) {
         if (!resyncRequestAccepted(resyncId, entityName)) {
@@ -218,11 +183,7 @@ public final class CdcEngine {
         return true;
     }
 
-    /**
-     * Force-resync request for selected rows of an entity. Same contract as
-     * {@link #requestForceResync(UUID, String)}; PK sets of concurrent
-     * requests union, a pending whole-entity request absorbs them.
-     */
+    /** Per-row variant; PK sets of concurrent requests union, a pending whole-entity request absorbs them. */
     public boolean requestForceResync(UUID resyncId, String entityName, LongSet pks) {
         if (!resyncRequestAccepted(resyncId, entityName)) {
             return false;
@@ -233,22 +194,8 @@ public final class CdcEngine {
     }
 
     /**
-     * INTERNAL per-command pk-republish — same snapshot-perturb + immediate
-     * cycle as {@link #requestForceResync(UUID, String, LongSet)} but carries
-     * NO {@code resyncId}, so it emits NO {@code ResyncCompletedEvent}. Used by
-     * {@code NxSync.requestResync} so command handlers can guarantee
-     * re-publication of specific rows right after a mutation without registering
-     * a tracked admin resync operation (which would make the platform consumer
-     * log spurious unknown-resyncId WARNs per command). Thread-safe,
-     * non-blocking; never mutates {@link SnapshotStore} on the calling thread —
-     * the perturbation runs on the entity's cycle thread, the calling thread
-     * only enqueues + submits.
-     *
-     * <p>Coalesced: concurrent requests union their PK sets, and a request
-     * landing mid-cycle re-submits at cycle end (the same pending-request
-     * machinery the tracked resync uses). No-op + WARN when the entity is
-     * unknown or the engine is not running; no-op on a {@code null}/empty PK
-     * set.</p>
+     * Per-command pk-republish carrying no {@code resyncId}, so no {@code ResyncCompletedEvent} (avoids spurious unknown-resyncId WARNs downstream).
+     * Coalesced: PK sets union; no-op + WARN when entity unknown or engine not running.
      */
     public void requestPkRepublishNoEvent(String entityName, LongSet pks) {
         if (pks == null || pks.isEmpty()) {
@@ -285,27 +232,15 @@ public final class CdcEngine {
     private void runGuardedCycle(String entity, EntitySlot slot, boolean triggered) {
         AtomicBoolean ticking = slot.ticking;
         if (!ticking.compareAndSet(false, true)) {
-            // Lost the CAS — a cycle is already running. Do NOT clear
-            // pendingImmediate here: the running cycle's finally must observe it
-            // and re-submit, otherwise an immediate trigger landing now is lost.
+            // Lost the CAS: leave pendingImmediate set so the running cycle's finally re-submits.
             log.debug("Entity {} cycle already running — out-of-band/scheduled tick skipped", entity);
             return;
         }
         try {
-            // Consume pendingImmediate BEFORE the snapshot read opens: any trigger
-            // arriving after this point (during or after the read) re-sets the
-            // flag and forces another full cycle, so a change committed before the
-            // trigger is guaranteed to be observed by some cycle. Consuming after
-            // the read would lose a trigger racing the read.
+            // Consume before the snapshot read opens: a later trigger re-sets the flag and forces another cycle.
             slot.pendingImmediate.set(false);
-            // Drain BEFORE runCycle: the planner must see invalidation sentinels
-            // in the snapshot's PK envelope, otherwise out-of-range sentinel
-            // DELETEDs would slip to the next cycle.
+            // Drain before runCycle so the planner sees invalidation sentinels in the PK envelope.
             ResyncCoordinator.DrainResult drain = resyncCoordinator.drainAndInvalidate(entity, snapshot);
-            // Targeted fast-path: only a triggered (out-of-band) run whose drain
-            // was targeted-only with a non-empty PK set hashes just those PKs via
-            // IN(...). A scheduled tick always full-scans (must catch external
-            // deletes the resync set doesn't know about).
             LongSet targetedPks = (triggered && drain.targetedOnly()) ? drain.targetedPks() : null;
             EntitySyncTask task = slot.task;
             long cycleStartedMs = System.currentTimeMillis();
@@ -313,10 +248,8 @@ public final class CdcEngine {
             try {
                 result = task.runCycle(targetedPks);
             } catch (RuntimeException cycleFailure) {
-                // E.g. WindowPlanner's plan-size cap after a garbage PK inflated
-                // the snapshot envelope. Record a degraded result so the heartbeat
-                // does not keep showing the last pre-failure result forever and the
-                // resync completion gate stays deferred.
+                // Record a degraded result (e.g. plan-size cap) so heartbeat and the resync completion gate don't go
+                // stale.
                 log.warn(
                         "Entity {} cycle threw {}: {} — recording DEGRADED result",
                         entity,
@@ -325,8 +258,7 @@ public final class CdcEngine {
                 result = CycleResult.degraded(System.currentTimeMillis() - cycleStartedMs);
                 statsTracker.recordCycleResult(entity, result);
                 resyncCoordinator.onCycleResult(entity, result);
-                // No checkpoint: the cycle died mid-flight, the snapshot may hold
-                // partially-applied state not worth persisting.
+                // No checkpoint: a mid-flight death may leave partially-applied snapshot state.
                 return;
             }
             statsTracker.recordCycleResult(entity, result);
@@ -342,11 +274,8 @@ public final class CdcEngine {
             }
         } finally {
             ticking.set(false);
-            // A resync request OR an immediate trigger (NxSync.requestNow) that
-            // landed mid-cycle hit the ticking guard as a no-op — re-submit so it
-            // runs in the immediately following cycle instead of waiting for the
-            // next scheduled tick. Order matters: release ticking first, then
-            // observe the flags, so the re-submitted cycle can win the CAS.
+            // Re-submit a request/trigger that hit the ticking guard mid-cycle; release ticking first so it can win the
+            // CAS.
             if ((slot.pendingImmediate.get() || resyncCoordinator.hasPending(entity)) && !stopped.get()) {
                 triggerEntityNow(entity);
             }
@@ -356,9 +285,6 @@ public final class CdcEngine {
     private static final class EntitySlot {
         final EntitySyncTask task;
         final AtomicBoolean ticking = new AtomicBoolean(false);
-        // Set by triggerEntityNow before submit; consumed at cycle start, observed
-        // again in the cycle's finally to re-submit a coalesced follow-up cycle so
-        // an immediate trigger racing the ticking guard is never dropped.
         final AtomicBoolean pendingImmediate = new AtomicBoolean(false);
 
         EntitySlot(EntitySyncTask task) {
@@ -378,12 +304,11 @@ public final class CdcEngine {
         ScheduledThreadPoolExecutor pool = scheduler;
         if (pool != null) {
             pool.shutdownNow();
-            // Cancel any blocked-in-JDBC statements that shutdownNow couldn't interrupt.
+            // Cancel statements blocked in JDBC that shutdownNow can't interrupt.
             for (EntitySyncTask t : tasks) {
                 try {
                     t.cancelCurrentStatement();
                 } catch (Throwable ignore) {
-                    // best-effort
                 }
             }
             try {
@@ -400,11 +325,9 @@ public final class CdcEngine {
         tasks.clear();
         slotsByEntity.clear();
         resyncCoordinator.clear();
-        // Persist only when every cycle thread has actually stopped. A flush that
-        // races a still-running cycle traverses an entity's Long2IntOpenHashMap
-        // while that thread mutates it (the snapshot single-writer invariant) —
-        // fastutil UB. A stale-but-intact prior checkpoint beats a snapshot
-        // written under that race.
+        // Persist only after all cycle threads stopped: a flush racing the single-writer Long2IntOpenHashMap mutation
+        // is UB;
+        // a stale checkpoint beats a corrupt one.
         if (terminated) {
             try {
                 persistence.flushAll(snapshot);
@@ -431,15 +354,7 @@ public final class CdcEngine {
         return mappings;
     }
 
-    /**
-     * Test seam — runs the REAL scheduled tick path
-     * ({@code runGuardedCycle(entity, slot, false)}) for one entity on the
-     * shared pool and blocks until it finishes. Unlike
-     * {@link #tickOnceSynchronously()} (which calls {@code task.runCycle()}
-     * directly), this exercises the engine's triggered=false routing so a test
-     * can assert a scheduled tick ignores any pending targeted resync set and
-     * full-scans.
-     */
+    /** Test seam: runs the real scheduled path (triggered=false) for one entity and blocks. */
     Future<?> runScheduledTickNow(String entityName) {
         EntitySlot slot = slotsByEntity.get(entityName);
         if (slot == null) {
@@ -452,20 +367,11 @@ public final class CdcEngine {
         return pool.submit(() -> runGuardedCycle(entityName, slot, false));
     }
 
-    /**
-     * Test seam — enqueues a no-event per-PK resync directly onto the
-     * coordinator WITHOUT submitting an immediate (triggered) cycle, so the
-     * pending targeted set survives to the next scheduled tick. Lets a test
-     * verify the scheduled path ignores it.
-     */
+    /** Test seam: enqueues a no-event per-PK resync without an immediate cycle, so it survives to the next scheduled tick. */
     void enqueueNoEventPksWithoutTrigger(String entityName, LongSet pks) {
         resyncCoordinator.enqueueNoEventPks(entityName, pks);
     }
 
-    /**
-     * Test seam — submits one synchronous tick for each entity via the
-     * shared scheduler pool.
-     */
     public List<Future<?>> tickOnceSynchronously() {
         if (!started.get()) {
             throw new IllegalStateException("CdcEngine not started");

@@ -18,30 +18,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 
 /**
- * Filesystem-backed {@link SnapshotPersistence}. One file per entity under
- * {@code <schemaDir>/<entity>.snap}, written via tmp + atomic rename so a
- * crash mid-write leaves the previous good copy intact. A shared directory
- * lock ({@code <schemaDir>/.lock}) prevents two adapter JVMs from clobbering
- * each other on the same host.
- *
- * <p>Binary record layout (big-endian):</p>
+ * One {@code <schemaDir>/<entity>.snap} per entity, written via tmp + atomic rename; {@code <schemaDir>/.lock} keeps two adapter JVMs apart.
+ * {@link #checkpoint} is skipped if the entity's last write completed within {@code checkpointMinIntervalSeconds}; {@link #flushAll} bypasses the throttle.
  * <pre>
  * magic         : 4 bytes ASCII "NXSS"
  * version       : int16 = 1
  * entityNameLen : int16 (UTF-8 byte length)
  * entityName    : entityNameLen bytes (UTF-8)
  * count         : int32 entry count
- * entries       : count × (int64 pk, int32 crc) — 12 bytes each
+ * entries       : count x (int64 pk, int32 crc) - 12 bytes each
  * bodyCrc32     : int32 CRC32 of count + entries (raw bytes)
  * </pre>
- *
- * <p>Throttling: per-entity {@link #checkpoint} writes are skipped when the
- * previous write for that entity <em>completed</em> less than
- * {@code checkpointMinIntervalSeconds} ago — slow fsyncs stretch the
- * effective window past the configured value, which is the intended
- * "don't double-fsync within N seconds of completion" semantics.
- * {@link #flushAll} bypasses the throttle so the freshest state always
- * survives shutdown.</p>
+ * All big-endian.
  */
 public final class FileSnapshotPersistence implements SnapshotPersistence {
 
@@ -57,8 +45,8 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
 
     private final Path schemaDir;
     private final long minIntervalNanos;
-    // Concurrent: different entities checkpoint from different CDC pool workers.
-    // Single-writer-per-entity holds for SnapshotStore, NOT for this shared map.
+    // Concurrent because entities checkpoint from different pool workers (the single-writer rule covers SnapshotStore,
+    // not this map).
     private final Map<String, Long> lastWriteNanos = new ConcurrentHashMap<String, Long>();
 
     private FileChannel lockChannel;
@@ -180,10 +168,8 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
                 log.warn("FileSnapshotPersistence.load: '{}' negative count {} — skipping", file.getFileName(), count);
                 return -1;
             }
-            // Cap count by what could fit in the file (entries plus trailing 4-byte
-            // checksum). Without this a crafted header (e.g. count=Integer.MAX_VALUE)
-            // triggers OOM in the Long2IntOpenHashMap pre-allocation BEFORE we get
-            // to checksum-verify the truncated body.
+            // Cap count by what fits in the file: a crafted header (count=Integer.MAX_VALUE) would OOM the
+            // pre-allocation before the checksum is verified.
             long maxFeasibleEntries = Math.max(0L, (fileSize - 4L) / ENTRY_BYTES);
             if ((long) count > maxFeasibleEntries) {
                 log.warn(
@@ -315,9 +301,8 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
                     throw firstError[0];
                 }
                 if (writtenCount[0] != sizeHint) {
-                    // Single-writer-per-entity contract guarantees agreement; a drift
-                    // here means a future refactor broke the contract — fail loud
-                    // before we commit a body whose count header lies.
+                    // Drift means the single-writer contract broke; fail loud before committing a body whose count
+                    // header lies.
                     throw new IOException(
                             "entry count drift during dump: expected " + sizeHint + " got " + writtenCount[0]);
                 }
@@ -369,7 +354,6 @@ public final class FileSnapshotPersistence implements SnapshotPersistence {
         try {
             Files.deleteIfExists(p);
         } catch (NoSuchFileException ignored) {
-            // raced — fine
         } catch (IOException e) {
             log.warn("FileSnapshotPersistence.deleteIfExists({}) failed: {}", p, e.getMessage());
         }

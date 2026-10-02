@@ -181,7 +181,7 @@ class DbSyncModuleTest {
     void stop_shouldBeNoOp_whenEngineNeverStarted() {
         DbSyncModule module = build(emptyJdbc(), emptySchema(), passSmoke());
 
-        module.stop(); // no engine yet
+        module.stop();
         module.onDisconnect();
 
         assertEquals("INIT", module.currentStatus().getState());
@@ -191,10 +191,9 @@ class DbSyncModuleTest {
     void start_shouldBeNoOp_whenStateDisabled() {
         DbSyncModule module = build(singleJdbc(stub("a", null)), singleSchema(clanProvider()), passSmoke());
 
-        module.onConnect(CTX_NO_TOPICS); // → DISABLED
+        module.onConnect(CTX_NO_TOPICS);
         module.start();
 
-        // Engine never started — stays DISABLED, currentStatus carries no entities.
         ModuleStatus status = module.currentStatus();
         assertEquals("DISABLED", status.getState());
         assertFalse(status.getStats().getEntities().isPresent());

@@ -5,28 +5,8 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One base level of a {@link Skill} — the per-level stats, localization and effects.
- * In L2 a skill scales across levels (mp cost, power, cool/reuse times grow); each
- * level is a distinct row carried in {@link Skill#getLevels()}.
- *
- * <p>{@code level} is the non-null identity within the skill. Every other field is
- * {@link Nullable}. Fields with a unit carry it in the name: time fields are
- * {@code *Ms} (milliseconds, {@code hitTimeMs}/{@code coolTimeMs}/{@code reuseDelayMs})
- * or {@code *Sec} ({@code abnormalTimeSec}); chance fields are {@code *Percent};
- * consumption / range / level fields are unit-bare {@code Integer}. {@code name} /
- * {@code description} are locale-keyed {@link LocalizedText}. {@code effects} is the
- * per-level effect list (target / self / passive channels, see
- * {@link SkillEffect#getKind()}); {@code statModifiers} are stat modifications attached
- * directly to the skill (no effect wrapper — typical for simple passives).</p>
- *
- * <p>{@code attribute} is the offensive element this level carries
- * ({@code FIRE}/{@code WATER}/{@code WIND}/{@code EARTH}/{@code HOLY}/{@code DARK});
- * {@code attributePower} is the element value. Both {@code null} when the level has no
- * offensive attribute.</p>
- *
- * <p>Enchant variants (route-enchanted levels) are NOT here — they ride
- * {@link Skill#getEnchantRoutes()} as {@link SkillEnchantRoute}. This list is the
- * base ladder only.</p>
+ * One base level of a {@link Skill}. Only {@code level} is non-null; time fields are {@code *Ms} or
+ * {@code *Sec}, chance fields {@code *Percent}. Enchant variants live in {@link Skill#getEnchantRoutes()}.
  */
 public final class SkillLevel {
 
@@ -181,9 +161,6 @@ public final class SkillLevel {
         return mpConsume;
     }
 
-    /**
-     * MP paid up-front when the cast starts (vs the total {@code mpConsume}).
-     */
     public @Nullable Integer getMpInitialConsume() {
         return mpInitialConsume;
     }
@@ -200,23 +177,16 @@ public final class SkillLevel {
         return itemTemplateCount;
     }
 
-    /**
-     * Maximum soulshot / spiritshot charges the skill consumes per cast.
-     */
+    /** Soulshot / spiritshot charges consumed per cast. */
     public @Nullable Integer getSoulMaxConsume() {
         return soulMaxConsume;
     }
 
-    /**
-     * Energy (agathion / kamael-style resource) consumed per cast.
-     */
     public @Nullable Integer getEnergyConsume() {
         return energyConsume;
     }
 
-    /**
-     * Momentum charges consumed per cast.
-     */
+    /** Momentum charges consumed per cast. */
     public @Nullable Integer getChargeConsume() {
         return chargeConsume;
     }
@@ -229,38 +199,27 @@ public final class SkillLevel {
         return effectRange;
     }
 
-    /**
-     * Radius of the area of effect for AoE skills; {@code null} for single-target.
-     */
+    /** AoE radius; {@code null} for single-target. */
     public @Nullable Integer getAffectRange() {
         return affectRange;
     }
 
-    /**
-     * Maximum number of targets an AoE skill affects; {@code null} if unbounded / single-target.
-     */
+    /** Max AoE targets; {@code null} if unbounded or single-target. */
     public @Nullable Integer getAffectLimit() {
         return affectLimit;
     }
 
-    /**
-     * Fan AoE: starting angle of the arc in degrees relative to the caster's heading;
-     * {@code null} for non-fan skills.
-     */
+    /** Fan AoE: arc start angle in degrees relative to the caster heading; {@code null} for non-fan skills. */
     public @Nullable Integer getFanStartAngle() {
         return fanStartAngle;
     }
 
-    /**
-     * Fan AoE: arc radius; {@code null} for non-fan skills.
-     */
+    /** Fan AoE: arc radius; {@code null} for non-fan skills. */
     public @Nullable Integer getFanRadius() {
         return fanRadius;
     }
 
-    /**
-     * Fan AoE: arc width in degrees; {@code null} for non-fan skills.
-     */
+    /** Fan AoE: arc width in degrees; {@code null} for non-fan skills. */
     public @Nullable Integer getFanAngle() {
         return fanAngle;
     }
@@ -269,150 +228,98 @@ public final class SkillLevel {
         return magicLevel;
     }
 
-    /**
-     * Abnormal (buff/debuff) slot level — higher overwrites lower of the same type.
-     */
+    /** Higher overwrites lower of the same abnormal type. */
     public @Nullable Integer getAbnormalLevel() {
         return abnormalLevel;
     }
 
-    /**
-     * Abnormal (buff/debuff) duration.
-     */
     public @Nullable Integer getAbnormalTimeSec() {
         return abnormalTimeSec;
     }
 
-    /**
-     * Cast animation time.
-     */
     public @Nullable Integer getHitTimeMs() {
         return hitTimeMs;
     }
 
-    /**
-     * Cool time (post-cast recovery).
-     */
     public @Nullable Integer getCoolTimeMs() {
         return coolTimeMs;
     }
 
-    /**
-     * Cooldown before reuse.
-     */
     public @Nullable Integer getReuseDelayMs() {
         return reuseDelayMs;
     }
 
-    /**
-     * Base critical-hit chance of the skill before the caster's stat modifiers apply
-     * (raw value as defined by the build); {@code null} / {@code 0} when the skill is
-     * not crit-capable.
-     */
+    /** Raw value before the caster's stat modifiers; {@code null} / {@code 0} when not crit-capable. */
     public @Nullable Integer getBaseCritRate() {
         return baseCritRate;
     }
 
-    /**
-     * Skill power (damage / heal magnitude) — a coefficient, no unit.
-     */
+    /** Damage / heal coefficient, unitless. */
     public @Nullable Double getPower() {
         return power;
     }
 
-    /**
-     * Power override used against players; {@code null} when PvP uses {@code power}.
-     */
+    /** Override against players; {@code null} when PvP uses {@code power}. */
     public @Nullable Double getPvpPower() {
         return pvpPower;
     }
 
-    /**
-     * Power override used against NPCs; {@code null} when PvE uses {@code power}.
-     */
+    /** Override against NPCs; {@code null} when PvE uses {@code power}. */
     public @Nullable Double getPvePower() {
         return pvePower;
     }
 
-    /**
-     * Lower bound of the debuff land-rate after all modifiers.
-     */
+    /** Land-rate floor after all modifiers. */
     public @Nullable Integer getMinChancePercent() {
         return minChancePercent;
     }
 
-    /**
-     * Upper bound of the debuff land-rate after all modifiers.
-     */
+    /** Land-rate ceiling after all modifiers. */
     public @Nullable Integer getMaxChancePercent() {
         return maxChancePercent;
     }
 
-    /**
-     * Base activation chance the land-rate formula starts from; {@code null} when the
-     * skill lands unconditionally.
-     */
+    /** Base land-rate the formula starts from; {@code null} when the skill lands unconditionally. */
     public @Nullable Integer getActivateRatePercent() {
         return activateRatePercent;
     }
 
-    /**
-     * Per-level-difference modifier applied to the land-rate (caster magic level vs
-     * target level).
-     */
+    /** Land-rate modifier per level difference (caster magic level vs target level). */
     public @Nullable Integer getLevelModifier() {
         return levelModifier;
     }
 
-    /**
-     * Chance of the full lethal strike (reduces the target to 1 HP / kills).
-     */
+    /** Lethal strike: reduces the target to 1 HP or kills. */
     public @Nullable Integer getLethalStrikeRatePercent() {
         return lethalStrikeRatePercent;
     }
 
-    /**
-     * Chance of the half-kill lethal (reduces the target's HP by half).
-     */
+    /** Half-kill lethal: halves the target's HP. */
     public @Nullable Integer getHalfKillRatePercent() {
         return halfKillRatePercent;
     }
 
-    /**
-     * Success chance of removing the {@code negateAbnormalTypes} entries.
-     */
     public @Nullable Integer getNegateRatePercent() {
         return negateRatePercent;
     }
 
     /**
-     * Abnormal types this skill removes (cleanse semantics), keyed by canonical
-     * UPPER_SNAKE abnormal-type token; the value is the maximum abnormal level the
-     * skill can remove. {@code null} when the skill negates nothing.
+     * Keyed by UPPER_SNAKE abnormal type; the value is the max abnormal level removable.
+     * {@code null} when the skill negates nothing.
      */
     public @Nullable Map<String, Integer> getNegateAbnormalTypes() {
         return negateAbnormalTypes;
     }
 
-    /**
-     * Aggro generated on NPCs by casting this level.
-     */
     public @Nullable Integer getAggroPoints() {
         return aggroPoints;
     }
 
-    /**
-     * Offensive element at this level ({@code FIRE}/{@code WATER}/{@code WIND}/
-     * {@code EARTH}/{@code HOLY}/{@code DARK}); {@code null} when the level carries no
-     * offensive attribute.
-     */
+    /** One of FIRE/WATER/WIND/EARTH/HOLY/DARK; {@code null} when the level has no offensive attribute. */
     public @Nullable String getAttribute() {
         return attribute;
     }
 
-    /**
-     * Offensive element power at this level; {@code null} when {@code attribute} is null.
-     */
     public @Nullable Integer getAttributePower() {
         return attributePower;
     }
@@ -425,25 +332,16 @@ public final class SkillLevel {
         return description;
     }
 
-    /**
-     * Effects applied at this level; {@code null} if none.
-     */
     public @Nullable List<SkillEffect> getEffects() {
         return effects;
     }
 
-    /**
-     * Stat modifications attached directly to the skill (no effect wrapper — typical
-     * for simple passives); {@code null} if none.
-     */
+    /** Applied without an effect wrapper (simple passives). */
     public @Nullable List<SkillStatModifier> getStatModifiers() {
         return statModifiers;
     }
 
-    /**
-     * Produced item groups for extractable skills (item-opening / conversion); {@code null}
-     * when the skill produces nothing.
-     */
+    /** Item groups for extractable skills; {@code null} when the skill produces nothing. */
     public @Nullable List<SkillProducedItemGroup> getProducedItems() {
         return producedItems;
     }

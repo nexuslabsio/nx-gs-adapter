@@ -4,10 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One produced item of a {@link SkillProducedItemGroup} — an item-template reference
- * with its quantity range. {@code itemTemplateId} is the non-null identity.
- * {@code minCount} / {@code maxCount} bound the produced quantity; a fixed quantity
- * carries {@code minCount} only ({@code maxCount} {@code null}).
+ * One produced item of a {@link SkillProducedItemGroup}; {@code itemTemplateId} is the non-null identity.
+ * A fixed quantity carries {@code minCount} only.
  */
 public final class SkillProducedItem {
 
@@ -29,10 +27,6 @@ public final class SkillProducedItem {
         return minCount;
     }
 
-    /**
-     * Upper bound of the produced quantity; {@code null} when the quantity is fixed at
-     * {@code minCount}.
-     */
     public @Nullable Long getMaxCount() {
         return maxCount;
     }

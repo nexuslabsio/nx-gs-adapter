@@ -9,36 +9,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One castle inside a {@link CastleSnapshotEvent}. Describes the castle's current
- * owning clan and the schedule of its next siege occurrence.
- *
- * <p>Fields:
- * <ul>
- *   <li>{@link #getCastleId() castleId} — REQUIRED. Stable per-castle key the
- *   consumer upserts on.</li>
- *   <li>{@link #getName() name} — optional display name. Unlike raid bosses
- *   (resolved from an NPC catalog), the platform has no castle catalog, so the
- *   host carries the name on the wire (typically {@code Castle.getName(...)}).</li>
- *   <li>{@link #getOwnerClanId() ownerClanId} — optional owning clan id. The host
- *   translates its no-owner sentinel (typically {@code 0}) to {@code null}.</li>
- *   <li>{@link #getNextSiegeAt() nextSiegeAt} — optional. Absolute Instant of the
- *   next scheduled siege start; {@code null} when unknown / unscheduled. The
- *   platform counts down locally, so the snapshot cadence can be slow.</li>
- *   <li>{@link #getRegistrationEndsAt() registrationEndsAt} — optional. Absolute
- *   Instant when clan registration for the next siege locks (some hours before
- *   {@code nextSiegeAt}); {@code null} when the host does not expose it.
- *   Registration open-start is not modelled — it is effectively open from the
- *   previous siege.</li>
- *   <li>{@link #getSiegeEndsAt() siegeEndsAt} — optional. Absolute Instant when the
- *   next siege ends ({@code nextSiegeAt} + the castle's siege duration);
- *   {@code null} when the host does not expose it.</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic per-castle attributes. {@code null} when absent; hosts MAY add
- *   arbitrary keys without an API release and consumers ignore unknown keys.</li>
- * </ul>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor parameter
- * names so Gson / Jackson can deserialize without {@code @JsonProperty}.</p>
+ * One castle inside a {@link CastleSnapshotEvent}. {@code name} rides the wire because the platform has no castle
+ * catalog. {@code ownerClanId} is {@code null} when unowned (host maps its no-owner sentinel). {@code nextSiegeAt},
+ * {@code registrationEndsAt} (locks some hours before the siege) and {@code siegeEndsAt} are absolute and {@code null}
+ * when the host does not expose them. {@code metadata} is an open map; consumers ignore unknown keys.
  */
 public final class CastleSnapshotEntry {
 
@@ -71,9 +45,6 @@ public final class CastleSnapshotEntry {
         this.schedule = schedule;
     }
 
-    /**
-     * Stable per-castle key the platform upserts on inside a snapshot.
-     */
     public int getCastleId() {
         return castleId;
     }
@@ -82,50 +53,27 @@ public final class CastleSnapshotEntry {
         return name;
     }
 
-    /**
-     * Owning clan id, or {@code null} when the castle is unowned (host maps its
-     * own no-owner sentinel to {@code null}).
-     */
     public @Nullable Long getOwnerClanId() {
         return ownerClanId;
     }
 
-    /**
-     * Absolute Instant of the next scheduled siege start, or {@code null} when
-     * unknown or unscheduled.
-     */
     public @Nullable Instant getNextSiegeAt() {
         return nextSiegeAt;
     }
 
-    /**
-     * Absolute Instant when registration for the next siege locks, or
-     * {@code null} when the host does not expose it.
-     */
     public @Nullable Instant getRegistrationEndsAt() {
         return registrationEndsAt;
     }
 
-    /**
-     * Absolute Instant when the next siege ends, or {@code null} when the host
-     * does not expose it.
-     */
     public @Nullable Instant getSiegeEndsAt() {
         return siegeEndsAt;
     }
 
-    /**
-     * Open string→string map of build-agnostic per-castle attributes, or
-     * {@code null} when absent. When non-null the returned map is unmodifiable.
-     */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;
     }
 
-    /**
-     * Recurring siege rule ("every weekday(s) at HH:MM") derived from the
-     * castle's fixed weekly siege schedule, or {@code null} when unavailable.
-     */
+    /** Derived from the castle's fixed weekly siege schedule; {@code null} when unavailable. */
     public @Nullable RecurringSchedule getSchedule() {
         return schedule;
     }

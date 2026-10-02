@@ -36,7 +36,6 @@ class HostExecutorImplTest {
     void sync_runnable_shouldBeNoOpOnNullTask() {
         HostExecutorImpl host = new HostExecutorImpl(IMMEDIATE_EXECUTOR, TEST_SYNC_TIMEOUT_MS);
 
-        // Should not throw
         host.sync((Runnable) null);
     }
 
@@ -86,10 +85,7 @@ class HostExecutorImplTest {
 
     @Test
     void sync_executorNeverCompletes_shouldThrowTimeoutException() {
-        // Deliberately never executes the task
-        Executor blackHole = task -> {
-            /* drop on the floor */
-        };
+        Executor blackHole = task -> {};
         HostExecutorImpl host = new HostExecutorImpl(blackHole, TEST_SYNC_TIMEOUT_MS);
 
         long t0 = System.currentTimeMillis();
@@ -97,7 +93,6 @@ class HostExecutorImplTest {
         long elapsed = System.currentTimeMillis() - t0;
 
         assertEquals(TEST_SYNC_TIMEOUT_MS, ex.getTimeoutMs());
-        // elapsed should be ~TEST_SYNC_TIMEOUT_MS — allow slack for slow CI but bound the upper end
         assertTrue(
                 elapsed >= TEST_SYNC_TIMEOUT_MS,
                 "expected await to last >= " + TEST_SYNC_TIMEOUT_MS + "ms, got " + elapsed);
@@ -116,8 +111,6 @@ class HostExecutorImplTest {
 
     @Test
     void async_shouldWrapTaskInSafeRunnable_swallowingThrowables() {
-        // SafeRunnable wraps the task and routes exceptions through NxLog —
-        // verify the task does NOT propagate to the executor's caller.
         AtomicReference<Throwable> caughtByExecutor = new AtomicReference<>();
         Executor immediateCatching = task -> {
             try {
@@ -132,7 +125,6 @@ class HostExecutorImplTest {
             throw new RuntimeException("boom");
         });
 
-        // SafeRunnable.wrap should have absorbed the exception — executor's catch should NOT fire.
         assertNull(caughtByExecutor.get(), "SafeRunnable.wrap should swallow task exceptions");
     }
 

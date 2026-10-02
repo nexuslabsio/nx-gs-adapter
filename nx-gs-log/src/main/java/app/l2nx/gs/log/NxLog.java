@@ -1,8 +1,5 @@
 package app.l2nx.gs.log;
 
-/**
- * Internal logging facade. Uses SLF4J {@code {}} placeholder syntax.
- */
 public interface NxLog {
 
     void debug(String message, Object... args);

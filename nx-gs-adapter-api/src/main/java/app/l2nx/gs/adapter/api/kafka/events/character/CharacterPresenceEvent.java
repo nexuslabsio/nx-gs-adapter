@@ -5,52 +5,14 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Discrete presence-change fact — one event per login or logout, emitted
- * from the standard packet path on the host. {@code online=true} encodes
- * login, {@code online=false} encodes logout. Single type because login
- * and logout share emission point, payload shape, partition key,
- * reconciliation rules, and topic — the differentiator is one bit.
- *
- * <p>One of three sources reconciled into {@code gs_characters.online} on
- * the platform (others: CDC {@code CharacterDbDto.online} via 60s poll
- * cycle, and runtime {@code CharacterRuntimeDto.online} via in-memory
- * tombstones). Timestamp-based last-writer-wins resolves cross-source races;
- * {@link #getEventId() eventId} is UUIDv7 so {@code occurredAt} extracts
- * cleanly from its time-ordered prefix.</p>
- *
- * <p>Cheat / custom clients bypassing the standard packet flow won't trigger
- * this event — CDC and runtime channels act as the always-present fallback.</p>
- *
- * <p>Fields:
- * <ul>
- *   <li>{@link #getEventId() eventId} — UUIDv7, REQUIRED. Idempotency key
- *   for at-least-once delivery; platform extracts {@code occurredAt} from
- *   the time-ordered prefix for last-writer-wins ordering.</li>
- *   <li>{@link #getCharId() charId} — REQUIRED. Also serves as the Kafka
- *   partition key so per-character history lands on one partition in
- *   occurrence order.</li>
- *   <li>{@link #isOnline() online} — REQUIRED. {@code true} = login,
- *   {@code false} = logout.</li>
- *   <li>{@link #getSessionId() sessionId} — optional wire correlation key for
- *   a login/logout pair. A login fact and its matching logout fact carry the
- *   SAME {@code sessionId}; the host mints a FRESH unique {@code sessionId} per
- *   login-session. {@code null} on builds that do not emit it — the platform
- *   then cannot correlate the logout and leaves the session's logout time
- *   unset.</li>
- *   <li>{@link #getAccountName() accountName} — optional; login account
- *   owning this character at the moment of the event.</li>
- *   <li>{@link #getIp() ip} — optional client IP captured at the event.</li>
- *   <li>{@link #getHwid() hwid} — optional hardware-id (build-specific
- *   format); only carries on cores with HWID tracking.</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic attributes about this presence change. {@code null} when
- *   absent (the common path). Canonical keys/values are documented in
- *   {@link WellKnownPresenceMetadata}; the one defined today is
- *   {@code logout_reason=disconnect}, set on logout events that were caused
- *   by an involuntary connection loss. Hosts MAY publish arbitrary
- *   non-canonical keys without an API release; consumers ignore keys they do
- *   not understand.</li>
- * </ul>
+ * One event per login ({@code online=true}) or logout, emitted from the standard packet path. Cheat/custom clients
+ * bypassing it are covered by the CDC and runtime channels, the other two sources reconciled into
+ * {@code gs_characters.online} with timestamp-based last-writer-wins; {@code eventId} is a UUIDv7 so {@code occurredAt}
+ * is extracted from its prefix. {@code charId} is also the partition key.
+ * {@code sessionId}: a login and its matching logout carry the SAME id, fresh per login-session; {@code null} on builds
+ * that do not emit it, in which case the platform leaves the session's logout time unset.
+ * {@code hwid} only on cores with HWID tracking. {@code metadata}: open map, {@code null} when absent; canonical keys in
+ * {@link WellKnownPresenceMetadata} (today {@code logout_reason=disconnect} for involuntary connection loss).
  */
 public final class CharacterPresenceEvent {
 

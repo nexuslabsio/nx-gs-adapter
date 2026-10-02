@@ -9,36 +9,11 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One configured game event inside a {@link GameEventSnapshotEvent}. Describes a
- * recurring PvP / world event's schedule and current lifecycle phase —
- * build-agnostic across event engines.
+ * One configured recurring PvP / world event inside a {@link GameEventSnapshotEvent}, build-agnostic across event
+ * engines. {@code code} is the stable per-event key the consumer upserts on; {@code metadata} keys are in
+ * {@link WellKnownGameEventMetadata}.
  *
- * <p>Fields:
- * <ul>
- *   <li>{@link #getCode() code} — REQUIRED. Stable build-agnostic event id (the
- *   host's own event id rendered as a string); the per-event key the consumer
- *   upserts on.</li>
- *   <li>{@link #getName() name} — optional display name (host default locale).</li>
- *   <li>{@link #isEnabled() enabled} — REQUIRED. {@code true} = the host has this
- *   event auto-scheduled / turned on.</li>
- *   <li>{@link #getStatus() status} — optional open string lifecycle phase. Canonical
- *   values {@code waiting} / {@code registration} / {@code in_progress} in
- *   {@link WellKnownGameEventStatuses}; {@code null} when the host engine exposes no
- *   phase. It distinguishes a registration / preparation phase from the active run,
- *   which a boolean cannot.</li>
- *   <li>{@link #getNextStartAt() nextStartAt} — optional. Instant of the next
- *   scheduled start; {@code null} when the event is not scheduled (disabled, or
- *   no upcoming occurrence).</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic per-event attributes. {@code null} when absent. Canonical
- *   keys/values are documented in {@link WellKnownGameEventMetadata}; defined today
- *   are {@code event_kind=tvt} and {@code event_kind=solo_boss}. Hosts MAY publish
- *   arbitrary non-canonical keys without an API release; consumers ignore keys they
- *   do not understand.</li>
- * </ul>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson / Jackson can deserialize without
+ * <p>Java-8 POJO; {@code -parameters} preserves constructor parameter names so Jackson / Gson bind without
  * {@code @JsonProperty}.</p>
  */
 public final class GameEventEntry {
@@ -69,10 +44,6 @@ public final class GameEventEntry {
         this.schedule = schedule;
     }
 
-    /**
-     * Stable build-agnostic event id. The per-event key the platform upserts on
-     * inside a snapshot.
-     */
     public String getCode() {
         return code;
     }
@@ -81,33 +52,26 @@ public final class GameEventEntry {
         return name;
     }
 
-    /**
-     * {@code true} = host has this event auto-scheduled / turned on.
-     */
     public boolean isEnabled() {
         return enabled;
     }
 
     /**
-     * Open lifecycle phase of the event, or {@code null} when the host engine
-     * exposes none. Canonical values: see {@link WellKnownGameEventStatuses}.
+     * Open lifecycle phase ({@link WellKnownGameEventStatuses}), or {@code null} when the host engine exposes none.
      */
     public @Nullable String getStatus() {
         return status;
     }
 
     /**
-     * Instant of the next scheduled start, or {@code null} when the event is
-     * not scheduled.
+     * Next scheduled start, or {@code null} when not scheduled (disabled or no upcoming occurrence).
      */
     public @Nullable Instant getNextStartAt() {
         return nextStartAt;
     }
 
     /**
-     * Open string→string map of build-agnostic per-event attributes, or
-     * {@code null} when absent. When non-null the returned map is unmodifiable.
-     * Canonical keys: see {@link WellKnownGameEventMetadata}.
+     * Open string-to-string map, unmodifiable, or {@code null} when absent.
      */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;

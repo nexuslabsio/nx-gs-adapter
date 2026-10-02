@@ -46,26 +46,9 @@ import java.util.function.Supplier;
 import org.apache.kafka.clients.producer.Callback;
 
 /**
- * Tier-1 module that runs the CRC32 CDC engine. Reads its inputs in order:
- *
- * <ol>
- *     <li>{@code ctx.syncTopics()} — empty/null → DISABLED + WARN.</li>
- *     <li>Tier-3 SPI {@link JdbcConnectionSource} via {@link ServiceLoader} —
- *     0 → FAILED, &gt;1 → FAILED, 1 → cached + smoke-checked. Smoke check
- *     failure → DEGRADED but engine still runs.</li>
- *     <li>Tier-2 SPI {@link DbSchemaProvider} via {@link ServiceLoader} —
- *     0 → DISABLED + WARN, &gt;1 → FAILED, 1 → cached. Every identifier in
- *     every {@link PrimarySource} / {@link ChildSource} is validated against
- *     {@code [A-Za-z_][A-Za-z0-9_]{0,63}} before engine start; an invalid
- *     name throws and the module enters FAILED.</li>
- * </ol>
- *
- * <p>SPI Javadoc note for providers: every identifier returned from
- * {@code primary().tableName()}, {@code primary().pkColumn()}, every entry
- * in {@code hashedColumns()}, and the same trio on {@code children()} must
- * match {@code [A-Za-z_][A-Za-z0-9_]{0,63}}. Schema-qualified names,
- * back-ticked names, and SQL metacharacters are rejected — the engine
- * interpolates these tokens into SQL without quoting.</p>
+ * Tier-1 module running the CRC32 CDC engine. Empty {@code ctx.syncTopics()} gives DISABLED; exactly one {@link JdbcConnectionSource} and
+ * {@link DbSchemaProvider} SPI is required (none: FAILED/DISABLED, several: FAILED); a failed smoke check only DEGRADES.
+ * Every table/column identifier must match {@code [A-Za-z_][A-Za-z0-9_]{0,63}} because the engine interpolates them into SQL unquoted.
  */
 public final class DbSyncModule implements AdapterModule {
 
@@ -262,9 +245,6 @@ public final class DbSyncModule implements AdapterModule {
             this.engine = null;
             return;
         }
-        // Wire NxSync triggers so host code can request an immediate sync
-        // pass for any of our entities (e.g. right after a TransferItemToCharacterCommand
-        // mutates a character) without waiting for the next scheduled tick.
         try {
             CdcEngine running = engine;
             JdbcConnectionSource resolvedSource = s;
@@ -278,8 +258,7 @@ public final class DbSyncModule implements AdapterModule {
             sync.registerResyncHandler((entityName, pks, cascade) ->
                     handleNxSyncResync(running, resolvedSource, knownEntities, ctx, entityName, pks, cascade));
         } catch (Throwable t) {
-            // Trigger registration failures must not take down the module —
-            // scheduled sync still works without the out-of-band path.
+            // Scheduled sync works without the out-of-band path.
             log.warn(
                     "Failed to register NxSync triggers for db-sync: {}",
                     t.getClass().getName(),
@@ -287,13 +266,7 @@ public final class DbSyncModule implements AdapterModule {
         }
     }
 
-    /**
-     * Routes {@code NxSync.requestResync} into the engine's no-event
-     * pk-republish. Runs on the caller's thread (game / consumer) — so the
-     * cascade-resolution JDBC and the engine submission are hopped onto the
-     * adapter IO pool, never the caller. No completion event is emitted (the
-     * no-event engine path carries no resyncId).
-     */
+    /** Runs on the caller's thread, so cascade-resolution JDBC and engine submission hop onto the adapter IO pool; emits no completion event. */
     private static void handleNxSyncResync(
             CdcEngine engine,
             JdbcConnectionSource src,
@@ -318,10 +291,8 @@ public final class DbSyncModule implements AdapterModule {
         if (targetPks.isEmpty()) {
             return;
         }
-        // Trusted first-party in-process caller, so we don't reject (that would
-        // silently lose a sync); per-command counts are normally 1-2. A large
-        // count signals a caller bug — WARN so it surfaces, but proceed: the
-        // chunked IN-clause cascade resolution already bounds the SQL.
+        // Trusted in-process caller: rejecting would silently lose a sync, so a large count only WARNs (cascade
+        // resolution is chunked).
         if (targetPks.size() > ResyncRowsCommand.MAX_PKS) {
             log.warn(
                     "NxSync.requestResync for entity {} carries {} pks (> {}) — unusually large for an in-process "
@@ -336,7 +307,7 @@ public final class DbSyncModule implements AdapterModule {
                 try {
                     cascadeByEntity = resolveCascade(src, engine, entityName, targetPks);
                 } catch (SQLException resolutionFailure) {
-                    // Fan-out best-effort: the parent still re-publishes below.
+                    // Best-effort: the parent still re-publishes below.
                     log.warn(
                             "NxSync.requestResync cascade resolution failed for entity {}: {} — "
                                     + "parent re-published without children",
@@ -371,7 +342,7 @@ public final class DbSyncModule implements AdapterModule {
         context = null;
         statsTracker = null;
         engine = null;
-        // Reset state so a fresh handshake re-enters the state machine cleanly without a process restart.
+        // Reset so a fresh handshake re-enters the state machine without a restart.
         state = STATE_INIT;
     }
 
@@ -417,10 +388,7 @@ public final class DbSyncModule implements AdapterModule {
         return ModuleStatus.builder().name(NAME).state(state).stats(stats).build();
     }
 
-    /**
-     * Chunk width of the cascade {@code IN (...)} resolution query. The
-     * {@link ResyncRowsCommand#MAX_PKS} cap bounds the total to two chunks.
-     */
+    /** Cascade {@code IN (...)} chunk width; {@link ResyncRowsCommand#MAX_PKS} bounds the total to two chunks. */
     static final int CASCADE_CHUNK_SIZE = 500;
 
     private void registerResyncHandlers(ConnectContext ctx) {
@@ -429,8 +397,7 @@ public final class DbSyncModule implements AdapterModule {
             commands.on(ResyncEntitiesCommand.class, this::handleResyncEntities);
             commands.on(ResyncRowsCommand.class, this::handleResyncRows);
         } catch (Throwable t) {
-            // Registration failure must not take down the module — sync itself
-            // works without the resync RPC surface.
+            // Sync works without the resync RPC surface.
             log.warn(
                     "Failed to register db-sync resync command handlers: {}",
                     t.getClass().getName(),
@@ -495,16 +462,15 @@ public final class DbSyncModule implements AdapterModule {
             if (pk == null) {
                 return CommandResult.validationFailed("pks must not contain null entries", "pks");
             }
-            // L2J object ids are strictly positive; a garbage PK would enter the
-            // snapshot as a sentinel and inflate the window-planning envelope.
+            // L2J object ids are positive; a garbage PK would become a sentinel and inflate the window-planning
+            // envelope.
             if (pk.longValue() <= 0L) {
                 return CommandResult.validationFailed("pks must contain only positive values (got " + pk + ")", "pks");
             }
             targetPks.add(pk.longValue());
         }
 
-        // Cascade resolution runs synchronously BEFORE any enqueue so a SQL
-        // failure replies INTERNAL_ERROR without a half-applied invalidation.
+        // Resolve before any enqueue so a SQL failure replies INTERNAL_ERROR without a half-applied invalidation.
         Map<String, LongOpenHashSet> cascadeByEntity;
         if (cmd.isCascade()) {
             try {
@@ -544,13 +510,7 @@ public final class DbSyncModule implements AdapterModule {
         return names;
     }
 
-    /**
-     * Resolves, per dependent entity, the child PKs whose declared
-     * {@link ParentRef} points at {@code parentEntity} for the given
-     * {@code parentPks}. Shared by the tracked {@link ResyncRowsCommand} handler
-     * and the no-event {@code NxSync.requestResync} path. Empty buckets are
-     * dropped; entities are keyed in declaration order.
-     */
+    /** Child PKs per dependent entity whose {@link ParentRef} points at the given parent PKs; empty buckets dropped. */
     private static Map<String, LongOpenHashSet> resolveCascade(
             JdbcConnectionSource src, CdcEngine engine, String parentEntity, LongOpenHashSet parentPks)
             throws SQLException {
@@ -579,10 +539,7 @@ public final class DbSyncModule implements AdapterModule {
         return cascadeByEntity;
     }
 
-    /**
-     * Identifiers are pre-validated by {@link #validateIdentifiers} at module
-     * start, so the interpolation here is injection-safe.
-     */
+    /** Identifiers are pre-validated by {@link #validateIdentifiers}, so interpolation is injection-safe. */
     private static LongOpenHashSet resolveChildPks(
             JdbcConnectionSource src, EntityMapping<?> child, ParentRef ref, LongOpenHashSet parentPks)
             throws SQLException {
@@ -627,8 +584,7 @@ public final class DbSyncModule implements AdapterModule {
         }
         for (EntityMapping<?> mapping : mappings) {
             String entity = mapping.entityName();
-            // Validated as a filesystem-safe identifier too — entity name is
-            // interpolated into FileSnapshotPersistence's per-entity file path.
+            // Entity name is interpolated into FileSnapshotPersistence's per-entity file path.
             SqlIdent.validate(entity, "EntityMapping.entityName");
             PrimarySource<?> primary = mapping.primary();
             SqlIdent.validate(primary.tableName(), "entity '" + entity + "' primary.tableName");

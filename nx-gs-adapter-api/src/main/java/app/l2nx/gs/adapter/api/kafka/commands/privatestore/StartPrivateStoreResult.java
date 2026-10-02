@@ -1,23 +1,12 @@
 package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
 
 import app.l2nx.gs.adapter.api.kafka.commands.privatestore.model.DroppedLine;
-import app.l2nx.gs.adapter.api.kafka.commands.privatestore.model.SellLine;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Success payload of {@link StartPrivateStoreSellCommand} /
- * {@link StartPrivateStorePackageSellCommand}.
- *
- * <p><b>Empty-list semantics.</b> {@link #getDropped() dropped} is non-null
- * on read; {@code null} passed to the constructor is normalized to
- * {@link Collections#emptyList()}. An empty list signals every requested
- * {@link SellLine} was accepted.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; defensive copy in
- * constructor; unmodifiable list view from the getter.</p>
+ * Success payload of {@link StartPrivateStoreSellCommand} / {@link StartPrivateStorePackageSellCommand}.
  */
 public final class StartPrivateStoreResult {
 
@@ -35,25 +24,17 @@ public final class StartPrivateStoreResult {
     }
 
     /**
-     * Open-string store-type token the host opened (e.g. {@code "SELL"} /
-     * {@code "PACKAGE_SELL"}); host-defined vocabulary, not a closed adapter
-     * enum. REQUIRED.
+     * Host-defined open-string vocabulary (e.g. {@code "SELL"}, {@code "PACKAGE_SELL"}), not a closed adapter enum.
      */
     public String getStoreType() {
         return storeType;
     }
 
-    /**
-     * Number of requested lines the host actually listed.
-     */
     public int getAcceptedCount() {
         return acceptedCount;
     }
 
-    /**
-     * Requested lines the host rejected when opening the store. Non-null;
-     * empty when every line was accepted.
-     */
+    /** Empty when every requested line was accepted. */
     public List<DroppedLine> getDropped() {
         return dropped;
     }

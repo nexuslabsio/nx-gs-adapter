@@ -51,7 +51,6 @@ class NxKafkaAdvancedIntegrationTest {
     void customGson_shouldAffectProducerSerialization() throws Exception {
         String topic = "test.custom-gson.producer";
 
-        // Gson that serializes dates as "yyyy-MM-dd"
         Gson customGson = new GsonBuilder().setDateFormat("yyyy-MM-dd").create();
 
         NxKafka kafka = NxKafka.configure()
@@ -140,7 +139,6 @@ class NxKafkaAdvancedIntegrationTest {
                 })
                 .build();
 
-        // Should not throw despite listener exception
         assertDoesNotThrow(kafka::shutdown);
     }
 

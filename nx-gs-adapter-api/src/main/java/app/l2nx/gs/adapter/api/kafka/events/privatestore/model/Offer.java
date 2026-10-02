@@ -8,11 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * One open position in a player's private store at snapshot tick.
- * {@code (itemTemplateId, side)} is on the parent {@link PrivateStoreSnapshotEvent};
- * per-offer fields describe trader / modifiers / quantity / price.
- */
+/** One open position in a private store at snapshot tick; {@code (itemTemplateId, side)} lives on the parent {@link PrivateStoreSnapshotEvent}. */
 public final class Offer {
 
     private final @Nullable Long itemId;
@@ -43,28 +39,17 @@ public final class Offer {
         this.packaged = packaged;
     }
 
-    /**
-     * Object id of this specific offered item instance (spec 065 §2.1).
-     * {@code null} (or {@code 0}) for {@link PrivateStoreSide#BID BID}
-     * offers, where it is meaningless — a BID offer targets a template, not a
-     * specific instance. {@code null} on old producers that predate this
-     * field.
-     */
+    /** {@code null} or {@code 0} for {@link PrivateStoreSide#BID BID} offers (they target a template, not an instance); {@code null} from old producers. */
     public @Nullable Long getItemId() {
         return itemId;
     }
 
-    /**
-     * Store-owning player char id (seller on ASK, buyer on BID).
-     */
+    /** Store owner: seller on ASK, buyer on BID. */
     public long getTraderId() {
         return traderId;
     }
 
-    /**
-     * Enchant level. {@code null} when the item type has no enchant concept;
-     * {@code 0} for enchantable-but-unenchanted; {@code > 0} otherwise.
-     */
+    /** {@code null} = no enchant concept; {@code 0} = unenchanted; {@code > 0} = enchanted. */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }
@@ -81,18 +66,11 @@ public final class Offer {
         return unitPrice;
     }
 
-    /**
-     * Currency item template id (typically {@code 57} = Adena).
-     */
     public long getCurrencyItemTemplateId() {
         return currencyItemTemplateId;
     }
 
-    /**
-     * {@code true} when this offer belongs to a PACKAGE_SELL store — the per-item price is
-     * nominal, the real price is the bundle total. {@code null} when the host did not report
-     * this (legacy); treat as {@code false}.
-     */
+    /** PACKAGE_SELL store: the per-item price is nominal, the real price is the bundle total. {@code null} (legacy) = {@code false}. */
     public @Nullable Boolean getPackaged() {
         return packaged;
     }

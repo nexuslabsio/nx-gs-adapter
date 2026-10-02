@@ -1,10 +1,6 @@
 package app.l2nx.gs.adapter.core.events;
 
-/**
- * Internal queue element pairing a payload with its resolved type binding.
- * Carrying the binding alongside the payload avoids re-resolving the
- * registry on the publisher daemon thread.
- */
+/** Carries the resolved binding so the daemon thread does not re-resolve the registry. */
 final class EventEnvelope {
 
     final Object payload;

@@ -11,12 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Holds the latest {@link EntityStats} per entity. Writers are
- * {@link EntityTickLoop}s; readers are heartbeat threads. Mirror of the
- * {@code db-sync} tracker — same heartbeat surface so operators see both
- * modules side-by-side under {@code ModuleStatus.stats.entities}.
- */
 public final class EntityStatsTracker {
 
     private final Map<String, EntityStats> latest = new ConcurrentHashMap<String, EntityStats>();

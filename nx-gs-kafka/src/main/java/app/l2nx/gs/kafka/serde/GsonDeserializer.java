@@ -5,17 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.kafka.common.serialization.Deserializer;
 
-/**
- * Kafka {@link Deserializer} that converts JSON bytes to a typed object via Gson.
- * This is a public utility for external users. Internally, nx-gs-kafka uses
- * {@code ByteArrayDeserializer} and deserializes in the poll loop.
- *
- * <pre>{@code
- * GsonDeserializer<MyEvent> deserializer = new GsonDeserializer<>(MyEvent.class);
- * }</pre>
- *
- * @param <T> the target type
- */
+/** Public utility; the internal poll loop deserializes from raw bytes itself. */
 public class GsonDeserializer<T> implements Deserializer<T> {
 
     private final Gson gson;

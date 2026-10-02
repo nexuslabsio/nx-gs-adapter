@@ -3,15 +3,7 @@ package app.l2nx.gs.adapter.core.events;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Function;
 
-/**
- * Hardcoded binding from a concrete event class to its wire metadata —
- * the family key for topic lookup, the {@code Nx-Message-Type} header value,
- * and a partition-key extractor.
- *
- * <p>{@link #messageTypeBytes()} pre-encodes the header value once at registry
- * construction so the daemon thread doesn't re-encode the same UTF-8 bytes
- * per envelope.</p>
- */
+/** {@link #messageTypeBytes()} is pre-encoded once so the daemon thread does not re-encode per envelope. */
 final class EventTypeBinding {
 
     private final String familyKey;

@@ -4,15 +4,8 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Receiver claimed mail attachments. COD adena movement (if any) is
- * inferred consumer-side from the paired SENT event's
- * {@link MailSentEvent#getCodAmount() codAmount}.
- *
- * <ul>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic attributes about this mail claim. {@code null} when absent;
- *   hosts MAY add arbitrary keys without an API release.</li>
- * </ul>
+ * Receiver claimed mail attachments. COD adena movement is inferred consumer-side from the paired SENT event's
+ * {@link MailSentEvent#getCodAmount() codAmount}. {@code metadata} is an optional open map ({@code null} when absent).
  */
 public final class MailAcceptedEvent {
 

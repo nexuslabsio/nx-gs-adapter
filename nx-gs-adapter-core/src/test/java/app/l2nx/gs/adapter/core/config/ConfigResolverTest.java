@@ -16,8 +16,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class ConfigResolverTest {
 
-    private static final String VALID_KEY = "nx_sk_abcdefghijklmnopqrstuvwxyz012345"; // 38 chars
-    private static final String VALID_LS_KEY = "nx_sk_lsxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; // 38 chars
+    private static final String VALID_KEY = "nx_sk_abcdefghijklmnopqrstuvwxyz012345";
+    private static final String VALID_LS_KEY = "nx_sk_lsxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
     private static final String VALID_PLATFORM_URL = "https://acme.api.l2nx.app";
 
     @Test
@@ -53,7 +53,6 @@ class ConfigResolverTest {
 
         ConfigResolver resolver = new ConfigResolver(sys::get, file);
 
-        // file value is blank → treated as absent → falls through to sysprop
         assertEquals(Optional.of("from-sysprop"), resolver.resolveString("l2nx.gs-key"));
     }
 
@@ -97,7 +96,6 @@ class ConfigResolverTest {
         Properties file = props("l2nx.gs-key", "   ");
         ConfigResolver resolver = new ConfigResolver(empty(), file);
 
-        // blank → treated as absent → "missing" error rather than "invalid format"
         IllegalStateException ex = assertThrows(IllegalStateException.class, resolver::resolveServerKey);
         assertTrue(ex.getMessage().contains("Missing"));
     }
@@ -144,11 +142,11 @@ class ConfigResolverTest {
     @ValueSource(
             strings = {
                 "http://acme.api.l2nx.app", // wrong scheme — bearer would travel plaintext
-                "ftp://acme.api.l2nx.app", // non-http(s) scheme
-                "https:///path", // missing host
-                "https://acme.api.l2nx.app?route=evil", // query string
-                "https://acme.api.l2nx.app#frag", // fragment
-                "https://acme api.l2nx.app" // malformed URI (space in authority)
+                "ftp://acme.api.l2nx.app",
+                "https:///path",
+                "https://acme.api.l2nx.app?route=evil",
+                "https://acme.api.l2nx.app#frag",
+                "https://acme api.l2nx.app"
             })
     void resolvePlatformUrl_shouldRejectInvalidValues(String value) {
         ConfigResolver resolver = withSysprop("l2nx.platform-url", value);
@@ -269,7 +267,6 @@ class ConfigResolverTest {
 
         Properties loaded = ConfigResolver.loadFileProperties(empty(), missing);
 
-        // No -Dl2nx.config-file, default file does not exist → graceful empty (sysprop fallback may fill keys)
         assertTrue(loaded.isEmpty());
     }
 
@@ -288,14 +285,14 @@ class ConfigResolverTest {
 
     @Test
     void loadFileProperties_shouldThrow_whenDefaultFileExistsButUnreadable(@TempDir Path tempDir) throws IOException {
-        // Directory at the expected file path — Files.newBufferedReader fails with IOException
+        // Directory at the file path: newBufferedReader fails with IOException
         Path defaultPath = tempDir.resolve("l2nx.properties");
         Files.createDirectory(defaultPath);
 
         IllegalStateException ex = assertThrows(
                 IllegalStateException.class, () -> ConfigResolver.loadFileProperties(empty(), defaultPath));
         assertTrue(ex.getMessage().contains("l2nx.properties"));
-        // Differentiated wording — must NOT claim the operator set -Dl2nx.config-file
+        // Must NOT claim the operator set -Dl2nx.config-file
         assertTrue(
                 ex.getMessage().contains("default config file"),
                 "expected default-file wording, got: " + ex.getMessage());
@@ -310,7 +307,6 @@ class ConfigResolverTest {
 
         Properties loaded = ConfigResolver.loadFileProperties(sys::get, defaultFile);
 
-        // Blank explicit path is treated as absent → falls through to default file
         assertEquals("from-default", loaded.getProperty("k"));
     }
 
@@ -463,7 +459,7 @@ class ConfigResolverTest {
 
     @Test
     void loadFileProperties_shouldThrow_whenExplicitPathIsMalformed() {
-        // NUL char is illegal in paths on every platform — Paths.get throws InvalidPathException
+        // NUL is illegal in paths on every platform; Paths.get throws InvalidPathException
         Map<String, String> sys = singletonMap("l2nx.config-file", "bad\u0000path");
 
         IllegalStateException ex =

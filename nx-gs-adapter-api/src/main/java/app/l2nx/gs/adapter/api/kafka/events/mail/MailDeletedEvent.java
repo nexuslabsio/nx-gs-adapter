@@ -4,15 +4,9 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * One party deleted a mail from their view — source
- * {@code Message.setDeletedBySender()} / {@code setDeletedByReceiver()}.
- * {@link #getSide() side} distinguishes which flag flipped; sender and
- * receiver deletions are orthogonal (the same mail can fire both, in any
- * order), so this is a flag transition, not a lifecycle status change.
- *
- * <p>Keyed by {@link #getMailId() mailId} (8-byte BE) like the other mail
- * lifecycle events. The deletion moment derives from the UUIDv7
- * {@link #getEventId() eventId}.</p>
+ * One party deleted a mail from their view. Sender and receiver deletions are orthogonal (the same mail can fire
+ * both, in any order), so this is a flag transition, not a lifecycle status change. Keyed by {@code mailId}
+ * (8-byte BE) like the other mail lifecycle events; the deletion time comes from the UUIDv7 {@code eventId}.
  */
 public final class MailDeletedEvent {
 
@@ -26,24 +20,17 @@ public final class MailDeletedEvent {
         this.side = side;
     }
 
-    /**
-     * UUIDv7 — upper 48 bits encode the deletion moment (occurredAt).
-     */
     public UUID getEventId() {
         return eventId;
     }
 
     /**
-     * Host-native {@code messages} row PK. Partition key (8-byte BE) shared
-     * across all mail lifecycle events for this mail.
+     * Host-native {@code messages} row PK; partition key (8-byte BE) shared by all mail lifecycle events of this mail.
      */
     public long getMailId() {
         return mailId;
     }
 
-    /**
-     * Which party deleted the mail ({@code SENDER} / {@code RECEIVER}).
-     */
     public MailDeletionSide getSide() {
         return side;
     }

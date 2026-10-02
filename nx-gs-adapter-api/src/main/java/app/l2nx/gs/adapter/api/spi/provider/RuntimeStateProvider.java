@@ -4,39 +4,22 @@ import app.l2nx.gs.adapter.api.spi.model.RuntimeEntityMapping;
 import java.util.List;
 
 /**
- * Tier-2 SPI: described once per game-server schema variant for the
- * runtime-sync module. Discovered by {@code RuntimeSyncModule} via
- * {@code ServiceLoader.load(RuntimeStateProvider.class)} once at module
- * {@code start()}. Providers ship a descriptor at
- * {@code META-INF/services/app.l2nx.gs.adapter.api.spi.provider.RuntimeStateProvider}.
+ * Describes the runtime-synced entities for one game-server schema variant; loaded by
+ * {@code RuntimeSyncModule} via {@link java.util.ServiceLoader} at {@code start()}. Counterpart of
+ * {@link DbSchemaProvider} for in-memory state.
  *
- * <p>Sibling of {@link DbSchemaProvider}: both Tier-2 SPIs surface entities
- * to be synced, but the data source differs — {@code DbSchemaProvider}
- * describes JDBC tables for CDC, {@link RuntimeStateProvider} describes
- * in-memory game-server stores polled per tick. The same schema variant
- * (e.g. {@code "bohpts"}) typically ships both providers in the host JAR.</p>
- *
- * <p>Resolution rule (single-impl assumption for MVP):</p>
- * <ul>
- *     <li>0 impls on classpath → runtime-sync transitions to {@code DISABLED}
- *     with an actionable WARN.</li>
- *     <li>1 impl → engine uses it.</li>
- *     <li>&gt;1 impls → runtime-sync transitions to {@code FAILED} with an
- *     actionable ERROR listing every conflicting impl class name.</li>
- * </ul>
+ * <p>Exactly one impl is supported: none disables runtime-sync ({@code DISABLED}), several fail it
+ * ({@code FAILED}).</p>
  */
 public interface RuntimeStateProvider {
 
     /**
-     * Schema variant identifier — informational, surfaced in startup logs and
-     * heartbeats. Examples: {@code "l2j"}, {@code "bohpts"},
-     * {@code "lucera"}. Not a selection key in MVP (single-impl rule).
+     * Informational variant name (e.g. {@code "bohpts"}) for logs and heartbeats.
      */
     String schemaName();
 
     /**
-     * The runtime entities this provider knows about. Order matters: the engine
-     * spins up one daemon thread per entity in the returned order.
+     * Entities to sync; the engine starts one daemon thread per entity in list order.
      */
     List<RuntimeEntityMapping<?>> mappings();
 }

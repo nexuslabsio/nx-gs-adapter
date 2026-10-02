@@ -22,12 +22,9 @@ class SnapshotStoreSentinelTest {
 
     @Test
     void snapshotStore_defaultReturnValue_shouldBeMissingHashSentinel() {
-        // Empty store returns MISSING_HASH (not 0).
         SnapshotStore store = new SnapshotStore();
         assertEquals(Phase1Hasher.MISSING_HASH, store.getCrc("nope", 1L));
 
-        // Populated store's underlying map also has MISSING_HASH as defaultReturnValue —
-        // verified indirectly: after putting and removing, the absent-key lookup returns sentinel.
         store.putCrc("clan", 1L, 0);
         store.removeCrc("clan", 1L);
         assertEquals(Phase1Hasher.MISSING_HASH, store.getCrc("clan", 1L));
@@ -61,12 +58,10 @@ class SnapshotStoreSentinelTest {
         assertEquals(1L, store.minPk("clan").getAsLong());
         assertEquals(100L, store.maxPk("clan").getAsLong());
 
-        // Remove current max — cache must invalidate and recompute.
         store.removeCrc("clan", 100L);
         assertEquals(20L, store.maxPk("clan").getAsLong());
         assertEquals(1L, store.minPk("clan").getAsLong());
 
-        // Remove current min — same.
         store.removeCrc("clan", 1L);
         assertEquals(5L, store.minPk("clan").getAsLong());
     }
@@ -84,13 +79,13 @@ class SnapshotStoreSentinelTest {
                 "clan", Arrays.asList(new Window(0L, 5L), new Window(6L, 15L), new Window(16L, 25L)));
 
         assertEquals(3, buckets.size());
-        assertEquals(2, buckets.get(0L).size()); // 1, 5
+        assertEquals(2, buckets.get(0L).size());
         assertTrue(buckets.get(0L).contains(1L));
         assertTrue(buckets.get(0L).contains(5L));
-        assertEquals(2, buckets.get(1L).size()); // 10, 15
+        assertEquals(2, buckets.get(1L).size());
         assertTrue(buckets.get(1L).contains(10L));
         assertTrue(buckets.get(1L).contains(15L));
-        assertEquals(1, buckets.get(2L).size()); // 20
+        assertEquals(1, buckets.get(2L).size());
         assertTrue(buckets.get(2L).contains(20L));
     }
 }

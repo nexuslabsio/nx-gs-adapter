@@ -5,27 +5,15 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inbound command instructing the game-server to set a character's access
- * level to an absolute value, mirroring the in-game {@code //changelvl}
- * command.
+ * Sets a character's access level to an absolute value, mirroring the in-game {@code //changelvl}; re-delivery
+ * converges on the same state.
  *
- * <p>Reply:
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link SetCharacterAccessLevelResult}{@code >}.
- * Error statuses: {@code NOT_FOUND} (character does not exist),
- * {@code INVALID_STATE} (a login raced the offline write), {@code VALIDATION_FAILED}
- * ({@code charId} / {@code accessLevel} missing, non-integer, negative — bans go
- * through {@code BanCommand} — or unregistered), {@code FORBIDDEN} (level above the
- * host's platform-grantable ceiling), {@code UNAVAILABLE} (DB error on the offline
- * path), {@code INTERNAL_ERROR} (unexpected host failure).</p>
+ * <p>Reply: {@code CommandResult<SetCharacterAccessLevelResult>}. Errors: {@code NOT_FOUND}, {@code INVALID_STATE}
+ * (a login raced the offline write), {@code VALIDATION_FAILED} ({@code charId} / {@code accessLevel} missing,
+ * non-integer, negative - bans go through {@code BanCommand} - or unregistered), {@code FORBIDDEN} (above the
+ * host's platform-grantable ceiling), {@code UNAVAILABLE} (DB error on the offline path), {@code INTERNAL_ERROR}.</p>
  *
- * <p><b>Partitioning.</b> Routed by {@link #getCharId() charId} on the commands
- * topic.</p>
- *
- * <p><b>Idempotency.</b> Writes an absolute value, so re-delivery converges on
- * the same state.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * <p>Routed by {@code charId}.</p>
  */
 public final class SetCharacterAccessLevelCommand implements NxCommand<SetCharacterAccessLevelResult> {
 
@@ -45,27 +33,19 @@ public final class SetCharacterAccessLevelCommand implements NxCommand<SetCharac
         this.staffNotes = staffNotes;
     }
 
-    /**
-     * Target character's primary key. REQUIRED.
-     */
     public Long getCharId() {
         return charId;
     }
 
     /**
-     * Opaque, same vocabulary as {@code CharacterDbDto.accessLevel}: numeric text
-     * on int builds ({@code "7"}), a role name on string-role builds — the host
-     * converts, the platform never interprets. REQUIRED; handler emits
-     * {@code VALIDATION_FAILED} when missing, unrecognized or negative.
+     * Opaque, same vocabulary as {@code CharacterDbDto.accessLevel}: numeric text on int builds ({@code "7"}), a role
+     * name on string-role builds. The host converts, the platform never interprets.
      */
     public String getAccessLevel() {
         return accessLevel;
     }
 
-    /**
-     * Staff-only note: never shown in-game, logged by the host, surfaced on the
-     * platform's command audit. OPTIONAL.
-     */
+    /** Staff-only note: never shown in-game, logged by the host and surfaced on the platform command audit. */
     public @Nullable String getStaffNotes() {
         return staffNotes;
     }

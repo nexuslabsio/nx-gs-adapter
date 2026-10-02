@@ -8,14 +8,12 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One item-movement line carried by a mail-lifecycle event. Mirrors
+ * One item-movement line of a mail-lifecycle event; mirrors
  * {@link app.l2nx.gs.adapter.api.kafka.events.privatetrade.TradeItemMovement}.
  *
- * <p>{@link #getItemId() itemId} / {@link #getNewItemId() newItemId} describe
- * the object-id transition. SENT and RETURNED have no within-event transition
- * — both fields equal the mail attachment row id. ACCEPTED transitions
- * mail-row → receiver inventory; CANCELLED mail-row → sender inventory.
- * Stack-merge collapses {@code newItemId} onto an existing stack id.</p>
+ * <p>{@code itemId} / {@code newItemId} are the object-id transition. SENT and RETURNED have none (both equal the
+ * attachment row id); ACCEPTED goes mail row to receiver inventory, CANCELLED to sender inventory. A stack merge
+ * collapses {@code newItemId} onto the existing stack id.</p>
  */
 public final class MailItemMovement {
 
@@ -45,16 +43,10 @@ public final class MailItemMovement {
         return itemTemplateId;
     }
 
-    /**
-     * Object-id before the lifecycle step's transition.
-     */
     public long getItemId() {
         return itemId;
     }
 
-    /**
-     * Object-id after the lifecycle step's transition.
-     */
     public long getNewItemId() {
         return newItemId;
     }

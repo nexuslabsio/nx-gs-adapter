@@ -12,28 +12,9 @@ import java.util.Properties;
 import java.util.function.Function;
 
 /**
- * Operator-owned tuning knobs for the CDC engine. Values are read once at engine
- * start and cached for the engine lifetime — no live reload, full handshake
- * required to retune.
- *
- * <p>Source chain (file-first, matching the adapter's bootstrap config):</p>
- * <ol>
- *     <li>{@code l2nx.properties} on disk (path from {@code -Dl2nx.config-file},
- *     or cwd default).</li>
- *     <li>JVM system properties as fallback.</li>
- * </ol>
- *
- * <p>Knob keys are namespaced under {@code l2nx.cdc-engine.*}.</p>
- *
- * <p><strong>Pool sizing vs persistence latency:</strong> snapshot checkpoint
- * (write + fsync) runs inline on the CDC pool worker thread that just finished
- * the entity's cycle. On a 6.5M-entry entity (~78 MB on disk) a fsync can
- * take 50–200 ms on local SSD, 0.2–1 s on HDD / dev-container loopback, or
- * several seconds on network-mounted storage. With the default 300 s throttle
- * a single entity flushes ~12×/hour; on a 2-worker pool with 4 entities that
- * works out to ~3 % worker utilization even on pathologically slow disks,
- * but operators on very slow storage may want to bump {@link #KEY_WORKERS}
- * past the {@code max(2, cores/2)} default to absorb the tail latency.</p>
+ * Operator-owned tuning knobs ({@code l2nx.cdc-engine.*}), read once at engine start; retuning needs a full handshake.
+ * Source: {@code l2nx.properties} ({@code -Dl2nx.config-file} or cwd), then JVM system properties.
+ * Snapshot checkpoint (write + fsync) runs inline on the pool worker; on slow storage raise {@link #KEY_WORKERS} past the {@code max(2, cores/2)} default.
  */
 public final class EngineConfig {
 

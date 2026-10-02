@@ -10,51 +10,15 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one player character, payload of
- * {@code SyncEvent<CharacterDbDto>} on the platform-supplied per-tenant
- * character sync topic (e.g. {@code bohpts.gs.sync.characters}).
+ * Wire DTO for one player character, payload of {@code SyncEvent<CharacterDbDto>}.
  *
- * <p>Required fields: {@link #getId() id} (source-side {@code charId}) and
- * {@link #getName() name} (source-side {@code char_name}). Both are
- * structurally guaranteed by every L2J-derived schema (PK + NOT NULL on
- * {@code char_name}); a row without either is dirty data that the schema
- * provider MUST drop with a WARN before constructing the DTO. The builder
- * enforces non-null name; null at construction time throws
- * {@link NullPointerException} — fail-loud on dirty assembly rather than
- * shipping placeholder data downstream.</p>
+ * Only {@code id} and {@code name} are required (builder throws NPE on null name); every other
+ * field is optional and null when the tenant does not surface it. Sentinel zero (no clan, not
+ * pending deletion) and SQL NULL are mapped to null by schema providers.
  *
- * <p>Everything else is optional. Different tenants populate different
- * subsets depending on which columns exist in their schema and which the
- * tenant chose to surface — schema providers control this via
- * {@code PrimarySource.hashedColumns()} and what they put into the row in
- * {@code mapRow()}.</p>
- *
- * <p>Sentinel mapping: most game-server schemas use {@code 0} as the
- * "no clan" sentinel in {@code characters.clanid} and as the "not pending
- * deletion" sentinel in {@code characters.deletetime}. Schema providers
- * translate sentinel-zero (and source SQL NULL) to {@code null} when
- * populating {@code clanId} / {@code scheduledDeletionAt}; platform consumers see
- * explicit nulls.</p>
- *
- * <p>The persisted {@code online} flag is surfaced as a coarse CDC backstop
- * (see {@link #getOnline()}); authoritative real-time presence lives on the
- * sibling runtime channel ({@code CharacterRuntimeDto.online}) and discrete
- * {@code CharacterPresenceEvent}s, reconciled by platform-side consumers.</p>
- *
- * <p>Tick-frequency volatile state ({@code curHp}/{@code curMp}/{@code x}/
- * {@code y}/{@code z}/{@code lastAccess} and similar) is
- * intentionally not modeled — including such fields in a poll-based CDC hash
- * would cause an UPDATE storm for every online character on every cycle;
- * real-time state belongs on a separate event channel. Accumulated
- * {@link #getOnlineTimeSeconds() online time} is the exception: the source
- * column advances only when the row is persisted (logout + periodic
- * autosave), not at tick frequency, so it is CDC-tolerable.</p>
- *
- * <p>Experience and SP are a second, narrower exception: they ARE surfaced —
- * per class, inside {@link #getClasses()} — but only as unhashed ride-alongs,
- * so they never trigger a sync event and are never fresher than the source's
- * last full store. Live figures for the class being played ride the runtime
- * channel instead.</p>
+ * Tick-frequency state (hp/mp/position/lastAccess) is deliberately absent: hashing it would
+ * cause an UPDATE storm per cycle. Online time and per-class exp/sp are persisted-only values
+ * and ride along unhashed.
  */
 public final class CharacterDbDto {
 
@@ -137,248 +101,120 @@ public final class CharacterDbDto {
         this.locks = locks == null ? null : Collections.unmodifiableList(locks);
     }
 
-    /**
-     * Primary key — source {@code charId}, {@code NOT NULL}.
-     */
     public long getId() {
         return id;
     }
 
-    /**
-     * Character name — source {@code char_name}, {@code NOT NULL}. Schema
-     * providers MUST skip rows where the source column is null/missing
-     * rather than shipping placeholders.
-     */
+    /** Schema providers must drop rows without a name rather than ship placeholders. */
     public String getName() {
         return name;
     }
 
-    /**
-     * Login account owning this character — source {@code account_name}.
-     * {@code null} when the tenant does not surface this column. Used by
-     * platform consumers as a generic per-character account label and as a
-     * filter dimension; the field is generic across L2 forks (vanilla L2J,
-     * Lucera, Essence all carry it on {@code characters}).
-     */
     public @Nullable String getAccountName() {
         return accountName;
     }
 
-    /**
-     * Display title.
-     */
     public @Nullable String getTitle() {
         return title;
     }
 
-    /**
-     * Current character level (active class).
-     */
+    /** Level of the active class. */
     public @Nullable Integer getLevel() {
         return level;
     }
 
-    /**
-     * Character sex.
-     */
     public @Nullable CharacterSex getSex() {
         return sex;
     }
 
-    /**
-     * Character race.
-     */
     public @Nullable CharacterRace getRace() {
         return race;
     }
 
-    /**
-     * Active class. {@code null} when the source ID is not part of the
-     * canonical class set surfaced by {@link CharacterClass}, or when the
-     * tenant does not surface this column.
-     */
+    /** Null when the source id is not in the canonical {@link CharacterClass} set. */
     public @Nullable CharacterClass getClassId() {
         return classId;
     }
 
-    /**
-     * Base (root) class — source {@code base_class}. Equal to
-     * {@link #getClassId()} for characters that have not used a subclass /
-     * dual-class slot.
-     */
+    /** Equals {@link #getClassId()} when no subclass slot was used. */
     public @Nullable CharacterClass getBaseClassId() {
         return baseClassId;
     }
 
     /**
-     * The character's full class roster — exactly one
-     * {@link app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClassKind#MAIN}
-     * entry plus one {@code SUB} entry per subclass, ordered as the schema
-     * provider's {@code mapEntity} produced them (no platform-side ordering
-     * contract).
-     *
-     * <p>Assembled by the schema provider so that fork-specific storage —
-     * main class on the character row versus a side table that also holds
-     * it — never reaches consumers. Which entry is currently being played
-     * is given by {@link #getClassId()}, not by a flag on the entry.</p>
-     *
-     * <p>{@code null} when the tenant does not sync classes at all; empty
-     * list when it syncs them but the character resolved to no canonical
-     * class.</p>
+     * Full class roster: one MAIN entry plus one SUB per subclass, in provider order.
+     * Null when the tenant does not sync classes; empty when none resolved to a canonical class.
      */
     public @Nullable List<CharacterClassDbDto> getClasses() {
         return classes;
     }
 
-    /**
-     * Clan membership. {@code null} when the source {@code clanid = 0}
-     * (the conventional "no clan" sentinel) or SQL NULL or when the
-     * tenant does not surface this column.
-     */
+    /** Null for the "no clan" sentinel ({@code clanid = 0}). */
     public @Nullable Long getClanId() {
         return clanId;
     }
 
-    /**
-     * PvP kill counter.
-     */
     public @Nullable Integer getPvpCounter() {
         return pvpCounter;
     }
 
-    /**
-     * PK (player-kill) counter.
-     */
     public @Nullable Integer getPkCounter() {
         return pkCounter;
     }
 
-    /**
-     * Karma score (negative reputation accrued from PKs).
-     */
     public @Nullable Integer getKarma() {
         return karma;
     }
 
-    /**
-     * Noblesse status — source {@code nobless} (typically tinyint 0/1).
-     * {@code null} when the tenant does not surface this column.
-     */
     public @Nullable Boolean getNoblesse() {
         return noblesse;
     }
 
-    /**
-     * Pending-deletion timestamp — source {@code deletetime} (typically
-     * epoch-millis BIGINT, with {@code 0} as the "not pending deletion"
-     * sentinel). Schema providers translate sentinel-zero / SQL NULL to
-     * {@code null}; non-null values denote when the character will be
-     * (or was scheduled to be) hard-deleted by the game server.
-     */
+    /** Null for the "not pending deletion" sentinel ({@code deletetime = 0}). */
     public @Nullable Instant getScheduledDeletionAt() {
         return scheduledDeletionAt;
     }
 
-    /**
-     * Persisted online flag from the source row — typically
-     * {@code characters.online} (TINYINT 0/1) on L2J schemas.
-     * {@code null} when the tenant does not surface this column.
-     *
-     * <p>One of three sources platform consumers reconcile into the
-     * {@code online} column on {@code gs_characters} (the others being
-     * the runtime channel's {@code CharacterRuntimeDto.online} and
-     * discrete {@code CharacterPresenceEvent}s). Timestamp-based
-     * last-writer-wins on the platform side — CDC source has the
-     * coarsest tick cadence (~60s) and acts as the authoritative
-     * backstop after adapter restart, when the runtime channel's
-     * in-memory previous-online set is empty.</p>
-     */
+    /** Persisted online flag; coarse CDC backstop (~60s) reconciled platform-side with the runtime channel and presence events. */
     public @Nullable Boolean getOnline() {
         return online;
     }
 
-    /**
-     * Accumulated total online time in seconds — source {@code onlinetime}.
-     * The game server rewrites this column to the live total (stored baseline
-     * + current-session elapsed) on every full store (logout + periodic
-     * autosave), so it advances at autosave cadence rather than tick frequency
-     * and is safe to surface through CDC. {@code null} when the tenant does not
-     * surface this column. For a currently-online character the value is stale
-     * by up to one autosave interval; platform consumers wanting a live figure
-     * compose {@code value + (now − loginAt)} from the presence stream.
-     */
+    /** Stale by up to one autosave interval for an online character. */
     public @Nullable Long getOnlineTimeSeconds() {
         return onlineTimeSeconds;
     }
 
-    /**
-     * Current hero status — {@code true} when the character is a recognized
-     * hero in the active Olympiad cycle (source {@code heroes.played = 1}).
-     * {@code null} when the tenant does not surface hero status. Historical
-     * crownings (who became hero, when, in which class / cycle) are carried by
-     * the discrete {@code HeroGrantedEvent} on the {@code olympiad} event
-     * family, not here.
-     */
+    /** True for a hero in the active Olympiad cycle; historical crownings are carried by {@code HeroGrantedEvent}. */
     public @Nullable Boolean getHero() {
         return hero;
     }
 
-    /**
-     * Whether experience gain is blocked for this character — source
-     * legacy char-var {@code blockedEXP@} ({@code "1"} = blocked,
-     * {@code "0"}/absent = allowed). {@code null} when the tenant does not
-     * surface this flag.
-     */
+    /** From legacy char-var {@code blockedEXP@} ({@code "1"} = blocked). */
     public @Nullable Boolean getExpBlocked() {
         return expBlocked;
     }
 
-    /**
-     * Gear score of the character's active class — a build-defined numeric
-     * "power" rating summed from item base / enchant / attribute / augment,
-     * character level, skills and set bonuses. Persisted by the game server only
-     * on character store (logout / autosave), so the value is a snapshot at the
-     * last save, not a live figure for an online character. {@code null} when the
-     * build does not compute gear score or does not surface the column.
-     */
+    /** Snapshot of the active class at the last character store, not live. */
     public @Nullable Integer getGearScore() {
         return gearScore;
     }
 
-    /**
-     * Character fame (reputation) points; null when the source build reports none.
-     */
     public @Nullable Long getFame() {
         return fame;
     }
 
-    /**
-     * Opaque GM/access level; numeric text on int-based builds (e.g. "7"), role
-     * name on string-role builds; null when not surfaced.
-     */
+    /** Opaque: numeric text on int-based builds, role name on string-role builds. */
     public @Nullable String getAccessLevel() {
         return accessLevel;
     }
 
-    /**
-     * Per-instance re-entry cooldowns — source {@code character_instance_time}
-     * (or its tenant equivalent), one entry per {@code (charId, instanceId)}.
-     * {@code null} when the tenant does not sync instance cooldowns (no
-     * {@code ChildSource} declared); empty list when the tenant syncs them but
-     * the character has none.
-     */
+    /** Null when the tenant does not sync cooldowns; empty when the character has none. */
     public @Nullable List<CharacterInstanceCooldownDbDto> getInstanceCooldowns() {
         return instanceCooldowns;
     }
 
-    /**
-     * Active character locks — one entry per in-effect binding derived from
-     * build-specific {@code character_variables} rows (bohpts {@code lockIp} /
-     * {@code lockHwid} / {@code lockItem}). Each entry's {@code lockType} is a
-     * {@link WellKnownCharacterLockTypes} value. {@code null} when the tenant does
-     * not sync locks; empty list when the tenant syncs them but the character has
-     * no active lock.
-     */
+    /** Each entry's {@code lockType} is a {@link WellKnownCharacterLockTypes} value. Null when the tenant does not sync locks. */
     public @Nullable List<CharacterLockDbDto> getLocks() {
         return locks;
     }

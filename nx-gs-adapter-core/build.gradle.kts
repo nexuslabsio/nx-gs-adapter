@@ -14,8 +14,7 @@ java {
 
 tasks.withType<JavaCompile> {
     options.release.set(8)
-    // Suppress "source/target value 8 is obsolete" — Java 8 target is intentional
-    // (host JVMs span Java 8 to 25+); JDK recommends this exact flag.
+    // -Xlint:-options silences the Java 8 "obsolete" warning; host JVMs span 8 to 25+
     options.compilerArgs.addAll(listOf("-Xlint:deprecation", "-Xlint:-options"))
 }
 
@@ -30,7 +29,6 @@ dependencies {
     api(libs.gson)
     compileOnly(libs.slf4j.api)
 
-    // :nx-gs-log is shadow-included into the published jar — not exposed as a Maven dep.
     compileOnly(project(":nx-gs-log"))
     testImplementation(project(":nx-gs-log"))
 
@@ -48,14 +46,12 @@ tasks.test {
     }
 }
 
-// Silence "missing comment" javadoc warnings on getters / builder methods.
-// Keeps other doclint categories active (broken @link, syntax errors, etc.).
+// Only "missing" is silenced; other doclint categories stay active
 tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:-missing", "-quiet")
 }
 
-// Embed :nx-gs-log compiled classes directly into the published nx-gs-adapter-core.jar
-// so Maven Central consumers don't need a separate nx-gs-log dependency.
+// nx-gs-log is embedded, not published, so Maven Central consumers need no separate dependency
 tasks.named<Jar>("jar") {
     manifest {
         attributes("Implementation-Version" to project.version)
@@ -63,9 +59,7 @@ tasks.named<Jar>("jar") {
     from(project(":nx-gs-log").sourceSets["main"].output)
 }
 
-// Ship the version as a classpath resource so it survives shadow/fat-JAR repacks
-// (host JVM's manifest replaces ours; Package.getImplementationVersion then returns
-// null). AdapterVersion.resolve() reads this file first, manifest as fallback.
+// A resource survives shadow/fat-JAR repacks that replace our manifest; AdapterVersion.resolve() reads it first
 val generateVersionResource = tasks.register("generateVersionResource") {
     val outputDir = layout.buildDirectory.dir("generated/resources/version")
     outputs.dir(outputDir)

@@ -7,31 +7,13 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Per-namespace per-entity Kafka topic addressing returned in {@link ConnectResponse}.
- *
- * <p>Three coexisting namespaces:</p>
+ * Per-namespace entity-to-topic maps returned in {@link ConnectResponse}.
  * <ul>
- *     <li>{@link #getDb()} — DB-derived sync via {@code db-sync} module
- *     ({@code <tenant>.gs.sync.db.<entity>}). Keys: {@code "clan"},
- *     {@code "character"}, {@code "item"}, …</li>
- *     <li>{@link #getRuntime()} — in-memory runtime sync via
- *     {@code runtime-sync} module ({@code <tenant>.gs.sync.runtime.<entity>}).
- *     Keys: {@code "character"}, …</li>
- *     <li>{@link #getGd()} — game-data (datapack-derived static templates) sync via
- *     the {@code gd-sync} module ({@code <tenant>.gd.sync.<entity>}). Keys:
- *     {@code "itemtemplate"}, {@code "npctemplate"}, {@code "skill"}, …</li>
+ *     <li>{@link #getDb()} - {@code db-sync}: {@code <tenant>.gs.sync.db.<entity>}.</li>
+ *     <li>{@link #getRuntime()} - {@code runtime-sync}: {@code <tenant>.gs.sync.runtime.<entity>}.</li>
+ *     <li>{@link #getGd()} - {@code gd-sync} (datapack templates): {@code <tenant>.gd.sync.<entity>}.</li>
  * </ul>
- *
- * <p>Per-namespace shape: {@code Map<entityName, fullyQualifiedTopic>}. Same entity
- * name MAY appear in more than one namespace (e.g. {@code character} in {@code db}
- * AND {@code runtime}) — namespace separation here is what disambiguates them on
- * the wire.</p>
- *
- * <p>Each namespace map is defensively copied on construction and exposed as
- * unmodifiable. {@code null} on any namespace is normalized to an empty map at
- * this layer — modules treat {@code null} and empty as identical (both drive
- * {@code DISABLED} for the corresponding sync module), and erasing the
- * distinction here keeps engine code branch-free on namespace presence.</p>
+ * The same entity name may appear in several namespaces. Maps are copied defensively and exposed unmodifiable; {@code null} is normalized to empty, which both mean {@code DISABLED} for that module.
  */
 public final class SyncTopics {
 
@@ -46,29 +28,15 @@ public final class SyncTopics {
         this.gd = freeze(gd);
     }
 
-    /**
-     * DB-derived per-entity topics ({@code db-sync} module). Always non-null;
-     * empty map means no DB sync entities are configured. Getter normalizes
-     * {@code null} to an empty map so JSON deserialization (which bypasses the
-     * ctor and may leave the field null when the namespace was absent on the
-     * wire) does not break the contract.
-     */
+    /** Never null; getter normalizes a missing namespace (Gson bypasses the constructor) to empty. */
     public Map<String, String> getDb() {
         return db == null ? Collections.emptyMap() : db;
     }
 
-    /**
-     * In-memory runtime per-entity topics ({@code runtime-sync} module). Always
-     * non-null; empty map means no runtime sync entities are configured.
-     */
     public Map<String, String> getRuntime() {
         return runtime == null ? Collections.emptyMap() : runtime;
     }
 
-    /**
-     * Game-data per-entity topics ({@code gd-sync} module). Always non-null;
-     * empty map means no game-data sync entities are configured.
-     */
     public Map<String, String> getGd() {
         return gd == null ? Collections.emptyMap() : gd;
     }

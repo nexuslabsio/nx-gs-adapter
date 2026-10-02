@@ -5,36 +5,14 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One per-item failure entry in {@link SendMailResult#getItemErrors()}.
- * Carries an optional inbound-line hint plus a non-null host-supplied reason
- * string so the platform can render a partial-success report.
+ * One failed attachment line in {@link SendMailResult#getItemErrors()}; the mail is still sent without it.
  *
- * <p>Emitted by the host when an attachment line fails to materialize during
- * mail composition (e.g. the template id does not exist in the host's item
- * catalog, or the host's attachment-creation pipeline rejects the line for
- * other reasons). The mail itself is still sent — only specific attachment
- * lines are dropped — so partial failures surface as
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult#ok(Object)
- * success} with a non-empty {@code itemErrors}, NOT as an error envelope.</p>
+ * <p>Line identity is best-effort: the host's {@code MailManager} reports opaque strings that do not correlate
+ * positionally with the inbound items, so {@code itemTemplateId} and {@code count} are {@code null} unless the host
+ * can attribute the failure.</p>
  *
- * <p><b>Identity is best-effort.</b> The bohpts {@code MailManager} reports
- * per-line failures as opaque human-readable strings without machine-readable
- * line identity, and the failure list does NOT correlate positionally with
- * the inbound items list (errors only appear for lines that failed). So
- * {@link #getItemTemplateId() itemTemplateId} and {@link #getCount() count}
- * are {@code @Nullable} on the wire — populated only when the host can
- * confidently attribute the failure to a specific inbound line. The
- * {@link #getReason() reason} string is the always-present diagnostic.</p>
- *
- * <p><b>Reason format.</b> Free-form host-supplied diagnostic. Stable enough to
- * surface in operator-facing UIs but NOT a wire contract — the platform MUST
- * NOT switch on the string. Use the absence/presence of an entry as the
- * machine-readable "this line failed" signal.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names. {@code reason}
- * normalized to empty string at construction when {@code null} is passed,
- * so getters and {@code equals}/{@code hashCode}/{@code toString} agree.</p>
+ * <p>{@code reason} is a free-form diagnostic, not a wire contract; never switch on it. {@code null} is normalized
+ * to an empty string.</p>
  */
 public final class ItemDeliveryError {
 
@@ -48,29 +26,15 @@ public final class ItemDeliveryError {
         this.reason = reason == null ? "" : reason;
     }
 
-    /**
-     * Catalog item-template id of the failed line when the host can attribute
-     * the failure to a specific inbound {@link MailItem}; otherwise
-     * {@code null}.
-     */
     public @Nullable Long getItemTemplateId() {
         return itemTemplateId;
     }
 
-    /**
-     * Requested stack size of the failed line when known; otherwise
-     * {@code null}. Carried for parity with the inbound request line — not
-     * the count actually delivered (which is zero when this entry is present).
-     */
+    /** Requested size, not the delivered count (zero when this entry exists). */
     public @Nullable Long getCount() {
         return count;
     }
 
-    /**
-     * Host-supplied diagnostic reason. Always non-null; {@code null} passed
-     * to the constructor is normalized to an empty string. Free-form — NOT a
-     * wire-stable discriminator.
-     */
     public String getReason() {
         return reason;
     }

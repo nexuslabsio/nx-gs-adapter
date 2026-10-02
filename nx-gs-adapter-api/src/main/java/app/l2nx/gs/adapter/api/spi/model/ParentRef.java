@@ -3,23 +3,13 @@ package app.l2nx.gs.adapter.api.spi.model;
 import java.util.Objects;
 
 /**
- * Declares that rows of the declaring entity belong to a row of another
- * declared entity: "every row of this entity references one
- * {@link #parentEntityName()} row via {@link #fkColumn()} on this entity's
- * primary table" (e.g. item &rarr; {@code of("character", "owner_id")}).
+ * Declares that every row of the declaring entity references one {@link #parentEntityName()} row via
+ * {@link #fkColumn()} on its primary table (e.g. item &rarr; {@code of("character", "owner_id")}).
+ * The force-resync cascade follows it.
  *
- * <p>Consumed by the db-sync force-resync cascade: a row-level resync of the
- * parent entity with {@code cascade=true} resolves the dependent child rows
- * via {@code SELECT <pkColumn> FROM <primaryTable> WHERE <fkColumn> IN (...)}
- * and invalidates them alongside the requested parent rows, so the platform
- * receives a consistent re-publication of the parent and everything hanging
- * off it.</p>
- *
- * <p>Constraints (validated at module start, failure fails the module):
- * {@link #fkColumn()} must match {@code [A-Za-z_][A-Za-z0-9_]{0,63}} — it is
- * interpolated into SQL without quoting; {@link #parentEntityName()} must be
- * the {@link EntityMapping#entityName()} of another entity declared by the
- * same provider.</p>
+ * <p>Validated at module start (failure fails the module): {@link #fkColumn()} must match
+ * {@code [A-Za-z_][A-Za-z0-9_]{0,63}} since it is interpolated into SQL unquoted;
+ * {@link #parentEntityName()} must name another entity of the same provider.</p>
  */
 public final class ParentRef {
 
@@ -35,17 +25,10 @@ public final class ParentRef {
         return new ParentRef(parentEntityName, fkColumn);
     }
 
-    /**
-     * {@link EntityMapping#entityName()} of the entity this entity's rows
-     * belong to. Must reference an entity declared by the same provider.
-     */
     public String parentEntityName() {
         return parentEntityName;
     }
 
-    /**
-     * Column on the declaring entity's primary table holding the parent's PK.
-     */
     public String fkColumn() {
         return fkColumn;
     }

@@ -95,8 +95,7 @@ class NxEventsImplTest {
     @Test
     void publish_shouldEnqueueServerOnlineSnapshotIntoPublisher() throws InterruptedException {
         ConcurrentLinkedQueue<Object> sentValues = new ConcurrentLinkedQueue<Object>();
-        // ConcurrentLinkedQueue rejects nulls, so partition-key=null observation
-        // is recorded via a flag rather than queueing the byte[].
+        // ConcurrentLinkedQueue rejects nulls, so null partition-key is recorded via a flag
         AtomicBoolean partitionKeyWasNull = new AtomicBoolean(false);
         CountDownLatch latch = new CountDownLatch(1);
         EventsPublisher.Sender sender = (record, callback) -> {
@@ -344,7 +343,6 @@ class NxEventsImplTest {
 
     @Test
     void swap_shouldRetargetFacade_atNewPublisher() throws InterruptedException {
-        // Old publisher captures via captured1 sender.
         ConcurrentLinkedQueue<Object> captured1 = new ConcurrentLinkedQueue<Object>();
         CountDownLatch latch1 = new CountDownLatch(1);
         EventsPublisher.Sender sender1 = (record, callback) -> {
@@ -358,7 +356,6 @@ class NxEventsImplTest {
         publisher.start();
         NxEventsImpl events = new NxEventsImpl(publisher, registry1);
 
-        // Old publisher receives the first event.
         events.publish(PremiumPurchaseEvent.builder()
                 .eventId(UUIDv7.generate())
                 .characterId(1L)
@@ -366,7 +363,6 @@ class NxEventsImplTest {
         assertTrue(latch1.await(2, TimeUnit.SECONDS));
         assertEquals(1, captured1.size());
 
-        // Stop old and start a new publisher; swap the facade onto it.
         publisher.stop();
         ConcurrentLinkedQueue<Object> captured2 = new ConcurrentLinkedQueue<Object>();
         CountDownLatch latch2 = new CountDownLatch(1);

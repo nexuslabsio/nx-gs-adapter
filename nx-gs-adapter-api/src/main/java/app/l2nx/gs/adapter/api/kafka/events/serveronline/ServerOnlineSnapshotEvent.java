@@ -5,39 +5,17 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO published to the {@code serveronline} family topic
- * ({@code <tenant>.gs.events.serveronline}) on a host-driven cadence. Carries
- * a point-in-time breakdown of game-server population by activity bucket.
+ * Periodic population breakdown by activity bucket, on the {@code serveronline} family topic.
  *
- * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire timestamp is
- * encoded in the upper 48 bits — extractable via
- * {@code app.l2nx.gs.commons.UUIDv7.extractCreatedAt(eventId)}; no separate
- * {@code occurredAt} field. Platform consumers dedupe on the {@code eventId}
- * (at-least-once delivery) and order within-server by the embedded
- * timestamp.</p>
+ * <p>{@code eventId} MUST be a UUIDv7 (upper 48 bits = timestamp); consumers dedupe on it
+ * (at-least-once) and order within a server by it.</p>
  *
- * <p>{@link #getBuckets() buckets} is an open map. Every snapshot MUST
- * carry the required canonical keys
- * {@link WellKnownServerOnlineBuckets#TOTAL} and
- * {@link WellKnownServerOnlineBuckets#UNIQUE}; hosts SHOULD additionally
- * publish the optional canonical keys
- * ({@link WellKnownServerOnlineBuckets#OFFLINE_TRADE},
- * {@link WellKnownServerOnlineBuckets#FISHING}) when the corresponding
- * concept applies, and MAY publish arbitrary host-specific keys. There is
- * no top-level {@code total} field: buckets can overlap (e.g. a fishing
- * player typically also counts in {@code UNIQUE}), so consumers MUST NOT
- * derive any total as {@code sum(buckets)} — read the {@code TOTAL} entry
- * directly. See {@link WellKnownServerOnlineBuckets} for the soft
- * cross-bucket invariant.</p>
+ * <p>{@code buckets} is an open map and MUST carry {@link WellKnownServerOnlineBuckets#TOTAL} and
+ * {@link WellKnownServerOnlineBuckets#UNIQUE}. Buckets can overlap, so consumers MUST NOT derive a
+ * total as {@code sum(buckets)}; read {@code TOTAL}.</p>
  *
- * <p>{@link #getMetadata() metadata} is a separate, optional open
- * string→string map of build-agnostic attributes describing this snapshot
- * (distinct from {@link #getBuckets() buckets}, which carries the numeric
- * population breakdown). {@code null} when absent. Hosts MAY publish arbitrary
- * keys without an API release; consumers ignore keys they do not understand.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson can deserialize without {@code @JsonProperty}.</p>
+ * <p>{@code metadata} is a separate open string map of snapshot attributes (no counts); hosts MAY add
+ * keys without an API release, consumers ignore unknown ones.</p>
  */
 public final class ServerOnlineSnapshotEvent {
 
@@ -53,37 +31,17 @@ public final class ServerOnlineSnapshotEvent {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * Event identity. MUST be a UUIDv7 — the upper 48 bits encode the
-     * snapshot occurrence timestamp.
-     */
+    /** MUST be a UUIDv7. */
     public UUID getEventId() {
         return eventId;
     }
 
-    /**
-     * Bucket-key → count breakdown. Always non-null on read; {@code null}
-     * passed to the constructor is normalized to an empty map. The returned
-     * map is unmodifiable; mutation attempts throw
-     * {@link UnsupportedOperationException}.
-     *
-     * <p>Keys: see {@link WellKnownServerOnlineBuckets} for the canonical
-     * set. Values: non-negative long counts.</p>
-     */
+    /** Non-negative counts. Never null (a {@code null} constructor argument becomes an empty map); unmodifiable. */
     public Map<String, Long> getBuckets() {
         return buckets;
     }
 
-    /**
-     * Open string→string map of build-agnostic attributes about this
-     * snapshot. {@code null} when absent. When non-null the returned map is
-     * unmodifiable; mutation attempts throw
-     * {@link UnsupportedOperationException}.
-     *
-     * <p>Distinct from {@link #getBuckets() buckets}: this carries no
-     * population counts. Hosts MAY add arbitrary keys without an API release;
-     * consumers ignore keys they do not understand.</p>
-     */
+    /** Unmodifiable when non-null. */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;
     }

@@ -4,39 +4,19 @@ import app.l2nx.gs.adapter.api.spi.ConnectContext;
 import app.l2nx.gs.adapter.api.spi.provider.ItemTemplateProvider;
 
 /**
- * Game-data sync capability, acquired via {@link ConnectContext#gameData()}. Lets
- * the host trigger a fresh full-snapshot publish of static game-data templates
- * (itemtemplate today; skills / npc later) onto the {@code gd} sync stream.
- *
- * <p>The {@code gd-sync} module publishes an initial snapshot automatically once
- * connected. The host calls {@link #publishSnapshot()} to re-publish on demand —
- * e.g. after an in-game datapack reload — so the platform picks up changes without
- * a restart. The call is non-blocking: it schedules the snapshot on an adapter
- * daemon thread and returns immediately. Always non-null — a context wired without
- * a gd-sync runtime hands back a no-op that drops the request.</p>
- *
- * <p>Mirrors the {@link NxSync} trigger pattern: the {@code gd-sync} module
- * registers its snapshot runner via {@link #registerSnapshotTrigger(NxGameDataTrigger)}
- * during its connect lifecycle; {@link #publishSnapshot()} fans out to every
- * registered trigger. Adapter-core owns the façade so it survives reconnect — the
- * module re-registers its trigger on each handshake.</p>
+ * Obtained via {@link ConnectContext#gameData()}. The {@code gd-sync} module publishes an initial snapshot
+ * itself; the host calls {@link #publishSnapshot()} to republish static templates on demand (e.g. after a
+ * datapack reload). Adapter-core owns this facade so it survives reconnect; the module re-registers its
+ * trigger on each handshake.
  */
 public interface NxGameData {
 
     /**
-     * Schedule a fresh full snapshot of every registered game-data entity (pulls
-     * each {@link ItemTemplateProvider}, publishes UPSERTs + a terminal complete
-     * marker). Idempotent and safe to call repeatedly. Fans out to every
-     * {@link NxGameDataTrigger} registered via
-     * {@link #registerSnapshotTrigger(NxGameDataTrigger)}.
+     * Non-blocking and idempotent: schedules a full snapshot (UPSERTs from each {@link ItemTemplateProvider}
+     * plus a terminal complete marker) on an adapter daemon thread via every registered trigger.
      */
     void publishSnapshot();
 
-    /**
-     * Module-side hook bound by the {@code gd-sync} module during its connect
-     * lifecycle. Each registered trigger runs a fresh full-snapshot publish when
-     * the host calls {@link #publishSnapshot()}. Triggers MUST NOT block, throw,
-     * or propagate failure — the façade invokes them defensively.
-     */
+    /** Module-side hook; triggers must not block or throw. */
     void registerSnapshotTrigger(NxGameDataTrigger trigger);
 }

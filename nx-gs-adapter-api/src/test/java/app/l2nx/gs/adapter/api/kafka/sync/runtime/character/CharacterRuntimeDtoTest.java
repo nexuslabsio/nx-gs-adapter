@@ -60,8 +60,6 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto explicitTrue =
                 CharacterRuntimeDto.builder().id(1L).online(Boolean.TRUE).build();
 
-        // Consumer-side semantics treat null and true alike, but the DTO itself
-        // preserves the distinction — equals reflects raw field state.
         assertNotEquals(omittedOnline, explicitTrue);
     }
 
@@ -122,7 +120,6 @@ class CharacterRuntimeDtoTest {
 
     @Test
     void carriesState_shouldBeTrue_forAnOfflineTraderTick() {
-        // Not online, yet real observed state — the case a presence-based gate would drop.
         CharacterRuntimeDto trader = CharacterRuntimeDto.builder()
                 .id(42L)
                 .online(Boolean.FALSE)
@@ -138,8 +135,6 @@ class CharacterRuntimeDtoTest {
     @ParameterizedTest(name = "{0} alone marks the row as state-bearing")
     @MethodSource("singleFieldRows")
     void carriesState_shouldBeTrue_whenAnySingleObservableFieldIsSet(String field, CharacterRuntimeDto dto) {
-        // Pins the field set: a volatile field added to the wire but forgotten in carriesState()
-        // would silently turn an ordinary tick into a tombstone.
         assertTrue(dto.carriesState(), field);
     }
 
@@ -262,8 +257,6 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto plainIdle =
                 CharacterRuntimeDto.builder().id(1L).aiStatus("idle").build();
 
-        // activities differ (fishing vs none) though aiStatus matches —
-        // the two fields are orthogonal and both participate in equality.
         assertNotEquals(fishingIdle, plainIdle);
     }
 
@@ -357,12 +350,7 @@ class CharacterRuntimeDtoTest {
         assertNull(dto.getMaxWeight());
     }
 
-    /**
-     * The DTO carries no binder annotations, so consumers bind it through implicit
-     * constructor-parameter names — which only resolves while exactly one constructor is visible.
-     * A second one (e.g. a back-compat overload when the wire grows) makes creator detection
-     * ambiguous and every consumer silently fails to deserialize the whole channel.
-     */
+    /** Overloads break implicit constructor-parameter-name binding, so exactly one constructor must exist. */
     @Test
     void class_shouldExposeExactlyOneConstructor() {
         assertEquals(1, CharacterRuntimeDto.class.getDeclaredConstructors().length);

@@ -13,17 +13,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Drives the {@link NxAdapter} state machine via package-private simulate helpers
- * (no real ConnectFlow or NxKafka) to verify the Kafka-state-coupled mapping rules:
- *
- * <ul>
- *   <li>Pre-first-ACTIVE {@code TRANSIENT} stays in {@code REGISTERING}; post-ACTIVE
- *       drives {@code DEGRADED}.</li>
- *   <li>Kafka {@code CONNECTED} → {@code ACTIVE}, {@code DISCONNECTED} → {@code DEGRADED}
- *       only when adapter is in a live state.</li>
- * </ul>
- */
 class NxAdapterStateMachineTest {
 
     private List<AdapterState> captured;
@@ -50,8 +39,7 @@ class NxAdapterStateMachineTest {
 
     @Test
     void simulateKafkaStateChange_shouldNotPropagateDisconnected_whenStateIsInit() {
-        // Pre-first-ACTIVE: a Kafka DISCONNECTED before we ever reached ACTIVE/DEGRADED
-        // must not transition the adapter (handshake not yet complete).
+        // DISCONNECTED before the first ACTIVE must not transition: handshake incomplete
         NxAdapter.simulateKafkaStateChangeForTesting(KafkaState.DISCONNECTED);
 
         assertEquals(AdapterState.INIT, NxAdapter.state());
@@ -73,7 +61,7 @@ class NxAdapterStateMachineTest {
         NxAdapter.simulateKafkaStateChangeForTesting(KafkaState.CONNECTED);
         captured.clear();
 
-        // Adapter shutdown drives CLOSED itself — a stray Kafka CLOSED event must be ignored.
+        // Shutdown drives CLOSED itself; a stray Kafka CLOSED must be ignored
         NxAdapter.simulateKafkaStateChangeForTesting(KafkaState.CLOSED);
 
         assertEquals(AdapterState.ACTIVE, NxAdapter.state());
@@ -82,27 +70,21 @@ class NxAdapterStateMachineTest {
 
     @Test
     void simulateConnectOutcome_shouldStayInRegistering_whenTransientPreActive() {
-        // Bring adapter to REGISTERING via STARTING.
         NxAdapter.simulateConnectOutcomeForTesting(ConnectFlow.Outcome.STARTING);
         captured.clear();
 
-        // TRANSIENT before first ACTIVE must NOT downgrade to DEGRADED.
         NxAdapter.simulateConnectOutcomeForTesting(ConnectFlow.Outcome.TRANSIENT);
-        // Subsequent retry fires STARTING again — state cycles inside REGISTERING.
         NxAdapter.simulateConnectOutcomeForTesting(ConnectFlow.Outcome.STARTING);
 
         assertEquals(AdapterState.REGISTERING, NxAdapter.state());
-        // Only the second STARTING fired a transition (re-asserting REGISTERING).
         assertEquals(Collections.singletonList(AdapterState.REGISTERING), captured);
     }
 
     @Test
     void simulateConnectOutcome_shouldEnterDegraded_whenTransientPostActive() {
-        // Reach ACTIVE via Kafka CONNECTED — this latches wasActive=true.
         NxAdapter.simulateKafkaStateChangeForTesting(KafkaState.CONNECTED);
         captured.clear();
 
-        // Now a TRANSIENT (e.g. from a follow-up connect) must flip to DEGRADED.
         NxAdapter.simulateConnectOutcomeForTesting(ConnectFlow.Outcome.TRANSIENT);
 
         assertEquals(AdapterState.DEGRADED, NxAdapter.state());

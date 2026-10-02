@@ -8,21 +8,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic playable-class wire DTO — the common L2 denominator for the static class catalog,
- * carried as the payload of {@code GameDataSyncEvent} on the {@code gd} (game-data) sync stream's
- * {@code classtemplate} entity topic. Each host build supplies its own provider that maps its
- * core's internal class registry into this shape; nothing here names a specific core.
- *
- * <p>One {@code ClassTemplate} is one playable class node in the profession tree: its canonical
- * identity ({@link #getClazz()}), the class it advances from ({@link #getParentClazz()}), and the
- * race / type / tier facets needed to group and lay out the tree. Identity is the
- * {@link CharacterClass} token only — there is no source-side numeric id (display names /
- * translations live consumer-side, keyed by the token).</p>
- *
- * <p><b>Nullability:</b> {@link #getClazz()} is non-null for any playable class (a non-canonical
- * fork class is a contract gap fixed by extending {@link CharacterClass}, not by emitting null).
- * {@link #getParentClazz()} is null for a base (root) class; the remaining facets are
- * {@link Nullable} so {@code null} means "this build did not supply it".</p>
+ * Wire DTO for one playable-class node of the profession tree, payload of {@code GameDataSyncEvent} on the
+ * {@code classtemplate} topic; identity is the {@link CharacterClass} token only, no numeric id. {@link #getClazz()} is
+ * non-null (non-canonical fork classes extend {@link CharacterClass}); {@link #getParentClazz()} is null for a base class.
  */
 public final class ClassTemplate {
 
@@ -45,37 +33,22 @@ public final class ClassTemplate {
         this.tier = tier;
     }
 
-    /**
-     * Canonical class identity; non-null for a playable class.
-     */
     public @Nullable CharacterClass getClazz() {
         return clazz;
     }
 
-    /**
-     * The class this one advances from (its profession parent); {@code null} for a base class.
-     */
     public @Nullable CharacterClass getParentClazz() {
         return parentClazz;
     }
 
-    /**
-     * Race the class belongs to; {@code null} if unknown.
-     */
     public @Nullable CharacterRace getRace() {
         return race;
     }
 
-    /**
-     * Whether the class is a fighter or a mystic; {@code null} if unknown.
-     */
     public @Nullable CharacterClassType getType() {
         return type;
     }
 
-    /**
-     * Profession tier ({@code BASE} → {@code THIRD}); {@code null} if unknown.
-     */
     public @Nullable CharacterClassTier getTier() {
         return tier;
     }

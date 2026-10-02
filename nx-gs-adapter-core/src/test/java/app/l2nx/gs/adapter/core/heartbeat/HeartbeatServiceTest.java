@@ -116,7 +116,6 @@ class HeartbeatServiceTest {
         scheduler.runFixedDelayOnce();
 
         HeartbeatEvent event = (HeartbeatEvent) publisher.calls.get(0).payload;
-        // 30s, not 330s — connectInstant was recaptured at the second start().
         assertEquals(Duration.ofSeconds(30), event.getUptime());
     }
 
@@ -186,8 +185,6 @@ class HeartbeatServiceTest {
         } finally {
             pool.shutdownNow();
         }
-        // Service must remain in a coherent state — no exception leaked, final
-        // stop quiesces cleanly.
         service.stop();
     }
 

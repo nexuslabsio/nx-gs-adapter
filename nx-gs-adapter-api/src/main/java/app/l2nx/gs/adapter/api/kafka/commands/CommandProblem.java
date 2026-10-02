@@ -7,11 +7,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Structured problem body for a non-OK {@link CommandResult}. Transport-neutral
- * subset of RFC 9457 — {@code title} stable per problem kind, {@code detail}
- * per-instance context, {@code extensions} free-form Gson-serializable map.
- * HTTP-specific fields (status, type URI, instance URI) live elsewhere
- * ({@link CommandStatus}, {@code Nx-Correlation-Id}).
+ * Problem body for a non-OK {@link CommandResult}; transport-neutral subset of RFC 9457.
+ * {@code title} is stable per problem kind, {@code detail} is per-instance, {@code extensions} is Gson-serializable.
  */
 public final class CommandProblem {
 
@@ -48,23 +45,14 @@ public final class CommandProblem {
         return new Builder();
     }
 
-    /**
-     * Convenience: problem with only a title.
-     */
     public static CommandProblem of(String title) {
         return new CommandProblem(title, null, null);
     }
 
-    /**
-     * Convenience: problem with title + detail.
-     */
     public static CommandProblem of(String title, String detail) {
         return new CommandProblem(title, detail, null);
     }
 
-    /**
-     * Convenience: problem with title + single-key extension.
-     */
     public static CommandProblem of(String title, String extKey, Object extValue) {
         Map<String, Object> ext = new LinkedHashMap<String, Object>();
         ext.put(extKey, extValue);

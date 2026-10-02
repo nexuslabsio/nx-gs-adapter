@@ -6,29 +6,10 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO published to the {@code privatestore} family topic
- * ({@code <tenant>.gs.events.privatestore}) when a private-store deal is
- * finalized on the game thread. One event represents one transaction —
- * possibly multi-line if the counterparty atomically acquired several
- * positions in a single click.
- *
- * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire timestamp is
- * encoded in the upper 48 bits — extractable via
- * {@code app.l2nx.gs.commons.UUIDv7.extractCreatedAt(eventId)}; no separate
- * {@code occurredAt} field. Platform consumers dedupe on the {@code eventId}
- * (at-least-once delivery).</p>
- *
- * <p>{@link #getStoreType() storeType} indicates which party opened the
- * store — see {@link PrivateStoreSide} for the maker/taker direction
- * semantics.</p>
- *
- * <p>Soft invariant: {@code lines.size() >= 1}. Producers MUST NOT emit an
- * empty purchase event; the wire schema permits it, the platform consumer logs
- * and dedupes rather than rejecting.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson / Jackson can deserialize without
- * {@code @JsonProperty}.</p>
+ * Private-store deal finalized on the game thread, on the {@code privatestore} family topic; one event per transaction, multi-line when several positions were bought atomically.
+ * <p>{@link #getEventId() eventId} MUST be a UUIDv7 (upper 48 bits encode the timestamp); consumers dedupe on it (at-least-once).
+ * <p>{@link #getStoreType() storeType} says which party opened the store (maker/taker direction; see {@link PrivateStoreSide}).
+ * <p>Soft invariant: {@code lines.size() &gt;= 1}. Producers MUST NOT emit an empty event; the consumer logs and dedupes rather than rejecting.
  */
 public final class PrivateStorePurchaseEvent {
 
@@ -61,71 +42,37 @@ public final class PrivateStorePurchaseEvent {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * Event identity. MUST be a UUIDv7 — the upper 48 bits encode the
-     * occurrence timestamp.
-     */
     public UUID getEventId() {
         return eventId;
     }
 
-    /**
-     * Which side of the order book opened the store this purchase closed in.
-     * See {@link PrivateStoreSide} for maker/taker semantics.
-     */
     public PrivateStoreSide getStoreType() {
         return storeType;
     }
 
-    /**
-     * Source-side character ID of the seller (the party that delivered items
-     * and received currency). Identity-by-role, not by store-opener — for an
-     * {@link PrivateStoreSide#ASK ASK} purchase the seller is the store-opener;
-     * for a {@link PrivateStoreSide#BID BID} purchase the seller is the taker.
-     */
+    /** Seller (delivered items, received currency). Identity by role: the store-opener for {@link PrivateStoreSide#ASK ASK}, the taker for {@link PrivateStoreSide#BID BID}. */
     public long getSellerId() {
         return sellerId;
     }
 
-    /**
-     * Seller display name. Optional — host hooks may publish without it; the
-     * platform resolves the name via its joined {@code db-sync.character}
-     * stream.
-     */
+    /** Optional; the platform resolves it via the {@code db-sync.character} stream. */
     public @Nullable String getSellerName() {
         return sellerName;
     }
 
-    /**
-     * Source-side character ID of the buyer (the party that delivered
-     * currency and received items).
-     */
     public long getBuyerId() {
         return buyerId;
     }
 
-    /**
-     * Buyer display name. Optional.
-     */
     public @Nullable String getBuyerName() {
         return buyerName;
     }
 
-    /**
-     * Per-position breakdown of the purchase. Always non-null on read;
-     * {@code null} passed to the constructor is normalized to an empty list.
-     * Soft invariant: producers populate at least one line.
-     */
+    /** Never null on read; {@code null} passed to the constructor becomes an empty list. */
     public List<TradeLine> getLines() {
         return lines;
     }
 
-    /**
-     * Optional open string&rarr;string map of build-agnostic attributes about
-     * this purchase. {@code null} when absent. Hosts MAY publish
-     * arbitrary keys without an API release; consumers ignore keys they do not
-     * understand.
-     */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;
     }

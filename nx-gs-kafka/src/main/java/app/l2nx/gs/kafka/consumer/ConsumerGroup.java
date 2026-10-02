@@ -16,12 +16,6 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
-/**
- * Manages a single Kafka consumer with a dedicated daemon poll-loop thread
- * for one topic subscription. Each {@code subscribe()} call creates one instance.
- *
- * @param <T> the deserialized message type
- */
 class ConsumerGroup<T> implements NxConsumer {
 
     private static final Duration POLL_TIMEOUT = Duration.ofMillis(500);
@@ -100,10 +94,8 @@ class ConsumerGroup<T> implements NxConsumer {
                     ConsumerRecords<String, byte[]> records = consumer.poll(POLL_TIMEOUT);
                     for (ConsumerRecord<String, byte[]> record : records) {
                         if (!processRecord(record) && !autoCommitEnabled) {
-                            // Handler failed — seek back to this offset so the next poll re-fetches
-                            // it (and the rest of the batch). Without seek, Kafka's internal cursor
-                            // advances past the failed record and subsequent successful commits in
-                            // the same batch would skip it on restart.
+                            // Rewind to the failed record; otherwise later commits in the batch would skip it on
+                            // restart
                             consumer.seek(new TopicPartition(record.topic(), record.partition()), record.offset());
                             break;
                         }
@@ -145,7 +137,7 @@ class ConsumerGroup<T> implements NxConsumer {
             byte[] value = record.value();
             message = value == null ? null : gson.fromJson(new String(value, StandardCharsets.UTF_8), type);
         } catch (Throwable deserFailure) {
-            // Permanent failure — payload won't parse on retry. Commit + skip.
+            // Permanent failure: the payload will not parse on retry
             log.warn(
                     "Deserialization failed for topic {} partition {} offset {} — committing and skipping",
                     topic,

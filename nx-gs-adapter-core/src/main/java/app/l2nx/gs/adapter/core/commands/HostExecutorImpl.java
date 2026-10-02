@@ -13,40 +13,9 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@link HostExecutor} implementation backed by a host-supplied
- * {@link Executor}. Built once per connect cycle by {@link CommandsBootstrap}
- * from the executor host code registered via
- * {@code NxAdapter.hostExecutor(Executor)}.
- *
- * <p>{@link #sync(Runnable)} / {@link #sync(Supplier)} block the calling
- * thread on a {@link CountDownLatch} the host executor counts down when the
- * task completes — bounded by {@code syncTimeoutMs} so a saturated /
- * deadlocked host pool cannot wedge the consumer thread indefinitely.
- * On timeout the call throws {@link HostExecutorTimeoutException}; the
- * dispatcher maps this to
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#UNAVAILABLE}.</p>
- *
- * <p>Exceptions thrown by the task are captured and rethrown to the calling
- * thread (using a generic-erasure {@code sneakyThrow} trick so checked
- * exceptions are NOT in scope — the SPI promises only
- * {@code RuntimeException} / {@code Error} propagation).</p>
- *
- * <p>{@link #async(Runnable)} delegates to {@code executor.execute} after
- * wrapping the task in {@link SafeRunnable} so any {@code Throwable} thrown
- * inside the task is logged by the adapter's logging facade rather than
- * leaking to the host thread's uncaught-exception handler.</p>
- *
- * <p>When no host executor has been registered, every method throws
- * {@link IllegalStateException} with a self-explanatory message — the
- * misconfiguration surfaces at the first hop instead of silently dropping
- * work.</p>
- *
- * <p>Note on interrupt semantics: if the calling thread is interrupted
- * while {@link #sync(Runnable)} / {@link #sync(Supplier)} awaits the latch,
- * the interrupt flag is restored and a {@link RuntimeException} is thrown.
- * The submitted task continues to execute on the host's pool — its result
- * is unobservable by the caller but the host thread is not leaked (the
- * latch + result holders are eligible for GC once the caller frame returns).</p>
+ * {@code sync} waits on a latch bounded by {@code syncTimeoutMs} so a saturated host pool cannot wedge the
+ * consumer thread; timeout throws {@link HostExecutorTimeoutException}. On interrupt the task keeps running
+ * on the host pool but its result is dropped.
  */
 final class HostExecutorImpl implements HostExecutor {
 
@@ -65,8 +34,6 @@ final class HostExecutorImpl implements HostExecutor {
 
     @Override
     public void sync(Runnable task) {
-        // sync(Supplier) does the same plumbing — adapt Runnable to a null-returning Supplier
-        // so latch / error capture / interrupt translation lives in one place.
         sync(() -> {
             if (task != null) {
                 task.run();
@@ -98,9 +65,6 @@ final class HostExecutorImpl implements HostExecutor {
                 }
             });
         } catch (Throwable submitFailure) {
-            // Executor.execute rejected the task (saturated, shutting down).
-            // Caller deserves to know — wrap as runtime so handler can map to
-            // CommandResult.error(UNAVAILABLE, ...) explicitly if desired.
             throw rethrow(submitFailure);
         }
         boolean completed;
@@ -126,9 +90,7 @@ final class HostExecutorImpl implements HostExecutor {
         if (task == null) {
             return;
         }
-        // SafeRunnable.wrap routes any task-side Throwable to the adapter's logging
-        // facade (NxLog) so async() failures are observable in adapter logs even when
-        // the host executor's thread does not install an uncaught-exception handler.
+        // host executor threads may lack an uncaught-exception handler; wrap so failures reach the adapter log
         exec.execute(SafeRunnable.wrap(task, log));
     }
 
@@ -140,17 +102,10 @@ final class HostExecutorImpl implements HostExecutor {
         return exec;
     }
 
-    /**
-     * Sneaky-throw any {@code Throwable} as an unchecked exception. The
-     * generic erasure trick lets us throw a checked exception without
-     * declaring it; the {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}
-     * contract narrows propagation to {@code RuntimeException} / {@code Error}
-     * so this is fine in practice — every exception type host code throws is
-     * one of those.
-     */
+    /** Sneaky throw: the handler contract only propagates {@code RuntimeException} / {@code Error}. */
     private static RuntimeException rethrow(Throwable t) {
         HostExecutorImpl.rethrowAs(t);
-        return null; // unreachable
+        return null;
     }
 
     @SuppressWarnings("unchecked")

@@ -2,12 +2,6 @@ package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
 
 import java.util.Objects;
 
-/**
- * Success payload of {@link StopPrivateStoreCommand}.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
- */
 public final class StopPrivateStoreResult {
 
     private final String previousStoreType;
@@ -19,11 +13,7 @@ public final class StopPrivateStoreResult {
         this.previousStoreType = previousStoreType;
     }
 
-    /**
-     * Open-string store-type token that was open before this command closed
-     * it (e.g. {@code "SELL"} / {@code "PACKAGE_SELL"} / {@code "BUY"});
-     * host-defined vocabulary, not a closed adapter enum.
-     */
+    /** Host-defined open vocabulary (e.g. {@code SELL}, {@code PACKAGE_SELL}, {@code BUY}), not an adapter enum. */
     public String getPreviousStoreType() {
         return previousStoreType;
     }

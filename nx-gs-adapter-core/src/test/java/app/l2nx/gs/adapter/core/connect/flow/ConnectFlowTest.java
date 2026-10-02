@@ -107,7 +107,6 @@ class ConnectFlowTest {
 
     static Stream<Arguments> dispatchScenarios() {
         return Stream.of(
-                // status, body, expected terminal outcome, whether a retry is scheduled
                 Arguments.of(
                         "401 → FAILED (invalid server-key)",
                         401,
@@ -152,8 +151,7 @@ class ConnectFlowTest {
 
     @Test
     void run_shouldEmitTransientOutcome_whenIoFailure() {
-        // Capture the URL while WireMock is up, then stop it so the request fails
-        // with ConnectException — exercises the IO-failure dispatch branch.
+        // Stop WireMock after capturing the URL so the request fails with ConnectException.
         String baseUrl = wireMock.baseUrl();
         wireMock.stop();
 
@@ -174,9 +172,6 @@ class ConnectFlowTest {
 
         ConnectFlow flow = newFlow();
 
-        // Each run() schedules one retry; the captured scheduler doesn't fire it
-        // automatically. Walk attempts 1..5 manually and assert the canonical
-        // 30s → 1m → 2m → 5m schedule, capped at 5m.
         flow.run();
         flow.run();
         flow.run();
@@ -339,8 +334,6 @@ class ConnectFlowTest {
 
         flow.run();
 
-        // STARTING → TRANSIENT → FAILED — scheduler.schedule throws so the retry
-        // path can't recover; flow signals terminal failure.
         assertEquals(
                 Arrays.asList(ConnectFlow.Outcome.STARTING, ConnectFlow.Outcome.TRANSIENT, ConnectFlow.Outcome.FAILED),
                 outcomes);

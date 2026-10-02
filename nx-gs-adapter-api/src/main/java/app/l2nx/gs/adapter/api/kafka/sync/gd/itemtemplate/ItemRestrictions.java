@@ -4,15 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Trade / storage / permission flags of an {@link ItemTemplate} — "what you may do
- * with this item". Grouped (frontend has the same {@code ItemRestrictions} concept)
- * so the permission surface is one cohesive object instead of a scatter of booleans.
- *
- * <p>All fields are tri-state {@link Nullable Boolean} ({@code true}/{@code false}/
- * unknown). This object carries only the flags the server template exposes in
- * memory (Phase 1). Client-patch permission flags ({@code privateStoreSellable},
- * {@code npcTrade}, {@code commissionStore}, {@code clanWarehouseDepositable}) are
- * NOT here — they are Phase-2 DB columns populated from the client patch.</p>
+ * Tri-state ({@code null} = unknown) trade / storage / permission flags of an {@link ItemTemplate}.
+ * Only flags the server template exposes; client-patch flags ({@code privateStoreSellable}, {@code npcTrade}, ...) are absent.
  */
 public final class ItemRestrictions {
 
@@ -52,9 +45,6 @@ public final class ItemRestrictions {
         return dropable;
     }
 
-    /**
-     * Sellable to an NPC shop.
-     */
     public @Nullable Boolean getSellable() {
         return sellable;
     }
@@ -64,22 +54,16 @@ public final class ItemRestrictions {
     }
 
     /**
-     * Depositable into the personal warehouse (vs the clan warehouse — Phase 2).
+     * Personal warehouse only, not the clan warehouse.
      */
     public @Nullable Boolean getWarehouseDepositable() {
         return warehouseDepositable;
     }
 
-    /**
-     * Allowed in freight (cross-town warehouse transfer).
-     */
     public @Nullable Boolean getFreightable() {
         return freightable;
     }
 
-    /**
-     * Blocked / restricted inside the Olympiad.
-     */
     public @Nullable Boolean getOlympiadRestricted() {
         return olympiadRestricted;
     }

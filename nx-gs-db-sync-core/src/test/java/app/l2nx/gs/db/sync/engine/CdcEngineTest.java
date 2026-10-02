@@ -35,7 +35,7 @@ class CdcEngineTest {
     @Test
     void start_shouldSeedDegradedStats_whenEntityHasNoTopic() {
         EntityStatsTracker tracker = new EntityStatsTracker();
-        TopicResolver resolver = entity -> null; // no topics for any entity
+        TopicResolver resolver = entity -> null;
         engine = new CdcEngine(
                 "bohpts",
                 Collections.singletonList(clanMapping()),
@@ -52,8 +52,7 @@ class CdcEngineTest {
                 k -> null,
                 RecordingNxEvents.noop());
 
-        // Replace the running scheduler tick path: stop immediately so the
-        // periodic scheduler doesn't fire ticks under test.
+        // Stop immediately so the periodic scheduler doesn't tick under test.
         engine.start();
         engine.stop();
 
@@ -112,10 +111,9 @@ class CdcEngineTest {
                 RecordingNxEvents.noop());
 
         engine.start();
-        engine.start(); // second call must be a no-op
+        engine.start();
         engine.stop();
 
-        // Only one DEGRADED seed regardless of repeated start()
         List<EntityStats> snapshot = tracker.currentStatuses();
         assertNotNull(snapshot);
         assertTrue(snapshot.size() <= 1);
@@ -193,7 +191,6 @@ class CdcEngineTest {
 
         engine.start();
         engine.stop();
-        // No assertion needed on payload — the point is that start/stop didn't throw.
     }
 
     private static EntityMapping<ClanDbDto> clanMapping() {
@@ -209,8 +206,7 @@ class CdcEngineTest {
         @Override
         public void load(SnapshotStore target) {
             loadCount++;
-            // Seed something so flushAll has work to do — verifies flushAll runs
-            // BEFORE clearAll() wipes the store.
+            // Seed something so we verify flushAll runs before clearAll().
             target.putCrc("clan", 1L, 999);
         }
 

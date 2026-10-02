@@ -15,20 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Per-entity force-resync bookkeeping for {@link CdcEngine}: thread-safe
- * pending-request enqueue from any thread, drain + snapshot invalidation +
- * completion emission strictly on the entity's cycle thread.
- *
- * <p>Merge semantics: a whole-entity request absorbs any queued PK sets; PK
- * sets union. A whole-entity absorb discards queued ghost-PK sentinels (PKs
- * the snapshot never had) by design — invalidate-all only perturbs stored
- * entries, so ghost convergence for the absorbed request relies on the
- * concurrent FULL operation's platform sweep. Drained {@code resyncId}s move
- * to a per-entity in-flight list
- * stamped with the drain time ({@code cycleStartedAt}); the list survives
- * non-successful cycles (the original drain time is kept) and is emitted +
- * cleared after the first FULLY successful cycle — HEALTHY state AND zero
- * failed AND zero still-pending publishes.</p>
+ * Per-entity force-resync bookkeeping: enqueue from any thread, drain/invalidate/completion only on the entity's cycle thread.
+ * A whole-entity request absorbs queued PK sets (dropping ghost sentinels; the concurrent FULL operation's platform sweep covers ghosts);
+ * drained {@code resyncId}s stay in-flight with their original drain time until the first fully successful cycle (HEALTHY, zero failed, zero pending publishes).
  */
 final class ResyncCoordinator {
 
@@ -36,34 +25,24 @@ final class ResyncCoordinator {
 
     private final NxEvents events;
     private final Map<String, Pending> pendingByEntity = new ConcurrentHashMap<String, Pending>();
-    // Mutated only on the entity's cycle thread (under the engine's ticking guard);
-    // ConcurrentHashMap only for the cross-entity map structure itself.
+    // Single-writer on the cycle thread; ConcurrentHashMap only for the cross-entity map structure.
     private final Map<String, List<InFlight>> inFlightByEntity = new ConcurrentHashMap<String, List<InFlight>>();
 
     ResyncCoordinator(NxEvents events) {
         this.events = events;
     }
 
-    /**
-     * Enqueue a whole-entity resync. Any thread; non-blocking; absorbs
-     * previously queued PK sets for the entity.
-     */
     void enqueueAll(UUID resyncId, String entityName) {
         Pending pending = pendingOf(entityName);
         synchronized (pending) {
             pending.all = true;
             pending.pks.clear();
-            // invalidate-all perturbs every stored entry, subsuming any queued
-            // no-event per-pk requests; drop them so the drain does not re-touch.
+            // invalidate-all subsumes queued no-event per-pk requests.
             pending.noEventPks.clear();
             pending.resyncIds.add(resyncId);
         }
     }
 
-    /**
-     * Enqueue a selected-rows resync. Any thread; non-blocking; unions with
-     * previously queued PK sets; a queued whole-entity request absorbs it.
-     */
     void enqueuePks(UUID resyncId, String entityName, LongSet pks) {
         Pending pending = pendingOf(entityName);
         synchronized (pending) {
@@ -74,16 +53,7 @@ final class ResyncCoordinator {
         }
     }
 
-    /**
-     * Enqueue an INTERNAL per-command pk-republish. Any thread; non-blocking;
-     * unions with previously queued no-event PKs. Carries NO {@code resyncId} —
-     * the drain invalidates these PKs alongside the tracked requests but never
-     * records an {@link InFlight}, so {@link #onCycleResult} emits no
-     * {@link ResyncCompletedEvent} for them. Used by
-     * {@code NxSync.requestResync} so a command handler can guarantee
-     * re-publication of specific rows without spawning a tracked admin resync
-     * operation.
-     */
+    /** No-event per-command pk-republish: invalidated on drain but never tracked as {@link InFlight}, so no {@link ResyncCompletedEvent}. */
     void enqueueNoEventPks(String entityName, LongSet pks) {
         Pending pending = pendingOf(entityName);
         synchronized (pending) {
@@ -104,19 +74,8 @@ final class ResyncCoordinator {
     }
 
     /**
-     * Drain the entity's pending requests and apply the invalidations to the
-     * snapshot. Cycle thread only — runs at the top of the guarded cycle,
-     * BEFORE the task plans windows, so inserted sentinels extend the
-     * snapshot's PK envelope and are scanned this cycle.
-     *
-     * <p>Returns a {@link DrainResult} describing the drain so the engine can
-     * decide whether the cycle qualifies for the targeted fast-path:
-     * {@code targetedOnly} is true when something was drained and NO whole-entity
-     * {@code all} request was pending; {@code targetedPks} is then the union of
-     * the drained tracked + no-event PKs (the bounded set to hash via
-     * {@code IN(...)}). When {@code all} was drained, {@code targetedOnly} is
-     * false and {@code targetedPks} is irrelevant (full scan required).
-     * {@link DrainResult#EMPTY} when nothing was pending.</p>
+     * Runs before window planning so inserted sentinels extend the PK envelope this cycle; cycle thread only.
+     * {@code targetedOnly} is true when something was drained and no whole-entity request was pending; then {@code targetedPks} is the bounded set for {@code IN(...)}.
      */
     DrainResult drainAndInvalidate(String entityName, SnapshotStore snapshot) {
         Pending pending = pendingByEntity.get(entityName);
@@ -158,9 +117,8 @@ final class ResyncCoordinator {
                     entityName,
                     drainedIds);
         }
-        // No-event PKs invalidate the same way but record no InFlight resyncId,
-        // so the next cycle re-publishes them with NO ResyncCompletedEvent. When
-        // a whole-entity (all) request was absorbed they are already perturbed.
+        // No-event PKs record no InFlight, so no ResyncCompletedEvent; already perturbed if an all-request was
+        // absorbed.
         if (!all && noEventPks != null) {
             LongIterator it = noEventPks.iterator();
             while (it.hasNext()) {
@@ -183,8 +141,7 @@ final class ResyncCoordinator {
         if (all) {
             return DrainResult.EMPTY;
         }
-        // Union of drained tracked + no-event PKs — the bounded set a targeted
-        // fast-path cycle hashes via IN(...). Empty union → null (no fast-path).
+        // Empty union -> null (no fast-path).
         LongOpenHashSet union = new LongOpenHashSet();
         if (pks != null) {
             union.addAll(pks);
@@ -195,12 +152,7 @@ final class ResyncCoordinator {
         return new DrainResult(union.isEmpty() ? null : union);
     }
 
-    /**
-     * Outcome of a {@link #drainAndInvalidate} call, surfaced to the engine so a
-     * triggered cycle can take the per-PK targeted fast-path. {@code targetedOnly}
-     * is true only when something was drained and no whole-entity {@code all}
-     * request was pending; {@code targetedPks} then holds the bounded PK set.
-     */
+    /** {@code targetedOnly} is true only when something was drained and no whole-entity request was pending; {@code targetedPks} is then the bounded set. */
     static final class DrainResult {
         static final DrainResult EMPTY = new DrainResult(null);
 
@@ -222,11 +174,8 @@ final class ResyncCoordinator {
     }
 
     /**
-     * Completion gate, cycle thread only — runs right after the cycle whose
-     * drain populated the in-flight list. Emits one {@link ResyncCompletedEvent}
-     * per in-flight {@code resyncId} when the cycle was fully successful;
-     * otherwise keeps the list for the retry cycle (un-acked rows keep their
-     * perturbed hash, so the next cycle re-publishes them).
+     * Emits one {@link ResyncCompletedEvent} per in-flight id after a fully successful cycle; otherwise keeps the list
+     * (un-acked rows keep their perturbed hash, so the retry cycle re-publishes them). Cycle thread only.
      */
     void onCycleResult(String entityName, CycleResult result) {
         List<InFlight> inFlight = inFlightByEntity.get(entityName);
@@ -265,10 +214,7 @@ final class ResyncCoordinator {
         inFlight.clear();
     }
 
-    /**
-     * Drops every pending request and in-flight id. Engine stop path —
-     * matches the documented non-goal of crash-durable resync requests.
-     */
+    /** Engine stop path; resync requests are deliberately not crash-durable. */
     void clear() {
         pendingByEntity.clear();
         inFlightByEntity.clear();
@@ -315,8 +261,6 @@ final class ResyncCoordinator {
     private static final class Pending {
         boolean all;
         final LongOpenHashSet pks = new LongOpenHashSet();
-        // Per-command pk-republish requests carrying no resyncId — invalidated
-        // on drain but never tracked for completion emission.
         final LongOpenHashSet noEventPks = new LongOpenHashSet();
         final Set<UUID> resyncIds = new LinkedHashSet<UUID>();
     }

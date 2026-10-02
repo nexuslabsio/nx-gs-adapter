@@ -7,15 +7,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One spawn definition for an NPC — where / how many / how often it appears. Carried in
- * {@link NpcTemplate#getSpawns()} (the provider attaches each spawn to its NPC, joining the
- * host's spawn registry to the template set).
- *
- * <p>A spawn is either point-based (scalar {@code x}/{@code y}/{@code z}/{@code heading}) or
- * area-based ({@link #getTerritory()} polygon); a given spawn uses one or the other. The actual
- * respawn time is random in {@code [respawnSec - respawnRandomSec, respawnSec +
- * respawnRandomSec]}. {@code periodOfDay} (e.g. {@code day}/{@code night}) and
- * {@code respawnPattern} (cron-like schedule) are open strings. All fields {@link Nullable}.</p>
+ * Point spawn (scalar x/y/z/heading) or area spawn ({@link #getTerritory()}), never both. Respawn is random
+ * in {@code [respawnSec - respawnRandomSec, respawnSec + respawnRandomSec]}.
  */
 public final class NpcSpawn {
 

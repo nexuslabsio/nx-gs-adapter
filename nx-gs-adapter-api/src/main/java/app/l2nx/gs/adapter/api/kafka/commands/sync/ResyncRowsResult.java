@@ -7,16 +7,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Success payload of {@link ResyncRowsCommand}. Carries the invalidation
- * counts known at ack time, keyed by entity name: the target entity maps to
- * the number of distinct requested PKs; with {@code cascade=true} each child
- * entity maps to the number of cascade-resolved rows. Entities that resolved
- * zero cascade rows are OMITTED from the map (the target entity is always
- * present). {@code keySet()} therefore enumerates exactly the entities a
- * {@code ResyncCompletedEvent} will follow for.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Ack of {@link ResyncRowsCommand}: invalidated counts by entity. Target entity is always present; zero-count cascade
+ * entities are OMITTED, so {@code keySet()} is exactly the set a {@code ResyncCompletedEvent} will follow for.
  */
 public final class ResyncRowsResult {
 
@@ -28,11 +20,7 @@ public final class ResyncRowsResult {
                 : Collections.unmodifiableMap(new LinkedHashMap<String, Integer>(invalidatedByEntity));
     }
 
-    /**
-     * Per-entity invalidated-row counts; zero-count cascade entities omitted.
-     * Iteration order: target entity first, cascade children in provider
-     * declaration order.
-     */
+    /** Target entity first, then cascade children in provider declaration order. */
     public Map<String, Integer> getInvalidatedByEntity() {
         return invalidatedByEntity;
     }

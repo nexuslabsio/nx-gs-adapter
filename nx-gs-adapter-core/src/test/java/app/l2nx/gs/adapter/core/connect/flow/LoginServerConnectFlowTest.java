@@ -143,8 +143,6 @@ class LoginServerConnectFlowTest {
 
     @Test
     void syncTopics_shouldAlwaysReturnNull_forLoginServerHost() {
-        // LS deployments carry no sync streams — syncTopics() returns null both
-        // before and after a successful connect.
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
                 .willReturn(aResponse()
                         .withStatus(200)
@@ -215,7 +213,6 @@ class LoginServerConnectFlowTest {
         ConnectFlow loop = new ConnectFlow(lsFlow, new DefaultBackoffSchedule(), scheduler, outcomes::add, active::set);
         loop.run();
 
-        // STARTING only — onActiveFlow consumed the success path before bare ACTIVE.
         assertEquals(Arrays.asList(ConnectFlow.Outcome.STARTING), outcomes);
         assertTrue(scheduler.captured.isEmpty(), "no retry on 200");
         HostConnectFlow<?> captured = active.get();

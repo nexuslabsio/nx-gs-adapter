@@ -1,12 +1,6 @@
 package app.l2nx.gs.adapter.core.connect.model;
 
-/**
- * Platform-side error response body — Gson-deserialized from 4xx / 5xx responses.
- *
- * <p>Wire shape: {@code {"code": "...", "message": "..."}}. Either field may be
- * {@code null} when the platform returns a body that doesn't match the envelope
- * (e.g. a generic 5xx HTML page or empty body).</p>
- */
+/** Either field may be {@code null} when the body doesn't match the envelope (e.g. 5xx HTML page, empty body). */
 public final class ErrorEnvelope {
 
     private final String code;

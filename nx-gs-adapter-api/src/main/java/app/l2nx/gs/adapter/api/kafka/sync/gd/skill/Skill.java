@@ -7,32 +7,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic skill wire DTO — the common L2 denominator for static skill data,
- * carried as the payload of {@code GameDataSyncEvent} on the {@code gd} (game-data)
- * sync stream's {@code skill} entity topic. Each host build supplies its own provider
- * that maps its core's internal skill representation into this shape; nothing here
- * names a specific core.
- *
- * <p>One {@code Skill} is the whole aggregate for a {@code skillId}: the level-invariant
- * header plus the nested level ladder ({@link #getLevels()}) and enchant-route variants
- * ({@link #getEnchantRoutes()}). The consumer upserts the parent and replaces its
- * children atomically.</p>
- *
- * <p><b>Nullability:</b> only {@link #getId()} is non-null. Every other field is
- * {@link Nullable} (former primitives boxed) so {@code null} means "this build did not
- * supply it" rather than a fabricated default.</p>
- *
- * <p><b>Vocabulary:</b> {@code operateType} / {@code skillType} / {@code targetType} /
- * {@code trait} / {@code abnormalType} / {@code saveVs} are open canonical L2 strings
- * (the value sets are large and fork-variable; the provider emits the core's enum name,
- * not a JVM ordinal). Boolean classification flags are grouped in {@link #getFlags()}
- * ({@link SkillFlags}), unwrapped flat into columns by the consumer.</p>
- *
- * <p><b>Attribute:</b> the offensive element ({@code FIRE}/{@code WATER}/…) and its
- * power are per-resolve-node, not per-aggregate header. They live on each
- * {@link SkillLevel} and {@link SkillEnchantRoute} so enchant routes that add an
- * element (e.g. "+3 Fire Attack") can carry their own attribute independently of the
- * base levels.</p>
+ * Build-agnostic skill wire DTO ({@code skill} topic of the {@code gd} sync stream); one instance is the whole
+ * aggregate for a skillId. Only {@link #getId()} is non-null: {@code null} means the build did not supply the value.
+ * Type-like strings are open canonical L2 names (enum name, not ordinal); the offensive attribute lives on
+ * {@link SkillLevel} and {@link SkillEnchantRoute}.
  */
 public final class Skill {
 
@@ -117,103 +95,62 @@ public final class Skill {
         return id;
     }
 
-    /**
-     * Operate-type — canonical L2 code (e.g. {@code A1}, {@code CA1}, {@code DA2},
-     * {@code TG}, {@code AU}). Active / continuous-active / delayed-active / toggle / aura.
-     */
+    /** Code: {@code A1}, {@code CA1}, {@code DA2}, {@code TG}, {@code AU}. */
     public @Nullable String getOperateType() {
         return operateType;
     }
 
-    /**
-     * Skill type (e.g. {@code PDAM}, {@code BUFF}, {@code DEBUFF}, {@code HEAL}).
-     */
     public @Nullable String getSkillType() {
         return skillType;
     }
 
-    /**
-     * Target type (e.g. {@code ENEMY_ONLY}, {@code SELF}, {@code PARTY}).
-     */
     public @Nullable String getTargetType() {
         return targetType;
     }
 
-    /**
-     * Trait (e.g. {@code BLEED}, {@code POISON}, {@code NONE}).
-     */
     public @Nullable String getTrait() {
         return trait;
     }
 
     /**
-     * Abnormal (buff-slot) stacking type of the skill's primary effect — canonical
-     * UPPER_SNAKE token; same-type abnormals overwrite by abnormal level. {@code null}
-     * when the skill occupies no buff slot.
+     * Buff-slot stacking type of the primary effect; same-type abnormals overwrite by abnormal level.
+     * {@code null} when the skill occupies no buff slot.
      */
     public @Nullable String getAbnormalType() {
         return abnormalType;
     }
 
-    /**
-     * Client visual effect tokens shown while the abnormal is active (canonical
-     * UPPER_SNAKE, e.g. {@code STUN}, {@code POISON}); {@code null} when none.
-     */
     public @Nullable List<String> getAbnormalVisualEffects() {
         return abnormalVisualEffects;
     }
 
-    /**
-     * Saving stat the land-rate formula rolls against ({@code STR}/{@code CON}/
-     * {@code DEX}/{@code INT}/{@code WIT}/{@code MEN}); {@code null} when the skill
-     * makes no save roll.
-     */
+    /** STR / CON / DEX / INT / WIT / MEN; {@code null} when the skill makes no save roll. */
     public @Nullable String getSaveVs() {
         return saveVs;
     }
 
-    /**
-     * Shared-cooldown group id — skills with the same group share their reuse delay;
-     * {@code null} when the skill cools down independently.
-     */
+    /** Skills in the same group share their reuse delay; {@code null} when independent. */
     public @Nullable Integer getSharedReuseGroup() {
         return sharedReuseGroup;
     }
 
-    /**
-     * Minimum pledge (clan) rank required to cast; {@code null} when unrestricted.
-     */
     public @Nullable Integer getMinPledgeClass() {
         return minPledgeClass;
     }
 
-    /**
-     * Skill id this skill triggers on proc; {@code null} when the skill triggers nothing.
-     */
     public @Nullable Integer getTriggeredSkillId() {
         return triggeredSkillId;
     }
 
-    /**
-     * Level of the triggered skill; {@code null} when {@code triggeredSkillId} is null.
-     */
     public @Nullable Integer getTriggeredSkillLevel() {
         return triggeredSkillLevel;
     }
 
-    /**
-     * Event that fires the trigger — canonical UPPER_SNAKE token (e.g. {@code ON_HIT},
-     * {@code ON_CRIT}, {@code ON_ATTACKED}); {@code null} when the skill triggers
-     * unconditionally or triggers nothing.
-     */
+    /** Token such as {@code ON_HIT} / {@code ON_CRIT}; {@code null} when unconditional or no trigger. */
     public @Nullable String getTriggeredChanceType() {
         return triggeredChanceType;
     }
 
-    /**
-     * Chance of the trigger firing on the {@code triggeredChanceType} event; {@code null}
-     * when the build defines no chance.
-     */
     public @Nullable Integer getTriggeredChancePercent() {
         return triggeredChancePercent;
     }
@@ -222,55 +159,33 @@ public final class Skill {
         return icon;
     }
 
-    /**
-     * Number of base levels in the ladder.
-     */
     public @Nullable Integer getMaxLevel() {
         return maxLevel;
     }
 
-    /**
-     * Boolean classification flags (magic / debuff / passive / …); {@code null} if none supplied.
-     */
     public @Nullable SkillFlags getFlags() {
         return flags;
     }
 
-    /**
-     * Cast preconditions (weapon / target / state requirements), read from the skill's
-     * canonical level; {@code null} if none.
-     */
+    /** Read from the skill's canonical level. */
     public @Nullable List<SkillCondition> getConditions() {
         return conditions;
     }
 
-    /**
-     * Base level ladder; {@code null} if not supplied (empty is a degenerate skill).
-     */
     public @Nullable List<SkillLevel> getLevels() {
         return levels;
     }
 
-    /**
-     * Enchant-route variants (enchanted levels beyond the base ladder); {@code null} if none.
-     */
     public @Nullable List<SkillEnchantRoute> getEnchantRoutes() {
         return enchantRoutes;
     }
 
-    /**
-     * Playable classes that learn this skill (inverted from the host's class skill trees);
-     * {@code null} if none (e.g. NPC-only / item-granted skills).
-     */
+    /** Inverted from the host's class skill trees; {@code null} for NPC-only / item-granted skills. */
     public @Nullable List<SkillClassLearn> getClasses() {
         return classes;
     }
 
-    /**
-     * Gear-score contributions this skill grants (owning / per-level / per-enchant
-     * bonuses, optionally class-restricted); {@code null} when the build does not
-     * compute gear score or the skill contributes none.
-     */
+    /** Owning / per-level / per-enchant bonuses; {@code null} when the build computes no gear score. */
     public @Nullable List<GearScoreContribution> getGearScoreContributions() {
         return gearScoreContributions;
     }

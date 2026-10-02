@@ -5,11 +5,6 @@ import java.util.Collections;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Package-private collection-freezing helpers shared by the private-store
- * command DTOs. Defensive copy + unmodifiable wrap; null/empty input collapses
- * to {@link Collections#emptyList()} / {@link Collections#emptyMap()}.
- */
 final class PrivateStoreLists {
 
     private PrivateStoreLists() {}

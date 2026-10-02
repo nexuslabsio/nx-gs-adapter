@@ -4,16 +4,8 @@ import app.l2nx.gs.adapter.api.kafka.ops.HeartbeatEvent;
 import java.util.*;
 
 /**
- * Per-module health snapshot embedded into {@link HeartbeatEvent#getEnabledModules()}.
- *
- * <p>{@code state} is a string on the wire (uppercase: {@code ACTIVE}, {@code DEGRADED},
- * {@code DISABLED}, {@code FAILED}) — keeps the platform-side consumer decoupled from
- * any JVM enum ordinal. Consumers SHOULD treat unknown values as {@code UNKNOWN} for
- * forward-compat when new states ship.</p>
- *
- * <p>{@link Stats} is a typed-slot bag for module-specific extras — {@code pool} for
- * DB-reading modules today; future slots (table list, last-sync timestamp, etc.) added
- * as additional optional fields on {@code Stats} without breaking this wire shape.</p>
+ * Per-module health snapshot embedded in {@link HeartbeatEvent#getEnabledModules()}.
+ * {@code state} is an uppercase string ({@code ACTIVE}, {@code DEGRADED}, {@code DISABLED}, {@code FAILED}); consumers SHOULD treat unknown values as {@code UNKNOWN}.
  */
 public final class ModuleStatus {
 
@@ -93,22 +85,8 @@ public final class ModuleStatus {
     }
 
     /**
-     * Typed-slot bag of module-specific extras.
-     * <ul>
-     *     <li>{@link #getPool()} — JDBC pool counters from DB-reading modules
-     *     (db-sync surfaces {@code JdbcConnectionSource.stats()}).</li>
-     *     <li>{@link #getEntities()} — per-entity operational state for sync
-     *     modules; populated by the CDC engine on every cycle. Replaces the
-     *     earlier placeholder names-only {@code tables} list (entity-centric
-     *     vocabulary; {@code "clan"}, not {@code "clan_data"}).</li>
-     *     <li>{@link #getEvents()} — bounded-queue counters for the built-in
-     *     {@code events} module (adapter-core's outbound fan-out).</li>
-     *     <li>{@link #getCommands()} — consumer + dispatch counters for the
-     *     built-in {@code commands} module (adapter-core's inbound RPC
-     *     surface).</li>
-     * </ul>
-     * <p>Future slots ship as additional optional fields without breaking
-     * existing consumers — unknown JSON keys are ignored.</p>
+     * Module-specific extras; each slot is optional and unknown JSON keys are ignored, so new slots are non-breaking.
+     * {@code entities} uses entity names ({@code "clan"}), not table names.
      */
     public static final class Stats {
 

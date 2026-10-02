@@ -8,11 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * One transferred position in a closed {@link PrivateStorePurchaseEvent}.
- * Identity tuple {@code (itemTemplateId, enchantLevel, attributes)} lets
- * consumers pivot at any granularity.
- */
+/** One transferred position in a closed {@link PrivateStorePurchaseEvent}. */
 public final class TradeLine {
 
     private final long itemTemplateId;
@@ -37,17 +33,11 @@ public final class TradeLine {
         this.currencyItemTemplateId = currencyItemTemplateId;
     }
 
-    /**
-     * Source-side L2 item template ID.
-     */
     public long getItemTemplateId() {
         return itemTemplateId;
     }
 
-    /**
-     * Enchant level. {@code null} when the item type has no enchant concept;
-     * {@code 0} for enchantable-but-unenchanted; {@code > 0} otherwise.
-     */
+    /** {@code null} = no enchant concept; {@code 0} = unenchanted; {@code > 0} = enchanted. */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }
@@ -64,10 +54,7 @@ public final class TradeLine {
         return unitPrice;
     }
 
-    /**
-     * Currency item template id (typically {@code 57} = Adena; can differ for
-     * alt-currency stores).
-     */
+    /** Currency item template id; differs from Adena ({@code 57}) for alt-currency stores. */
     public long getCurrencyItemTemplateId() {
         return currencyItemTemplateId;
     }

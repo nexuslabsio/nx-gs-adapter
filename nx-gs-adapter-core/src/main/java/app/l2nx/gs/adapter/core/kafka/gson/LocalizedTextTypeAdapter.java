@@ -9,16 +9,7 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Gson {@link TypeAdapter} for {@link LocalizedText}: reads / writes the flat
- * locale-keyed object form ({@code {"en": "Great Axe", "ru": "Двуручный Топор"}})
- * matching the platform's {@code LocalizedText} wire shape.
- *
- * <p>Lives in adapter-core (not {@code nx-gs-kafka}) because the Gson factory in
- * {@code nx-gs-kafka} must stay free of any {@code nx-gs-adapter-api} dependency;
- * adapter-core depends on api and registers this adapter onto the producer Gson
- * at construction time.</p>
- */
+/** Lives in adapter-core because nx-gs-kafka's Gson factory must not depend on nx-gs-adapter-api. */
 public final class LocalizedTextTypeAdapter extends TypeAdapter<LocalizedText> {
 
     @Override
@@ -51,8 +42,7 @@ public final class LocalizedTextTypeAdapter extends TypeAdapter<LocalizedText> {
             }
         }
         in.endObject();
-        // of(...) returns null for an all-blank / empty map rather than tripping
-        // the LocalizedText non-blank invariant on an empty wire object.
+        // of(...) returns null for an empty map instead of tripping the non-blank invariant
         return LocalizedText.of(values);
     }
 }

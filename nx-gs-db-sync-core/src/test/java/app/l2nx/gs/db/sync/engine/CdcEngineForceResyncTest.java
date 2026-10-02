@@ -28,13 +28,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Engine-level force-resync wiring: drain-before-cycle ordering, completion
- * emission gating, and the mid-cycle re-submit. Cycles run against a
- * deep-stubbed JDBC connection — the planner sees an empty DB, so the
- * snapshot's (invalidated) entries diff to DELETED publishes whose outcome is
- * controlled by the test's KafkaSender.
- */
+/** Force-resync wiring: drain-before-cycle ordering, completion gating, mid-cycle re-submit; an empty host DB makes invalidated entries diff to DELETED. */
 class CdcEngineForceResyncTest {
 
     private static final long PK = 1L;
@@ -82,8 +76,7 @@ class CdcEngineForceResyncTest {
         assertTrue(engine.requestForceResync(RESYNC_ID, "clan", pks(PK)));
 
         await(() -> published.size() == 1);
-        // Drain ran BEFORE the cycle borrowed its connection: the cycle thread
-        // observed the perturbed CRC, not the original.
+        // Drain ran before the cycle borrowed its connection.
         int crcSeenByCycle = source.crcAtBorrow.get(0);
         assertNotEquals(100, crcSeenByCycle);
         assertNotEquals(Phase1Hasher.MISSING_HASH, crcSeenByCycle);
@@ -92,8 +85,6 @@ class CdcEngineForceResyncTest {
         assertEquals(RESYNC_ID, completed.getResyncId());
         assertEquals("clan", completed.getEntityName());
         assertFalse(completed.getCompletedAt().isBefore(completed.getCycleStartedAt()));
-        // Empty host DB → the invalidated row diffed to DELETED and its ack
-        // removed it from the snapshot.
         assertFalse(snapshot.containsCrc("clan", PK));
     }
 
@@ -129,16 +120,12 @@ class CdcEngineForceResyncTest {
 
         engine.requestPkRepublishNoEvent("clan", pks(PK));
 
-        // Cycle observed the perturbed CRC (the no-event drain ran before borrow)
-        // and the empty host DB diffed the invalidated row to a DELETED publish
-        // whose ack removed it from the snapshot.
         await(() -> !snapshot.containsCrc("clan", PK));
         int crcSeenByCycle = source.crcAtBorrow.get(0);
         assertNotEquals(100, crcSeenByCycle);
         assertNotEquals(Phase1Hasher.MISSING_HASH, crcSeenByCycle);
 
-        // NO ResyncCompletedEvent — this is an internal per-command resync, not a
-        // tracked admin operation. Run another cycle to prove none ever lands.
+        // Internal per-command resync: no ResyncCompletedEvent ever lands.
         engine.triggerEntityNow("clan");
         await(() -> checkpoints.get() >= 2);
         assertTrue(published.isEmpty(), "no-event republish must not emit any completion event");
@@ -169,8 +156,7 @@ class CdcEngineForceResyncTest {
         engine.triggerEntityNow("clan");
         assertTrue(entered.await(10, TimeUnit.SECONDS), "first cycle must reach the JDBC borrow");
 
-        // Mid-cycle request: triggerEntityNow inside is a guarded no-op; only
-        // the end-of-cycle re-submit can run it.
+        // Mid-cycle request: only the end-of-cycle re-submit can run it.
         assertTrue(engine.requestForceResync(RESYNC_ID, "clan", pks(PK)));
         release.countDown();
 
@@ -181,11 +167,8 @@ class CdcEngineForceResyncTest {
     @Test
     void runGuardedCycle_shouldRecordDegradedResultAndKeepTicking_whenGarbagePkExplodesWindowPlanning() {
         snapshot.putCrc("clan", PK, 100);
-        // A garbage PK already in the snapshot inflates its envelope to
-        // [1, Long.MAX_VALUE / 2]. A WHOLE-entity resync runs the full range
-        // scan over that envelope, so WindowPlanner's plan-size cap throws.
-        // (A per-PK resync would take the targeted IN-list fast-path and never
-        // inflate the envelope — Fix ①.)
+        // A garbage PK inflates the envelope; a whole-entity resync full-scans it and trips the plan-size cap (per-PK
+        // would take the IN fast-path).
         snapshot.putCrc("clan", Long.MAX_VALUE / 2, 200);
         engine = buildEngine();
         engine.start();
@@ -196,9 +179,7 @@ class CdcEngineForceResyncTest {
         assertTrue(published.isEmpty(), "an exploded cycle must not emit completion");
         assertEquals(0, checkpoints.get(), "a thrown cycle must skip the snapshot checkpoint");
 
-        // Ticking guard released — a follow-up trigger enters another cycle
-        // (which explodes on the still-poisoned snapshot but keeps being
-        // recorded) instead of being permanently locked out.
+        // Ticking guard released: a follow-up trigger still enters a cycle.
         int cyclesSoFar = source.crcAtBorrow.size();
         engine.triggerEntityNow("clan");
         await(() -> source.crcAtBorrow.size() > cyclesSoFar);
@@ -277,11 +258,7 @@ class CdcEngineForceResyncTest {
         fail("condition not met within 10s");
     }
 
-    /**
-     * Records the snapshot CRC of {@link #PK} at every borrow (the borrow is
-     * the first thing a cycle does after the drain) and optionally gates the
-     * first borrow so a request can be injected mid-cycle.
-     */
+    /** Records the snapshot CRC of {@link #PK} at each borrow and can gate the first borrow to inject a request mid-cycle. */
     private static final class CapturingSource implements JdbcConnectionSource {
         final SnapshotStore snapshot;
         final List<Integer> crcAtBorrow = Collections.synchronizedList(new ArrayList<Integer>());

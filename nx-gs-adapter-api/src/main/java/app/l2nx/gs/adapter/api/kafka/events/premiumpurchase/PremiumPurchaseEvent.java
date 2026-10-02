@@ -6,28 +6,10 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO published to the {@code premiumpurchase} family topic
- * ({@code <tenant>.gs.events.premiumpurchase}) when a player buys items /
- * services inside the game world. Combined item+service baskets are
- * first-class — a single purchase event MAY carry any mix of items and
- * services.
- *
- * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire timestamp is
- * encoded in the upper 48 bits — extractable via
- * {@code app.l2nx.gs.commons.UUIDv7.extractCreatedAt(eventId)}; no separate
- * {@code occurredAt} field. Platform consumers dedupe on the {@code eventId}
- * (at-least-once delivery).</p>
- *
- * <p>Soft invariant: {@code items.size() + services.size() &gt;= 1}. Producers
- * MUST NOT emit an empty event; the wire schema permits it, the platform
- * consumer logs and dedupes rather than rejecting.</p>
- *
- * <p>{@link #getMetadata() metadata} is an optional open string&rarr;string map
- * of build-agnostic attributes, {@code null} when absent (the common path). Hosts
- * MAY add arbitrary keys without an API release; consumers ignore unknown keys.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson can deserialize without {@code @JsonProperty}.</p>
+ * Player buys items / services in the game world, on the {@code premiumpurchase} family topic; one event may mix items and services.
+ * <p>{@link #getEventId() eventId} MUST be a UUIDv7 (upper 48 bits encode the timestamp); consumers dedupe on it (at-least-once).
+ * <p>Soft invariant: {@code items.size() + services.size() &gt;= 1}. Producers MUST NOT emit an empty event; the consumer logs and dedupes rather than rejecting.
+ * <p>{@link #getMetadata() metadata} is an optional open string-to-string map; {@code null} when absent, consumers ignore unknown keys.
  */
 public final class PremiumPurchaseEvent {
 
@@ -57,58 +39,33 @@ public final class PremiumPurchaseEvent {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * Event identity. MUST be a UUIDv7 — the upper 48 bits encode the
-     * occurrence timestamp.
-     */
     public UUID getEventId() {
         return eventId;
     }
 
-    /**
-     * Source-side character primary key ({@code charId} / {@code objectId}).
-     */
     public long getCharacterId() {
         return characterId;
     }
 
-    /**
-     * Character display name. Optional — host hooks may publish without it
-     * when name lookup at the publish call site is awkward; the platform
-     * resolves the name via its joined {@code db-sync.character} stream.
-     */
+    /** Optional; the platform resolves it via the {@code db-sync.character} stream when absent. */
     public @Nullable String getCharacterName() {
         return characterName;
     }
 
-    /**
-     * Owning account login. Optional.
-     */
     public @Nullable String getAccountName() {
         return accountName;
     }
 
-    /**
-     * Item-grant lines. Always non-null on read; {@code null} passed to the
-     * constructor is normalized to an empty list.
-     */
+    /** Never null on read; {@code null} passed to the constructor becomes an empty list. */
     public List<PurchaseItem> getItems() {
         return items == null ? Collections.emptyList() : items;
     }
 
-    /**
-     * Service-applied lines. Always non-null on read; {@code null} passed to
-     * the constructor is normalized to an empty list.
-     */
+    /** Never null on read; {@code null} passed to the constructor becomes an empty list. */
     public List<PurchaseService> getServices() {
         return services == null ? Collections.emptyList() : services;
     }
 
-    /**
-     * Optional open string&rarr;string map of build-agnostic attributes.
-     * {@code null} when absent (the common path). Hosts MAY add arbitrary keys
-     * without an API release; consumers ignore unknown keys.
-     */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;
     }

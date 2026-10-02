@@ -7,18 +7,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A recurring (weekly) schedule for a tracked activity — raid/epic boss respawn,
- * castle siege, or game event — carried as an optional field on the corresponding
- * snapshot entry. Describes the "every &lt;weekday(s)&gt; at HH:MM" rule(s) the
- * host derives from its own cron-style configuration, complementing the single
- * "next occurrence" instant already on the entry.
- *
- * <p>{@code null} schedule means the host could not express the activity as a
- * weekly rule (e.g. a one-off / seasonal cron, or a respawn-window boss) — the
- * consumer then relies on the entry's next-occurrence instant alone.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor parameter
- * names so Gson / Jackson can deserialize without {@code @JsonProperty}.</p>
+ * Weekly "every weekday(s) at HH:MM" rule(s) for a tracked activity (boss respawn, siege, event), derived
+ * by the host from its cron config. A {@code null} schedule on the entry means the activity is not
+ * expressible as a weekly rule; the consumer then relies on the entry's next-occurrence instant alone.
  */
 public final class RecurringSchedule {
 
@@ -30,10 +21,7 @@ public final class RecurringSchedule {
                 : Collections.unmodifiableList(new ArrayList<RecurringSlot>(slots));
     }
 
-    /**
-     * The recurrence rules; never {@code null}, the returned list is unmodifiable.
-     * A populated schedule carries at least one slot.
-     */
+    /** Never null, unmodifiable; a populated schedule has at least one slot. */
     public List<RecurringSlot> getSlots() {
         return slots;
     }

@@ -4,14 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Cohesive cluster of an {@link ArmorSetTemplate}'s flat base-stat bonuses — the STR / DEX /
- * CON / INT / WIT / MEN deltas applied while the full set is worn. Grouped (the same way
- * {@code SkillFlags} groups a skill's classification flags) so the header surface is one
- * object instead of a scatter of integers; the consumer unwraps it flat into columns.
- *
- * <p>All fields are {@link Nullable Integer} and <b>may be negative</b> (some sets trade one
- * stat for another). The {@code int} stat is named {@code intBonus} because {@code int} is a
- * Java keyword; DB column {@code int_bonus}.</p>
+ * Flat STR/DEX/CON/INT/WIT/MEN deltas while the full set is worn; may be negative. INT is {@code intBonus}
+ * because {@code int} is a Java keyword (DB column {@code int_bonus}).
  */
 public final class ArmorSetStatBonus {
 
@@ -49,10 +43,6 @@ public final class ArmorSetStatBonus {
         return con;
     }
 
-    /**
-     * INT bonus. Field/accessor is {@code intBonus}/{@code getIntBonus} ({@code int} is a
-     * Java keyword); DB column {@code int_bonus}.
-     */
     public @Nullable Integer getIntBonus() {
         return intBonus;
     }

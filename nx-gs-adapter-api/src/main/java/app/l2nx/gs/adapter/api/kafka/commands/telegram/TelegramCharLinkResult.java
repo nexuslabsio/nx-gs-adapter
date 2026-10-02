@@ -3,14 +3,8 @@ package app.l2nx.gs.adapter.api.kafka.commands.telegram;
 import java.util.Objects;
 
 /**
- * Success payload of {@link TelegramCharLinkCommand}: the resolved
- * character's primary key. The platform persists a tentative binding
- * between {@link TelegramCharLinkCommand#getTelegramUserId() telegramUserId}
- * and this {@code charId} immediately, before the user types the code back
- * into the bot.
- *
- * <p>Java 8 POJO; final field; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter name.</p>
+ * Resolved character's primary key. The platform persists a tentative binding immediately, before the user types the
+ * code back into the bot.
  */
 public final class TelegramCharLinkResult {
 
@@ -23,10 +17,6 @@ public final class TelegramCharLinkResult {
         this.charId = charId;
     }
 
-    /**
-     * Primary key of the character on which {@code (accountName, charName)}
-     * resolved. Always non-null on a success envelope.
-     */
     public Long getCharId() {
         return charId;
     }

@@ -23,8 +23,7 @@ class RaidBossKindTest {
 
     @Test
     void name_shouldMatchEnumLiteral() {
-        // Wire reflects the enum literal (Gson default) — pin the format so a
-        // refactor renaming the constants surfaces here, not on the platform side.
+        // Pins the enum-literal wire format so a constant rename fails here, not on the platform.
         assertEquals("RAID", RaidBossKind.RAID.name());
         assertEquals("EPIC", RaidBossKind.EPIC.name());
         assertEquals("INSTANCE_BOSS", RaidBossKind.INSTANCE_BOSS.name());

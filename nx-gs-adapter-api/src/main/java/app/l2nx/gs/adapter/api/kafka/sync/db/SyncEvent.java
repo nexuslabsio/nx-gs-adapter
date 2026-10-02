@@ -4,51 +4,15 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Typed CDC event published by the adapter for one row of one synced entity.
- * Generic parameter {@code T} is the entity's DTO class
- * (e.g. {@code SyncEvent<ClanDbDto>}); the platform-side consumer parameterizes
- * its {@code Consumer<SyncEvent<T>>} against the same {@code nx-gs-adapter-api}
- * artifact and gets compile-time payload guarantees.
+ * Typed CDC event for one row of one synced entity; {@code T} is the entity DTO class.
  *
- * <p><b>Wire shape</b> (Gson-serialized JSON):</p>
- * <pre>
- *   {
- *     "entityName": "clan",
- *     "pk": 12345,
- *     "op": "UPDATED",
- *     "payload": { "clanId": 12345, "clanName": "Hellbound", ... },
- *     "timestampEpochMs": 1761661381123
- *   }
- * </pre>
+ * Wire shape (Gson JSON): {@code {"entityName":"clan","pk":12345,"op":"UPDATED","payload":{...},"timestampEpochMs":1761661381123}}
  *
- * <p><b>Field semantics:</b></p>
- * <ul>
- *     <li>{@code entityName} — domain identifier in singular form
- *     ({@code "clan"}, {@code "character"}, {@code "item"}); matches
- *     {@code EntityMapping.entityName()} on the producer side. NOT the source
- *     SQL table name.</li>
- *     <li>{@code pk} — primary key as {@code long}. Engine reads via
- *     {@code rs.getLong(pkColumn)}. The Kafka message key is the same value
- *     encoded as 8 bytes big-endian (identical to
- *     {@code LongSerializer.serialize(topic, pk)}); consumers can decode with
- *     {@code LongDeserializer} for byte-equal partition + compaction-key parity
- *     across any future external writer.</li>
- *     <li>{@code op} — string enum on the wire: {@code "CREATED"},
- *     {@code "UPDATED"}, {@code "DELETED"}. String (not enum) keeps the platform
- *     consumer decoupled from JVM enum ordinals; consumers SHOULD treat unknown
- *     values defensively for forward-compat.</li>
- *     <li>{@code payload} — the row DTO. {@code null} for {@code DELETED}.
- *     Topics use bounded retention (typically ≤1 day), not log compaction, so
- *     consumers must explicitly handle the {@code DELETED} op rather than
- *     treating null-value tombstones as signal. Equality comparison (and
- *     hashing) of {@code SyncEvent} delegates to {@code T.equals} /
- *     {@code T.hashCode} — DTO authors MUST implement value semantics on their
- *     payload classes if downstream code compares {@code SyncEvent}s.</li>
- *     <li>{@code timestampEpochMs} — engine-side {@code System.currentTimeMillis()}
- *     at publish time. Epoch milliseconds keep the wire shape primitive
- *     (Gson-friendly with zero {@code TypeAdapter} setup) and consistent with
- *     {@code EntityStats.lastSyncEpochMs}.</li>
- * </ul>
+ * {@code entityName} is the singular domain name, not the SQL table. The Kafka key is {@code pk}
+ * as 8-byte big-endian ({@code LongSerializer}). {@code op} is a string ({@code CREATED}/
+ * {@code UPDATED}/{@code DELETED}) to avoid enum ordinal coupling; treat unknown values defensively.
+ * {@code payload} is null for {@code DELETED}; topics use bounded retention, not compaction, so
+ * consumers must handle {@code DELETED} explicitly. Equality delegates to {@code T.equals}.
  */
 public final class SyncEvent<T> {
 

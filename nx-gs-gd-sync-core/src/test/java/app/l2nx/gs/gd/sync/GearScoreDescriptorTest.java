@@ -21,12 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/**
- * Drives the {@code gearscore} entity through the production {@link GameDataSyncModule#defaultDescriptors()}
- * registry. The module resolves providers via {@link java.util.ServiceLoader}, so a real test impl on the
- * classpath ({@link TestGearScoreRulesetProvider}, registered under {@code META-INF/services}) is what proves
- * the descriptor is registered, resolves, and publishes — the exact wiring the production fix restores.
- */
+/** Drives the {@code gearscore} entity through the production descriptor registry via a real ServiceLoader impl. */
 class GearScoreDescriptorTest {
 
     private static final String TOPIC = "kbt.gd.sync.gearscore";
@@ -60,8 +55,7 @@ class GearScoreDescriptorTest {
                 .syncTopics(topics)
                 .build();
         module.onConnect(ctx);
-        // ctx.io() defaults to a direct-run executor, so start()'s initial snapshot
-        // runs synchronously on this thread — no await needed.
+        // ctx.io() is a direct-run executor, so the initial snapshot runs synchronously
         module.start();
     }
 

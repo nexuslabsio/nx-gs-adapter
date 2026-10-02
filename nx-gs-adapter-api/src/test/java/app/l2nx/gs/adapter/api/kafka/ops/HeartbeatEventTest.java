@@ -99,7 +99,7 @@ class HeartbeatEventTest {
         source.add(a);
 
         HeartbeatEvent event = HeartbeatEvent.builder().enabledModules(source).build();
-        source.add(b); // mutate after build
+        source.add(b);
 
         List<ModuleStatus> seen = event.getEnabledModules();
         assertEquals(1, seen.size());

@@ -4,19 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A leader→minion relationship of an NPC — the minion's template id and how many
- * spawn with the leader. The leader-side "spawn random minions" flag is carried on
- * {@link NpcTemplate#getRandomMinions()} since it applies to the leader, not the pair.
- *
- * <p>{@code minionNpcTemplateId} is the non-null identity. The minion template may not exist
- * in the snapshot's NPC set (a minion can be defined in an unloaded file), so no
- * referential guarantee is implied.</p>
- *
- * <p>{@code groupIndex} identifies the alternative minion set this ref belongs to when the
- * leader spawns one of several random sets (see {@link NpcTemplate#getRandomMinions()}) —
- * refs sharing a {@code groupIndex} spawn together, distinct indices are mutually exclusive
- * alternatives. {@code null} when the leader has a single fixed set. Without it, random sets
- * built from the same minion ids would collapse into duplicate {@code (leader, minion)} pairs.</p>
+ * The minion template may be absent from the snapshot's NPC set, so no referential guarantee. Refs sharing a
+ * {@code groupIndex} spawn together; distinct indices are mutually exclusive random sets, {@code null} for one fixed set.
  */
 public final class NpcMinionRef {
 

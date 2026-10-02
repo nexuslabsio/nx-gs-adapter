@@ -4,16 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A reference to a skill granted by an item — the intrinsic {@code (id, level)} the
- * item's datapack template carries, plus how it is granted. The full skill (name /
- * description / effects) lives in the skills entity; this is only the cross-reference,
- * so it can ship before that entity exists.
- *
- * <p>{@code id}+{@code level} are the non-null identity of the reference. {@code type}
- * is an open, nullable string (build-agnostic vocabulary): {@code NORMAL},
- * {@code ENCHANT}, {@code EQUIP}, {@code UNEQUIP}, {@code CRITICAL_SKILL},
- * {@code MAGIC_SKILL}. {@code chancePercent} is the proc chance ({@code [0, 100]}), present
- * for conditional grants (on-crit / on-magic), {@code null} otherwise.</p>
+ * {@code type} is an open nullable string: {@code NORMAL}, {@code ENCHANT}, {@code EQUIP}, {@code UNEQUIP}, {@code CRITICAL_SKILL},
+ * {@code MAGIC_SKILL}. {@code chancePercent} ({@code [0, 100]}) is the proc chance of conditional grants, else {@code null}.
  */
 public final class ItemSkillRef {
 

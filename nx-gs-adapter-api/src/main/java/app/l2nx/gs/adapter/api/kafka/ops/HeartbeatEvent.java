@@ -8,19 +8,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Heartbeat message published every 60s. Kafka message key is {@code serverId}.
- *
- * <p>{@code uptime} is the session-scoped duration since the most recent
- * successful {@code /connect} (resets on reconnect). Wire format is ISO-8601
- * (e.g. {@code "PT60S"}) — Gson uses the registered {@code Duration} adapter
- * in {@code nx-gs-kafka.NxGsonAdapters}; Jackson auto-handles via JavaTimeModule.
- * Identity fields ({@code tenantId}, {@code tenantSlug}, {@code serverId},
- * {@code serverSlug}, {@code serverName}) mirror the values delivered by
- * {@code ConnectResponse} so consumers can route / label heartbeats without
- * a separate lookup.</p>
- *
- * <p>{@code enabledModules} carries one {@link ModuleStatus} per discovered Tier-1
- * module — the platform consumes the list to render per-server module health.</p>
+ * Heartbeat published every 60s, keyed by {@code serverId}.
+ * {@code uptime} is measured from the latest successful {@code /connect} and serialized as ISO-8601 (e.g. {@code "PT60S"}).
  */
 public final class HeartbeatEvent {
 

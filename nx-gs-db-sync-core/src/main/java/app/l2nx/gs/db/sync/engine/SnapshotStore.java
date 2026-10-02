@@ -8,23 +8,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * In-memory primitive-keyed CRC32 snapshot, one {@link Long2IntOpenHashMap} per
- * synced entity. Open-hash backing keeps per-entry footprint ~16 bytes — at
- * 6.5M+ items a tree-backed map would burn ~360 MB. Range / extreme lookups
- * become O(N) scans but happen on a dedicated daemon thread per entity.
- *
- * <p>Sentinel: {@code defaultReturnValue} is set to
- * {@link Phase1Hasher#MISSING_HASH} so callers can compare lookup-result
- * directly without a separate {@code containsKey} round-trip when 0 is a
- * legitimate CRC32 value.</p>
- *
- * <p>Thread safety: the outer per-entity registries are concurrent — different
- * entities' cycles run on different CDC pool threads, and the first
- * {@code putCrc} / {@code invalidate} for an entity structurally modifies the
- * outer map on that entity's thread while other entities' threads do the same.
- * Each inner {@code Long2IntOpenHashMap} stays single-writer: every mutation
- * for a given entity happens on that entity's cycle thread (under the engine's
- * per-entity ticking guard), so the inner maps need no synchronization.</p>
+ * Per-entity primitive-keyed CRC32 snapshot ({@link Long2IntOpenHashMap}: ~16 bytes/entry, a tree map would burn ~360 MB at 6.5M items);
+ * range/extreme lookups are O(N) scans. {@code defaultReturnValue} is {@link Phase1Hasher#MISSING_HASH} because 0 is a valid CRC32.
+ * Outer registries are concurrent; each inner map is single-writer (its entity's cycle thread under the ticking guard).
  */
 public final class SnapshotStore {
 
@@ -69,16 +55,8 @@ public final class SnapshotStore {
     }
 
     /**
-     * Force-resync invalidation of one PK. MUST be called from the entity's
-     * cycle thread only (same single-writer contract as every other mutation).
-     *
-     * <p>A PK present in the snapshot gets its stored CRC perturbed to a value
-     * guaranteed to differ from the stored one and never equal to
-     * {@link Phase1Hasher#MISSING_HASH}, so the next cycle's diff classifies
-     * the row as UPDATED (live row) or DELETED (row gone from the host DB). A
-     * PK absent from the snapshot gets a sentinel entry inserted so the diff
-     * emits DELETED when the host DB has no such row — repairing platform-side
-     * ghost rows the snapshot never knew.</p>
+     * Perturbs a present PK's CRC (never equal to the stored one or MISSING_HASH) so the diff yields UPDATED/DELETED;
+     * an absent PK gets a sentinel so a missing host row emits DELETED (repairs platform ghosts). Cycle thread only.
      */
     public void invalidate(String entityName, long pk) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
@@ -89,12 +67,7 @@ public final class SnapshotStore {
         putCrc(entityName, pk, perturb(map.get(pk)));
     }
 
-    /**
-     * Force-resync invalidation of every stored PK of one entity. MUST be
-     * called from the entity's cycle thread only. Perturbs every stored value
-     * in place (zero-alloc fastIterator walk); min/max extremes are unaffected
-     * because only values change.
-     */
+    /** Perturbs every stored CRC in place (zero-alloc); min/max unaffected. Cycle thread only. */
     public void invalidateAll(String entityName) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null || map.isEmpty()) {
@@ -107,13 +80,7 @@ public final class SnapshotStore {
         }
     }
 
-    /**
-     * Stored value for an invalidated PK the snapshot never had. Any value
-     * works as long as it differs from {@link Phase1Hasher#MISSING_HASH} (the
-     * map's defaultReturnValue the put/remove bookkeeping keys on) — a live
-     * host row hashes to the real CRC and mismatches with probability
-     * 1 - 2^-32, an absent row diffs to DELETED regardless of the value.
-     */
+    /** Any value != MISSING_HASH works: a live row mismatches with probability 1 - 2^-32, an absent row diffs to DELETED regardless. */
     static final int INVALIDATION_SENTINEL = Phase1Hasher.MISSING_HASH ^ 1;
 
     private static int perturb(int crc) {
@@ -121,12 +88,7 @@ public final class SnapshotStore {
         return flipped == Phase1Hasher.MISSING_HASH ? crc ^ 2 : flipped;
     }
 
-    /**
-     * Returns the PKs in {@code [fromPk, toPk]} (closed interval) currently
-     * stored for the entity. O(N) full-keys scan on first call per cycle;
-     * subsequent windows in the same cycle should consult
-     * {@link #bucketByWindows} for amortized O(1) per window.
-     */
+    /** PKs in the closed interval {@code [fromPk, toPk]}; O(N) scan, use {@link #bucketByWindows} for multiple windows per cycle. */
     public LongSet keysInRange(String entityName, long fromPk, long toPk) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null || map.isEmpty()) {
@@ -143,14 +105,7 @@ public final class SnapshotStore {
         return result;
     }
 
-    /**
-     * Single-pass bucketing of an entity's snapshot keys across an ordered
-     * window list. Returned map is keyed by window index (0..windows.size()-1)
-     * → LongSet of PKs falling inside that window. Windows must be ordered
-     * and non-overlapping (the engine constructs them that way). PKs outside
-     * every window are dropped — the planner's envelope guarantees this is
-     * never a real case, but no need to assert.
-     */
+    /** One-pass bucketing of snapshot keys by window index; windows must be ordered and non-overlapping, PKs outside all windows are dropped. */
     public Long2ObjectOpenHashMap<LongSet> bucketByWindows(String entityName, List<Window> windows) {
         Long2ObjectOpenHashMap<LongSet> buckets = new Long2ObjectOpenHashMap<LongSet>(windows.size());
         for (int i = 0; i < windows.size(); i++) {
@@ -171,14 +126,7 @@ public final class SnapshotStore {
         return buckets;
     }
 
-    /**
-     * Bucketing for the targeted force-resync fast-path. Each window carries an
-     * explicit PK {@code IN}-list; the previous-keys bucket for window {@code i}
-     * is exactly that window's PKs that are currently present in the snapshot
-     * (a ghost PK whose drain-inserted sentinel lives in the snapshot is
-     * included, so a missing live row diffs to DELETE). Bounds the lookup to the
-     * targeted PKs — no O(N) full-keys scan.
-     */
+    /** Bucketing for the targeted fast-path: per window, only its {@code IN}-list PKs present in the snapshot (drain sentinels included, so a missing live row diffs to DELETE); no O(N) scan. */
     public Long2ObjectOpenHashMap<LongSet> bucketByTargetedWindows(String entityName, List<Window> windows) {
         Long2ObjectOpenHashMap<LongSet> buckets = new Long2ObjectOpenHashMap<LongSet>(windows.size());
         Long2IntOpenHashMap map = byEntity.get(entityName);
@@ -238,22 +186,12 @@ public final class SnapshotStore {
         return OptionalLong.of(cacheOf(entityName, map).max(map));
     }
 
-    /**
-     * Snapshot of entity names currently tracked. Stable (copy-on-read) so callers
-     * can iterate without worrying about a concurrent {@link #clearEntity} reshuffle.
-     */
+    /** Copy-on-read, safe against concurrent {@link #clearEntity}. */
     public Set<String> entityNames() {
         return new LinkedHashSet<String>(byEntity.keySet());
     }
 
-    /**
-     * Streaming iteration over all (pk, crc) entries for one entity. No-op when
-     * the entity is unknown. Iteration order is unspecified.
-     *
-     * <p>Uses fastutil's {@code fastIterator()} — the entry view is reused
-     * across the loop, so a 6.5M-entry dump allocates zero {@code Entry}
-     * instances instead of 6.5M.</p>
-     */
+    /** Iteration order unspecified; no-op for an unknown entity. Uses fastIterator() (reused entry view) to avoid allocating per entry. */
     public void forEachEntry(String entityName, EntryConsumer consumer) {
         Long2IntOpenHashMap map = byEntity.get(entityName);
         if (map == null || map.isEmpty()) {
@@ -266,13 +204,7 @@ public final class SnapshotStore {
         }
     }
 
-    /**
-     * Streaming bulk-load entry point. Returns a {@link Loader} the caller
-     * fills via {@link Loader#put(long, int)} and finalizes via
-     * {@link Loader#commit()} once the source is fully decoded; if the source
-     * fails mid-decode the loader is simply abandoned — partial state never
-     * reaches the live store.
-     */
+    /** Streaming bulk load: fill via {@link Loader#put}, finalize via {@link Loader#commit()}; an abandoned loader never reaches the live store. */
     public Loader newLoader(String entityName, int sizeHint) {
         Long2IntOpenHashMap fresh = new Long2IntOpenHashMap(sizeHint);
         fresh.defaultReturnValue(Phase1Hasher.MISSING_HASH);
@@ -338,11 +270,7 @@ public final class SnapshotStore {
         return cache;
     }
 
-    /**
-     * Lazy memoization of min/max PK. Insert tracks new extremes incrementally;
-     * remove of a non-extreme PK is a no-op; remove of an extreme marks dirty
-     * and the next read recomputes via one O(N) scan.
-     */
+    /** Lazy min/max: inserts update incrementally, removing an extreme marks dirty and the next read rescans. */
     private static final class ExtremeCache {
         private boolean valid;
         private long min;

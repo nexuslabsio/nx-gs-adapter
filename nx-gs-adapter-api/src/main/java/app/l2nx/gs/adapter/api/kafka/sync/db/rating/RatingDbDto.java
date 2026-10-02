@@ -7,24 +7,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic wire DTO for one character's standing in a ranked rating, payload of
- * {@code SyncEvent<RatingDbDto>} on the unified db-sync rating topic
- * ({@code <tenant>.gs.sync.db.rating}). One topic carries every rating kind;
- * {@link #getRatingType() ratingType} discriminates which leaderboard the row belongs
- * to. The source is a per-character row in the game DB, replicated via CDC, so rank is
- * NOT on the wire — consumers compute it at read time with a window function.
+ * Wire DTO for one character's standing in a ranked rating, payload of {@code SyncEvent<RatingDbDto>}.
+ * {@code ratingType} discriminates the leaderboard; rank is not on the wire, consumers derive it at read time.
  *
- * <p>Required fields: {@link #getRatingType() ratingType}, {@link #getCharId() charId}
- * and {@link #getPoints() points}. {@code ratingType} is an open string — canonical
- * values live in {@link WellKnownRatingTypes} ({@code lower_snake_case}); a host
- * shipping a new rating is not a breaking contract change, the platform stores unknown
- * types verbatim.</p>
- *
- * <p>{@link #getSeason() season} is {@code null} for a seasonless rating; otherwise the
- * id of the current period. {@link #getMetadata() metadata} carries optional
- * type-specific extras as a flat {@code String→String} map (e.g. {@code streak_days},
- * {@code last_catch_date} as an ISO string, {@code achievements} as a delimited list) —
- * stringified so this contract stays free of typed timestamp fields.</p>
+ * {@code ratingType} is an open string (canonical values in {@link WellKnownRatingTypes}); unknown types are stored verbatim.
  */
 public final class RatingDbDto {
 
@@ -48,40 +34,25 @@ public final class RatingDbDto {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * Which leaderboard this row belongs to — open string, canonical values in
-     * {@link WellKnownRatingTypes} ({@code lower_snake_case}, e.g. {@code "fishing"}).
-     */
     public String getRatingType() {
         return ratingType;
     }
 
-    /**
-     * Current period id; {@code null} for a seasonless rating.
-     */
+    /** Null for a seasonless rating. */
     public @Nullable String getSeason() {
         return season;
     }
 
-    /**
-     * The ranked character — source primary key (character object id).
-     */
     public long getCharId() {
         return charId;
     }
 
-    /**
-     * The rating's universal score (higher = better); rank is derived at read time,
-     * not stored.
-     */
+    /** Higher is better. */
     public long getPoints() {
         return points;
     }
 
-    /**
-     * Optional type-specific extras as a flat {@code String→String} map; {@code null}
-     * when the rating carries none.
-     */
+    /** Flat String-to-String map of type-specific extras (stringified to avoid typed timestamps); null when none. */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;
     }

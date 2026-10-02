@@ -7,19 +7,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic armor-set wire DTO — the common L2 denominator for a single set, carried
- * as the payload of {@code GameDataSyncEvent} on the {@code gd} (game-data) sync stream's
- * {@code armorsettemplate} entity topic. Each host build supplies its own provider that maps
- * its core's internal set representation into this shape; nothing here names a specific core.
- *
- * <p>One {@code ArmorSetTemplate} is the whole aggregate for a set id: the flat stat bonus
- * group ({@link #getStatBonus()}) plus the nested per-slot item list ({@link #getItems()})
- * and granted-skill list ({@link #getSkills()}). A slot can carry multiple alternative items
- * (each its own {@link ArmorSetItem} row). The consumer upserts the parent and replaces its
- * children atomically.</p>
- *
- * <p><b>Nullability:</b> only {@link #getId()} is non-null. Item references inside children
- * use the canonical {@code itemTemplateId} name; skill references use {@code skillTemplateId}.</p>
+ * Wire DTO for one armor set, payload of {@code GameDataSyncEvent} on the {@code armorsettemplate} topic; the
+ * consumer replaces children atomically. A slot may carry several alternative {@link ArmorSetItem} rows.
  */
 public final class ArmorSetTemplate {
 
@@ -43,24 +32,14 @@ public final class ArmorSetTemplate {
         return id;
     }
 
-    /**
-     * Flat stat bonuses granted while the set is active; {@code null} if none supplied.
-     */
     public @Nullable ArmorSetStatBonus getStatBonus() {
         return statBonus;
     }
 
-    /**
-     * Items composing the set, one row per (slot, item) — a slot may have several
-     * alternative items. {@code null} if not supplied.
-     */
     public @Nullable List<ArmorSetItem> getItems() {
         return items;
     }
 
-    /**
-     * Skills the set grants (base / shield / enchant6 / enchant-by-level); {@code null} if none.
-     */
     public @Nullable List<ArmorSetSkill> getSkills() {
         return skills;
     }

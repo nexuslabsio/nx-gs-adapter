@@ -1,22 +1,12 @@
 package app.l2nx.gs.adapter.api.kafka.ops.model;
 
 /**
- * Per-entity operational state surfaced by the CDC engine on every cycle inside
- * {@link EntityStats#getState()}. Wire shape: enum-name string ({@code "HEALTHY"} /
- * {@code "DEGRADED"}). Platform-side consumers SHOULD treat unknown values as
- * {@code UNKNOWN} for forward-compat.
+ * Per-entity CDC state, serialized as the enum name.
+ * Consumers SHOULD treat unknown values as {@code UNKNOWN}.
  */
 public enum EntityState {
-
-    /**
-     * Last cycle completed without error — Phase 1 + Phase 2 + publish all clean.
-     */
     HEALTHY,
 
-    /**
-     * Last cycle threw, hit a query timeout, or had a Kafka publish failure. The
-     * engine keeps ticking; the snapshot for failed PKs stays unadvanced and is
-     * replayed on the next cycle.
-     */
+    /** Last cycle failed; unadvanced snapshots of failed PKs are replayed next cycle. */
     DEGRADED
 }

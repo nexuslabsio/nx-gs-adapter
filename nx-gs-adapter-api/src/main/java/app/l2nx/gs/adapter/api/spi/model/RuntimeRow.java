@@ -3,9 +3,7 @@ package app.l2nx.gs.adapter.api.spi.model;
 import java.util.Objects;
 
 /**
- * One row in a runtime-sync snapshot: the primary key (entity identity) plus
- * the typed DTO populated from live field accessors at snapshot time. Produced
- * by {@link RuntimeEntityMapping#snapshot()}.
+ * One row of a runtime snapshot from {@link RuntimeEntityMapping#snapshot()}.
  *
  * @param <T> wire DTO type for the entity
  */
@@ -19,17 +17,10 @@ public final class RuntimeRow<T> {
         this.dto = dto;
     }
 
-    /**
-     * Primary key — entity identity, matches the DTO's {@code id}-equivalent
-     * field.
-     */
     public long getPk() {
         return pk;
     }
 
-    /**
-     * Typed payload — passed to {@code SyncEvent.payload} on publish.
-     */
     public T getDto() {
         return dto;
     }

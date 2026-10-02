@@ -7,21 +7,11 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one persisted ban row, payload of
- * {@code SyncEvent<BanDbDto>} on the platform-supplied per-tenant ban sync topic.
- * This is the up-channel mirror of the bans a host applies — whether issued from
- * the platform via {@link app.l2nx.gs.adapter.api.kafka.commands.ban.BanCommand}
- * or in-game (GM command, anti-cheat) — so the platform sees the full moderation
- * picture.
+ * Wire DTO for one persisted ban row, payload of {@code SyncEvent<BanDbDto>}. Mirrors bans from any
+ * origin (platform {@link app.l2nx.gs.adapter.api.kafka.commands.ban.BanCommand} or in-game).
  *
- * <p>Only the primary key {@code id} is required; everything else is optional so
- * a host can surface the subset its schema carries. The schema provider maps its
- * engine's raw ban columns onto the platform-canonical vocabulary
- * ({@link WellKnownBanTypes} / {@link WellKnownBanTargetTypes}) in
- * {@code mapEntity}.</p>
- *
- * <p>A persisted row carries a concrete {@code targetType} — never the
- * {@code HARD} fan-out marker, which exists only on the inbound command.</p>
+ * Only {@code id} is required. Persisted rows carry a concrete {@code targetType}, never the
+ * inbound-only {@code HARD} marker.
  */
 public final class BanDbDto {
 
@@ -53,65 +43,38 @@ public final class BanDbDto {
         this.issuedBy = issuedBy;
     }
 
-    /**
-     * Primary key — the host ban row id, {@code NOT NULL}.
-     */
     public long getId() {
         return id;
     }
 
-    /**
-     * Ban target dimension — a {@link WellKnownBanTargetTypes} value
-     * ({@code CHARACTER} / {@code ACCOUNT} / {@code IP} / {@code HWID}; never
-     * {@code HARD}). {@code null} when the host does not surface it.
-     */
+    /** A {@link WellKnownBanTargetTypes} value. */
     public @Nullable String getTargetType() {
         return targetType;
     }
 
-    /**
-     * The keyed datum for {@link #getTargetType() targetType} — char id (as a
-     * string), account login, plaintext IP, or HWID hash.
-     */
+    /** Char id (as string), account login, plaintext IP, or HWID hash, per {@link #getTargetType() targetType}. */
     public @Nullable String getTargetValue() {
         return targetValue;
     }
 
-    /**
-     * Human-readable name of the target (character or account name), surfaced
-     * because the in-game admin UI displayed it. {@code null} when not synced.
-     */
     public @Nullable String getTargetName() {
         return targetName;
     }
 
-    /**
-     * Ban kind — a {@link WellKnownBanTypes} value. {@code null} when the
-     * host does not surface it.
-     */
+    /** A {@link WellKnownBanTypes} value. */
     public @Nullable String getBanType() {
         return banType;
     }
 
-    /**
-     * Instant the ban lapses; {@code null} means permanent (the host's
-     * "no expiry" sentinel maps to {@code null}).
-     */
+    /** Null means permanent. */
     public @Nullable Instant getExpiresAt() {
         return expiresAt;
     }
 
-    /**
-     * Human-readable ban reason. {@code null} when not synced.
-     */
     public @Nullable String getReason() {
         return reason;
     }
 
-    /**
-     * Who issued the ban — an admin display name or service identifier.
-     * {@code null} when not synced.
-     */
     public @Nullable String getIssuedBy() {
         return issuedBy;
     }

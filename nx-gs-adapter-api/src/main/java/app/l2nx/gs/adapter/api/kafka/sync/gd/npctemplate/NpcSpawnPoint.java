@@ -4,9 +4,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One vertex of a territory-based spawn polygon — a horizontal {@code (x, y)} point
- * with a vertical {@code [zmin, zmax]} band. Carried in {@link NpcSpawn#getTerritory()}
- * for area spawns; point spawns use {@link NpcSpawn}'s scalar coordinates instead.
+ * Territory polygon vertex: horizontal {@code (x, y)} plus a vertical {@code [zmin, zmax]} band.
  */
 public final class NpcSpawnPoint {
 

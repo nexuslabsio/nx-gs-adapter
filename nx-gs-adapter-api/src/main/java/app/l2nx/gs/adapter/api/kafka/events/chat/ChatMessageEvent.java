@@ -8,44 +8,19 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO published to the {@code chat} family topic
- * ({@code <tenant>.gs.events.chat}) for every player-typed chat message. The
- * adapter ships the raw fact — sender, channel, text — and all pattern matching
+ * Raw chat fact published to {@code <tenant>.gs.events.chat} for every player-typed message; pattern matching
  * lives in the platform.
  *
- * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire timestamp is
- * encoded in the upper 48 bits — extractable via
- * {@code app.l2nx.gs.commons.UUIDv7.extractCreatedAt(eventId)}; no separate
- * {@code occurredAt} field. Platform consumers dedupe on the {@code eventId}
- * (at-least-once delivery).</p>
+ * <p>{@code eventId} is a UUIDv7: its upper 48 bits carry the occurrence time (no {@code occurredAt} field), and consumers dedupe on it (at-least-once delivery).</p>
  *
- * <p>{@link #getCharId() charId} is the sender object id and the partition key
- * (8-byte big-endian) so one sender's messages keep occurrence order on a
- * single partition. It is a primitive and therefore cannot carry a wire null,
- * so {@code 0} means <em>no legal sender</em> — the platform itself spoke and
- * there is no character to attribute the line to. That follows the game's own
- * convention for a senderless chat packet; consumers store it as an absent
- * character rather than as object id zero.</p>
+ * <p>{@code charId} is the sender id and partition key (8-byte big-endian). {@code 0} means no legal sender (the
+ * platform itself spoke); consumers store it as an absent character, not object id zero.</p>
  *
- * <p>{@link #getChannel() channel} is a {@link WellKnownChatChannels} code (or
- * {@code UNKNOWN_<int>} for a build-specific channel this catalog does not yet
- * name). {@link #getText() text} is already sanitized host-side.</p>
+ * <p>Target fields are set only on {@link WellKnownChatChannels#WHISPER}. {@code targetCharId} is {@code null}
+ * when the recipient is offline or unresolved, while {@code targetCharName} may still hold the typed name.</p>
  *
- * <p>{@link #getTargetCharId() targetCharId} /
- * {@link #getTargetCharName() targetCharName} are populated only for the
- * {@link WellKnownChatChannels#WHISPER WHISPER} channel; both are {@code null}
- * on every other channel. {@code targetCharId} is {@code null} when the
- * recipient is offline or cannot be resolved, while {@code targetCharName} may
- * still carry the typed recipient name.</p>
- *
- * <p>{@link #getMetadata() metadata} is an optional open string&rarr;string map
- * of build-agnostic attributes ({@code rawType} — the build's numeric chat
- * type, room id, etc.), {@code null} when absent. Hosts MAY add arbitrary keys
- * without an API release; consumers ignore unknown keys.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so parameter-name-binding deserializers (Jackson on the
- * platform, Gson on the adapter) bind without {@code @JsonProperty}.</p>
+ * <p>Java-8 POJO; {@code -parameters} preserves constructor parameter names so Jackson / Gson bind without
+ * {@code @JsonProperty}.</p>
  */
 public final class ChatMessageEvent {
 
@@ -78,16 +53,10 @@ public final class ChatMessageEvent {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * UUIDv7 — upper 48 bits encode occurredAt.
-     */
     public UUID getEventId() {
         return eventId;
     }
 
-    /**
-     * Sender object id. Partition key (8-byte BE).
-     */
     public long getCharId() {
         return charId;
     }
@@ -97,8 +66,7 @@ public final class ChatMessageEvent {
     }
 
     /**
-     * {@link WellKnownChatChannels} code, or {@code UNKNOWN_<int>} for a
-     * build-specific channel this catalog does not name.
+     * {@link WellKnownChatChannels} code, or {@code UNKNOWN_<int>} for a build-specific channel the catalog does not name.
      */
     public String getChannel() {
         return channel;
@@ -109,18 +77,12 @@ public final class ChatMessageEvent {
     }
 
     /**
-     * Whisper recipient object id. Set only on
-     * {@link WellKnownChatChannels#WHISPER WHISPER}; {@code null} on other
-     * channels and when the recipient is offline / unresolved.
+     * Whisper recipient id; {@code null} on other channels and when the recipient is offline / unresolved.
      */
     public @Nullable Long getTargetCharId() {
         return targetCharId;
     }
 
-    /**
-     * Whisper recipient name. Set only on
-     * {@link WellKnownChatChannels#WHISPER WHISPER}.
-     */
     public @Nullable String getTargetCharName() {
         return targetCharName;
     }

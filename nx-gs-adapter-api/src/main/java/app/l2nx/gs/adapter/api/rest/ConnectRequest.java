@@ -3,9 +3,7 @@ package app.l2nx.gs.adapter.api.rest;
 import java.util.Objects;
 
 /**
- * Adapter handshake request body.
- *
- * <p>Wire JSON shape: <code>{"adapterVersion": "..."}</code></p>
+ * Adapter handshake request, e.g. <code>{"adapterVersion": "..."}</code>.
  *
  * @see ConnectResponse
  */
@@ -13,18 +11,11 @@ public final class ConnectRequest {
 
     private final String adapterVersion;
 
-    /**
-     * All-args constructor used by JSON binders: Spring/Jackson via parameter-name binding
-     * (requires {@code -parameters} compile flag, configured in this module's build), Gson
-     * via field reflection.
-     */
+    /** Spring/Jackson bind by parameter name (needs {@code -parameters}); Gson uses field reflection. */
     public ConnectRequest(String adapterVersion) {
         this.adapterVersion = adapterVersion;
     }
 
-    /**
-     * Adapter version as reported by the JAR manifest, or operator override.
-     */
     public String getAdapterVersion() {
         return adapterVersion;
     }
@@ -55,9 +46,6 @@ public final class ConnectRequest {
         return "ConnectRequest[adapterVersion=" + adapterVersion + "]";
     }
 
-    /**
-     * Hand-written builder — mirrors the {@code @Builder(toBuilder = true)} ergonomics of records.
-     */
     public static final class Builder {
         private String adapterVersion;
 

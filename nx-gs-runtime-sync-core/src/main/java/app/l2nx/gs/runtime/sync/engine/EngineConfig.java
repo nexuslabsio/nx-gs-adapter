@@ -11,22 +11,7 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.function.Function;
 
-/**
- * Operator-owned tuning knobs for the runtime-sync engine. Values are read once
- * at engine start and cached for the engine lifetime — no live reload, full
- * handshake required to retune.
- *
- * <p>Source chain (file-first, matching the adapter's bootstrap config):</p>
- * <ol>
- *     <li>{@code l2nx.properties} on disk (path from {@code -Dl2nx.config-file},
- *     or cwd default).</li>
- *     <li>JVM system properties as fallback.</li>
- * </ol>
- *
- * <p>Keys are namespaced under {@code l2nx.runtime-sync.*} — independent of
- * {@code l2nx.cdc-engine.*} so the two engines tune independently (different
- * tick cadences, different latency budgets).</p>
- */
+/** Read once at engine start, no live reload. {@code l2nx.properties} wins over system properties; keys are independent of {@code l2nx.cdc-engine.*}. */
 public final class EngineConfig {
 
     public static final String KEY_TICK_INTERVAL_SECONDS = "l2nx.runtime-sync.tick-interval-seconds";
@@ -58,13 +43,7 @@ public final class EngineConfig {
         return publishFlushSeconds;
     }
 
-    /**
-     * Resolves the shared scheduler pool size. If the operator set
-     * {@code l2nx.runtime-sync.workers} explicitly, use it; otherwise derive
-     * {@code max(2, min(entityCount, cores/2))} so a 1-entity adapter still
-     * gets two threads (tick + room for an overrun warning) and a wide adapter
-     * never out-allocates half the host's cores.
-     */
+    /** Explicit {@code workers} override, else {@code max(2, min(entityCount, cores/2))} so one entity still gets a spare thread for overrun warnings. */
     public int workers(int entityCount) {
         if (workersOverride != null) {
             return workersOverride;
@@ -82,10 +61,6 @@ public final class EngineConfig {
         return new EngineConfig(DEFAULT_TICK_INTERVAL_SECONDS, DEFAULT_PUBLISH_FLUSH_SECONDS);
     }
 
-    /**
-     * Production source chain — file ({@code -Dl2nx.config-file} or cwd
-     * default {@code l2nx.properties}) wins over JVM system properties.
-     */
     public static Function<String, String> productionChain() {
         Properties fileProps = loadFileProperties(System::getProperty);
         return fileFirstChain(fileProps, System::getProperty);

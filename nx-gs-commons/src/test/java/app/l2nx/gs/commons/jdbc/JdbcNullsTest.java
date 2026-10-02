@@ -35,7 +35,6 @@ class JdbcNullsTest {
         when(rs.getInt("col")).thenReturn(0);
         when(rs.wasNull()).thenReturn(false);
 
-        // wasNull == false dominates — real 0 is preserved, not coerced to null.
         assertEquals(Integer.valueOf(0), JdbcNulls.nullableInt(rs, "col"));
     }
 

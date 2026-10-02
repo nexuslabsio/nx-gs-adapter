@@ -5,25 +5,14 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inbound command instructing the game-server to disconnect an online
- * character, either dropping it to the login screen or closing the client
- * outright.
+ * Disconnects an online character, either dropping it to the login screen or closing the client.
  *
- * <p>Reply:
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link KickCharacterResult}{@code >}.
- * Error statuses: {@code NOT_FOUND} (no such character), {@code INVALID_STATE}
- * (character exists but is not online), {@code VALIDATION_FAILED} ({@code charId}
- * missing / out of range), {@code INTERNAL_ERROR}.</p>
+ * <p>Reply: {@code CommandResult<KickCharacterResult>}. Errors: {@code NOT_FOUND} (no such character),
+ * {@code INVALID_STATE} (not online), {@code VALIDATION_FAILED} ({@code charId} missing / out of range),
+ * {@code INTERNAL_ERROR}.</p>
  *
- * <p><b>Partitioning.</b> Routed by {@link #getCharId() charId} on the commands
- * topic.</p>
- *
- * <p><b>Idempotency.</b> Not idempotent by nature (a second delivery after the
- * player relogged would kick them again) — hosts dedupe on the correlation
- * id.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * <p>Routed by {@code charId}. Not idempotent (a re-delivery after the player relogged kicks again), so hosts
+ * dedupe on the correlation id.</p>
  */
 public final class KickCharacterCommand implements NxCommand<KickCharacterResult> {
 
@@ -40,25 +29,16 @@ public final class KickCharacterCommand implements NxCommand<KickCharacterResult
         this.staffNotes = staffNotes;
     }
 
-    /**
-     * Target character's primary key. REQUIRED.
-     */
     public Long getCharId() {
         return charId;
     }
 
-    /**
-     * {@code true} closes the game client; {@code false} drops the player to
-     * the login screen.
-     */
+    /** {@code true} closes the game client; {@code false} drops the player to the login screen. */
     public boolean isCloseClient() {
         return closeClient;
     }
 
-    /**
-     * Staff-only note: never shown in-game, logged by the host, surfaced on the
-     * platform's command audit. OPTIONAL.
-     */
+    /** Staff-only note: never shown in-game, logged by the host and surfaced on the platform command audit. */
     public @Nullable String getStaffNotes() {
         return staffNotes;
     }

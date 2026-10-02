@@ -84,7 +84,6 @@ class CdcEngineE2ETest {
             st.execute("INSERT INTO clan_data VALUES (1, 'Hellbound', 5, 100, 0)");
             st.execute("INSERT INTO clan_data VALUES (2, 'Phoenix', 3, 200, 50)");
             st.execute("INSERT INTO clan_data VALUES (3, 'Dragons', 7, 300, 50)");
-            // Clan 1 — 2 skills; clan 2 — 2 skills; clan 3 — none.
             st.execute("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (1, 101, 1)");
             st.execute("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (1, 102, 2)");
             st.execute("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (2, 201, 5)");
@@ -123,8 +122,6 @@ class CdcEngineE2ETest {
         try (KafkaConsumer<byte[], byte[]> consumer = newConsumer()) {
             consumer.subscribe(Collections.singletonList(TOPIC));
 
-            // Cycle 1 — initial sync: 3 CREATED events; payloads carry the assembled
-            // skills lists pulled from clan_skills.
             awaitTick();
             List<ConsumerRecord<byte[], byte[]>> initial = poll(consumer, 3);
             assertEquals(3, initial.size(), "initial sync emits one event per existing clan");
@@ -143,7 +140,6 @@ class CdcEngineE2ETest {
             assertSkillsContain(byClanId.get(1L), 101, 1);
             assertSkillsContain(byClanId.get(1L), 102, 2);
 
-            // Cycle 2 — primary-only mutation: rename clan 2 → exactly one UPDATED.
             try (Connection c = jdbc();
                     PreparedStatement ps = c.prepareStatement("UPDATE clan_data SET clan_name = ? WHERE clan_id = ?")) {
                 ps.setString(1, "Phoenix-renamed");
@@ -156,7 +152,6 @@ class CdcEngineE2ETest {
             assertEquals("Phoenix-renamed", renameEvent.getPayload().getName());
             assertEquals(2, renameEvent.getPayload().getSkills().size(), "skill list survives a primary-only rename");
 
-            // Cycle 3 — child INSERT: add a new skill row for clan 1 → UPDATED with 3 skills.
             try (Connection c = jdbc();
                     Statement st = c.createStatement()) {
                 st.executeUpdate("INSERT INTO clan_skills (clan_id, skill_id, skill_level) VALUES (1, 103, 4)");
@@ -167,7 +162,6 @@ class CdcEngineE2ETest {
             assertEquals(3, addSkillEvent.getPayload().getSkills().size());
             assertSkillsContain(addSkillEvent.getPayload(), 103, 4);
 
-            // Cycle 4 — child UPDATE: change a skill level for clan 2 → UPDATED with new level.
             try (Connection c = jdbc();
                     Statement st = c.createStatement()) {
                 st.executeUpdate("UPDATE clan_skills SET skill_level = 99 " + "WHERE clan_id = 2 AND skill_id = 201");
@@ -177,7 +171,6 @@ class CdcEngineE2ETest {
             assertEquals(2L, levelEvent.getPk());
             assertSkillsContain(levelEvent.getPayload(), 201, 99);
 
-            // Cycle 5 — child DELETE: drop a skill for clan 1 → UPDATED with 2 skills.
             try (Connection c = jdbc();
                     Statement st = c.createStatement()) {
                 st.executeUpdate("DELETE FROM clan_skills WHERE clan_id = 1 AND skill_id = 101");
@@ -187,7 +180,6 @@ class CdcEngineE2ETest {
             assertEquals(1L, dropSkillEvent.getPk());
             assertEquals(2, dropSkillEvent.getPayload().getSkills().size());
 
-            // Cycle 6 — primary DELETE on a non-boundary row (clan 2) → tombstone.
             try (Connection c = jdbc();
                     Statement st = c.createStatement()) {
                 st.executeUpdate("DELETE FROM clan_data WHERE clan_id = 2");
@@ -196,11 +188,8 @@ class CdcEngineE2ETest {
             ConsumerRecord<byte[], byte[]> tombstone1 = expectSingleTombstone(consumer);
             assertEquals(2L, decodeKey(tombstone1.key()));
 
-            // Cycle 7 — envelope regression: delete the current MAX(clan_id) row (clan 3).
-            // Pre-fix, the next cycle's MAX_db would shrink to 1 and clan 3 would
-            // never re-enter any window — its DELETE would silently never fire.
-            // Post-fix, the window envelope includes max(MAX_db, MAX_snapshot) = 3,
-            // so the window covers PK 3 and the diff produces a tombstone.
+            // Regression: deleting the current MAX row must still fire a DELETE; the envelope includes max(MAX_db,
+            // MAX_snapshot).
             try (Connection c = jdbc();
                     Statement st = c.createStatement()) {
                 st.executeUpdate("DELETE FROM clan_data WHERE clan_id = 3");
@@ -213,7 +202,6 @@ class CdcEngineE2ETest {
                     "envelope-based windowing must catch deletion of the prior MAX(pk)");
         }
 
-        // Stats — entity HEALTHY, consecutiveErrors stays at 0 across the run.
         List<EntityStats> entities = statsTracker.currentStatuses();
         assertEquals(1, entities.size());
         EntityStats clanStats = entities.get(0);
@@ -221,7 +209,6 @@ class CdcEngineE2ETest {
         assertEquals(EntityState.HEALTHY, clanStats.getState());
         assertEquals(Integer.valueOf(0), clanStats.getConsecutiveErrors());
 
-        // HeartbeatEvent shape — db-sync module ACTIVE, entities[clan]=HEALTHY.
         ModuleStatus dbSyncStatus = ModuleStatus.builder()
                 .name("db-sync")
                 .state("ACTIVE")
@@ -248,9 +235,7 @@ class CdcEngineE2ETest {
 
     @Test
     void engine_shouldRepublishRowsAsUpdatedAndEmitCompletion_onWholeEntityForceResync() throws Exception {
-        // Own topic — the consumer group reads from earliest and must not see
-        // records produced by the other scenario; the clan_data rows themselves
-        // are whatever the shared schema currently holds (order-independent).
+        // Own topic: the consumer reads from earliest and must not see the other scenario's records.
         String topic = "test.gs.sync.clans.resync";
         List<Object> adapterEvents = Collections.synchronizedList(new ArrayList<>());
         engine = buildEngine(new EntityStatsTracker(), topic, RecordingNxEvents.into(adapterEvents));
@@ -262,7 +247,6 @@ class CdcEngineE2ETest {
         try (KafkaConsumer<byte[], byte[]> consumer = newConsumer()) {
             consumer.subscribe(Collections.singletonList(topic));
 
-            // Cycle 1 — full sync: snapshot now holds the real CRC of every row.
             awaitTick();
             List<ConsumerRecord<byte[], byte[]>> initial = poll(consumer, clanCount);
             assertEquals(clanCount, initial.size(), "first cycle publishes every existing clan");
@@ -272,12 +256,9 @@ class CdcEngineE2ETest {
                 syncedPks.add(decodeKey(record.key()));
             }
 
-            // No DB change — a forced whole-entity resync must still re-publish
-            // every row, as UPDATED with full payload.
             UUID resyncId = UUID.fromString("018f0000-0000-7000-8000-0000000000ee");
             assertTrue(engine.requestForceResync(resyncId, "clan"));
 
-            // requestForceResync submits an immediate guarded cycle on the pool.
             List<ConsumerRecord<byte[], byte[]>> republished = poll(consumer, clanCount);
             assertEquals(clanCount, republished.size(), "every synced row re-published");
             Set<Long> republishedPks = new HashSet<>();
@@ -346,7 +327,7 @@ class CdcEngineE2ETest {
 
     private CdcEngine buildEngine(EntityStatsTracker statsTracker, String topic, NxEvents events) {
         EngineConfig config = new EngineConfig(
-                /* tickIntervalSeconds */ 60, // unused — driven by tickOnceSynchronously()
+                /* tickIntervalSeconds */ 60,
                 /* rowsPerWindow */ 500_000,
                 /* queryTimeoutSeconds */ 10,
                 /* publishFlushSeconds */ 5);
@@ -397,10 +378,7 @@ class CdcEngineE2ETest {
     }
 
     private static List<ConsumerRecord<byte[], byte[]>> poll(KafkaConsumer<byte[], byte[]> consumer, int expected) {
-        // Single poll loop — polling itself drives metadata refresh and group
-        // join, so a record-collecting loop covers both the assignment-wait and
-        // the record-delivery phases. A separate "drain until assigned" wait
-        // would silently consume records and discard them.
+        // Single poll loop: a separate drain-until-assigned wait would silently discard records.
         List<ConsumerRecord<byte[], byte[]>> collected = new ArrayList<>();
         long deadline = System.currentTimeMillis() + 60_000L;
         while (System.currentTimeMillis() < deadline && collected.size() < expected) {

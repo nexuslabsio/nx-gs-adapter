@@ -42,7 +42,6 @@ class NxAdapterStateChangeOrderTest {
 
         NxAdapter.simulateConnectOutcomeForTesting(ConnectFlow.Outcome.STARTING);
         NxAdapter.simulateConnectOutcomeForTesting(ConnectFlow.Outcome.ACTIVE);
-        // start() with no l2nx.gs-key fails config resolve → FAILED before CLOSED.
         NxAdapter.start().shutdown();
 
         assertEquals(

@@ -9,32 +9,14 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Discrete server-lifecycle fact — emitted once when the game server has
- * finished loading the world and is accepting (or about to accept) logins.
- * Joins {@link ServerOnlineSnapshotEvent} on the {@code serveronline} family
- * ({@code <tenant>.gs.events.serveronline}); the two share a topic and are
- * dispatched by the {@code Nx-Message-Type} header.
+ * Emitted once when the server has finished loading the world and is accepting logins; shares the
+ * {@code serveronline} topic with {@link ServerOnlineSnapshotEvent} (dispatched by {@code Nx-Message-Type}).
  *
- * <p>The host owns suppression of this event during scheduled maintenance
- * restarts — it simply does not emit a started / stopping event inside its
- * restart window. The platform applies no restart-time logic.</p>
+ * <p>The host owns suppression during scheduled maintenance restarts; the platform applies no restart
+ * logic. {@code eventId} is a UUIDv7 idempotency key. {@code metadata} carries {@link WellKnownServerStartMetadata}
+ * keys; a consumer SHOULD mute its "server is up" notification when {@code gm_only=true}.</p>
  *
- * <p>Fields:
- * <ul>
- *   <li>{@link #getEventId() eventId} — UUIDv7, REQUIRED. Idempotency key;
- *   platform extracts {@code occurredAt} from the time-ordered prefix.</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic startup attributes; {@code null} when absent. Canonical key
- *   in {@link WellKnownServerStartMetadata}: {@code gm_only} ({@code "true"} /
- *   {@code "false"}) — whether the server started in GM-only mode. A consumer
- *   SHOULD mute its "server is up" notification when {@code gm_only=true}
- *   (a GM-only startup is a maintenance state, not an "open for players"
- *   announcement). Hosts MAY publish arbitrary non-canonical keys.</li>
- * </ul>
- *
- * <p>Partition key: {@code null} (round-robin); ordering per server is preserved
- * via the UUIDv7 {@code eventId} timestamp, consumers group by the
- * {@code Nx-Server-Id} header.</p>
+ * <p>Partition key is {@code null} (round-robin); consumers group by the {@code Nx-Server-Id} header.</p>
  */
 public final class ServerStartedEvent {
 

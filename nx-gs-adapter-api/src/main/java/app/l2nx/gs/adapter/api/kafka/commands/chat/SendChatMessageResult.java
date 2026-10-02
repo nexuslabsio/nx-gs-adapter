@@ -2,14 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.commands.chat;
 
 import java.util.Objects;
 
-/**
- * Success payload of {@link SendChatMessageCommand}. Pure telemetry — the
- * platform stores the message from its own echo event, not from this reply, so
- * neither field is load-bearing for correctness.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
- */
+/** Telemetry only: the platform stores the message from its echo event, not from this reply. */
 public final class SendChatMessageResult {
 
     private final int linesSent;
@@ -20,19 +13,12 @@ public final class SendChatMessageResult {
         this.recipients = recipients;
     }
 
-    /**
-     * Physical chat lines emitted — the count of non-empty lines after the host
-     * splits {@link SendChatMessageCommand#getText()} on {@code \n}.
-     */
+    /** Non-empty lines after the host splits the text on {@code \n}. */
     public int getLinesSent() {
         return linesSent;
     }
 
-    /**
-     * Online recipients the packet actually reached. Best-effort; hosts that do
-     * not track this MAY report {@code 0}, so a zero here does NOT mean the
-     * message failed.
-     */
+    /** Best-effort; hosts that do not track it MAY report {@code 0}, which does NOT mean failure. */
     public int getRecipients() {
         return recipients;
     }

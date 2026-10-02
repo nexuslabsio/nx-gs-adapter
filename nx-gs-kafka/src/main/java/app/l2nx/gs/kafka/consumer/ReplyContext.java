@@ -9,15 +9,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;
 
 /**
- * Provides reply capability for request-reply messaging.
- * Compatible with Spring Kafka's {@code ReplyingKafkaTemplate} protocol.
- *
- * <p>Extracts {@code kafka_replyTopic} and {@code kafka_correlationId} headers
- * from the incoming record. Call {@link #reply(Object)} to send a JSON-serialized
- * response to the reply topic with the same correlation ID.</p>
- *
- * <p>If the incoming message has no reply headers, {@link #reply(Object)} is a
- * no-op with a warning log.</p>
+ * Reply support compatible with Spring Kafka {@code ReplyingKafkaTemplate}; reply() is a warn-logged no-op without a reply topic header.
  */
 public class ReplyContext {
 
@@ -36,21 +28,10 @@ public class ReplyContext {
         this.correlationId = extractRawHeader(record, HEADER_CORRELATION_ID);
     }
 
-    /**
-     * Returns {@code true} if the incoming message contains reply headers.
-     */
     public boolean hasReplyTopic() {
         return replyTopic != null;
     }
 
-    /**
-     * Sends a reply to the requester's reply topic with the same correlation ID.
-     * The response is serialized to JSON via Gson by the producer.
-     *
-     * <p>No-op with warning if the incoming message had no reply headers.</p>
-     *
-     * @param response the object to serialize and send as reply
-     */
     public void reply(Object response) {
         if (replyTopic == null) {
             log.warn("Cannot reply: incoming message has no {} header", HEADER_REPLY_TOPIC);
@@ -69,7 +50,7 @@ public class ReplyContext {
     }
 
     private static String extractStringHeader(ConsumerRecord<?, ?> record, String key) {
-        // Spring Kafka writes these headers raw — do not JSON-parse
+        // Spring Kafka writes these headers raw, not JSON
         Header header = record.headers().lastHeader(key);
         if (header == null || header.value() == null) {
             return null;

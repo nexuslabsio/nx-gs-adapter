@@ -7,24 +7,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one clan, payload of {@code SyncEvent<ClanDbDto>} on the
- * per-tenant clan sync topic.
+ * Wire DTO for one clan, payload of {@code SyncEvent<ClanDbDto>}. {@code id} and {@code name} are required.
  *
- * <p>Required: {@link #getId() id} (source-side {@code clan_id}) and
- * {@link #getName() name} (source-side {@code clan_name}). Schema
- * providers MUST drop dirty rows that lack either rather than ship
- * placeholders. {@link #getLevel() level} is optional — historical schemas
- * leave it unset on freshly-created clans before the next save tick.</p>
- *
- * <p>Schema providers translate source sentinels (typically
- * {@code leader_id} / {@code ally_id} = 0) to {@code null} so the platform
- * sees explicit absence. {@code skills} is {@code null} when the tenant
- * does not sync skills at all (no {@code ChildSource} declared), empty
- * list when the clan has none — Gson's default
- * {@code serializeNulls=false} preserves that distinction on the wire.
- * {@code icon} carries the clan crest as already-decoded PNG bytes
- * (schema provider converts its native blob format in {@code mapEntity});
- * {@code null} when no crest is synced or the source row has no reference.</p>
+ * Zero sentinels ({@code leader_id}/{@code ally_id}) map to null. {@code skills} is null when the tenant does
+ * not sync skills, empty when none. {@code icon} is the crest as decoded PNG bytes.
  */
 public final class ClanDbDto {
 

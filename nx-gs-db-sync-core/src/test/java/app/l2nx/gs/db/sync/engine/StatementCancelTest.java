@@ -13,7 +13,7 @@ class StatementCancelTest {
     @Test
     void cancelCurrent_shouldNoOp_whenNoStatementRegistered() {
         StatementRegistry registry = new StatementRegistry();
-        registry.cancelCurrent(); // must not throw
+        registry.cancelCurrent();
     }
 
     @Test
@@ -34,7 +34,6 @@ class StatementCancelTest {
         doThrow(new SQLException("cancel unsupported")).when(statement).cancel();
         registry.set(statement);
 
-        // Must not propagate.
         registry.cancelCurrent();
         verify(statement).cancel();
     }
@@ -52,9 +51,6 @@ class StatementCancelTest {
 
     @Test
     void cdcEngineStop_shouldCancelInFlightStatements() {
-        // Sanity check: the engine wires task.cancelCurrentStatement() into stop().
-        // Direct unit test on the registry covers the cancel call itself;
-        // CdcEngineE2E covers the full path end-to-end.
         assertNotNull(new StatementRegistry());
     }
 }

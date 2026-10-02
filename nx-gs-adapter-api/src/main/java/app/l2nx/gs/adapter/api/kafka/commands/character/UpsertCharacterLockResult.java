@@ -2,14 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.commands.character;
 
 import java.util.Objects;
 
-/**
- * Success payload of {@link UpsertCharacterLockCommand}. Echoes the
- * post-upsert state of the one lock the command named, so the platform sees
- * the truth that lands on the host without a follow-up read.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
- */
+/** Post-upsert state of the one lock the command named, so the platform needs no follow-up read. */
 public final class UpsertCharacterLockResult {
 
     private final Long charId;
@@ -26,17 +19,10 @@ public final class UpsertCharacterLockResult {
         this.lock = lock;
     }
 
-    /**
-     * Target character's primary key the upsert was applied to.
-     */
     public Long getCharId() {
         return charId;
     }
 
-    /**
-     * Final state of the affected lock — type, active flag, and value after
-     * the set/clear.
-     */
     public CharacterLockState getLock() {
         return lock;
     }

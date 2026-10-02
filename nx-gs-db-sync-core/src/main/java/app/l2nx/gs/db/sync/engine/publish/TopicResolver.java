@@ -5,27 +5,13 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Resolves entity name → Kafka topic from the platform-supplied
- * {@code ConnectContext.syncTopics()} map. Cached as an immutable snapshot at
- * engine start; not re-resolved per cycle (a topic re-key would arrive only on
- * a fresh handshake, which already triggers a full engine rebuild).
- */
+/** Entity to topic map from {@code ConnectContext.syncTopics()}, cached at engine start (a re-key arrives only via a handshake that rebuilds the engine). */
 @FunctionalInterface
 public interface TopicResolver {
 
-    /**
-     * @return the topic name for the given entity, or {@code null} if the
-     * platform did not publish a topic for it. Engine treats null as
-     * "entity DEGRADED, no Kafka publishes for the entity".
-     */
+    /** Returns {@code null} when no topic was published; the engine then marks the entity DEGRADED. */
     String resolveTopic(String entityName);
 
-    /**
-     * Snapshot factory: copies the supplied map at engine start so a later
-     * mutation of the source map (defensive code only — {@code ConnectContext}
-     * already exposes an unmodifiable view) cannot affect the running engine.
-     */
     static TopicResolver fromSnapshot(Map<String, String> source) {
         Map<String, String> snapshot;
         if (source == null || source.isEmpty()) {
@@ -36,10 +22,6 @@ public interface TopicResolver {
         return entityName -> snapshot.get(entityName);
     }
 
-    /**
-     * Convenience binding to a {@link ConnectContext} — reads the {@code db}
-     * namespace of {@code syncTopics} (db-sync's slice).
-     */
     static TopicResolver fromContext(ConnectContext ctx) {
         if (ctx == null || ctx.getSyncTopics() == null) {
             return fromSnapshot(null);

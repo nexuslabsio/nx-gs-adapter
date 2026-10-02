@@ -12,11 +12,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * Compile-smoke for the Tier-2 SPI contract: an anonymous-class implementation
- * wires up cleanly and round-trips the values it declares. Guards against
- * accidental method-signature changes.
- */
 class DbSchemaProviderTest {
 
     @Test

@@ -17,8 +17,7 @@ final class ConsoleNxLog implements NxLog {
 
     @Override
     public void debug(String message, Object... args) {
-        // Console fallback does not print debug messages.
-        // Use SLF4J with a binding for debug-level logging.
+        // console fallback has no debug; use an SLF4J binding for debug logging
     }
 
     @Override
@@ -41,7 +40,7 @@ final class ConsoleNxLog implements NxLog {
         String formatted = format(message, args);
         stream.println(PREFIX + " [" + level + "] " + timestamp + " " + name + " - " + formatted);
 
-        // If the last arg is a Throwable and was not consumed by a placeholder, print its stack trace
+        // unconsumed trailing Throwable: print its stack trace
         if (args != null && args.length > 0 && args[args.length - 1] instanceof Throwable) {
             int placeholders = countPlaceholders(message);
             if (placeholders < args.length) {

@@ -4,23 +4,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One stat modification a skill (or one of its effects) applies — the build-agnostic
- * projection of a core function template ({@code <add>} / {@code <mul>} / … nodes in
- * L2J-family datapacks). This is the substance of passive skills and buffs: which stat
- * is modified, how, and by how much.
- *
- * <p>{@code stat} is the canonical UPPER_SNAKE stat token (the core stat-enum name, e.g.
- * {@code POWER_ATTACK}, {@code MAX_HP}, {@code MOVE_SPEED}) — same vocabulary as item
- * stat bonuses. {@code op} is the canonical UPPER_SNAKE operation token derived from the
- * core function kind ({@code ADD} / {@code SUB} / {@code MUL} / {@code BASE_MUL} /
- * {@code DIV} / {@code SET} / {@code SHARE} / {@code ENCHANT} / {@code ENCHANT_ADD} /
- * {@code ENCHANT_HP} / {@code ENCHANT_MUL} / {@code GET}). Both are non-null identity.</p>
- *
- * <p>{@code value} is the constant operand; {@code null} when the core computes the
- * operand dynamically (a formula over caster state) — the modifier still names the stat
- * and operation, only the magnitude is runtime-dependent. {@code order} is the core's
- * application-order byte (modifiers of the same stat apply in ascending order);
- * {@code null} when not supplied.</p>
+ * One stat modification of a skill or effect, projected from a core function template. {@code stat} (core
+ * stat-enum name, e.g. {@code MAX_HP}) and {@code op} (core function kind, e.g. {@code ADD}, {@code BASE_MUL})
+ * are non-null UPPER_SNAKE tokens. {@code value} is {@code null} when the core computes the operand at runtime;
+ * {@code order} is the ascending application order among modifiers of the same stat.
  */
 public final class SkillStatModifier {
 
@@ -36,31 +23,18 @@ public final class SkillStatModifier {
         this.order = order;
     }
 
-    /**
-     * Canonical UPPER_SNAKE stat token (core stat-enum name).
-     */
     public String getStat() {
         return stat;
     }
 
-    /**
-     * Canonical UPPER_SNAKE operation token (core function kind).
-     */
     public String getOp() {
         return op;
     }
 
-    /**
-     * Constant operand; {@code null} when the core computes it dynamically.
-     */
     public @Nullable Double getValue() {
         return value;
     }
 
-    /**
-     * Application order among modifiers of the same stat (ascending); {@code null} if
-     * not supplied.
-     */
     public @Nullable Integer getOrder() {
         return order;
     }

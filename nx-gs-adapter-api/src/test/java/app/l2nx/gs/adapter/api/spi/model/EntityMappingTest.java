@@ -10,10 +10,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/**
- * Compile-smoke for the Tier-2 SPI contract: an anonymous-class implementation
- * declares all required surface and round-trips the values it returns.
- */
 class EntityMappingTest {
 
     @Test
@@ -125,7 +121,6 @@ class EntityMappingTest {
 
         assertEquals(1, mapping.children().size());
         assertSame(skills, mapping.children().get(0));
-        // mapEntity round-trip with two child rows
         Map<String, List<Object>> children = Collections.singletonMap("clan_skills", Arrays.asList("a", "b"));
         assertEquals("primary|2", mapping.mapEntity("primary", children));
         assertNotNull(mapping.children());

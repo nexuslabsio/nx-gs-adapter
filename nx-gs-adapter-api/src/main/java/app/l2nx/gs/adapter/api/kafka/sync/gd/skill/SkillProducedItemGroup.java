@@ -7,14 +7,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One produced item group of an extractable {@link SkillLevel} — skills that open /
- * convert an item into other items (capsules, event boxes, lottery-style extractors)
- * roll one of several groups; the rolled group grants all of its {@link SkillProducedItem}
- * entries together.
- *
- * <p>{@code chancePercent} is the group's roll chance; {@code enchantLevel} is the
- * enchant applied to the produced items ({@code null} when none). {@code items} is the
- * non-null produced bundle (≥1 entry).</p>
+ * One produced item group of an extractable {@link SkillLevel}: the skill rolls one of several groups, which
+ * grants all of its {@link SkillProducedItem} entries together. {@code items} is non-null, at least one entry.
  */
 public final class SkillProducedItemGroup {
 
@@ -34,16 +28,11 @@ public final class SkillProducedItemGroup {
         return chancePercent;
     }
 
-    /**
-     * Enchant level applied to the produced items; {@code null} when none.
-     */
+    /** {@code null} when produced items are not enchanted. */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }
 
-    /**
-     * Items produced together when this group is rolled.
-     */
     public List<SkillProducedItem> getItems() {
         return items;
     }

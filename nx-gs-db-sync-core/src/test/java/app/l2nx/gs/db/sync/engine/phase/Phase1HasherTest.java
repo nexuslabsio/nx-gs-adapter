@@ -289,8 +289,7 @@ class Phase1HasherTest {
             Window targeted = Window.ofPks(new LongArrayList(Arrays.asList(42L, 43L)));
             new Phase1Hasher().hashPrimary(conn, targeted, primary, 5, 10_000, dialect);
 
-            // Bounded fast-path never uses the MySQL Integer.MIN_VALUE streaming
-            // sentinel — a plain positive fetch size for every dialect.
+            // Bounded fast-path uses a plain positive fetch size for every dialect.
             verify(ps).setFetchSize(10_000);
             verify(ps, never()).setFetchSize(Integer.MIN_VALUE);
         }

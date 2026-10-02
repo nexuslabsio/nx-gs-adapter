@@ -3,12 +3,7 @@ package app.l2nx.gs.db.sync.engine.jdbc;
 import java.sql.Statement;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Tracks the JDBC {@link Statement} currently executing for a sync task so
- * the engine can {@link Statement#cancel()} it on shutdown. Without this,
- * a hung query inside Phase-1 / Phase-2 keeps the daemon thread blocked
- * until the driver-side socket timeout fires.
- */
+/** Tracks the executing {@link Statement} so shutdown can cancel it instead of waiting for the driver socket timeout. */
 public final class StatementRegistry {
 
     private volatile @Nullable Statement current;
@@ -31,7 +26,7 @@ public final class StatementRegistry {
             try {
                 s.cancel();
             } catch (Throwable ignore) {
-                // Best-effort — JDBC drivers vary in cancellation support.
+                // Cancellation support varies by driver.
             }
         }
     }

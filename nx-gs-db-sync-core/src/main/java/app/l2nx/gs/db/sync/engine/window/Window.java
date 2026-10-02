@@ -6,22 +6,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A PK window for one Phase-1 hash query. Two shapes:
- *
- * <ul>
- *   <li><b>Range</b> — closed interval {@code [fromPk, toPk]} matching
- *   {@code WHERE pk BETWEEN ? AND ?}. Produced by {@link WindowPlanner#plan},
- *   used by full scheduled / whole-entity cycles.</li>
- *   <li><b>Targeted</b> — an explicit PK list matching
- *   {@code WHERE pk IN (?, ?, ...)}. Produced by
- *   {@link WindowPlanner#planTargeted}, used by the per-PK force-resync
- *   fast-path so a triggered cycle hashes only the invalidated rows instead of
- *   full-scanning the table. {@code fromPk} / {@code toPk} are the min / max of
- *   the PK list (so snapshot bucketing still works), but the WHERE clause is an
- *   {@code IN}-list, not a range.</li>
- * </ul>
- *
- * <p>Consumed by {@link app.l2nx.gs.db.sync.engine.phase.Phase1Hasher}.</p>
+ * A PK window for one Phase-1 query: either a closed range ({@code BETWEEN}, from {@link WindowPlanner#plan}) or a targeted
+ * {@code IN}-list ({@link WindowPlanner#planTargeted}); a targeted window's {@code fromPk}/{@code toPk} are the list's min/max for snapshot bucketing.
  */
 public final class Window {
 
@@ -44,11 +30,7 @@ public final class Window {
         this.pks = pks;
     }
 
-    /**
-     * Builds a targeted {@code IN}-list window from an explicit, non-empty PK
-     * list. The list is copied defensively; {@code fromPk} / {@code toPk} are
-     * set to its min / max so snapshot bucketing locates the window.
-     */
+    /** Copies the non-empty list defensively; {@code fromPk}/{@code toPk} are its min/max. */
     public static Window ofPks(LongList pks) {
         if (pks == null || pks.isEmpty()) {
             throw new IllegalArgumentException("targeted Window requires a non-empty PK list");
@@ -72,18 +54,11 @@ public final class Window {
         return toPk;
     }
 
-    /**
-     * {@code true} when this is a targeted {@code IN}-list window;
-     * {@code false} for a range window.
-     */
     public boolean targeted() {
         return pks != null;
     }
 
-    /**
-     * The explicit PK list of a targeted window. {@code null} for a range
-     * window — callers must guard with {@link #targeted()}.
-     */
+    /** {@code null} for a range window; guard with {@link #targeted()}. */
     public @Nullable LongList pks() {
         return pks;
     }

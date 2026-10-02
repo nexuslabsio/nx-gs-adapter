@@ -4,40 +4,15 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Reply envelope for an inbound {@link NxCommand}. Travels on
- * {@code <tenant>.gs.commands.replies} with header {@code Nx-Correlation-Id}
- * echoed from the inbound command and {@code Nx-Message-Type =
- * "<OriginalCommandClassNameWithoutCommandSuffix>Result"} (e.g.
- * {@code "TransferItemToCharacterResult"}).
+ * Reply envelope for an inbound {@link NxCommand}, sent on {@code <tenant>.gs.commands.replies} with
+ * {@code Nx-Correlation-Id} echoed and {@code Nx-Message-Type = "<CommandNameWithoutCommandSuffix>Result"}.
  *
- * <p><b>Invariant.</b> {@link #getPayload() payload} is non-null iff
- * {@link #getStatus() status} is {@link CommandStatus#OK}; {@link #getProblem()
- * problem} is non-null iff status is NOT OK. The constructor enforces this
- * for programmatic construction. Wire-path Gson bypasses the constructor —
- * platform consumers SHOULD assume the invariant when reading.</p>
+ * <p>Invariant: payload is non-null iff status is OK; problem is non-null iff status is not OK. The constructor
+ * enforces it, but Gson bypasses the constructor, so consumers should assume it when reading.</p>
  *
- * <p>Common shapes:</p>
- * <pre>
- *   CommandResult.&lt;DeleteItemResult&gt;ok(new DeleteItemResult(...));
- *   CommandResult.&lt;Void&gt;ok();                                    // marker-only success
- *   CommandResult.&lt;Void&gt;notFound("Character not found");
- *   CommandResult.&lt;Void&gt;notFound("Character not found", "charId", 12345L);
- *   CommandResult.&lt;Void&gt;validationFailed("count must be positive", "field", "count");
- *   CommandResult.&lt;Void&gt;error(CommandStatus.FORBIDDEN,
- *           CommandProblem.of("Self-punishment not allowed"));
- * </pre>
+ * <p>Success data belongs in the {@code R} payload, never in problem extensions (failure context only).</p>
  *
- * <p>Domain-specific success data (partial-success flags, affected entity
- * ids, modes) lives in the {@code R} payload class — NOT in
- * {@link CommandProblem#getExtensions() problem.extensions}, which is
- * reserved for failure context.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
- *
- * @param <R> success-payload type carried by this command (declared on
- *            {@link NxCommand}{@code <R>}); use {@link Void} for commands
- *            whose OK reply carries no typed data.
+ * @param <R> success-payload type declared on {@link NxCommand}; {@link Void} when there is none
  */
 public final class CommandResult<R> {
 
@@ -68,10 +43,6 @@ public final class CommandResult<R> {
         return status;
     }
 
-    /**
-     * Coarse 3-way classification (OK / CLIENT_ERROR / SERVER_ERROR).
-     * Shorthand for {@code getStatus().tier()}.
-     */
     public CommandStatus.Tier getTier() {
         return status.tier();
     }
@@ -80,62 +51,33 @@ public final class CommandResult<R> {
         return status == CommandStatus.OK;
     }
 
-    /**
-     * Success payload; non-null iff {@link #isOk()}.
-     */
     public @Nullable R getPayload() {
         return payload;
     }
 
-    /**
-     * Failure context; non-null iff NOT {@link #isOk()}.
-     */
     public @Nullable CommandProblem getProblem() {
         return problem;
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Static factories
-    // ─────────────────────────────────────────────────────────────────────
-
-    /**
-     * OK reply with no typed payload (use when {@code R == Void}).
-     */
     public static <R> CommandResult<R> ok() {
         return new CommandResult<R>(CommandStatus.OK, null, null);
     }
 
-    /**
-     * OK reply with a typed payload.
-     */
     public static <R> CommandResult<R> ok(R payload) {
         return new CommandResult<R>(CommandStatus.OK, payload, null);
     }
 
-    /**
-     * Error reply with a pre-built {@link CommandProblem}.
-     */
     public static <R> CommandResult<R> error(CommandStatus status, CommandProblem problem) {
         return new CommandResult<R>(status, null, problem);
     }
 
-    /**
-     * Error reply with just a title; the problem body has no extensions.
-     */
     public static <R> CommandResult<R> error(CommandStatus status, String title) {
         return new CommandResult<R>(status, null, CommandProblem.of(title));
     }
 
-    /**
-     * Error reply with title + single-key extension context.
-     */
     public static <R> CommandResult<R> error(CommandStatus status, String title, String extKey, Object extValue) {
         return new CommandResult<R>(status, null, CommandProblem.of(title, extKey, extValue));
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Sugar: per-status factories for the common cases
-    // ─────────────────────────────────────────────────────────────────────
 
     public static <R> CommandResult<R> notFound(String title) {
         return error(CommandStatus.NOT_FOUND, title);

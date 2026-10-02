@@ -60,7 +60,6 @@ class DeleteItemCommandTest {
 
     @Test
     void builder_buildWithoutRequiredField_shouldThrow() {
-        // charId not set → null → constructor rejects
         assertThrows(
                 IllegalArgumentException.class,
                 () -> DeleteItemCommand.builder().itemId(1L).build());

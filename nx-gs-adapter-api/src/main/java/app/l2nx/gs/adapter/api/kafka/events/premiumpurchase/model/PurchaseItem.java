@@ -5,18 +5,8 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One item-grant line of a {@link PremiumPurchaseEvent}. Carries which item
- * was deposited into the character's inventory, in what quantity, with optional
- * host-specific metadata, and the per-line cost.
- *
- * <p>{@link #getParams() params} is a free-form {@code Map<String,String>}
- * for host-specific extension (e.g. {@code enchant=10}, {@code attribute=fire}).
- * Phase-1 bohpts datapack SKUs are unenchanted and don't use {@code params};
- * the slot is here so a future enchanted-item SKU is a non-breaking addition.</p>
- *
- * <p>{@link #getPayments() payments} is non-null and required to contain at
- * least one entry — a "free" item grant is not a purchase event and should be
- * routed through a different event family when one ships.</p>
+ * One item-grant line of a {@link PremiumPurchaseEvent}.
+ * <p>{@link #getParams() params} is a free-form host-specific map (e.g. {@code enchant=10}). {@link #getPayments() payments} is non-null with at least one entry.
  */
 public final class PurchaseItem {
 
@@ -32,36 +22,21 @@ public final class PurchaseItem {
         this.payments = freezeList(payments);
     }
 
-    /**
-     * L2 item ID granted to the character.
-     */
     public long getItemId() {
         return itemId;
     }
 
-    /**
-     * Quantity of the item granted.
-     *
-     * <p>Soft invariant: {@code qty &gt; 0}. The constructor accepts
-     * {@code 0} and negative values to keep the POJO Gson-friendly, but
-     * producers MUST NOT emit non-positive grants. Consumer-side validation
-     * logs and dedupes; the wire schema permits the value.</p>
-     */
+    /** Soft invariant: {@code qty &gt; 0}. The constructor accepts {@code 0} / negatives to stay Gson-friendly, but producers MUST NOT emit them; consumers log and dedupe. */
     public long getQty() {
         return qty;
     }
 
-    /**
-     * Optional host-specific metadata. Always non-null on read; {@code null}
-     * passed to the constructor is normalized to an empty map.
-     */
+    /** Never null on read; {@code null} passed to the constructor becomes an empty map. */
     public Map<String, String> getParams() {
         return params == null ? Collections.emptyMap() : params;
     }
 
-    /**
-     * Per-line cost. Non-null; producers MUST populate at least one payment.
-     */
+    /** Producers MUST populate at least one payment. */
     public List<Payment> getPayments() {
         return payments == null ? Collections.emptyList() : payments;
     }

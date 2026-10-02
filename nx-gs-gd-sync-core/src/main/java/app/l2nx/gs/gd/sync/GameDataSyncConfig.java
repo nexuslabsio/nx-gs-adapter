@@ -12,21 +12,9 @@ import java.util.Properties;
 import java.util.function.Function;
 
 /**
- * Operator-owned tuning for the gd-sync module. Read once at module start and
- * cached for the connection lifetime — no live reload.
- *
- * <p>Source chain (file-first, matching the adapter's bootstrap config):</p>
- * <ol>
- *     <li>{@code l2nx.properties} on disk (path from {@code -Dl2nx.config-file},
- *     or cwd default).</li>
- *     <li>JVM system properties as fallback.</li>
- * </ol>
- *
- * <p>The single knob today is the scheduled-resync interval
- * ({@code l2nx.gd-sync.resync-interval-hours}): {@code 0} (default) or absent
- * disables the scheduler; any {@code >0} value enables it, clamped up to a
- * minimum of {@code 1} hour (guard against an over-frequent full-snapshot
- * burst).</p>
+ * Read once at module start, no live reload. {@code l2nx.properties} wins over system properties.
+ * {@code l2nx.gd-sync.resync-interval-hours}: {@code 0}/absent disables the scheduler, any positive value is
+ * clamped up to 1 hour.
  */
 public final class GameDataSyncConfig {
 
@@ -45,17 +33,11 @@ public final class GameDataSyncConfig {
         this.resyncIntervalHours = resyncIntervalHours;
     }
 
-    /**
-     * Resolved scheduled-resync interval in hours. {@code 0} = disabled; any
-     * configured positive value is clamped up to {@link #MIN_RESYNC_INTERVAL_HOURS}.
-     */
+    /** {@code 0} = disabled. */
     public int resyncIntervalHours() {
         return resyncIntervalHours;
     }
 
-    /**
-     * Whether the periodic resync scheduler should run.
-     */
     public boolean scheduledResyncEnabled() {
         return resyncIntervalHours > 0;
     }

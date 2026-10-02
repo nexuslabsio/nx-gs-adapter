@@ -6,16 +6,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One executed lot of a {@link BuyFromPrivateStoreCommand} — what the buyer
- * actually received, echoed back from the lot the host resolved.
- *
- * <p>Because purchases are all-or-nothing, {@link #getCount() count} always
- * equals the requested count and {@link #getUnitPriceAdena() unitPriceAdena}
- * the requested price; the line is echoed so the caller can render a receipt
- * (and persist an audit row) without re-reading its own request.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Echo of an executed {@link BuyFromPrivateStoreCommand} lot. Purchases are all-or-nothing, so count and price
+ * always equal the request.
  */
 public final class BoughtLine {
 
@@ -34,10 +26,6 @@ public final class BoughtLine {
         this.unitPriceAdena = unitPriceAdena;
     }
 
-    /**
-     * Object id of the specific item instance the buyer saw in the market
-     * book — the same identity key as the requesting {@link BuyLine#getItemId()}.
-     */
     public int getItemId() {
         return itemId;
     }
@@ -46,10 +34,6 @@ public final class BoughtLine {
         return itemTemplateId;
     }
 
-    /**
-     * Enchant level of the received item. {@code null} for templates that
-     * cannot be enchanted.
-     */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }
@@ -58,11 +42,7 @@ public final class BoughtLine {
         return count;
     }
 
-    /**
-     * Per-unit adena price paid to the seller — the burned surcharge is NOT
-     * included here, it is reported once per deal on
-     * {@link BuyFromPrivateStoreResult#getTaxAdena()}.
-     */
+    /** Excludes the burned surcharge, reported once per deal on {@link BuyFromPrivateStoreResult#getTaxAdena()}. */
     public long getUnitPriceAdena() {
         return unitPriceAdena;
     }

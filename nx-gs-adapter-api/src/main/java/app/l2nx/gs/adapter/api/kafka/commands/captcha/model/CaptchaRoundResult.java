@@ -50,10 +50,7 @@ public final class CaptchaRoundResult {
         return correct;
     }
 
-    /**
-     * From sending the picture to the click, measured on the host, so it excludes Kafka and platform
-     * latency; {@code null} when the round timed out.
-     */
+    /** Host-measured from sending the picture to the click (excludes Kafka and platform latency); {@code null} when timed out. */
     public @Nullable Long getAnswerTimeMs() {
         return answerTimeMs;
     }

@@ -24,10 +24,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
-/**
- * Verifies the at-least-once contract: when a handler throws, the offset is
- * not committed and the record is redelivered on next poll / restart.
- */
+/** At-least-once: a throwing handler leaves the offset uncommitted and the record is redelivered. */
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class HandlerCommitIntegrationTest {
@@ -48,7 +45,6 @@ class HandlerCommitIntegrationTest {
         String topic = "test.handler.no-commit";
         String groupId = "g-handler-no-commit";
 
-        // First boot: handler throws on every record — no commit expected.
         NxKafka first = buildKafka("first");
         AtomicInteger firstCount = new AtomicInteger();
         CountDownLatch firstSeen = new CountDownLatch(1);
@@ -60,11 +56,9 @@ class HandlerCommitIntegrationTest {
 
         publishJson(topic, "{\"name\":\"a\",\"score\":1}");
         assertTrue(firstSeen.await(15, TimeUnit.SECONDS), "First instance never received the record");
-        // Give the handler time to throw — no commit should fire.
         Thread.sleep(1000);
         first.shutdown();
 
-        // Second boot: same groupId, handler succeeds — should receive same record again.
         NxKafka second = buildKafka("second");
         CountDownLatch secondSeen = new CountDownLatch(1);
         second.subscribe(topic, groupId, TestEvent.class, event -> secondSeen.countDown());
@@ -74,19 +68,14 @@ class HandlerCommitIntegrationTest {
 
     @Test
     void midBatchFailure_shouldRedeliverFailedAndSubsequent_onRestart() throws Exception {
-        // Multi-record-batch case: if record N fails mid-batch, records N+1.. must not
-        // commit past N. Without the seek-on-failure fix, subsequent successful commits
-        // would advance the partition cursor past the failed record and the next restart
-        // would skip it permanently.
+        // If record N fails mid-batch, later commits must not advance past it; without seek-on-failure restart skips N.
         String topic = "test.handler.midbatch";
         String groupId = "g-handler-midbatch";
 
-        // Publish 5 records in one batch — single partition by default.
         for (int i = 1; i <= 5; i++) {
             publishJson(topic, "{\"name\":\"r\",\"score\":" + i + "}");
         }
 
-        // First boot: fail on score=3, succeed on others. Single-threaded handler.
         NxKafka first = buildKafka("first-mb");
         List<Integer> firstSeen = new CopyOnWriteArrayList<Integer>();
         first.subscribe(topic, groupId, TestEvent.class, event -> {
@@ -96,13 +85,10 @@ class HandlerCommitIntegrationTest {
             }
         });
 
-        // Give the consumer time to drain whatever it can.
         Thread.sleep(5000);
         first.shutdown();
 
-        // Second boot: same groupId, handler succeeds — must redeliver score=3 (and possibly later
-        // records the first boot also tried after the failure; redelivery of already-acked records
-        // is allowed by at-least-once but loss of record 3 is NOT).
+        // Redelivery of already-acked records is allowed by at-least-once; losing score=3 is not.
         NxKafka second = buildKafka("second-mb");
         List<Integer> secondSeen = new CopyOnWriteArrayList<Integer>();
         CountDownLatch sawThree = new CountDownLatch(1);

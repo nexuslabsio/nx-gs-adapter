@@ -14,34 +14,11 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic item-template wire DTO — the common L2 denominator for static
- * item data, carried as the payload of {@code GameDataSyncEvent} on the {@code gd}
- * (game-data) sync stream's {@code itemtemplate} entity topic. Each host build
- * supplies its own provider that maps its core's internal item representation into
- * this shape; nothing here names a specific core.
- *
- * <p><b>Nullability:</b> only {@link #getId()} and {@link #getType()} are non-null.
- * Every other field is {@link Nullable} (former primitives boxed) so {@code null}
- * means "this build did not supply it" rather than a fabricated default. For the
- * boolean flags this yields an honest tri-state (true / false / unknown).</p>
- *
- * <p><b>Functional grouping:</b> cohesive areas are nested objects rather than a
- * flat scatter — {@link #getStats()} (combat numbers), {@link #getRestrictions()}
- * (trade / storage / permission flags), {@link #getUpgrade()} (enchant / attribute
- * / crystallize mechanics). A group is {@code null} when the item has no profile
- * for it (e.g. etc-items carry no {@code stats}).</p>
- *
- * <p><b>Vocabulary:</b> {@link #getType()}, {@link #getEquipSlot()}, {@link #getWeaponType()},
- * {@link #getArmorType()} and {@link #getEtcItemType()} are closed domain enums
- * ({@link ItemClass}, {@link ItemEquipSlot}, {@link WeaponType}, {@link ArmorType},
- * {@link EtcItemType}) — the provider maps its core's internal enums/bitmasks onto them, or
- * yields {@code null} when a source value has no canonical counterpart. The remaining
- * open-string vocabulary fields ({@code material}, {@code grade}, {@code defaultAction},
- * {@code useHandler}) draw from a platform-canonical vocabulary in {@code UPPER_SNAKE_CASE}.</p>
- *
- * <p>TODO: add client-patch fields (description, additional name, colour, panel icon,
- * patch-only permission flags) — these come from client data files, not the host's
- * in-memory templates, which is all this DTO currently sources.</p>
+ * Wire DTO for static item data, payload of {@code GameDataSyncEvent} on the {@code itemtemplate} topic. Only
+ * {@link #getId()} and {@link #getType()} are non-null; elsewhere {@code null} means "not supplied", so flags are tri-state.
+ * Enum-typed fields are {@code null} when the source value has no canonical counterpart; open-string
+ * fields use platform {@code UPPER_SNAKE_CASE} vocabulary.
+ * TODO: client-patch fields (description, colour, panel icon) are not sourced from host templates yet.
  */
 public final class ItemTemplate {
 
@@ -187,23 +164,16 @@ public final class ItemTemplate {
         return petUsable;
     }
 
-    /**
-     * Whether the item is consumed (count decremented / stack removed) on use.
-     * {@code null} when the build does not surface this.
-     */
     public @Nullable Boolean getConsumable() {
         return consumable;
     }
 
-    /**
-     * Action on use (equip / use / soulshot / …).
-     */
     public @Nullable String getDefaultAction() {
         return defaultAction;
     }
 
     /**
-     * Use-effect handler name (etc-items only; {@code null} otherwise).
+     * Etc-items only.
      */
     public @Nullable String getUseHandler() {
         return useHandler;
@@ -217,52 +187,32 @@ public final class ItemTemplate {
         return reuseDelayMs;
     }
 
-    /**
-     * Skills the item grants ({@code skillId}+{@code level} refs); {@code null} if none.
-     */
     public @Nullable List<ItemSkillRef> getSkills() {
         return skills;
     }
 
-    /**
-     * Combat stats (weapons / armor); {@code null} for items with no combat profile.
-     */
     public @Nullable ItemStats getStats() {
         return stats;
     }
 
-    /**
-     * Trade / storage / permission flags; {@code null} if the build supplied none.
-     */
     public @Nullable ItemRestrictions getRestrictions() {
         return restrictions;
     }
 
-    /**
-     * Enchant / attribute / crystallize mechanics; {@code null} if none apply.
-     */
     public @Nullable ItemUpgrade getUpgrade() {
         return upgrade;
     }
 
     /**
-     * Base gear-score contribution of this item — the build-defined "power"
-     * weight the item adds before enchant / attribute scaling. {@code null} when
-     * the build does not compute gear score for the item (host sentinel
-     * {@code -1} maps to {@code null}).
+     * Base weight before enchant / attribute scaling; host sentinel {@code -1} maps to {@code null}.
      */
     public @Nullable Integer getGearScore() {
         return gearScore;
     }
 
     /**
-     * Optional open-string profile key governing how this item's gear score grows
-     * with enchant level — a reference into the gear-score ruleset
-     * ({@code gearscore} entity) rather than an inline table: it matches the rule
-     * with the same {@code key} in the ruleset's {@code ENCHANT_PROFILE} group.
-     * Canonical {@code UPPER_SNAKE_CASE} values are in
-     * {@link WellKnownGearScoreEnchantProfiles}. {@code null} when the build has no
-     * gear score or no profile concept.
+     * Key of the matching rule in the ruleset's {@code ENCHANT_PROFILE} group; values in
+     * {@link WellKnownGearScoreEnchantProfiles}.
      */
     public @Nullable String getGearScoreEnchantProfile() {
         return gearScoreEnchantProfile;

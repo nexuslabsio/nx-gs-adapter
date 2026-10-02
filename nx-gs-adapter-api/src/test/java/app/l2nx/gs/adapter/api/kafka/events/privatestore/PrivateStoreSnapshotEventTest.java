@@ -29,7 +29,6 @@ class PrivateStoreSnapshotEventTest {
                 .offers(null)
                 .build();
 
-        // Empty offers list is the documented tombstone shape.
         assertTrue(event.getOffers().isEmpty());
     }
 
@@ -129,8 +128,6 @@ class PrivateStoreSnapshotEventTest {
 
     @Test
     void emptyOffers_shouldBeAcceptedAsTombstone() {
-        // Tombstone semantics: producers emit one empty-offers event when a
-        // tracked (itemId, side) pair empties. The DTO must permit it.
         PrivateStoreSnapshotEvent tombstone = PrivateStoreSnapshotEvent.builder()
                 .eventId(UUID.randomUUID())
                 .itemTemplateId(1234L)

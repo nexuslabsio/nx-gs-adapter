@@ -6,15 +6,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
-/**
- * Resolves the adapter version from a classpath resource shipped inside
- * nx-gs-adapter-core.jar. Falls back to {@code Package.getImplementationVersion()}
- * for backwards-compatibility, then to {@code "unknown"}.
- *
- * <p>Resource-first because shadow / fat-JAR builds (e.g. embedding the adapter
- * into a game-server's bundled JAR) replace the original manifest with the
- * host's, after which {@code Package.getImplementationVersion()} returns null.</p>
- */
+/** Resource-first: shadow / fat-JAR builds replace the manifest, so getImplementationVersion() returns null there. */
 public final class AdapterVersion {
 
     private static final String FALLBACK = "unknown";

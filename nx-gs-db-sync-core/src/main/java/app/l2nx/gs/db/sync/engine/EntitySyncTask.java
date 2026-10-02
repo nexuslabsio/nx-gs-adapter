@@ -28,12 +28,7 @@ import java.util.concurrent.*;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Runs one CDC cycle for one entity: plan windows, Phase-1 CRC (primary +
- * children inside ONE consistent-snapshot txn per window), diff against
- * snapshot, Phase-2 fetch + assemble for changed PKs, publish, walk per-PK
- * futures and advance snapshot only for ack'd PKs.
- */
+/** One CDC cycle for one entity: plan windows, Phase-1 CRC, diff, Phase-2 fetch, publish, then advance the snapshot only for ack'd PKs. */
 public final class EntitySyncTask {
 
     private static final NxLog log = NxLogFactory.getLogger(EntitySyncTask.class);
@@ -77,15 +72,8 @@ public final class EntitySyncTask {
     }
 
     /**
-     * Runs one cycle. When {@code targetedPks} is non-null and non-empty the
-     * cycle takes the force-resync fast-path: Phase-1 plans targeted
-     * {@code IN}-list windows over only those PKs (primary scoped by
-     * {@code pk IN (...)}, children by {@code fk IN (...)}) instead of a
-     * full-table range scan. The diff / Phase-2 / publish / snapshot-advance
-     * logic is identical — ghost PKs (in {@code targetedPks} but with no live
-     * row) still fall out as DELETE because the IN-list returns no row and the
-     * perturbed snapshot entry has no scan match. A null/empty set is the
-     * full-scan path (scheduled tick / whole-entity resync).
+     * A non-empty {@code targetedPks} takes the fast-path (windows scoped to those PKs via {@code IN}); ghost PKs still diff to DELETE.
+     * Null/empty means the full scan (scheduled tick / whole-entity resync).
      */
     public CycleResult runCycle(@Nullable LongSet targetedPks) {
         long started = System.currentTimeMillis();
@@ -182,9 +170,8 @@ public final class EntitySyncTask {
                     assembled = Long2ObjectMaps.emptyMap();
                 } else {
                     try {
-                        // Phase-2 fetches fresh rows post-Phase-1; rows can move between
-                        // the two — engine treats missing-in-Phase-2 as silent no-op and
-                        // re-detects via next cycle's Phase-1 diff.
+                        // Rows can move between phases; a row missing in Phase-2 is a silent no-op, re-detected by the
+                        // next Phase-1 diff.
                         assembled = assembleEntities(createUpdate, conn);
                     } catch (SQLTimeoutException timeout) {
                         log.warn("Entity {} window {} Phase-2 timed out — DEGRADED, skipping window", entity, window);
@@ -272,11 +259,7 @@ public final class EntitySyncTask {
                 pendingPublishCount);
     }
 
-    /**
-     * Cancel any in-flight JDBC statement on this task. Called by the engine
-     * on stop so a hung query inside Phase-1 / Phase-2 is interrupted instead
-     * of pinning the daemon thread until the driver-side socket timeout fires.
-     */
+    /** Interrupts a hung JDBC statement on engine stop instead of waiting for the driver socket timeout. */
     public void cancelCurrentStatement() {
         statementRegistry.cancelCurrent();
     }
@@ -397,16 +380,8 @@ public final class EntitySyncTask {
     }
 
     /**
-     * Walk per-PK publish futures. Already-completed futures are drained first
-     * (cheap, no get-with-timeout) so a slow publish at the head of iteration
-     * order can't starve already-acked publishes that follow. Remaining
-     * pending futures share a single deadline; whatever's still pending past
-     * the deadline replays next cycle.
-     *
-     * <p>Returns {@code [created, updated, deleted, failed, pending]} —
-     * indexes 3/4 count publishes that failed exceptionally / outlived the
-     * flush deadline; both feed the cycle's fully-successful gate.
-     * Package-private for the publish-walk unit tests.</p>
+     * Already-completed futures are drained first so a slow head publish can't starve acked ones; the rest share one deadline and replay next cycle.
+     * Returns {@code [created, updated, deleted, failed, pending]}; failed and pending feed the fully-successful gate. Package-private for tests.
      */
     long[] walkInFlightAndAdvance(
             String entity,

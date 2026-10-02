@@ -30,7 +30,6 @@ class ActivityTest {
         meta.put("elapsed_seconds", "10");
         Activity activity = Activity.builder().type("fishing").metadata(meta).build();
 
-        // Mutating the source map after build must not leak into the DTO.
         meta.put("elapsed_seconds", "999");
         assertEquals("10", activity.getMetadata().get("elapsed_seconds"));
 

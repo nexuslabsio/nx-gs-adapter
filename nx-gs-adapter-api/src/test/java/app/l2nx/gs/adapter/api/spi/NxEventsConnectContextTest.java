@@ -23,7 +23,6 @@ class NxEventsConnectContextTest {
                 .syncTopics(new SyncTopics(null, null, null))
                 .build();
 
-        // No NPE, no throw — and the same singleton across calls.
         assertNotNull(ctx.events());
         ctx.events().publish(stubPurchase());
     }
@@ -84,7 +83,6 @@ class NxEventsConnectContextTest {
                 })
                 .build();
 
-        // Identity bits identical → equal even though events impls differ.
         assertEquals(withNoOp, withCustom);
         assertEquals(withNoOp.hashCode(), withCustom.hashCode());
     }

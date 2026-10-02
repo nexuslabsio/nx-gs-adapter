@@ -94,9 +94,6 @@ class GameServerConnectFlowTest {
 
     @Test
     void connect_shouldNotHitLegacyServersPath() {
-        // Verify the new adapter version starts hitting /gameservers/connect (not the
-        // legacy /servers/connect path that the platform keeps as a dual-mode alias
-        // for OLDER adapter deployments during rollout).
         wireMock.stubFor(post(urlEqualTo(CONNECT_PATH))
                 .willReturn(aResponse()
                         .withStatus(200)
@@ -129,7 +126,6 @@ class GameServerConnectFlowTest {
         assertEquals("Acme X1", flow.serverName());
         assertEquals("acme.gs.heartbeat", flow.heartbeatTopic());
         assertNotNull(flow.kafka());
-        // GS fixture above carries no syncTopics on the wire → null.
         assertNull(flow.syncTopics());
     }
 }

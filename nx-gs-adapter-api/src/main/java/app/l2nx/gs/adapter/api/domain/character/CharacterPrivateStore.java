@@ -3,17 +3,9 @@ package app.l2nx.gs.adapter.api.domain.character;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Active private-store mode of a player character.
+ * Active private-store mode. Transient menu-open states and "no store" map to {@code null}.
  *
- * <p>Surfaced on the wire as the open subset of L2 store states — only
- * fully-active modes are modeled: the transient menu-open states
- * ({@code SELL_PENDING}, {@code BUY_PENDING}) and the "no store" sentinel
- * map to {@code null}.</p>
- *
- * <p>Schema providers translate the source-side numeric ID
- * (canonical L2 convention: {@code 1=SELL, 3=BUY, 5=CRAFT, 8=PACKAGE_SELL})
- * into this enum via {@link #byId(int)}. Source IDs not in this set are
- * logged as warnings and surface as {@code null} on the wire.</p>
+ * <p>{@code getId()} is the canonical L2 source id ({@code 1=SELL, 3=BUY, 5=CRAFT, 8=PACKAGE_SELL}).</p>
  */
 public enum CharacterPrivateStore {
     SELL(1),
@@ -41,19 +33,12 @@ public enum CharacterPrivateStore {
         this.id = id;
     }
 
-    /**
-     * Source-side numeric store-mode ID.
-     */
     public int getId() {
         return id;
     }
 
     /**
-     * Resolves a numeric store-mode ID into the enum constant.
-     *
-     * @param id source-side numeric ID
-     * @return the matching constant, or {@code null} when the ID is not
-     * one of the surfaced active store modes
+     * Returns {@code null} for an id that is not an active store mode.
      */
     public static @Nullable CharacterPrivateStore byId(int id) {
         if (id < 0 || id >= BY_ID.length) return null;

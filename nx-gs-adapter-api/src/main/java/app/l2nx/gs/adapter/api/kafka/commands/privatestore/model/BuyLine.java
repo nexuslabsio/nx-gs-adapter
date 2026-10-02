@@ -8,37 +8,11 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One lot of a {@link BuyFromPrivateStoreCommand}, addressed by the exact
- * inventory instance the buyer saw in the market book.
- *
- * <p><b>{@code itemId} is the primary identity key.</b> The host resolves this
- * lot in the seller's live trade list by {@code itemId} (the instance
- * object-id) first, then re-verifies {@code (itemTemplateId, enchantLevel,
- * attributes, unitPriceAdena)} against the resolved item — the same instance
- * may have been re-enchanted or re-attributed in place since the buyer last
- * saw it, so an object-id match alone is not sufficient.</p>
- *
- * <p><b>Exact-match semantics.</b> The fields beyond {@code itemId} are an
- * optimistic lock, not a search filter: a price, enchant, or attribute that no
- * longer matches the live lot fails the whole command with
- * {@code OFFER_CHANGED} rather than buying something else. Partial fills do
- * not exist — see {@link BuyFromPrivateStoreCommand}.</p>
- *
- * <p><b>Required fields.</b> {@link #getItemId() itemId},
- * {@link #getItemTemplateId() itemTemplateId}, {@link #getCount() count} and
- * {@link #getUnitPriceAdena() unitPriceAdena} are REQUIRED — the constructor
- * enforces {@code itemId > 0}, {@code itemTemplateId > 0}, {@code count > 0},
- * {@code unitPriceAdena >= 0}, and that {@code count * unitPriceAdena} does not
- * overflow a {@code long}, via {@link IllegalArgumentException} for
- * programmatic construction. Wire-path deserialization bypasses the constructor
- * — the handler re-checks and emits {@code VALIDATION_FAILED}.
- * {@link #getEnchantLevel() enchantLevel} and {@link #getAttributes()
- * attributes} are OPTIONAL — {@code null} means "the offer carried none", which
- * is itself part of the match. When present, {@code enchantLevel} MUST be in
- * {@code 0..127}.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * One lot of a {@link BuyFromPrivateStoreCommand}. The host resolves it by {@code itemId} (instance object-id), then
+ * re-verifies template, enchant, attributes and price - the same instance may have been re-enchanted in place.
+ * Fields beyond {@code itemId} are an optimistic lock: any mismatch fails the whole command with
+ * {@code OFFER_CHANGED}; there are no partial fills. {@code null} enchant/attributes means "offer carried none" and is
+ * part of the match.
  */
 public final class BuyLine {
 
@@ -87,52 +61,32 @@ public final class BuyLine {
         this.unitPriceAdena = unitPriceAdena;
     }
 
-    /**
-     * Object id of the specific item instance the buyer saw in the market
-     * book — the primary lot identity key (NOT the catalog item-template id).
-     */
+    /** Instance object-id, NOT the catalog template id. */
     public int getItemId() {
         return itemId;
     }
 
-    /**
-     * Catalog item-template id of the offered item (NOT an inventory instance
-     * object-id).
-     */
+    /** Catalog template id, NOT an instance object-id. */
     public long getItemTemplateId() {
         return itemTemplateId;
     }
 
-    /**
-     * Enchant level the offer was published with. OPTIONAL — {@code null} for
-     * item templates that cannot be enchanted. When present, in {@code 0..127}.
-     */
+    /** {@code null} for non-enchantable templates; otherwise {@code 0..127}. */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }
 
-    /**
-     * Elemental attributes the offer was published with. Empty when the offer
-     * carried none; participates in lot matching only when non-empty.
-     * Immutable on read.
-     */
+    /** Empty when the offer carried none; matched only when non-empty. */
     public Map<Attribute, Integer> getAttributes() {
         return attributes;
     }
 
-    /**
-     * Units to buy. REQUIRED, MUST be positive. The host buys exactly this
-     * many or fails the command — it never silently shrinks the count to what
-     * is still available.
-     */
+    /** The host buys exactly this many or fails; it never shrinks the count. */
     public long getCount() {
         return count;
     }
 
-    /**
-     * Per-unit adena price as published in the offer. REQUIRED, MUST be
-     * non-negative. Must match the live lot exactly.
-     */
+    /** Must match the live lot exactly. */
     public long getUnitPriceAdena() {
         return unitPriceAdena;
     }

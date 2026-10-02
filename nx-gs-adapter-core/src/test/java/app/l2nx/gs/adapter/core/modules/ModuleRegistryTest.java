@@ -45,7 +45,6 @@ class ModuleRegistryTest {
 
         registry.connect(ctx);
 
-        // failing.start MUST NOT have been invoked; healthy.start MUST have been invoked.
         assertFalse(failing.startCalled);
         assertTrue(healthy.startCalled);
     }
@@ -73,7 +72,6 @@ class ModuleRegistryTest {
 
         registry.shutdown();
 
-        // Both onDisconnect calls still fire despite first.stop throwing.
         assertTrue(first.onDisconnectCalled);
         assertTrue(second.onDisconnectCalled);
     }

@@ -4,16 +4,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Adapter handshake response for {@code POST /api/tenants/loginservers/connect}.
- * Mirrors {@link ConnectResponse} for the gameserver host-type, minus the
- * sync-stream topic bundle (login servers never carry DB / runtime / datapack
- * sync data).
- *
- * <p>{@link #getHeartbeatTopic()} is fully-qualified
- * ({@code "<tenant>.ls.<slug>.heartbeat"}). {@link #getMessagingTopics()}
- * {@code events} map carries the {@code account} family
- * ({@code "<tenant>.ls.events.account"}) — single-family today; reserved for
- * future LS-emitted event families without a contract bump.</p>
+ * Handshake response for {@code POST /api/tenants/loginservers/connect}; like {@link ConnectResponse} but without sync topics.
+ * {@code heartbeatTopic} is {@code "<tenant>.ls.<slug>.heartbeat"}; {@code messagingTopics.events} currently carries only {@code account} ({@code "<tenant>.ls.events.account"}).
  *
  * @see ConnectResponse
  * @see KafkaCredentials

@@ -89,7 +89,6 @@ class NxProducerIntegrationTest {
                 .property("linger.ms", 0)
                 .build();
 
-        // Should not throw — errors are logged internally
         assertDoesNotThrow(() -> kafka.send("test.unavail", new TestEvent("p", 1)));
     }
 
@@ -98,7 +97,6 @@ class NxProducerIntegrationTest {
         NxKafka kafka = buildKafka("test-producer-shut");
         kafka.shutdown();
 
-        // Should not throw — silently skipped with warning
         assertDoesNotThrow(() -> kafka.send("test.closed", new TestEvent("p", 1)));
     }
 

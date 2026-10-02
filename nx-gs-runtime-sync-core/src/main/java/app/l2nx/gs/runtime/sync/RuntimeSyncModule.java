@@ -21,18 +21,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.kafka.clients.producer.Callback;
 
-/**
- * Tier-1 module that runs the runtime-sync engine. Reads its inputs in order:
- *
- * <ol>
- *     <li>{@code ctx.syncTopics().runtime()} — empty/null → DISABLED + WARN.</li>
- *     <li>Tier-2 SPI {@link RuntimeStateProvider} via {@link ServiceLoader} —
- *     0 → DISABLED + WARN, &gt;1 → FAILED, 1 → cached.</li>
- * </ol>
- *
- * <p>Discovered via
- * {@code META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule}.</p>
- */
+/** {@code ctx.syncTopics().runtime()} empty -> DISABLED; 0 {@link RuntimeStateProvider} -> DISABLED, more than 1 -> FAILED. */
 public final class RuntimeSyncModule implements AdapterModule {
 
     private static final NxLog log = NxLogFactory.getLogger(RuntimeSyncModule.class);

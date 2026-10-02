@@ -97,7 +97,6 @@ class NxConsumerIntegrationTest {
 
         kafka.unsubscribe(topic);
 
-        // After unsubscribe, can subscribe again
         CountDownLatch latch2 = new CountDownLatch(1);
         kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> latch2.countDown());
 
@@ -114,7 +113,6 @@ class NxConsumerIntegrationTest {
 
         kafka.subscribe(topic, "g-" + topic, TestEvent.class, event -> latch.countDown());
 
-        // Send invalid JSON, then valid
         publishJson(topic, "not-json");
         publishJson(topic, "{\"name\":\"valid\",\"score\":1}");
 
@@ -132,7 +130,6 @@ class NxConsumerIntegrationTest {
         publishJson("test.consumer.shut1", "{\"name\":\"p\",\"score\":1}");
         assertTrue(latch.await(10, TimeUnit.SECONDS));
 
-        // shutdown should not throw
         assertDoesNotThrow(kafka::shutdown);
     }
 

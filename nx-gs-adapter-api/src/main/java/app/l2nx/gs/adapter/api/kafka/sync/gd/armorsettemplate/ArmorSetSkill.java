@@ -4,15 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One skill an {@link ArmorSetTemplate} grants. {@code skillTemplateId} is the non-null FK to
- * the skill-template entity; {@code kind} is the canonical UPPER_SNAKE category
- * ({@code BASE}/{@code SHIELD}/{@code ENCHANT6}/{@code ENCHANT_BY}) that says under what
- * condition the skill applies.
- *
- * <p>{@code minPieces} qualifies {@code BASE} skills (the minimum number of set pieces worn
- * for the bonus; {@code null} = any/full set). {@code enchantLevel} qualifies
- * {@code ENCHANT_BY} skills (the enchant level at which the skill activates). The same
- * skill may appear under {@code ENCHANT_BY} at several enchant levels.</p>
+ * {@code kind} ({@code BASE}/{@code SHIELD}/{@code ENCHANT6}/{@code ENCHANT_BY}) says when the skill applies. {@code minPieces}
+ * qualifies {@code BASE} ({@code null} = full set); {@code enchantLevel} qualifies {@code ENCHANT_BY}, which may repeat per level.
  */
 public final class ArmorSetSkill {
 
@@ -43,24 +36,14 @@ public final class ArmorSetSkill {
         return skillLevel;
     }
 
-    /**
-     * Why the skill applies: {@code BASE} / {@code SHIELD} / {@code ENCHANT6} /
-     * {@code ENCHANT_BY}.
-     */
     public String getKind() {
         return kind;
     }
 
-    /**
-     * For {@code BASE} skills: minimum set pieces worn for the bonus; {@code null} = any/full set.
-     */
     public @Nullable Integer getMinPieces() {
         return minPieces;
     }
 
-    /**
-     * For {@code ENCHANT_BY} skills: the enchant level at which the skill activates.
-     */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }

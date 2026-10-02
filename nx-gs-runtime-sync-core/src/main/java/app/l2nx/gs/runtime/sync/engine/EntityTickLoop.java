@@ -17,30 +17,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.kafka.clients.producer.RecordMetadata;
 
 /**
- * One tick loop per declared runtime entity. Dispatched onto a shared scheduler
- * pool. Each tick:
- *
- * <ol>
- *     <li>Call {@code mapping.snapshot()} → {@code Iterable<RuntimeRow<T>>}.</li>
- *     <li>Hash each row via {@code mapping.hash(dto)} into a fresh
- *     {@link Long2LongOpenHashMap pk → hash}.</li>
- *     <li>Diff against the previous tick:
- *         <ul>
- *             <li>NEW (pk in current, not in prev) → publish {@code CREATED}.</li>
- *             <li>CHANGED (pk in both, hash differs) → publish {@code UPDATED}.</li>
- *             <li>GONE (pk in prev, not in current) → silently drop. No tombstone.</li>
- *         </ul>
- *     </li>
- *     <li>Wait up to {@code publishFlushSeconds} for Kafka acks; advance
- *     {@code prev} only for PKs whose ack arrived (failed publishes replay
- *     next tick).</li>
- * </ol>
+ * One tick loop per runtime entity: snapshot, hash, diff against the previous tick, publish CREATED/UPDATED.
+ * Vanished pks are silently dropped (no tombstone); the previous snapshot advances only for acked pks, so
+ * failed publishes replay next tick.
  */
 public final class EntityTickLoop {
 
-    /**
-     * Sentinel — fastutil's default-return-value collides with a legit hash of 0.
-     */
+    /** Sentinel because fastutil's default return value collides with a legitimate hash of 0. */
     static final long MISSING_HASH = Long.MIN_VALUE;
 
     private static final NxLog log = NxLogFactory.getLogger(EntityTickLoop.class);
@@ -81,7 +64,6 @@ public final class EntityTickLoop {
             return;
         }
         Runnable tick = SafeRunnable.wrap(this::guardedTick, log);
-        // First tick fires after one interval — keep boot quiet, then settle into cadence.
         future = scheduler.scheduleWithFixedDelay(
                 tick, config.tickIntervalSeconds(), config.tickIntervalSeconds(), TimeUnit.SECONDS);
     }
@@ -171,13 +153,11 @@ public final class EntityTickLoop {
         Long2LongMap prev = prevSnapshot;
         Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight =
                 new Long2ObjectOpenHashMap<CompletableFuture<RecordMetadata>>();
-        // Pre-size to currentSnapshot — final occupancy cannot exceed it.
         Long2LongMap nextPrev = newHashMap(currentSnapshot.size());
         long created = 0L;
         long updated = 0L;
 
-        // Single pass: classify each pk as NEW / CHANGED / unchanged via one
-        // prev.get() (MISSING_HASH sentinel disambiguates absence from hash=0).
+        // one prev.get() classifies the pk; MISSING_HASH distinguishes absence from hash=0
         LongIterator it = currentSnapshot.keySet().iterator();
         while (it.hasNext()) {
             long pk = it.nextLong();
@@ -215,12 +195,7 @@ public final class EntityTickLoop {
         statsTracker.recordCycleResult(entityName, result);
     }
 
-    /**
-     * Drains already-done futures cheaply on the first pass, then deadline-waits
-     * pending ones for the remainder of {@code publishFlushSeconds}. Failed
-     * publishes carry the previous hash forward so replay happens next tick
-     * (at-least-once contract).
-     */
+    /** Done futures are drained first; pending ones share one {@code publishFlushSeconds} deadline. Failures carry the previous hash forward. */
     private long[] walkInFlight(
             Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
             Long2LongMap prev,
@@ -232,7 +207,6 @@ public final class EntityTickLoop {
             return new long[] {0L, 0L};
         }
 
-        // Pass 1: drain already-done — no blocking, just classify.
         Long2ObjectMap<CompletableFuture<RecordMetadata>> pending =
                 new Long2ObjectOpenHashMap<CompletableFuture<RecordMetadata>>();
         ObjectIterator<Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>>> it =
@@ -253,7 +227,6 @@ public final class EntityTickLoop {
             }
         }
 
-        // Pass 2: deadline-bounded wait for the rest.
         if (!pending.isEmpty()) {
             long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(config.publishFlushSeconds());
             ObjectIterator<Long2ObjectMap.Entry<CompletableFuture<RecordMetadata>>> pendIt =
@@ -270,7 +243,6 @@ public final class EntityTickLoop {
                     timedOutAcks++;
                     carryPrev(prev, nextPrev, pk);
                 } catch (InterruptedException ie) {
-                    // Shutdown signal — stop walking and let the scheduler tear down.
                     Thread.currentThread().interrupt();
                     timedOutAcks++;
                     carryPrev(prev, nextPrev, pk);
@@ -311,7 +283,6 @@ public final class EntityTickLoop {
         return map;
     }
 
-    // Test seam — exposes the post-tick snapshot keys.
     List<Long> currentSnapshotKeysForTesting() {
         Long2LongMap snap = prevSnapshot;
         List<Long> result = new ArrayList<Long>(snap.size());

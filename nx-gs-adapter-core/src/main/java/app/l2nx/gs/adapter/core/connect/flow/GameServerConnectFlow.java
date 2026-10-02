@@ -6,13 +6,6 @@ import app.l2nx.gs.adapter.core.connect.model.TypedConnectOutcome;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * {@link HostConnectFlow} for gameserver host-type. POSTs to
- * {@code /api/tenants/gameservers/connect} and deserializes the body into
- * {@link ConnectResponse}. New gameserver adapter deployments hit this path;
- * the platform serves {@code /api/tenants/servers/connect} as a dual-mode
- * alias for older adapter versions that pre-date the rename.
- */
 public final class GameServerConnectFlow implements HostConnectFlow<ConnectResponse> {
 
     public static final String CONNECT_PATH = "/api/tenants/gameservers/connect";

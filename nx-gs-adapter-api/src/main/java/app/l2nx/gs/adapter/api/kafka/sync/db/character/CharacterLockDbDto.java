@@ -4,20 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one active character lock, carried inside
- * {@link CharacterDbDto#getLocks()}.
- *
- * <p>Surfaces a single active binding derived from a build-specific
- * {@code character_variables} row ({@code lockIp} / {@code lockHwid} /
- * {@code lockItem} on bohpts). The schema provider emits one entry per
- * <b>active</b> lock — a lock is active iff its source value is present,
- * non-blank, and not the {@code "0"} sentinel; inactive locks are dropped before
- * assembly, so every entry that reaches the wire is an in-effect lock.</p>
- *
- * <p>{@code lockType} is an {@code UPPER_SNAKE} open-string token (canonical
- * constants in {@link WellKnownCharacterLockTypes}); {@code lockValue} carries
- * the bound datum (plaintext IP for {@code IP}, HWID hash for {@code HWID} /
- * {@code ITEM}), surfaced because the legacy admin UI displayed it.</p>
+ * Wire DTO for one active character lock, carried in {@link CharacterDbDto#getLocks()}.
+ * Only in-effect locks are emitted (value present, non-blank, not {@code "0"}).
  */
 public final class CharacterLockDbDto {
 
@@ -29,19 +17,12 @@ public final class CharacterLockDbDto {
         this.lockValue = lockValue;
     }
 
-    /**
-     * Lock kind — an {@link WellKnownCharacterLockTypes} value ({@code UPPER_SNAKE}
-     * open string), {@code NOT NULL} on the wire.
-     */
+    /** A {@link WellKnownCharacterLockTypes} value (open string). */
     public String getLockType() {
         return lockType;
     }
 
-    /**
-     * The bound datum — plaintext IP for an {@code IP} lock, the 64-hex HWID hash
-     * for {@code HWID} / {@code ITEM} locks. {@code null} when the host surfaces the
-     * lock without an associated value.
-     */
+    /** Plaintext IP for {@code IP}, 64-hex HWID hash for {@code HWID}/{@code ITEM}; null when the host gives none. */
     public @Nullable String getLockValue() {
         return lockValue;
     }

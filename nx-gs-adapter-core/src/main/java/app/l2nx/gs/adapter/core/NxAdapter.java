@@ -49,29 +49,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-/**
- * Adapter entry point — singleton-style facade exposing the lifecycle to the host JVM.
- *
- * <p>Usage:</p>
- * <pre>
- *   NxAdapter.onStateChange(s -&gt; log.info("adapter state: {}", s)); // optional
- *   NxAdapter.start();                                                 // fire-and-forget
- * </pre>
- *
- * <p>{@link #start()} never propagates an exception to the host JVM. Any failure during
- * config resolution is caught here, logged via {@link NxLog}, and reflected in
- * {@link #state()} as {@link AdapterState#FAILED}.</p>
- */
+/** Singleton facade over the adapter lifecycle; {@link #start()} never throws into the host JVM, failures surface as {@link AdapterState#FAILED}. */
 public final class NxAdapter {
 
     private static final NxLog log = NxLogFactory.getLogger(NxAdapter.class);
     private static final AtomicReference<AdapterState> STATE = new AtomicReference<>(AdapterState.INIT);
     private static final AtomicBoolean started = new AtomicBoolean(false);
     private static final AtomicBoolean closed = new AtomicBoolean(false);
-    /**
-     * Latches on the first {@link AdapterState#ACTIVE}. Pre-latch a transient connect
-     * failure stays in {@code REGISTERING}; post-latch it drives {@code DEGRADED}.
-     */
+    /** Latches on first ACTIVE: before it a connect failure stays REGISTERING, after it drives DEGRADED. */
     private static final AtomicBoolean wasActive = new AtomicBoolean(false);
 
     private static final Object transitionLock = new Object();
@@ -102,49 +87,22 @@ public final class NxAdapter {
 
     private NxAdapter() {}
 
-    /**
-     * Register a state-transition callback. May be called before or after {@link #start()}.
-     * Replaces any previously registered callback.
-     */
     public static void onStateChange(Consumer<AdapterState> callback) {
         stateCallback = callback;
     }
 
     /**
-     * Register the host's game-side {@link Executor} for command-handler
-     * {@code ctx.host().sync(...)} / {@code .async(...)} hops. MUST be called
-     * before {@link #start()} when {@code commandsTopic} is configured.
-     *
-     * <p>Typical host wiring:</p>
-     * <pre>
-     *   NxAdapter.hostExecutor(task -&gt; ThreadPoolManager.getInstance().executeGeneral(task));
-     *   NxAdapter.start();
-     * </pre>
-     *
-     * <p>Calling without an executor when {@code commandsTopic} is configured
-     * surfaces as a startup WARN; the first {@code ctx.host().sync(...)} call
-     * from any handler then throws {@link IllegalStateException}. Read-only
-     * handlers (no game state mutation) keep working unaffected.</p>
-     *
-     * <p>May be called more than once — last write wins. Replacing while the
-     * adapter is already running is permitted but discouraged; the new
-     * executor takes effect on the next {@code ctx.host()} call.</p>
+     * Host game-side executor for {@code ctx.host().sync/async}; must be set before start() when commandsTopic is configured,
+     * else the first sync() throws IllegalStateException. Last write wins.
      */
     public static void hostExecutor(Executor executor) {
         hostExecutorRef.set(executor);
     }
 
-    /**
-     * Current adapter state.
-     */
     public static AdapterState state() {
         return STATE.get();
     }
 
-    /**
-     * Resolve config and (if enabled) initiate the connect flow on a daemon scheduler.
-     * Non-blocking — returns immediately. Never throws into the host JVM.
-     */
     public static NxAdapter start() {
         if (!started.compareAndSet(false, true)) {
             log.warn(
@@ -152,8 +110,7 @@ public final class NxAdapter {
                     STATE.get());
             return INSTANCE;
         }
-        // Banner runs before config resolve so a misconfigured / disabled adapter still
-        // announces itself.
+        // Before config resolve so a misconfigured or disabled adapter still announces itself
         StartupBanner.emit(log, AdapterVersion.resolve());
 
         AdapterConfig config;
@@ -186,8 +143,7 @@ public final class NxAdapter {
         heartbeatService = new HeartbeatService(
                 defaultPublisher(), hbScheduler, config.getAdapterVersion(), NxAdapter::collectModuleStatuses);
 
-        // Single read of the volatile so a concurrent test-only swap can't split
-        // the null-check from the dereference.
+        // Single volatile read so a test-only swap can't split the null-check from the dereference
         KafkaFactory override = kafkaFactoryOverride;
         KafkaFactory factory = override != null ? override : new DefaultKafkaFactory();
         KafkaInitializer kafkaInit = new KafkaInitializer(factory, config.getKafkaProducerOverrides());
@@ -204,18 +160,7 @@ public final class NxAdapter {
         return INSTANCE;
     }
 
-    /**
-     * Idempotent shutdown — cancel heartbeat, cancel connect scheduler, shut down the
-     * Kafka client if alive, and transition to {@link AdapterState#CLOSED}. Safe to call
-     * from any thread; safe to call repeatedly.
-     *
-     * <p>Blocking-idempotent: a concurrent second caller does not return early — it
-     * waits until the in-flight shutdown completes. This lets a host drive shutdown
-     * synchronously before a hard {@code Runtime.halt()} (which skips the
-     * auto-registered JVM hook) and rely on the event queue being drained and the
-     * Kafka producer flushed by the time this returns, even if the auto hook is
-     * running the shutdown on another thread.</p>
-     */
+    /** Idempotent; a concurrent second caller blocks until the in-flight shutdown completes, so a host can shut down before Runtime.halt() with the queue drained and producer flushed. */
     public void shutdown() {
         synchronized (shutdownLock) {
             shutdownLocked();
@@ -238,8 +183,7 @@ public final class NxAdapter {
         }
         ScheduledExecutorService hbExec = heartbeatScheduler;
         if (hbExec != null) {
-            // Let an in-flight tick complete its publish rather than interrupting
-            // it mid-send (shutdownNow would surface as a noisy WakeupException).
+            // shutdownNow mid-send would surface as a noisy WakeupException
             hbExec.shutdown();
             try {
                 if (!hbExec.awaitTermination(2L, TimeUnit.SECONDS)) {
@@ -267,9 +211,7 @@ public final class NxAdapter {
             moduleRegistry = null;
         }
 
-        // Stop the commands consumer first so the daemon stops admitting new
-        // records and in-flight handlers can finish + emit their replies before
-        // we tear down the producer that NxKafka owns.
+        // Consumer first so in-flight handlers can emit replies before the producer is torn down
         CommandsConsumer cmds = commandsConsumer;
         if (cmds != null) {
             try {
@@ -311,7 +253,6 @@ public final class NxAdapter {
                 kafka.shutdown();
             }
         } catch (KafkaException notConfigured) {
-            // Adapter never reached initKafka — nothing to shut down.
         } catch (Throwable t) {
             log.error("NxKafka.shutdown threw {}", t.getClass().getName(), t);
         }
@@ -336,7 +277,7 @@ public final class NxAdapter {
             try {
                 NxKafka.instance().send(topic, key, payload);
             } catch (KafkaException notConfigured) {
-                // Should never fire — initKafka arms heartbeat only after build() returns.
+                // Unreachable: initKafka arms heartbeat only after build() returns
                 log.warn("Heartbeat publisher invoked before NxKafka was configured");
             }
         };
@@ -348,8 +289,7 @@ public final class NxAdapter {
             Runtime.getRuntime().addShutdownHook(hook);
             shutdownHook = hook;
         } catch (Throwable t) {
-            // JVM already shutting down or host SecurityManager disallows hooks; the
-            // adapter still runs, operators just won't get auto-shutdown on JVM exit.
+            // Hooks disallowed (JVM shutting down or SecurityManager): adapter runs without auto-shutdown
             log.warn("Failed to register JVM shutdown hook: {}", t.getClass().getName(), t);
         }
     }
@@ -360,8 +300,7 @@ public final class NxAdapter {
                 transition(AdapterState.REGISTERING);
                 break;
             case ACTIVE:
-                // Reached only when Kafka wiring is skipped (test-only); production goes
-                // through initKafka via onActiveFlow and never emits bare ACTIVE here.
+                // Only when Kafka wiring is skipped (test-only); production goes through initKafka
                 wasActive.set(true);
                 transition(AdapterState.ACTIVE);
                 break;
@@ -382,8 +321,7 @@ public final class NxAdapter {
     }
 
     private static void initKafka(KafkaInitializer init, HostConnectFlow<?> active) {
-        // Test paths can drive initKafka directly without going through start();
-        // prime a small IO pool so ConnectContext.io() and CommandContext.io() are usable.
+        // Test paths call initKafka directly; prime an IO pool so ConnectContext.io() and CommandContext.io() work
         if (ioExecutor == null) {
             ioExecutor = createIoExecutor(AdapterConfig.defaultIoWorkers());
         }
@@ -416,11 +354,8 @@ public final class NxAdapter {
             }
         }
 
-        // Events and commands bootstrap are isolated: a failure in either (e.g. a
-        // NoClassDefFoundError from an adapter-api/adapter-core version skew on the
-        // host classpath) must NOT abort sync-module discovery below, which is the
-        // adapter's primary job. ConnectContext null-coalesces a missing façade to a
-        // no-op, and the heartbeat surfaces the gap by omitting the events/commands slot.
+        // Events/commands bootstrap failures (e.g. NoClassDefFoundError from api/core version skew) must not abort
+        // sync-module discovery; ConnectContext no-ops a missing facade and heartbeat omits the slot
         NxEvents events = null;
         try {
             events = startEventsPublisher(active.topics());
@@ -430,8 +365,7 @@ public final class NxAdapter {
                     t.getClass().getName(),
                     t);
         }
-        // Group ID lives under the per-tenant prefix so the `User:<tenant>` SCRAM
-        // principal's group ACL (prefixed on `<tenant>.`) covers it.
+        // Under the tenant prefix so the User:<tenant> SCRAM principal's group ACL covers it
         String commandsGroupId = active.tenantSlug() + ".gs.commands." + active.serverSlug();
         NxSync sync = startSyncFacade();
         NxGameData gameData = startGameDataFacade();
@@ -485,20 +419,7 @@ public final class NxAdapter {
         return Collections.singletonMap(NxHeaders.NX_SERVER_ID, NxHeaders.encodeUuid(serverId));
     }
 
-    /**
-     * Build and start the events publisher with the per-family topic map from
-     * the connect response. Returns the {@link NxEvents} façade that goes
-     * into {@link ConnectContext#events()}. {@code messagingTopics}
-     * absent on the wire is normalized to an empty event-family map — the
-     * publisher still spins up so the heartbeat slot is populated; every
-     * {@code publishX} call short-circuits as a no-op + DEBUG log without
-     * burning queue capacity.
-     *
-     * <p>The façade is stable across reconnects — on a second handshake the
-     * underlying publisher is swapped behind the same {@link NxEvents}
-     * instance so modules that captured {@code ctx.events()} earlier keep
-     * publishing into the live publisher with no re-binding.</p>
-     */
+    /** Facade stays stable across reconnects (publisher swapped behind it); absent messagingTopics yields an empty family map so publishX no-ops. */
     private static NxEvents startEventsPublisher(MessagingTopics messagingTopics) {
         if (failEventsBootstrapForTesting) {
             throw new NoClassDefFoundError(
@@ -531,13 +452,7 @@ public final class NxAdapter {
         return facade;
     }
 
-    /**
-     * Build and start the commands consumer with the inbound + replies topic
-     * pair from the connect response. Returns the {@link NxCommands} façade
-     * that goes into {@link ConnectContext#commands()} — non-null even when
-     * commands are disabled (registrations are accepted as no-ops). When
-     * {@code commandsTopic} is unconfigured no consumer thread is spawned.
-     */
+    /** Facade is non-null even when commands are disabled (registrations no-op); no consumer thread without commandsTopic. */
     private static NxCommands startCommandsConsumer(
             MessagingTopics messagingTopics,
             KafkaCredentials kafka,
@@ -620,19 +535,13 @@ public final class NxAdapter {
             existing = new NxGameDataImpl();
             gameDataFacade = existing;
         } else {
-            // Reconnect: drop stale triggers so the gd-sync module re-registers
-            // cleanly instead of stacking duplicates.
+            // Reconnect: drop stale triggers so gd-sync doesn't stack duplicates
             existing.clearTriggers();
         }
         existing.bindExecutor(ioExecutor);
         return existing;
     }
 
-    /**
-     * Heartbeat-supplier seam — combines registry-discovered modules with the
-     * built-in {@code events} and {@code commands} module slots. Called once
-     * per heartbeat tick on the heartbeat scheduler thread.
-     */
     private static List<ModuleStatus> collectModuleStatuses() {
         ModuleRegistry registry = moduleRegistry;
         List<ModuleStatus> registryStatuses = registry != null ? registry.currentStatuses() : Collections.emptyList();
@@ -691,8 +600,7 @@ public final class NxAdapter {
     }
 
     private static void transition(AdapterState target) {
-        // Serializes state-set + callback dispatch so a callback that calls state()
-        // always observes the value just emitted, not a concurrently-set newer one.
+        // Serializes set + dispatch so a callback calling state() sees the value just emitted
         synchronized (transitionLock) {
             STATE.set(target);
             Consumer<AdapterState> cb = stateCallback;
@@ -714,11 +622,7 @@ public final class NxAdapter {
         kafkaFactoryOverride = factory;
     }
 
-    /**
-     * Test seam — installs an externally managed IO executor so tests
-     * exercising {@link #simulateInitKafkaForTesting} skip the production
-     * pool spin-up. The caller owns lifecycle.
-     */
+    /** Test seam: externally managed IO executor, caller owns lifecycle. */
     static void setIoExecutorForTesting(ExecutorService executor) {
         ioExecutor = executor;
     }
@@ -834,12 +738,6 @@ public final class NxAdapter {
         initKafka(init, new GameServerResponseFlowAdapter(response));
     }
 
-    /**
-     * Test-only adapter wrapping a fully-built {@link ConnectResponse} as a
-     * {@link HostConnectFlow}. Lets tests exercise the production
-     * {@code initKafka(HostConnectFlow)} path without standing up a real
-     * {@link GameServerConnectFlow} + WireMock.
-     */
     private static final class GameServerResponseFlowAdapter implements HostConnectFlow<ConnectResponse> {
         private final ConnectResponse r;
 
@@ -908,12 +806,7 @@ public final class NxAdapter {
         }
     }
 
-    /**
-     * Test seam — primes the module-registry slot without going through
-     * {@link #start()}. Required by tests that drive {@link #simulateInitKafkaForTesting}
-     * directly and want the ServiceLoader-based module discovery to actually
-     * happen (otherwise initKafka skips the {@code registry != null} branch).
-     */
+    /** Test seam: without it initKafka skips the {@code registry != null} branch. */
     static void primeModuleRegistryForTesting() {
         moduleRegistry = new ModuleRegistry();
     }

@@ -4,23 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one persisted {@code auto_announcements} row, payload of
- * {@code SyncEvent<AutoAnnouncementDbDto>} on the per-tenant
- * {@code auto_announcement} db-sync topic. Mirrors the game-server's native
- * in-game announcement rows so the platform can list them read-only
- * alongside its own authored announcements (origin {@code GAME} vs
- * {@code L2NX} is a platform-side distinction, not carried on this DTO).
- *
- * <p>{@link #getContent() content} is already the platform's neutral chat
- * micro-format — the schema provider performs the host-specific
- * {@code /n} → {@code \n} / {@code [=url=]} → bare-URL translation in
- * {@code mapEntity} before this DTO is built, so consumers never see the
- * bohpts wire tokens here.</p>
- *
- * <p>Only {@link #getId() id} and {@link #getContent() content} are
- * required; the remaining fields mirror the host's native scheduling
- * columns and are optional so a host can surface whatever subset its schema
- * carries.</p>
+ * Wire DTO for one {@code auto_announcements} row, payload of {@code SyncEvent<AutoAnnouncementDbDto>}.
+ * Only {@code id} and {@code content} are required.
  */
 public final class AutoAnnouncementDbDto {
 
@@ -46,54 +31,35 @@ public final class AutoAnnouncementDbDto {
         this.cycle = cycle;
     }
 
-    /**
-     * Primary key — the host's native {@code auto_announcements} row id,
-     * {@code NOT NULL}. The same value a
-     * {@link app.l2nx.gs.adapter.api.kafka.commands.announcement.DeleteAutoAnnouncementCommand}
-     * targets to remove this row.
-     */
+    /** Same value a {@link app.l2nx.gs.adapter.api.kafka.commands.announcement.DeleteAutoAnnouncementCommand} targets. */
     public long getId() {
         return id;
     }
 
     /**
-     * Announcement text, already translated to the platform's neutral chat
-     * micro-format (literal {@code \n} line breaks, bare URLs). {@code NOT NULL}.
+     * Already in the platform neutral chat micro-format (literal {@code
+     * }, bare URLs); host tokens are translated by the provider.
      */
     public String getContent() {
         return content;
     }
 
-    /**
-     * Whether the host broadcasts this announcement on the critical/alert
-     * channel rather than the normal one. {@code null} when the host schema
-     * does not surface a per-row channel flag.
-     */
+    /** True for the critical/alert channel. */
     public @Nullable Boolean getCritical() {
         return critical;
     }
 
-    /**
-     * Delay in milliseconds from server start before the first broadcast.
-     * {@code null} when not surfaced by the host schema.
-     */
+    /** Delay from server start before the first broadcast. */
     public @Nullable Long getInitialMs() {
         return initialMs;
     }
 
-    /**
-     * Repeat period in milliseconds between broadcasts. {@code null} when
-     * not surfaced by the host schema.
-     */
+    /** Repeat period between broadcasts. */
     public @Nullable Long getDelayMs() {
         return delayMs;
     }
 
-    /**
-     * Host-native repeat-count value (semantics — including any "infinite"
-     * sentinel — are host-defined). {@code null} when not surfaced by the
-     * host schema.
-     */
+    /** Host-defined repeat count, including any "infinite" sentinel. */
     public @Nullable Integer getCycle() {
         return cycle;
     }

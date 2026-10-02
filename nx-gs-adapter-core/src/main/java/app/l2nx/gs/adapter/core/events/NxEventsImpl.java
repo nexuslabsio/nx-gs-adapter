@@ -6,24 +6,7 @@ import app.l2nx.gs.log.NxLogFactory;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Adapter-core implementation of {@link NxEvents}. Stateless façade —
- * {@link #publish} resolves the registered binding for the concrete payload
- * class and enqueues into the shared {@link EventsPublisher}.
- *
- * <p>The façade survives reconnect: {@code NxAdapter} caches a single
- * {@code NxEventsImpl} per JVM and calls {@link #swap(EventsPublisher, EventTypeRegistry)}
- * to retarget it at a freshly built publisher. Modules that captured
- * {@code ctx.events()} from an earlier {@code onConnect} keep working
- * without re-registration.</p>
- *
- * <p>{@code null} payloads are swallowed with a WARN log (game-loop safety —
- * never throws to the caller).</p>
- *
- * <p>Package-private. External callers acquire an {@link NxEvents} handle
- * via {@link EventsBootstrap#start} or via {@code ConnectContext.events()}
- * — they never see this class directly.</p>
- */
+/** Stateless façade retargeted via {@link #swap} on reconnect; null payloads are swallowed with WARN (never throws into the game loop). */
 final class NxEventsImpl implements NxEvents {
 
     private static final NxLog log = NxLogFactory.getLogger(NxEventsImpl.class);
@@ -60,9 +43,7 @@ final class NxEventsImpl implements NxEvents {
                     event.getClass().getName());
             return;
         }
-        // Short-circuit: a family with no topic is "disabled" — never enqueue.
-        // Otherwise disabled-family envelopes burn queue capacity and inflate
-        // dropped-total against operator expectations of "no-op + DEBUG log".
+        // disabled families must not burn queue capacity or inflate droppedTotal
         if (!publisher.isFamilyEnabled(binding.familyKey())) {
             log.debug("events.{} disabled — no topic configured; skipping publish", binding.familyKey());
             return;

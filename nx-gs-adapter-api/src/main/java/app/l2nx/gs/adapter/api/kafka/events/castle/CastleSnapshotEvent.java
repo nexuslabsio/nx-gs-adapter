@@ -4,30 +4,10 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO riding the {@code castle} family topic
- * ({@code <tenant>.gs.events.castle}) on a host-managed cadence, multiplexed with
- * {@link SiegeFinishedEvent} via the {@code Nx-Message-Type} header. Carries a
- * point-in-time full snapshot of every castle — its owning clan and next
- * scheduled siege.
- *
- * <p><b>Full snapshot, not a delta.</b> Each event lists the complete current set
- * of castles. The platform consumer keeps last-known state per server and
- * replaces it on receipt; a castle absent from a newer snapshot is dropped
- * (mark-and-sweep). Because {@link CastleSnapshotEntry#getNextSiegeAt()} is an
- * absolute {@code Instant}, the platform counts down locally and the cadence can
- * be slow — castle state changes rarely.</p>
- *
- * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire timestamp is encoded
- * in the upper 48 bits — extractable via
- * {@code app.l2nx.gs.commons.UUIDv7.extractCreatedAt(eventId)}; no separate
- * {@code occurredAt} field. Platform consumers dedupe / order on the embedded
- * timestamp (at-least-once delivery).</p>
- *
- * <p>{@link #getMetadata() metadata} is an optional open string→string map of
- * build-agnostic snapshot-level attributes. {@code null} when absent.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor parameter
- * names so Gson / Jackson can deserialize without {@code @JsonProperty}.</p>
+ * Full point-in-time snapshot of every castle on the {@code castle} family topic, multiplexed with
+ * {@link SiegeFinishedEvent} via {@code Nx-Message-Type}. Not a delta: the consumer replaces its state and drops castles
+ * absent from a newer snapshot. Absolute {@code nextSiegeAt} lets the platform count down locally, so cadence can be slow.
+ * {@code eventId} MUST be a UUIDv7 (timestamp in the upper 48 bits, consumers dedupe/order on it).
  */
 public final class CastleSnapshotEvent {
 
@@ -43,28 +23,14 @@ public final class CastleSnapshotEvent {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * Event identity. MUST be a UUIDv7 — the upper 48 bits encode the snapshot
-     * occurrence timestamp.
-     */
     public UUID getEventId() {
         return eventId;
     }
 
-    /**
-     * Complete current set of castles. Always non-null on read; {@code null}
-     * passed to the constructor is normalized to an empty list. The returned list
-     * is unmodifiable.
-     */
     public List<CastleSnapshotEntry> getCastles() {
         return castles;
     }
 
-    /**
-     * Optional open string→string map of build-agnostic attributes about this
-     * snapshot. {@code null} when absent. When non-null the returned map is
-     * unmodifiable.
-     */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;
     }

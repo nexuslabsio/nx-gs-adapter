@@ -4,21 +4,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Post-upsert state of a single character lock, carried inside
- * {@link UpsertCharacterLockResult}. Lets the caller see the truth for the one
- * lock the command named, without a follow-up read.
- *
- * <p>{@code lockType} is an {@code UPPER_SNAKE} open-string token — canonical
- * constants live in
- * {@link app.l2nx.gs.adapter.api.kafka.sync.db.character.WellKnownCharacterLockTypes}
- * ({@code IP} / {@code HWID} / {@code ITEM}). {@code active} is {@code true}
- * when the lock is in effect (the source value is present, non-blank, and not
- * the {@code "0"} sentinel); {@code value} carries the bound datum (plaintext
- * IP for an {@code IP} lock, HWID hash for {@code HWID} / {@code ITEM}),
- * {@code null} when the lock was cleared or carries no value.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Post-upsert state of the one lock named by the command, carried in {@link UpsertCharacterLockResult} so the
+ * caller needs no follow-up read. {@code active} means the source value is present, non-blank and not the
+ * {@code "0"} sentinel.
  */
 public final class CharacterLockState {
 
@@ -32,28 +20,16 @@ public final class CharacterLockState {
         this.value = value;
     }
 
-    /**
-     * Lock kind — a
-     * {@link app.l2nx.gs.adapter.api.kafka.sync.db.character.WellKnownCharacterLockTypes}
-     * value ({@code UPPER_SNAKE} open string), {@code NOT NULL}.
-     */
+    /** A {@link app.l2nx.gs.adapter.api.kafka.sync.db.character.WellKnownCharacterLockTypes} value (open string). */
     public String getLockType() {
         return lockType;
     }
 
-    /**
-     * {@code true} when the lock is in effect after the upsert; {@code false}
-     * when it was cleared (or never set).
-     */
     public boolean isActive() {
         return active;
     }
 
-    /**
-     * Bound datum after the upsert — plaintext IP for an {@code IP} lock, the
-     * HWID hash for {@code HWID} / {@code ITEM} locks. {@code null} when the
-     * lock was cleared or carries no associated value.
-     */
+    /** Plaintext IP for an {@code IP} lock, HWID hash for {@code HWID} / {@code ITEM}; {@code null} when cleared. */
     public @Nullable String getValue() {
         return value;
     }

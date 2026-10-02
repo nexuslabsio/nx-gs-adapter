@@ -3,16 +3,7 @@ package app.l2nx.gs.runtime.sync.engine;
 import app.l2nx.gs.adapter.api.kafka.ops.model.EntityState;
 import java.util.Objects;
 
-/**
- * Outcome of one {@link EntityTickLoop} tick, surfaced to
- * {@link EntityStatsTracker}. Counters are post-publish-walk: only PKs whose
- * Kafka publish succeeded contribute to {@code created/updated}; failed
- * publishes leave the snapshot untouched and are replayed on the next tick.
- *
- * <p>Runtime-sync never emits DELETED events (no tombstone on logout) so the
- * {@code deleted} counter is always {@code 0} — present to match the
- * {@code EntityStats}/{@code ChangesSummary} wire shape.</p>
- */
+/** Counters are post-ack-walk: failed publishes do not count. {@code deleted} is always 0 (no tombstones) and exists only for the wire shape. */
 public final class CycleResult {
 
     private final EntityState state;

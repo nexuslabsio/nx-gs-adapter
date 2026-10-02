@@ -4,27 +4,9 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One effect a {@link SkillLevel} applies — the build-agnostic projection of a core
- * effect template. {@code name} is the effect handler name (e.g. {@code p_attack},
- * {@code Stun}, {@code HealPercent}); {@code params} are its tuning parameters as a
- * flat string→string map (the host flattens the core's parameter set, value-typed
- * however the core stores it).
- *
- * <p>{@code name} is the non-null identity. Effects are per-level — each skill level
- * carries its own list. The full numeric variation across levels is also captured by
- * the typed {@link SkillLevel} columns ({@code power}, {@code abnormalTimeSec}); this
- * carries the qualitative "which handlers fire".</p>
- *
- * <p>{@code kind} tells which effect channel the entry belongs to: {@code TARGET}
- * (applied to the skill's target — the default), {@code SELF} (applied to the caster on
- * cast) or {@code PASSIVE} (constantly applied while the passive / toggle is active).
- * {@code null} means {@code TARGET} (pre-{@code kind} wire back-compat).</p>
- *
- * <p>{@code abnormalType} / {@code abnormalLevel} are the buff-slot stacking
- * coordinates of this effect (same-type abnormals overwrite by level);
- * {@code effectPower} is the effect's own magnitude operand (land-rate / value base —
- * distinct from the skill-level {@code power}). {@code statModifiers} are the stat
- * modifications this effect applies while active — the substance of buffs and passives.</p>
+ * One effect a {@link SkillLevel} applies. {@code name} (non-null) is the effect handler name, e.g.
+ * {@code p_attack}, {@code Stun}; {@code params} is its flat string-to-string parameter map.
+ * {@code kind} is {@code TARGET} / {@code SELF} / {@code PASSIVE} (while active); {@code null} means {@code TARGET}.
  */
 public final class SkillEffect {
 
@@ -59,48 +41,29 @@ public final class SkillEffect {
         return name;
     }
 
-    /**
-     * Effect channel — {@code TARGET} / {@code SELF} / {@code PASSIVE}; {@code null}
-     * means {@code TARGET}.
-     */
     public @Nullable String getKind() {
         return kind;
     }
 
-    /**
-     * Effect handler parameters as a flat string-keyed map; {@code null} when the
-     * handler takes none.
-     */
     public @Nullable Map<String, String> getParams() {
         return params;
     }
 
-    /**
-     * Abnormal (buff-slot) stacking type — canonical UPPER_SNAKE token; {@code null}
-     * when the effect occupies no buff slot.
-     */
+    /** Buff-slot stacking type; {@code null} when the effect occupies no buff slot. */
     public @Nullable String getAbnormalType() {
         return abnormalType;
     }
 
-    /**
-     * Abnormal stacking level within {@code abnormalType} (higher overwrites lower).
-     */
+    /** Higher overwrites lower within {@code abnormalType}. */
     public @Nullable Integer getAbnormalLevel() {
         return abnormalLevel;
     }
 
-    /**
-     * The effect's own magnitude operand (land-rate / value base); distinct from the
-     * skill-level {@code power}.
-     */
+    /** Effect's own magnitude operand (land-rate / value base), distinct from the skill-level {@code power}. */
     public @Nullable Double getEffectPower() {
         return effectPower;
     }
 
-    /**
-     * Stat modifications applied while the effect is active; {@code null} if none.
-     */
     public @Nullable List<SkillStatModifier> getStatModifiers() {
         return statModifiers;
     }

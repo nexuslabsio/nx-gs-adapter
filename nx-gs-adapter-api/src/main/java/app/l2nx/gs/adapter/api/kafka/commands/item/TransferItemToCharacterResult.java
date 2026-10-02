@@ -3,14 +3,7 @@ package app.l2nx.gs.adapter.api.kafka.commands.item;
 import java.util.Objects;
 
 /**
- * Success payload of {@link TransferItemToCharacterCommand}. Echoes the actual amount
- * moved and both endpoints. The host's stack-size clamping semantics
- * mirror {@link DeleteItemResult}: {@link #getCountTransferred() countTransferred}
- * MAY be less than the inbound {@link TransferItemToCharacterCommand#getCount() count}
- * if the live stack was smaller at execution time.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Echoes the amount moved and both endpoints; {@code countTransferred} may be less than requested, as in {@link DeleteItemResult}.
  */
 public final class TransferItemToCharacterResult {
 

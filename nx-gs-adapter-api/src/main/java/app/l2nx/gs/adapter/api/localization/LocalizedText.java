@@ -7,23 +7,12 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Multilingual text value — a locale-keyed map of translated strings. Mirrors the
- * platform's {@code app.l2nx.common.localization.LocalizedText} approach so the two
- * round-trip byte-for-byte across the wire.
+ * Locale-keyed map of translated strings, wire-compatible with the platform's
+ * {@code app.l2nx.common.localization.LocalizedText}.
  *
- * <p><b>Wire form is a flat object</b> keyed by locale code:
- * {@code {"en": "Great Axe", "ru": "Двуручный Топор"}} — NOT
- * {@code {"values": {...}}}. This artifact carries no JSON binder (zero runtime
- * deps), so serialization is the consumer's responsibility:</p>
- * <ul>
- *     <li>adapter side (Gson) registers a {@code TypeAdapter<LocalizedText>} that
- *     reads/writes {@link #values()} as the flat object;</li>
- *     <li>platform side (Jackson) registers a module deserializing the flat object
- *     into this type (or directly into the platform {@code LocalizedText}).</li>
- * </ul>
- *
- * <p>Locales are NOT fixed — whatever languages the host build exposes are carried.
- * The value is immutable; at least one locale must hold a non-blank string.</p>
+ * <p>Wire form is a flat object ({@code {"en": "Great Axe", "ru": "..."}}), not {@code {"values": {...}}}.
+ * No JSON binder is bundled; consumers register their own (Gson adapter / Jackson module).
+ * Locales are open; immutable; at least one value must be non-blank.</p>
  */
 public final class LocalizedText {
 
@@ -37,9 +26,7 @@ public final class LocalizedText {
     }
 
     /**
-     * Factory mirroring the platform type's delegating creator. Returns {@code null}
-     * for a {@code null} or empty input so callers can map "no localized name" to a
-     * null field without tripping the non-blank invariant.
+     * Returns {@code null} for {@code null} or all-blank input instead of tripping the non-blank invariant.
      */
     public static @Nullable LocalizedText of(@Nullable Map<String, String> values) {
         if (values == null || !hasNonBlank(values)) {
@@ -48,9 +35,6 @@ public final class LocalizedText {
         return new LocalizedText(values);
     }
 
-    /**
-     * The locale → string map. Immutable; serialized as the flat wire object.
-     */
     public Map<String, String> values() {
         return values;
     }

@@ -4,22 +4,9 @@ import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import java.util.Objects;
 
 /**
- * Inbound command instructing the game-server to close whatever private
- * store a character currently has open (sell, package-sell, or buy).
- * Executed by the host's private-store subsystem on the character's game
- * thread.
- *
- * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link StopPrivateStoreResult}{@code >}
- * — {@code success(payload)} echoes which store type was closed. Common error
- * replies:</p>
- * <ul>
- *     <li>{@code NOT_FOUND} — {@code charId} does not exist / is not online
- *     on this server.</li>
- *     <li>{@code INVALID_STATE} — the character has no private store open.</li>
- * </ul>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Closes whatever private store the character has open; executed on the character's game thread.
+ * Reply: {@code success(StopPrivateStoreResult)}; errors: {@code NOT_FOUND} (char not online),
+ * {@code INVALID_STATE} (no store open).
  */
 public final class StopPrivateStoreCommand implements NxCommand<StopPrivateStoreResult> {
 

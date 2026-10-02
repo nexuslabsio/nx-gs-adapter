@@ -5,10 +5,7 @@ import app.l2nx.gs.adapter.api.spi.capability.NxSyncResyncHandler;
 import app.l2nx.gs.adapter.api.spi.capability.NxSyncTrigger;
 import java.util.Collection;
 
-/**
- * Silent-drop fallback used when no sync runtime is wired (tests,
- * pre-bootstrap contexts).
- */
+/** Fallback when no sync runtime is wired; drops every call. */
 final class NoOpSync implements NxSync {
 
     static final NoOpSync INSTANCE = new NoOpSync();

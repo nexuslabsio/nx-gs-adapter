@@ -19,32 +19,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.ProducerConfig;
 
-/**
- * Singleton entry point for NxKafka library.
- *
- * <pre>{@code
- * // Configure and connect
- * NxKafka kafka = NxKafka.configure()
- *     .brokers("kafka1:9092,kafka2:9092")
- *     .clientId("bohpts-x20")
- *     .reconnect(true)
- *     .build();
- *
- * // Send messages
- * kafka.send("bohpts.x20.purchased", new PurchaseEvent(playerId, itemId, price));
- *
- * // Subscribe to messages
- * kafka.subscribe("bohpts.x20.purchased", "bohpts-x20", PurchaseEvent.class, event -> {
- *     gameServer.enqueue(() -> handleEvent(event));
- * });
- *
- * // Access from anywhere
- * NxKafka.instance().isConnected();
- *
- * // Shutdown (also registered as JVM shutdown hook)
- * NxKafka.instance().shutdown();
- * }</pre>
- */
+/** Singleton entry point; obtain a builder via {@link #configure()}. */
 public final class NxKafka {
 
     private static volatile NxKafka instance;
@@ -100,23 +75,10 @@ public final class NxKafka {
                 config.getReconnectIntervalMs());
     }
 
-    /**
-     * Creates a new configuration builder. Call {@link KafkaConfig.Builder#build()} to
-     * initialize the singleton and connect to the Kafka cluster.
-     *
-     * @return configuration builder
-     * @throws KafkaException if already configured and not shut down
-     */
     public static KafkaConfig.Builder configure() {
         return new KafkaConfig.Builder();
     }
 
-    /**
-     * Returns the singleton instance.
-     *
-     * @return the configured NxKafka instance
-     * @throws KafkaException if {@link #configure()} has not been called yet
-     */
     public static NxKafka instance() {
         NxKafka local = instance;
         if (local == null) {
@@ -136,14 +98,7 @@ public final class NxKafka {
         }
     }
 
-    /**
-     * Sends a message to the specified topic (fire-and-forget).
-     * The message is serialized to JSON via Gson. Delivery errors are logged
-     * internally and never propagated to the calling thread.
-     *
-     * @param topic   Kafka topic name
-     * @param message object to serialize as JSON; must be Gson-serializable
-     */
+    /** Fire-and-forget; delivery errors are logged, never thrown. */
     public void send(String topic, Object message) {
         if (closed.get()) {
             log.warn("Cannot send to {}: NxKafka is shut down", topic);
@@ -161,15 +116,7 @@ public final class NxKafka {
         }
     }
 
-    /**
-     * Sends a keyed message to the specified topic (fire-and-forget).
-     * Messages with the same key are guaranteed to land in the same partition,
-     * preserving ordering for related events (e.g. per-player).
-     *
-     * @param topic   Kafka topic name
-     * @param key     partition key (e.g. player ID); may be null for round-robin
-     * @param message object to serialize as JSON; must be Gson-serializable
-     */
+    /** Same key lands in the same partition, preserving per-key order. */
     public void send(String topic, String key, Object message) {
         if (closed.get()) {
             log.warn("Cannot send to {}: NxKafka is shut down", topic);
@@ -187,22 +134,7 @@ public final class NxKafka {
         }
     }
 
-    /**
-     * Sends a message to the specified topic with a delivery callback.
-     * The message is serialized to JSON via Gson. The callback is invoked
-     * on the Kafka I/O thread when the broker acknowledges (or rejects) the record.
-     *
-     * <pre>{@code
-     * kafka.send("events.purchase", event, (metadata, exception) -> {
-     *     if (exception != null) log.warn("Send failed", exception);
-     * });
-     * }</pre>
-     *
-     * @param topic    Kafka topic name
-     * @param message  object to serialize as JSON; must be Gson-serializable
-     * @param callback invoked with {@link org.apache.kafka.clients.producer.RecordMetadata}
-     *                 on success, or with an exception on failure; never null
-     */
+    /** Callback runs on the Kafka I/O thread. */
     public void send(String topic, Object message, Callback callback) {
         if (rejectIfClosed(topic, callback)) {
             return;
@@ -218,16 +150,6 @@ public final class NxKafka {
         }
     }
 
-    /**
-     * Sends a keyed message to the specified topic with a delivery callback.
-     * Messages with the same key are guaranteed to land in the same partition.
-     *
-     * @param topic    Kafka topic name
-     * @param key      partition key (e.g. player ID); may be null for round-robin
-     * @param message  object to serialize as JSON; must be Gson-serializable
-     * @param callback invoked with {@link org.apache.kafka.clients.producer.RecordMetadata}
-     *                 on success, or with an exception on failure; never null
-     */
     public void send(String topic, String key, Object message, Callback callback) {
         if (rejectIfClosed(topic, callback)) {
             return;
@@ -243,18 +165,7 @@ public final class NxKafka {
         }
     }
 
-    /**
-     * Sends a byte-array-keyed message with a delivery callback. Used when the
-     * partition key is raw bytes rather than a UTF-8 string — primitive-PK
-     * CDC keying, binary correlation IDs, etc. Same partition guarantee as the
-     * String-keyed overload (partitioning is on the raw key bytes either way).
-     *
-     * @param topic    Kafka topic name
-     * @param key      raw partition key bytes; may be null for round-robin
-     * @param message  object to serialize as JSON; null for log-compaction tombstones
-     * @param callback invoked with {@link org.apache.kafka.clients.producer.RecordMetadata}
-     *                 on success, or with an exception on failure; never null
-     */
+    /** Raw-bytes key; a null message sends a log-compaction tombstone. */
     public void send(String topic, byte[] key, Object message, Callback callback) {
         if (rejectIfClosed(topic, callback)) {
             return;
@@ -270,14 +181,7 @@ public final class NxKafka {
         }
     }
 
-    /**
-     * Sends a pre-built byte-array-keyed producer record with a delivery callback.
-     * Use when the caller needs to attach per-record headers (e.g.
-     * {@code Nx-Message-Type}) in addition to the producer's static headers.
-     *
-     * @param record   pre-built record carrying topic + key + headers + value
-     * @param callback invoked on the Kafka I/O thread when the broker acknowledges or rejects the record
-     */
+    /** For records carrying per-record headers on top of the static producer headers. */
     public void sendBytesKeyRecord(
             org.apache.kafka.clients.producer.ProducerRecord<byte[], Object> record, Callback callback) {
         if (rejectIfClosed(record.topic(), callback)) {
@@ -294,11 +198,7 @@ public final class NxKafka {
         }
     }
 
-    /**
-     * Shared close-state guard for callback-flavored sends. Returns {@code true}
-     * when the call has been rejected (caller MUST return without sending);
-     * fires the failure callback with a "NxKafka is shut down" exception.
-     */
+    /** Fails the callback and returns true when closed; the caller must then not send. */
     private boolean rejectIfClosed(String topic, Callback callback) {
         if (!closed.get()) {
             return false;
@@ -312,46 +212,12 @@ public final class NxKafka {
         return true;
     }
 
-    /**
-     * Subscribes to a topic with a typed message handler (fire-and-forget messages).
-     * Creates a dedicated daemon thread with a poll loop for this topic.
-     *
-     * <pre>{@code
-     * kafka.subscribe("bohpts.x20.purchased", "bohpts-x20", PurchaseEvent.class, event -> {
-     *     gameServer.enqueue(() -> shop.handlePurchase(event));
-     * });
-     * }</pre>
-     *
-     * @param topic   Kafka topic name
-     * @param groupId Kafka consumer group id (required, non-empty)
-     * @param type    message class for Gson deserialization
-     * @param handler invoked for each message on the consumer thread
-     * @param <T>     message type
-     * @throws KafkaException if already subscribed to this topic or NxKafka is shut down
-     */
+    /** One daemon poll thread per topic; throws if already subscribed or shut down. */
     public <T> void subscribe(String topic, String groupId, Class<T> type, Consumer<T> handler) {
         subscribe(topic, groupId, type, (message, replyTo) -> handler.accept(message));
     }
 
-    /**
-     * Subscribes to a topic with a typed message handler and reply support.
-     * Creates a dedicated daemon thread with a poll loop for this topic.
-     * Use {@link ReplyContext#reply(Object)} to send responses back to the requester.
-     *
-     * <pre>{@code
-     * kafka.subscribe("gs.char.info.request", "gs-char-info", CharInfoRequest.class, (request, replyTo) -> {
-     *     CharInfo info = gameServer.getCharInfo(request.getCharId());
-     *     replyTo.reply(info);
-     * });
-     * }</pre>
-     *
-     * @param topic   Kafka topic name
-     * @param groupId Kafka consumer group id (required, non-empty)
-     * @param type    message class for Gson deserialization
-     * @param handler invoked for each message with a {@link ReplyContext} on the consumer thread
-     * @param <T>     message type
-     * @throws KafkaException if already subscribed to this topic or NxKafka is shut down
-     */
+    /** As above; the handler answers the requester via {@link ReplyContext#reply(Object)}. */
     public <T> void subscribe(String topic, String groupId, Class<T> type, BiConsumer<T, ReplyContext> handler) {
         if (groupId == null || groupId.isEmpty()) {
             throw new KafkaException("groupId must be non-empty");
@@ -368,11 +234,6 @@ public final class NxKafka {
         log.info("Subscribed to topic {} with groupId {}", topic, groupId);
     }
 
-    /**
-     * Unsubscribes from a topic, stopping its poll thread and closing the consumer.
-     *
-     * @param topic Kafka topic name
-     */
     public void unsubscribe(String topic) {
         NxConsumer group = consumers.remove(topic);
         if (group != null) {
@@ -381,14 +242,7 @@ public final class NxKafka {
         }
     }
 
-    /**
-     * Blocks until every buffered producer record has been sent to the broker
-     * (delegates to {@code KafkaProducer.flush()}). No-op when NxKafka is shut
-     * down. Takes the send read-lock so it cannot race a {@code close()}.
-     *
-     * <p>Used by the events publisher's synchronous-flush path to guarantee
-     * a just-published fact reaches the broker before JVM-exit teardown.</p>
-     */
+    /** Blocks until buffered records reach the broker; takes the send read-lock so it cannot race close(). */
     public void flush() {
         if (closed.get()) {
             return;
@@ -412,18 +266,12 @@ public final class NxKafka {
         return state;
     }
 
-    /**
-     * Gracefully shuts down NxKafka: stops all consumer poll threads,
-     * stops the health-check scheduler, closes the producer, and clears
-     * the singleton instance.
-     * Also registered as a JVM shutdown hook, so explicit calls are optional.
-     * Safe to call multiple times — concurrent callers await the first call's completion.
-     */
+    /** Idempotent; also runs as a JVM shutdown hook. Concurrent callers wait for the first to finish. */
     public void shutdown() {
         try {
             Runtime.getRuntime().removeShutdownHook(shutdownHook);
         } catch (IllegalStateException e) {
-            // JVM is already shutting down — hook is firing or already fired.
+            // JVM already shutting down; the hook is firing or has fired
         }
         doShutdown();
         try {

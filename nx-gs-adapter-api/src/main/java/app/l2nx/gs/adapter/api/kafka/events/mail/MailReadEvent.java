@@ -4,14 +4,9 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Receiver opened (read) a mail for the first time — source
- * {@code Message.markAsRead()}. The reader is implicitly the receiver; the
- * read moment derives from the UUIDv7 {@link #getEventId() eventId}, so no
- * separate {@code readAt} rides the wire.
- *
- * <p>Keyed by {@link #getMailId() mailId} (8-byte BE) like the other mail
- * lifecycle events, so the read fact lands in the same partition in
- * occurrence order.</p>
+ * Receiver opened a mail for the first time. The reader is implicitly the receiver and the read time comes from the
+ * UUIDv7 {@code eventId}. Keyed by {@code mailId} (8-byte BE) so it lands in the same partition as the other mail
+ * lifecycle events, in occurrence order.
  */
 public final class MailReadEvent {
 
@@ -23,16 +18,12 @@ public final class MailReadEvent {
         this.mailId = mailId;
     }
 
-    /**
-     * UUIDv7 — upper 48 bits encode the read moment (occurredAt).
-     */
     public UUID getEventId() {
         return eventId;
     }
 
     /**
-     * Host-native {@code messages} row PK. Partition key (8-byte BE) shared
-     * across all mail lifecycle events for this mail.
+     * Host-native {@code messages} row PK; partition key (8-byte BE) shared by all mail lifecycle events of this mail.
      */
     public long getMailId() {
         return mailId;

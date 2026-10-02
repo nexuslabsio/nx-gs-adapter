@@ -2,12 +2,6 @@ package app.l2nx.gs.adapter.api.kafka.commands.character;
 
 import java.util.Objects;
 
-/**
- * Success payload of {@link KickCharacterCommand}.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
- */
 public final class KickCharacterResult {
 
     private final Long charId;
@@ -25,10 +19,7 @@ public final class KickCharacterResult {
         return charId;
     }
 
-    /**
-     * {@code true} when the target was an offline trader: store ended,
-     * {@code closeClient} had no client to act on.
-     */
+    /** {@code true} when the target was an offline trader: store ended, {@code closeClient} had no client to act on. */
     public boolean isOfflineTrader() {
         return offlineTrader;
     }

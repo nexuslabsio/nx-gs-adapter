@@ -5,20 +5,9 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Mail row created on the host. One event per row; batched sends emit one
- * event per resulting row, each with its own {@link #getMailId() mailId}.
- * Bounced-back rejected mails (see {@link MailReturnedEvent}) also surface
- * here as a fresh SENT with the bounce mail's new {@code mailId}.
- *
- * <p>{@link #getSubject() subject} and {@link #getBody() body} are plaintext
- * — treat the topic as sensitive.</p>
- *
- * <ul>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic attributes about this mail. {@code null} when absent.
- *   Hosts MAY add arbitrary keys without an API release; consumers
- *   ignore keys they do not understand.</li>
- * </ul>
+ * Mail row created on the host; one event per row, each with its own {@link #getMailId() mailId}, including bounces of rejected mails ({@link MailReturnedEvent}).
+ * <p>{@link #getSubject() subject} and {@link #getBody() body} are plaintext - treat the topic as sensitive.
+ * <p>{@link #getMetadata() metadata} is an optional open string-to-string map; {@code null} when absent, consumers ignore unknown keys.
  */
 public final class MailSentEvent {
 
@@ -60,33 +49,22 @@ public final class MailSentEvent {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * UUIDv7 — upper 48 bits encode occurredAt.
-     */
+    /** UUIDv7; upper 48 bits encode occurredAt. */
     public UUID getEventId() {
         return eventId;
     }
 
-    /**
-     * Host-native {@code messages} row PK. Partition key (8-byte BE) shared
-     * across all four lifecycle events for this mail.
-     */
+    /** Host {@code messages} row PK; partition key (8-byte BE) shared by all four lifecycle events of this mail. */
     public long getMailId() {
         return mailId;
     }
 
-    /**
-     * Sender char id. {@code 0} for system / NPC mail (see
-     * {@link #getSenderName()}).
-     */
+    /** {@code 0} for system / NPC mail (see {@link #getSenderName()}). */
     public long getSenderCharId() {
         return senderCharId;
     }
 
-    /**
-     * Display author when set by host (system / NPC mail).
-     * {@code null} for player-to-player — name comes from char CDC.
-     */
+    /** {@code null} for player-to-player mail; the name then comes from char CDC. */
     public @Nullable String getSenderName() {
         return senderName;
     }
@@ -107,9 +85,7 @@ public final class MailSentEvent {
         return expiresAt;
     }
 
-    /**
-     * COD adena required from receiver on accept. {@code 0} = none.
-     */
+    /** COD adena the receiver pays on accept; {@code 0} = none. */
     public long getCodAmount() {
         return codAmount;
     }

@@ -5,21 +5,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic instance-template wire DTO — the {@code id → name} catalog for
- * instanced zones (reflections), carried as the payload of
- * {@code GameDataSyncEvent} on the {@code gd} (game-data) sync stream's
- * {@code instance} entity topic. The host supplies a provider reading its
- * reflection-name catalog (e.g. {@code reflectionNames.xml}); nothing here
- * names a specific core.
- *
- * <p>Resolves the numeric {@code instanceId} carried per character on
- * {@code CharacterInstanceCooldownDbDto} into a readable, localized name — the
- * name is NOT denormalized onto every cooldown row.</p>
- *
- * <p>Only {@link #getId() id} is non-null. {@link #getName() name} is a
- * {@link LocalizedText} (locale → string, e.g. {@code {"en": ..., "ru": ...}}),
- * carried as-is on the wire; conversion to the platform {@code LocalizedText}
- * happens consumer-side in nx-gamedata.</p>
+ * {@code id -> name} catalog of instanced zones, resolving the {@code instanceId} of {@code CharacterInstanceCooldownDbDto}.
+ * {@code name} is converted to the platform {@code LocalizedText} consumer-side in nx-gamedata.
  */
 public final class InstanceTemplate {
 
@@ -35,9 +22,6 @@ public final class InstanceTemplate {
         return id;
     }
 
-    /**
-     * Localized instance name; {@code null} when the host build supplied none.
-     */
     public @Nullable LocalizedText getName() {
         return name;
     }

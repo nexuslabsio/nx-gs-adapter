@@ -6,24 +6,7 @@ import java.net.HttpURLConnection;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Outcome of one {@link HostConnectFlow#connect()} attempt. Parameterized on
- * the host-type response DTO so the same shape carries both gameserver and
- * login-server responses.
- *
- * <p>Three shapes:</p>
- * <ul>
- *   <li>{@link #ok(Object)} — HTTP 200 + parsed response body.</li>
- *   <li>{@link #httpError(int, ErrorEnvelope)} — HTTP 4xx / 5xx with
- *   optional typed envelope.</li>
- *   <li>{@link #ioFailure(IOException)} — transport failure or malformed
- *   200 body.</li>
- * </ul>
- *
- * @param <R> typed response DTO (e.g.
- *            {@link app.l2nx.gs.adapter.api.rest.ConnectResponse},
- *            {@link app.l2nx.gs.adapter.api.rest.LoginServerConnectResponse})
- */
+/** Outcome of one {@link HostConnectFlow#connect()}: ok, HTTP error, or IO failure (transport error or malformed 200 body). */
 public final class TypedConnectOutcome<R> {
 
     private final int statusCode;

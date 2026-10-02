@@ -54,7 +54,6 @@ class SafeRunnableTest {
             throw new StackOverflowError("simulated");
         };
 
-        // Wrapper guards Throwable, not just Exception.
         Runnable wrapped = SafeRunnable.wrap(err, log);
         wrapped.run();
 

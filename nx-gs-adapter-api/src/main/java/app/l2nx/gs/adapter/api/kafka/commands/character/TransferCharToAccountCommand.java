@@ -4,52 +4,20 @@ import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import java.util.Objects;
 
 /**
- * Inbound command instructing the game-server to move a character from its
- * current login account to a different one. The character itself stays
- * intact (same {@code charId}, items, clan, progression) — only the
- * underlying {@code account_name} pointer is rewritten so the next login
- * succeeds from the new account's credentials.
+ * Moves a character to a different login account. Only the {@code account_name} pointer is rewritten; the character
+ * itself (charId, items, clan, progression) stays intact.
  *
- * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <Void>}
- * — {@code success()} on a successful account rebind; common error replies:</p>
- * <ul>
- *     <li>{@code NOT_FOUND} — character does not exist on this server.</li>
- *     <li>{@code INVALID_STATE} — character cannot be rebound right now
- *     (logged in to a non-disconnectable state, jailed, in olympiad, in
- *     siege, …); the host's policy defines the exact rejection set.</li>
- *     <li>{@code FORBIDDEN} — operation rejected on policy grounds (e.g.
- *     moving a banned character is disallowed by the host's audit policy).</li>
- *     <li>{@code VALIDATION_FAILED} — wire payload missing a required field
- *     (Gson defaults boxed {@code Long} / nullable {@code String} to
- *     {@code null} on missing wire field; handler MUST check non-null
- *     before applying).</li>
- *     <li>{@code UNAVAILABLE} — transient persistence failure (DB
- *     unreachable, contention timeout on the {@code characters} row
- *     lock); retry may succeed.</li>
- * </ul>
+ * <p>Reply: {@code CommandResult<Void>}. Errors: {@code NOT_FOUND}, {@code INVALID_STATE} (cannot be rebound now,
+ * e.g. jailed, in olympiad or siege; host policy defines the set), {@code FORBIDDEN} (e.g. banned character),
+ * {@code VALIDATION_FAILED} (Gson leaves missing wire fields {@code null}, so the handler must null-check),
+ * {@code UNAVAILABLE} (transient persistence failure; retry may succeed).</p>
  *
- * <p><b>Side effects.</b> If the character is logged in at the time of
- * the command, the handler SHOULD force a logout before the rebind so the
- * client does not observe inconsistent account state mid-session.</p>
+ * <p>If the character is logged in, the handler should force a logout before the rebind so the client never sees
+ * inconsistent account state mid-session. Routed by {@code charId}.</p>
  *
- * <p><b>Required fields.</b> Both fields ({@code charId},
- * {@code accountTo}) are semantically REQUIRED. The constructor enforces
- * non-null via {@link IllegalArgumentException} for programmatic
- * construction. Wire-path Gson bypasses the constructor — handler-side
- * null-checking is the wire-validation gate.</p>
- *
- * <p><b>Partitioning.</b> Routed by {@link #getCharId() charId} on the
- * commands topic — sequential with other character-scoped operations on
- * the same character.</p>
- *
- * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
- * {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); what repeats is a caller re-issuing after a
- * reply timeout, where the transfer may already have landed. If the character's
- * {@code account_name} already matches {@link #getAccountTo() accountTo}, the handler SHOULD treat
- * the call as a no-op success rather than re-issuing the UPDATE.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * <p>Delivery is at-most-once (see {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}), but a caller may
+ * re-issue after a reply timeout when the transfer already landed; if {@code account_name} already matches
+ * {@code accountTo}, the handler should reply no-op success instead of re-running the UPDATE.</p>
  */
 public final class TransferCharToAccountCommand implements NxCommand<TransferCharToAccountResult> {
 
@@ -67,22 +35,11 @@ public final class TransferCharToAccountCommand implements NxCommand<TransferCha
         this.accountTo = accountTo;
     }
 
-    /**
-     * Character primary key. REQUIRED. Handler MUST emit
-     * {@code VALIDATION_FAILED} when the wire payload omits this field
-     * (boxed {@code Long} surfaces missing wire data as {@code null}).
-     */
     public Long getCharId() {
         return charId;
     }
 
-    /**
-     * Target login-account name. REQUIRED, non-blank semantically.
-     * Free-form host-supplied identifier — the value MUST exist as an
-     * account on the login server (handler MAY verify and reply
-     * {@code NOT_FOUND} when missing, or leave verification to the next
-     * login attempt depending on host policy).
-     */
+    /** Target login-account name; handler may reply {@code NOT_FOUND} if it does not exist, or defer to the next login depending on host policy. */
     public String getAccountTo() {
         return accountTo;
     }

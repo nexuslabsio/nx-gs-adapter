@@ -2,12 +2,7 @@ package app.l2nx.gs.db.sync.engine.jdbc;
 
 import java.util.regex.Pattern;
 
-/**
- * Validates provider-supplied SQL identifiers (table / column names) used to
- * construct CRC and fetch queries. Provider input is interpolated into SQL
- * without quoting; without validation a hostile or buggy provider could inject
- * arbitrary SQL.
- */
+/** Validates provider-supplied identifiers that are interpolated into SQL unquoted. */
 public final class SqlIdent {
 
     private static final Pattern VALID = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]{0,63}$");

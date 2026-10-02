@@ -7,20 +7,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Build-agnostic crafting-recipe wire DTO — the common L2 denominator for a single
- * recipe, carried as the payload of {@code GameDataSyncEvent} on the {@code gd}
- * (game-data) sync stream's {@code recipetemplate} entity topic. Each host build supplies
- * its own provider that maps its core's internal recipe representation into this shape;
- * nothing here names a specific core.
- *
- * <p>One {@code RecipeTemplate} is the whole aggregate for a recipe id: the header fields
- * plus the nested ingredient list ({@link #getIngredients()}). The consumer upserts the
- * parent and replaces its children atomically.</p>
- *
- * <p><b>Nullability:</b> only {@link #getId()} is non-null. Every other field is
- * {@link Nullable} (former primitives boxed) so {@code null} means "this build did not
- * supply it" rather than a fabricated default. Item references use the canonical
- * {@code itemTemplateId} name.</p>
+ * Wire DTO for one crafting recipe, payload of {@code GameDataSyncEvent} on the {@code recipetemplate} topic; the
+ * consumer replaces ingredients atomically with the parent. Only {@link #getId()} is non-null; elsewhere {@code null} means not supplied.
  */
 public final class RecipeTemplate {
 
@@ -75,15 +63,12 @@ public final class RecipeTemplate {
         return id;
     }
 
-    /**
-     * The recipe-book / recipe-scroll item that teaches this recipe.
-     */
     public @Nullable Integer getRecipeItemTemplateId() {
         return recipeItemTemplateId;
     }
 
     /**
-     * Internal recipe code (e.g. {@code mk_wooden_arrow}); not localized.
+     * Internal code, not localized.
      */
     public @Nullable String getRecipeName() {
         return recipeName;
@@ -93,16 +78,10 @@ public final class RecipeTemplate {
         return craftLevel;
     }
 
-    /**
-     * Dwarven (create-item) recipe vs common craft.
-     */
     public @Nullable Boolean getDwarven() {
         return dwarven;
     }
 
-    /**
-     * Base success chance in percent.
-     */
     public @Nullable Integer getSuccessRatePercent() {
         return successRatePercent;
     }
@@ -116,8 +95,7 @@ public final class RecipeTemplate {
     }
 
     /**
-     * Masterwork (rare) product item, produced with {@link #getRarityPercent()} chance
-     * in place of the normal product; {@code null} if the recipe has no rare product.
+     * Masterwork product, replaces the normal one with {@link #getRarityPercent()} chance.
      */
     public @Nullable Integer getRareItemTemplateId() {
         return rareItemTemplateId;
@@ -127,30 +105,18 @@ public final class RecipeTemplate {
         return rareCount;
     }
 
-    /**
-     * Chance in percent that the rare product is produced instead of the normal one.
-     */
     public @Nullable Integer getRarityPercent() {
         return rarityPercent;
     }
 
-    /**
-     * MP consumed per craft attempt.
-     */
     public @Nullable Integer getMpConsume() {
         return mpConsume;
     }
 
-    /**
-     * HP consumed per craft attempt (rare; most recipes cost only MP).
-     */
     public @Nullable Integer getHpConsume() {
         return hpConsume;
     }
 
-    /**
-     * Required materials; {@code null} if not supplied.
-     */
     public @Nullable List<RecipeIngredient> getIngredients() {
         return ingredients;
     }

@@ -85,10 +85,8 @@ class ChangeSetTest {
 
     @Test
     void diff_shouldNotMisclassify_whenStoredCrcEqualsMissingSentinel() {
-        // Phase1Hasher.MISSING_HASH = Integer.MIN_VALUE (0x80000000). A real
-        // CRC32(row) can produce this exact bit pattern (probability 1/2^32 per
-        // row). Pre-fix: ChangeSet compared getCrc(...) == MISSING_HASH and
-        // misclassified the tracked row as CREATED on every cycle.
+        // A real CRC32 can equal MISSING_HASH (Integer.MIN_VALUE); the row must not be misclassified as CREATED.
+
         int sentinel = Phase1Hasher.MISSING_HASH;
         Long2IntMap scan = new Long2IntOpenHashMap();
         scan.put(1L, sentinel);
@@ -106,8 +104,8 @@ class ChangeSetTest {
 
     @Test
     void diff_shouldDetectUpdate_whenStoredCrcWasMissingSentinelAndNewCrcDiffers() {
-        // Same collision scenario, but the row actually changed — must still
-        // produce an UPDATE event, not a CREATE.
+        // Same collision, row changed: still UPDATE.
+
         Long2IntMap scan = new Long2IntOpenHashMap();
         scan.put(1L, 12345);
 
@@ -127,14 +125,14 @@ class ChangeSetTest {
     @Test
     void diff_shouldHandleMixedChanges() {
         Long2IntMap scan = new Long2IntOpenHashMap();
-        scan.put(1L, 100); // unchanged
-        scan.put(2L, 250); // updated (was 200)
-        scan.put(4L, 400); // created
+        scan.put(1L, 100);
+        scan.put(2L, 250);
+        scan.put(4L, 400);
 
         SnapshotStore snapshot = new SnapshotStore();
         snapshot.putCrc(ENTITY, 1L, 100);
         snapshot.putCrc(ENTITY, 2L, 200);
-        snapshot.putCrc(ENTITY, 3L, 300); // deleted
+        snapshot.putCrc(ENTITY, 3L, 300);
 
         LongSet prev = new LongOpenHashSet();
         prev.add(1L);

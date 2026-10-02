@@ -6,11 +6,6 @@ import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 
-/**
- * Diff result of a single window's Phase-1 scan: PKs partitioned into
- * created (new in this scan), updated (CRC32 differs from snapshot), and
- * deleted (in snapshot for this window's PK range, missing in current scan).
- */
 public final class ChangeSet {
 
     private final LongSet created;
@@ -43,17 +38,6 @@ public final class ChangeSet {
         return created.size() + updated.size() + deleted.size();
     }
 
-    /**
-     * Compute the diff between the just-read window scan and the previous
-     * snapshot for the same PK range.
-     *
-     * @param currentScan     Phase-1 result: PK → CRC32 for this window
-     * @param prevKeysInRange PKs that were in the snapshot for this window's
-     *                        range at the start of the cycle
-     * @param snapshot        the snapshot store (used to read previous CRC32 for
-     *                        "updated" detection)
-     * @param entityName      entity scope key for snapshot lookup
-     */
     public static ChangeSet diff(
             Long2IntMap currentScan, LongSet prevKeysInRange, SnapshotStore snapshot, String entityName) {
         LongOpenHashSet created = new LongOpenHashSet();
@@ -63,9 +47,8 @@ public final class ChangeSet {
         for (Long2IntMap.Entry e : currentScan.long2IntEntrySet()) {
             long pk = e.getLongKey();
             int newCrc = e.getIntValue();
-            // containsCrc + getCrc instead of comparing getCrc against MISSING_HASH:
-            // a real CRC32 value can collide with the sentinel (Integer.MIN_VALUE),
-            // which would otherwise misclassify tracked rows as CREATED on every cycle.
+            // containsCrc + getCrc, not getCrc vs MISSING_HASH: a real CRC32 can equal the sentinel and would be
+            // misread as CREATED every cycle.
             if (!snapshot.containsCrc(entityName, pk)) {
                 created.add(pk);
             } else if (snapshot.getCrc(entityName, pk) != newCrc) {

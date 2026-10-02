@@ -5,42 +5,10 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Snapshot of a single character's identity + affiliation + damage
- * contribution at a raid event moment. Used for
- * {@link RaidKillEvent#getLastHit() lastHit},
- * {@link RaidKillEvent#getDropOwner() dropOwner}, and every entry of
- * {@link RaidKillEvent#getParticipants() participants}.
- *
- * <p>Identity-affiliation fields ({@code clanId} / {@code allyId} /
- * {@code partyId} / {@code commandChannelId}) are captured at the event
- * moment — a character can switch clans / parties mid-fight; only the
- * event-moment value is recorded.</p>
- *
- * <p>{@code partyId} / {@code commandChannelId} are UUIDv7 identifiers minted
- * by the host on Party / CommandChannel construction. Stable across leader
- * changes within the same in-memory group; reset on disband / server restart.</p>
- *
- * <p>{@link #isPartyLeader() partyLeader} / {@link #isCommandChannelLeader()
- * commandChannelLeader} are required booleans capturing whether this actor
- * was the leader of their Party / CommandChannel at the event moment. Both
- * are {@code false} when the actor has no party / no CC. The "leader party"
- * of a CC is the party whose leader is also the CC leader.</p>
- *
- * <p>{@link #getDamageDealt() damageDealt} is the actor's accumulated damage
- * to this raid (from the host aggro list). Always {@code >= 0}; {@code 0}
- * is a valid value in {@link RaidKillEvent#getParticipants() participants}
- * — surfaces healers / tanks / aggro-skill users who only accrued hate, and
- * Party / CommandChannel teammates of active damagers (pure buffers).
- * Also valid for {@link RaidKillEvent#getLastHit() lastHit} when the final
- * blow came with the boss already at 0 HP from someone else's damage, or
- * for a GM {@code //kill} where the killer never aggroed. Names (char /
- * clan) are intentionally NOT carried — the platform joins on
- * {@code charId} / {@code clanId} against the CDC-synced character / clan
- * catalogs.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson / Jackson can deserialize without
- * {@code @JsonProperty}.</p>
+ * Character snapshot (identity, affiliation, damage) at the raid event moment; used for {@link RaidKillEvent#getLastHit() lastHit}, {@link RaidKillEvent#getDropOwner() dropOwner} and each {@link RaidKillEvent#getParticipants() participants} entry.
+ * <p>Affiliations are event-moment values (characters can switch clans / parties mid-fight). {@code partyId} / {@code commandChannelId} are host-minted UUIDv7s, stable across leader changes, reset on disband / restart.
+ * <p>{@code partyLeader} / {@code commandChannelLeader} are {@code false} without a party / CC; the "leader party" of a CC is the party whose leader is also the CC leader.
+ * <p>{@link #getDamageDealt() damageDealt} comes from the host aggro list, {@code >= 0}; {@code 0} is valid (healers, tanks, pure buffers, a final blow on an already-dead boss, GM {@code //kill}). Names are not carried - join on charId / clanId via CDC.
  */
 public final class RaidActor {
 
@@ -72,62 +40,36 @@ public final class RaidActor {
         this.damageDealt = damageDealt;
     }
 
-    /**
-     * Character {@code objectId}.
-     */
     public long getCharId() {
         return charId;
     }
 
-    /**
-     * Clan affiliation; {@code null} when unaffiliated.
-     */
     public @Nullable Long getClanId() {
         return clanId;
     }
 
-    /**
-     * Alliance affiliation; {@code null} when unaffiliated.
-     */
     public @Nullable Long getAllyId() {
         return allyId;
     }
 
-    /**
-     * Party identity (UUIDv7); {@code null} when solo at the event moment.
-     */
+    /** {@code null} when solo at the event moment. */
     public @Nullable UUID getPartyId() {
         return partyId;
     }
 
-    /**
-     * Command channel identity (UUIDv7); {@code null} when the actor's party
-     * was not in a CC at the event moment.
-     */
+    /** {@code null} when the actor's party was not in a CC. */
     public @Nullable UUID getCommandChannelId() {
         return commandChannelId;
     }
 
-    /**
-     * {@code true} ⇔ this actor was the leader of their Party at the event
-     * moment. {@code false} when the actor has no party at the moment.
-     */
     public boolean isPartyLeader() {
         return partyLeader;
     }
 
-    /**
-     * {@code true} ⇔ this actor was the leader of their CommandChannel at
-     * the event moment. {@code false} when the actor has no CC at the moment.
-     */
     public boolean isCommandChannelLeader() {
         return commandChannelLeader;
     }
 
-    /**
-     * Accumulated damage from the host aggro list. {@code >= 0}; {@code 0}
-     * is valid (KS final blow with prior damage by others, GM kill, etc.).
-     */
     public long getDamageDealt() {
         return damageDealt;
     }

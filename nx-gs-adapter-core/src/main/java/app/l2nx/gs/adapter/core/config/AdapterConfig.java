@@ -6,22 +6,12 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Immutable holder for adapter configuration resolved at startup.
- * Built by {@link ConfigResolver#resolve()}; not constructed directly.
- */
 public final class AdapterConfig {
 
-    /**
-     * Floor for the IO worker pool — keeps modules/handlers usable when host
-     * JVM reports a single available processor.
-     */
+    /** Floor so modules/handlers stay usable when the host reports one CPU. */
     public static final int DEFAULT_IO_WORKERS_MIN = 2;
 
-    /**
-     * Default host-type when no {@code l2nx.host-type} is configured —
-     * preserves back-compat for pre-host-type adapter deployments.
-     */
+    /** Back-compat default for deployments that pre-date host-type. */
     public static final String DEFAULT_HOST_TYPE = "gs";
 
     private final String serverKey;
@@ -112,11 +102,6 @@ public final class AdapterConfig {
         return commands;
     }
 
-    /**
-     * Adapter host-type — {@code gs} (game server) or {@code ls} (login
-     * server). Selects the platform connect endpoint and the expected
-     * server-key property name.
-     */
     public String getHostType() {
         return hostType;
     }

@@ -14,12 +14,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Owns one {@link EntityTickLoop} per declared runtime entity. All loops share
- * a single daemon {@link ScheduledThreadPoolExecutor} sized via
- * {@code l2nx.runtime-sync.workers} — a slow snapshot for one entity briefly
- * occupies one worker but doesn't fork a thread per entity.
- */
 public final class RuntimeSyncEngine {
 
     private static final NxLog log = NxLogFactory.getLogger(RuntimeSyncEngine.class);
@@ -79,7 +73,7 @@ public final class RuntimeSyncEngine {
         if (s != null) {
             s.shutdownNow();
             try {
-                // publish-flush is the largest in-flight wait per tick — give it room to drain.
+                // publish-flush is the largest in-flight wait per tick
                 long awaitSeconds = Math.max(2L, (long) config.publishFlushSeconds() + 1L);
                 if (!s.awaitTermination(awaitSeconds, TimeUnit.SECONDS)) {
                     log.warn("runtime-sync scheduler did not terminate within {}s", awaitSeconds);

@@ -13,27 +13,8 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
- * Drives the platform-side connect lifecycle through a host-type-specific
- * {@link HostConnectFlow} strategy and emits an {@link Outcome} per logical
- * state transition. The strategy owns the endpoint URL + typed response
- * deserialization; this class owns retry / backoff / state-machine semantics.
- *
- * <p>Status-code dispatch:</p>
- * <ul>
- *   <li>{@code 200} → {@link Outcome#ACTIVE}</li>
- *   <li>{@code 401} → {@link Outcome#FAILED} (terminal, no retry)</li>
- *   <li>{@code 403} + {@code code=GAME_SERVER_DEACTIVATED} →
- *       {@link Outcome#REJECTED} (terminal, no retry)</li>
- *   <li>{@code 409} + {@code code=KAFKA_CREDENTIALS_MISSING} → {@link Outcome#TRANSIENT}
- *       (retry via {@link BackoffSchedule})</li>
- *   <li>{@code 5xx} / {@link java.io.IOException} → {@link Outcome#TRANSIENT}
- *       (retry via {@link BackoffSchedule})</li>
- *   <li>any other status → {@link Outcome#FAILED} (treated as terminal so we don't
- *       hammer the platform on an unexpected response shape)</li>
- * </ul>
- *
- * <p>{@link Outcome#STARTING} is emitted at the top of every run (initial submit
- * and every retry) so the orchestrator can drive the {@code REGISTERING} transition.</p>
+ * Retry/backoff/state machine over a {@link HostConnectFlow}. 401, 403 GAME_SERVER_DEACTIVATED and any
+ * unexpected status are terminal so the platform isn't hammered; 409 KAFKA_CREDENTIALS_MISSING, 5xx and IO retry.
  */
 public final class ConnectFlow implements Runnable {
 
@@ -42,22 +23,13 @@ public final class ConnectFlow implements Runnable {
     private static final String CODE_GAME_SERVER_DEACTIVATED = "GAME_SERVER_DEACTIVATED";
     private static final String CODE_KAFKA_CREDENTIALS_MISSING = "KAFKA_CREDENTIALS_MISSING";
 
-    /**
-     * Strips bearer tokens from any text routed through {@link NxLog}.
-     */
     private static final Pattern BEARER_PATTERN = Pattern.compile("Bearer\\s+\\S+");
 
     private final HostConnectFlow<?> flow;
     private final BackoffSchedule backoff;
     private final ScheduledExecutorService scheduler;
     private final Consumer<Outcome> onOutcome;
-    /**
-     * Invoked exactly once, immediately before {@link Outcome#ACTIVE}, with the
-     * flow whose accessors expose the platform handshake result. Lets the
-     * orchestrator (e.g. {@code NxAdapter}) bootstrap the Kafka client before
-     * the {@code ACTIVE} state is observed by registered state-change callbacks.
-     * {@code null} = the response is not needed.
-     */
+    // Runs before ACTIVE is observable so Kafka is bootstrapped first; null = response not needed.
     private final Consumer<HostConnectFlow<?>> onActiveFlow;
 
     private final AtomicInteger attempt = new AtomicInteger(0);
@@ -90,11 +62,8 @@ public final class ConnectFlow implements Runnable {
         try {
             outcome = flow.connect();
         } catch (Throwable t) {
-            // Defensive: HostConnectFlow.connect is contracted not to throw, but a
-            // faulty impl (or downstream wiring bug) must not bring down the
-            // daemon thread. Log only the exception class — message may carry the
-            // bearer token if the JDK threw IllegalArgumentException from
-            // setRequestProperty.
+            // Must not kill the daemon thread; class name only - the message may carry the bearer token
+            // (IllegalArgumentException from setRequestProperty).
             log.error("Connect attempt threw {}", t.getClass().getName(), t);
             emit(Outcome.TRANSIENT);
             scheduleRetry();
@@ -124,9 +93,7 @@ public final class ConnectFlow implements Runnable {
                     } catch (Throwable t) {
                         log.error("ConnectFlow onActiveFlow threw: {}", t.getMessage(), t);
                     }
-                    // Ownership transferred — orchestrator drives the final post-200 state
-                    // (e.g. ACTIVE if Kafka up, DEGRADED if Kafka down). Re-emitting
-                    // Outcome.ACTIVE here would clobber a legitimate DEGRADED.
+                    // Orchestrator owns the post-200 state; emitting ACTIVE would clobber a legitimate DEGRADED.
                     return;
                 }
                 log.error("HostConnectFlow returned 200 with no parsed body — falling back to bare ACTIVE outcome");
@@ -169,15 +136,13 @@ public final class ConnectFlow implements Runnable {
     }
 
     private void scheduleRetry() {
-        // attempt is reset on success; absent that, cap it so a long-running
-        // outage doesn't accumulate an unbounded counter.
+        // Capped so a long outage can't overflow the counter.
         int n = attempt.updateAndGet(prev -> Math.min(prev + 1, Integer.MAX_VALUE - 1));
         Duration delay = backoff.next(n);
         try {
             scheduler.schedule(this, delay.toMillis(), TimeUnit.MILLISECONDS);
         } catch (Throwable t) {
-            // Scheduler is shutting down — can't retry. Surface as terminal so
-            // upstream stops waiting in REGISTERING / DEGRADED forever.
+            // Scheduler shut down; terminal so upstream doesn't wait in REGISTERING/DEGRADED forever.
             log.error(
                     "Failed to schedule connect retry attempt {}: {}",
                     n,
@@ -191,12 +156,7 @@ public final class ConnectFlow implements Runnable {
         return result.getError().map(e -> code.equals(e.getCode())).orElse(false);
     }
 
-    /**
-     * {@link app.l2nx.gs.adapter.core.config.ConfigResolver} normalizes {@code platformUrl}
-     * to a https URL with no trailing slash, query, or fragment, so the connect URL is
-     * just the base + path. Defensive trailing-slash strip is kept for tests that
-     * bypass the resolver via fixtures.
-     */
+    // ConfigResolver already normalizes platformUrl; the slash strip covers fixtures that bypass it.
     static String buildUrl(String platformUrl, String connectPath) {
         String base = platformUrl.endsWith("/") ? platformUrl.substring(0, platformUrl.length() - 1) : platformUrl;
         return base + connectPath;
@@ -209,30 +169,12 @@ public final class ConnectFlow implements Runnable {
         return BEARER_PATTERN.matcher(text).replaceAll("Bearer ***");
     }
 
-    /**
-     * Coarse-grained connect-flow events surfaced to the orchestrator
-     * ({@link app.l2nx.gs.adapter.core.NxAdapter}).
-     */
     public enum Outcome {
-        /**
-         * A connect attempt is about to be executed (initial submit or retry).
-         */
+        /** Emitted before every attempt, including retries. */
         STARTING,
-        /**
-         * 200 — adapter is connected.
-         */
         ACTIVE,
-        /**
-         * Transient failure — retry scheduled.
-         */
         TRANSIENT,
-        /**
-         * Terminal non-recoverable failure — no further retries.
-         */
         FAILED,
-        /**
-         * Terminal — server deactivated by tenant.
-         */
         REJECTED
     }
 }

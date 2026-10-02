@@ -6,10 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * One symmetric side of a closed personal trade. {@link #getItems() items}
- * lists what this side gave up; empty list = gift recipient.
- */
+/** One symmetric side of a closed personal trade; {@link #getItems() items} is what this side gave up, empty = gift recipient. */
 public final class TradeParty {
 
     private final long charId;

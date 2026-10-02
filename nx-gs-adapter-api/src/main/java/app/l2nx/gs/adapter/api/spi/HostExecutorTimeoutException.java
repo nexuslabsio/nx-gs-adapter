@@ -3,21 +3,9 @@ package app.l2nx.gs.adapter.api.spi;
 import app.l2nx.gs.adapter.api.spi.capability.HostExecutor;
 
 /**
- * Thrown by {@link HostExecutor#sync(Runnable)} /
- * {@link HostExecutor#sync(java.util.function.Supplier)} when the host's
- * executor does not complete the submitted task within the configured
- * {@code l2nx.commands.host-sync-timeout-ms} window.
- *
- * <p>Operationally indicates a saturated / deadlocked host thread pool —
- * the right reply for the dispatcher is
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#UNAVAILABLE}
- * because retrying after a delay may succeed once the pool drains.</p>
- *
- * <p>Caller MAY catch this and translate to a richer {@link
- * app.l2nx.gs.adapter.api.kafka.commands.CommandResult} (e.g. attaching
- * additional context); the adapter's commands consumer catches it
- * automatically and emits {@code UNAVAILABLE} with
- * {@code error.cause = "host-executor-timeout"}.</p>
+ * Thrown by {@link HostExecutor#sync} when the host executor misses {@code l2nx.commands.host-sync-timeout-ms}
+ * (saturated or deadlocked pool). The commands consumer maps it to {@code UNAVAILABLE} with
+ * {@code error.cause = "host-executor-timeout"}; retry after a delay may succeed.
  */
 public final class HostExecutorTimeoutException extends RuntimeException {
 
@@ -30,9 +18,6 @@ public final class HostExecutorTimeoutException extends RuntimeException {
         this.timeoutMs = timeoutMs;
     }
 
-    /**
-     * Configured timeout that elapsed without the task completing.
-     */
     public long getTimeoutMs() {
         return timeoutMs;
     }

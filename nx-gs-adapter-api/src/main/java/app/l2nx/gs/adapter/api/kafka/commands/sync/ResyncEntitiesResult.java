@@ -7,14 +7,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Success payload of {@link ResyncEntitiesCommand}. Carries the entity names
- * actually enqueued for invalidation — the full declared set when the command
- * omitted {@code entities}, the validated requested set otherwise. The ack is
- * enqueue-time only: per-entity completion follows asynchronously via
- * {@code ResyncCompletedEvent}.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Ack of {@link ResyncEntitiesCommand}: entity names enqueued for invalidation (all declared when {@code entities}
+ * was omitted). Enqueue-time only; completion follows via {@code ResyncCompletedEvent}.
  */
 public final class ResyncEntitiesResult {
 
@@ -26,11 +20,7 @@ public final class ResyncEntitiesResult {
                 : Collections.unmodifiableList(new ArrayList<String>(acceptedEntities));
     }
 
-    /**
-     * Entity names enqueued for invalidation. Never empty on a real ack —
-     * an adapter with zero declared entities replies {@code UNAVAILABLE}
-     * instead of an empty accept.
-     */
+    /** Never empty on a real ack; zero declared entities replies {@code UNAVAILABLE}. */
     public List<String> getAcceptedEntities() {
         return acceptedEntities;
     }

@@ -5,14 +5,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One soul-absorb rule of an NPC — who may absorb, within which player-level band, at what
- * chance. Carried in {@link NpcTemplate#getAbsorbs()}.
- *
- * <p>All fields {@link Nullable}: {@code type} is the absorb mode, {@code minLevel}/{@code maxLevel}
- * the inclusive player-level band, {@code chancePercent} the base probability,
- * {@code cursedChancePercent} the cursed-weapon variant, and {@code skill} whether the
- * absorb requires casting the soul-crystal absorb skill (vs implicit on-kill absorption);
- * emitted only when {@code true}.</p>
+ * Soul-absorb rule; {@code minLevel}/{@code maxLevel} are an inclusive player-level band and
+ * {@code cursedChancePercent} is the cursed-weapon variant.
  */
 public final class NpcAbsorb {
 
@@ -59,8 +53,7 @@ public final class NpcAbsorb {
     }
 
     /**
-     * Whether the absorb requires casting the soul-crystal absorb skill (vs implicit
-     * on-kill absorption); emitted only when {@code true}.
+     * Requires casting the soul-crystal absorb skill (vs implicit on-kill); emitted only when {@code true}.
      */
     public @Nullable Boolean getSkill() {
         return skill;

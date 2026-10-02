@@ -3,10 +3,8 @@ package app.l2nx.gs.adapter.api.kafka.sync.gd.armorsettemplate;
 import java.util.Objects;
 
 /**
- * One item that fills a slot of an {@link ArmorSetTemplate}. A slot may have several
- * alternative items (each its own row). {@code slot} is the canonical UPPER_SNAKE slot
- * vocabulary ({@code CHEST}/{@code LEGS}/{@code HEAD}/{@code GLOVES}/{@code FEET}/
- * {@code SHIELD}); {@code itemTemplateId} is the FK to the item-template entity.
+ * {@code slot} is the canonical slot ({@code CHEST}/{@code LEGS}/{@code HEAD}/{@code GLOVES}/{@code FEET}/{@code SHIELD});
+ * a slot may have several alternative items.
  */
 public final class ArmorSetItem {
 
@@ -18,10 +16,6 @@ public final class ArmorSetItem {
         this.itemTemplateId = itemTemplateId;
     }
 
-    /**
-     * Slot this item fills: {@code CHEST}/{@code LEGS}/{@code HEAD}/{@code GLOVES}/
-     * {@code FEET}/{@code SHIELD}.
-     */
     public String getSlot() {
         return slot;
     }

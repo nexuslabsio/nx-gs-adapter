@@ -17,10 +17,8 @@ import java.util.List;
 import java.util.OptionalLong;
 
 /**
- * Plans a per-cycle list of PK windows for one entity. Runs MIN/MAX over the
- * primary table once, unions with the snapshot's PK envelope so a deletion of
- * the current MIN or MAX still falls inside some next-cycle window, then
- * ceil-divides into chunks of {@code <= rowsPerWindow} width.
+ * Plans per-cycle PK windows: MIN/MAX of the primary table unioned with the snapshot's PK envelope (so a deleted MIN/MAX still
+ * falls in some window), ceil-divided into chunks of at most {@code rowsPerWindow}.
  */
 public final class WindowPlanner {
 
@@ -67,14 +65,7 @@ public final class WindowPlanner {
         return divideRange(minEnv.getAsLong(), maxEnv.getAsLong(), rowsPerWindow);
     }
 
-    /**
-     * Plans targeted {@code IN}-list windows for the force-resync fast-path: no
-     * MIN/MAX range scan, just the explicitly-invalidated PKs chunked into
-     * windows of {@link #TARGETED_CHUNK_SIZE} so each Phase-1 query stays a
-     * bounded {@code WHERE pk IN (...)}. Returns an empty list for a null/empty
-     * set (the cycle then does nothing). The {@code conn} parameter is accepted
-     * for signature symmetry with {@link #plan} (no DB round-trip needed here).
-     */
+    /** Chunks the invalidated PKs into bounded {@code IN}-list windows; empty for null/empty. {@code conn} is unused (signature symmetry with {@link #plan}). */
     public List<Window> planTargeted(EntityMapping<?> mapping, Connection conn, LongSet targetedPks) {
         if (targetedPks == null || targetedPks.isEmpty()) {
             return Collections.emptyList();
@@ -95,11 +86,7 @@ public final class WindowPlanner {
         return windows;
     }
 
-    /**
-     * Chunk width of a targeted {@code IN}-list window — reuses the cascade
-     * resolution chunk size so the per-PK fast-path issues the same bounded
-     * {@code IN(...)} cardinality as cascade fan-out.
-     */
+    /** Reuses the cascade resolution chunk size to keep the same bounded {@code IN(...)} cardinality. */
     public static final int TARGETED_CHUNK_SIZE = 500;
 
     private static OptionalLong unionMin(OptionalLong a, OptionalLong b) {
@@ -114,23 +101,15 @@ public final class WindowPlanner {
         return OptionalLong.of(Math.max(a.getAsLong(), b.getAsLong()));
     }
 
-    /**
-     * Hard cap on plan size — sanity guard against an overflow-induced explosion
-     * when MIN/MAX span the full BIGINT range and {@code rowsPerWindow} is small.
-     * Real schemas never approach this; hitting the cap means the underlying data
-     * is either pathological (PK growth gone wrong) or {@code rowsPerWindow} is
-     * misconfigured. Engine logs a warn and treats the entity as DEGRADED rather
-     * than OOM-ing the host JVM.
-     */
+    /** Sanity cap against overflow-induced plan explosion (MIN/MAX spanning BIGINT with small {@code rowsPerWindow}); hitting it makes the entity DEGRADED instead of OOM. */
     static final int MAX_WINDOWS_PER_PLAN = 1_000_000;
 
     static List<Window> divideRange(long minPk, long maxPk, int rowsPerWindow) {
         if (maxPk < minPk) {
             return Collections.emptyList();
         }
-        // span = maxPk - minPk + 1 overflows when the closed range exceeds Long.MAX_VALUE.
-        // Detect via the unsigned subtraction: a negative result means the span doesn't fit
-        // in a long, which forces chunking regardless of rowsPerWindow.
+        // The span overflows a long when the closed range exceeds Long.MAX_VALUE; a negative unsigned subtraction
+        // forces chunking.
         long rawSpan = maxPk - minPk;
         boolean spanFitsInLong = rawSpan >= 0L && rawSpan < Long.MAX_VALUE;
         if (spanFitsInLong && (rawSpan + 1L) <= rowsPerWindow) {

@@ -4,16 +4,9 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inbox mail rejected (or auto-bounced on expiry) — bounces back to sender
- * as a new mail that surfaces as its own {@link MailSentEvent}.
- * {@link #getMailId() mailId} is the rejected mail's id, NOT the bounce.
- *
- * <ul>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic attributes about this return. {@code null} when absent.
- *   Hosts MAY add arbitrary keys without an API release; consumers
- *   ignore keys they do not understand.</li>
- * </ul>
+ * Inbox mail rejected (or auto-bounced on expiry); the bounce surfaces as its own {@link MailSentEvent}.
+ * <p>{@link #getMailId() mailId} is the rejected mail's id, NOT the bounce's.
+ * <p>{@link #getMetadata() metadata} is an optional open string-to-string map; {@code null} when absent, consumers ignore unknown keys.
  */
 public final class MailReturnedEvent {
 

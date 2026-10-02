@@ -62,11 +62,6 @@ class ClanDbDtoTest {
 
     @Test
     void skills_shouldBeNull_whenTenantDoesNotSyncThem() {
-        // Tenant whose schema provider does not declare a clan_skills child
-        // source builds the DTO without calling .skills(...). Gson's default
-        // serializeNulls=false omits the field from JSON, so the consumer
-        // distinguishes "feature not synced" (null) from "feature synced,
-        // empty list" (empty list).
         ClanDbDto clan = ClanDbDto.builder().id(1L).name("X").level(1).build();
 
         assertNull(clan.getSkills());

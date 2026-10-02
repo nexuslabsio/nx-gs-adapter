@@ -7,30 +7,11 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one item, payload of {@code SyncEvent<ItemDbDto>} on the
- * platform-supplied per-tenant item sync topic
- * (e.g. {@code bohpts.gs.sync.items}).
+ * Wire DTO for one item, payload of {@code SyncEvent<ItemDbDto>}. Only {@code id} is required;
+ * {@code ownerId} is null for the {@code owner_id = 0} sentinel.
  *
- * <p>Only the primary key {@code id} (source-side {@code object_id}) is
- * required; everything else is optional. Different tenants populate
- * different subsets depending on which columns exist in their schema and
- * which the tenant chose to surface — schema providers control this via
- * {@code PrimarySource.hashedColumns()} and what they put into the row in
- * {@code mapRow()}.</p>
- *
- * <p>Sentinel mapping: most game-server schemas use {@code 0} as the
- * "no owner" sentinel in {@code items.owner_id}. Schema providers translate
- * sentinel-zero to {@code null} when populating {@code ownerId}; platform
- * consumers see explicit nulls.</p>
- *
- * <p>The {@code attributes} list aggregates child rows from the tenant's
- * {@code item_elementals}-equivalent table assembled by the schema
- * provider's {@code mapEntity}. {@code null} when the tenant does not sync
- * elementals at all (no {@code ChildSource} declared); empty list when the
- * tenant syncs elementals but the item has none. Gson's default
- * {@code serializeNulls=false} omits the field from JSON when {@code null},
- * so the wire shape unambiguously distinguishes "feature not synced" from
- * "feature synced, value empty".</p>
+ * {@code attributes} is null when the tenant does not sync elementals, empty when synced but none
+ * (Gson omits nulls, so the wire distinguishes the two).
  */
 public final class ItemDbDto {
 
@@ -62,68 +43,37 @@ public final class ItemDbDto {
         this.augmentation = augmentation;
     }
 
-    /**
-     * Primary key — source {@code object_id}, {@code NOT NULL}.
-     */
     public long getId() {
         return id;
     }
 
-    /**
-     * Item template id — source {@code item_id}, points to the static item
-     * catalog. {@code null} when the tenant does not surface this column or
-     * when the source value is SQL NULL.
-     */
+    /** Id in the static item catalog. */
     public @Nullable Long getItemTemplateId() {
         return itemTemplateId;
     }
 
-    /**
-     * Owner identifier (player or clan, depending on the {@code location}).
-     * {@code null} when the source {@code owner_id = 0} (the conventional
-     * "no owner" sentinel) or when the tenant does not surface this column.
-     */
+    /** Player or clan, depending on {@code location}. */
     public @Nullable Long getOwnerId() {
         return ownerId;
     }
 
-    /**
-     * Stack size (always non-negative on the source side).
-     */
     public @Nullable Long getCount() {
         return count;
     }
 
-    /**
-     * Enchant level.
-     */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }
 
-    /**
-     * Storage location.
-     */
     public @Nullable ItemLocation getLocation() {
         return location;
     }
 
-    /**
-     * Item elemental attributes, ordered as the schema provider's
-     * {@code mapEntity} produced them (no platform-side ordering contract).
-     * {@code null} when the tenant does not sync attributes (no
-     * {@code ChildSource} declared); empty list when the tenant syncs
-     * attributes but the item has none.
-     */
     public @Nullable List<ItemAttributeDbDto> getAttributes() {
         return attributes;
     }
 
-    /**
-     * Per-instance augmentation (life-stone options). {@code null} = the
-     * item is not augmented, OR the tenant does not sync augmentation (no
-     * {@code ChildSource} declared).
-     */
+    /** Null when not augmented or when the tenant does not sync augmentation. */
     public @Nullable ItemAugmentationDbDto getAugmentation() {
         return augmentation;
     }

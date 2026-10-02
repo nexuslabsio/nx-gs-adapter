@@ -7,43 +7,13 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Top-level Kafka topic addressing for the bidirectional messaging surface
- * between the game-server adapter and the platform's web side. Returned in
- * {@link ConnectResponse}, parallel to (and independent of) {@link SyncTopics}
- * which handles the DB / runtime / datapack sync streams.
- *
- * <p>Three coexisting addressing slots:</p>
+ * Kafka topic addressing for events and commands, returned in {@link ConnectResponse}.
  * <ul>
- *     <li>{@link #getEvents()} — outbound discrete-fact streams from core to
- *     platform. Per-family fully-qualified Kafka topic
- *     ({@code <tenant>.gs.events.<family>}). Phase-1 family: {@code premiumpurchase}.
- *     Phase-2 reserved keys: {@code character}, {@code clan}, {@code server}.</li>
- *     <li>{@link #getCommandsTopic()} — single inbound topic for all command
- *     types (e.g. {@code <tenant>.gs.commands}). The record key is a nullable
- *     {@code Long}: character-scoped commands are keyed on {@code charId} so
- *     cross-domain ordering per character is preserved, and commands with no
- *     natural character (announcements, resync, …) are sent unkeyed. The key is
- *     producer-side only — the adapter never reads it; routing inside the topic
- *     is by the {@code Nx-Message-Type} header, and server targeting by
- *     {@code Nx-Target-Server-Id}.</li>
- *     <li>{@link #getCommandsRepliesTopic()} — single outbound topic for
- *     command replies (e.g. {@code <tenant>.gs.commands.replies}). Each reply
- *     carries the inbound {@code Nx-Correlation-Id} header so the platform
- *     side can route it back to the originating web request.</li>
+ *     <li>{@link #getEvents()} - family to fully-qualified topic ({@code <tenant>.gs.events.<family>}).</li>
+ *     <li>{@link #getCommandsTopic()} - single inbound topic ({@code <tenant>.gs.commands}). The record key is a nullable {@code Long} (charId for character-scoped commands, preserving per-character ordering; unkeyed otherwise) and is never read by the adapter. Routing uses {@code Nx-Message-Type} and {@code Nx-Target-Server-Id}.</li>
+ *     <li>{@link #getCommandsRepliesTopic()} - single reply topic ({@code <tenant>.gs.commands.replies}); replies carry the inbound {@code Nx-Correlation-Id}.</li>
  * </ul>
- *
- * <p>The {@code events} map is defensively copied on construction and exposed
- * unmodifiable. {@code null} on a getter is normalized to an empty map at the
- * read site so Gson deserialization (which bypasses the constructor when the
- * field is absent on the wire) does not break the contract.</p>
- *
- * <p><b>Wire-shape evolution.</b> Phase-1 shipped a {@code commands: Map<String,String>}
- * placeholder for per-domain topics; Phase-4 replaces it with the single
- * {@code commandsTopic} + {@code commandsRepliesTopic} pair after design dialog
- * concluded that cross-character cross-domain ordering on a single character
- * is the more valuable invariant than per-domain isolation. A 0.13.x platform
- * still shipping {@code "commands": {}} on the wire is harmless under Gson's
- * default ignore-unknown-fields behaviour.</p>
+ * The {@code events} map is copied defensively and exposed unmodifiable; getters normalize {@code null} (Gson bypasses the constructor) to empty. A legacy {@code "commands": {}} on the wire is ignored.
  */
 public final class MessagingTopics {
 
@@ -60,33 +30,17 @@ public final class MessagingTopics {
         this.commandsRepliesTopic = isPresent(commandsRepliesTopic) ? commandsRepliesTopic : null;
     }
 
-    /**
-     * Outbound events: family → fully-qualified Kafka topic. Always non-null —
-     * {@code freeze()} normalizes a {@code null} constructor argument to an
-     * empty map. Empty means no event families are configured (every
-     * {@code NxEvents.publish(...)} becomes a no-op + DEBUG log).
-     */
+    /** Never null; empty means no event families are configured (publishing is a no-op). */
     public Map<String, String> getEvents() {
         return events;
     }
 
-    /**
-     * Single inbound commands topic. {@code null} (or blank on the wire) means
-     * commands inbound is disabled — adapter-core does not start the consumer
-     * thread. Host registrations via {@code ctx.commands().on(...)} are still
-     * accepted but never invoked.
-     */
+    /** {@code null} or blank disables the command consumer; registered handlers are never invoked. */
     public @Nullable String getCommandsTopic() {
         return commandsTopic;
     }
 
-    /**
-     * Single outbound topic for {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}
-     * replies. {@code null} (or blank on the wire) means replies are disabled —
-     * handlers run, but reply records cannot be published. Useful for
-     * fire-and-forget admin commands; in normal operation web side correlates
-     * by {@code Nx-Correlation-Id} on this topic.
-     */
+    /** {@code null} or blank disables replies: handlers still run but nothing is published. */
     public @Nullable String getCommandsRepliesTopic() {
         return commandsRepliesTopic;
     }

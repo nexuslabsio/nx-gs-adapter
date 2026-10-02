@@ -9,65 +9,29 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Inbound command instructing the game-server to buy the given lots from
- * another character's open sell-store on behalf of {@code buyerCharId} —
- * the remote ("buy now") counterpart of the in-game store purchase packet.
- * The buyer does NOT have to be online, in range, or in the same world
- * instance as the seller.
+ * Buys lots from another character's open sell-store on behalf of {@code buyerCharId} (remote "buy now"); the buyer
+ * need not be online, in range, or in the same world instance as the seller.
  *
- * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link BuyFromPrivateStoreResult}{@code >}.
- * Common error replies:</p>
- * <ul>
- *     <li>{@code VALIDATION_FAILED} — malformed {@link #getLines() lines},
- *     blank mail text, or buyer and seller are the same character.</li>
- *     <li>{@code NOT_FOUND} — the seller is not in the world or has no open
- *     sell-store.</li>
- *     <li>{@code INVALID_STATE} — the lot no longer matches the request, the
- *     store type is not served, or the buyer cannot receive the goods (adena,
- *     weight, slots, regulated combat, …).</li>
- *     <li>{@code FORBIDDEN} — the buyer is barred from trading at all
- *     (security lock, cursed weapon, restricted account).</li>
- *     <li>{@code COMMAND_EXPIRED} — {@link #getDeadline() deadline} has
- *     already passed when the host picked up the command; nothing moved.</li>
- * </ul>
+ * <p>{@code VALIDATION_FAILED}: malformed lines, blank mail text, buyer equals seller. {@code NOT_FOUND}: seller absent
+ * or no open sell-store. {@code INVALID_STATE}: lot changed, store type not served, buyer cannot receive the goods.
+ * {@code FORBIDDEN}: buyer barred from trading. {@code COMMAND_EXPIRED}: deadline passed, nothing moved.
+ * Gson bypasses the constructor, so the handler re-checks.</p>
  *
- * <p><b>Machine-readable reject reason.</b> Every non-OK reply carries a
- * stable {@code reason} code in
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandProblem#getExtensions()
- * CommandProblem.extensions}, with the numeric context of that reason
- * (required vs available adena / slots / weight) in sibling extension keys.
- * The platform localizes the code; the host never sends player-facing text.
- * The delivery mail's text is the platform's too — it arrives already
- * localized in this command, and the host writes it into the mail
- * verbatim.</p>
+ * <p>Every non-OK reply carries a stable {@code reason} code in
+ * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandProblem#getExtensions() CommandProblem.extensions}, with numeric
+ * context in sibling keys. The platform localizes; the host sends no player-facing text and writes the
+ * already-localized mail text verbatim.</p>
  *
- * <p><b>All-or-nothing.</b> Either every line is bought at exactly the
- * requested count and price, or nothing is charged and nothing moves. The host
- * validates all lots against the seller's live trade list <em>before</em>
- * entering the engine, so a stale order book fails the command instead of
- * silently buying less than the caller saw.</p>
- *
- * <p><b>Required fields.</b> {@link #getBuyerCharId() buyerCharId},
- * {@link #getSellerCharId() sellerCharId}, a non-empty {@link #getLines()
- * lines}, {@link #getDeadline() deadline}, and the non-blank
- * {@link #getMailSender() mailSender}, {@link #getMailSubject() mailSubject},
- * {@link #getMailBody() mailBody} are REQUIRED; buyer and seller MUST differ.
- * The constructor enforces this via {@link IllegalArgumentException} for
- * programmatic construction. Wire-path deserialization bypasses the
- * constructor — the handler re-checks and emits {@code VALIDATION_FAILED}.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * <p>All-or-nothing: every line is bought at exactly the requested count and price, or nothing is charged or moved.
+ * The host validates all lots against the seller's live trade list before entering the engine, so a stale order book
+ * fails instead of silently buying less.</p>
  */
 public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivateStoreResult> {
 
-    /** Upper bound the host clamps {@link #getTax() tax} to. */
     public static final int MAX_TAX_PERCENT = 50;
 
     /**
-     * Hard cap on {@link #getLines() lines} — the host delivers the purchase as
-     * a single mail with one attachment slot per line, and the engine's mail
-     * attachment cap ({@code Config.MAIL_MAX_ATTACHMENTS}) is 36.
+     * Delivery is one mail with a slot per line; the engine's attachment cap ({@code Config.MAIL_MAX_ATTACHMENTS}) is 36.
      */
     public static final int MAX_LINES = 36;
 
@@ -134,67 +98,45 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         return value;
     }
 
-    /**
-     * Character paying for the goods. Need not be online — the host loads an
-     * offline character for the duration of the deal.
-     */
+    /** Need not be online; the host loads an offline character for the deal. */
     public int getBuyerCharId() {
         return buyerCharId;
     }
 
-    /**
-     * Character whose open sell-store is being bought from. MUST be in the
-     * world (online or offline-trading) with a sell-store open.
-     */
+    /** Must be in the world (online or offline-trading) with a sell-store open. */
     public int getSellerCharId() {
         return sellerCharId;
     }
 
-    /**
-     * Lots to buy. REQUIRED, non-empty. Immutable on read.
-     */
     public List<BuyLine> getLines() {
         return lines;
     }
 
     /**
-     * Buyer-side surcharge in whole percent ({@code 5} = 5%) charged on top of
-     * the lot price and burned — the seller receives the lot price only. The
-     * host clamps to {@code 0..}{@link #MAX_TAX_PERCENT}. Fractional rates are
-     * deliberately unsupported; {@code 0} means no surcharge.
+     * Whole percent charged on top of the lot price and burned; the seller gets the lot price only. The host clamps to
+     * {@code 0..}{@link #MAX_TAX_PERCENT}.
      */
     public int getTax() {
         return tax;
     }
 
     /**
-     * Moment after which the host MUST refuse to execute this command
-     * ({@code COMMAND_EXPIRED}, nothing moves) instead of running it. The
-     * platform stamps {@code now + reply-timeout} at dispatch; the host checks
-     * this first, before resolving the seller or touching the seller's trade
-     * list. Guards against a command sitting in the Kafka backlog (retention
-     * ~3h) while the game-server was down and executing stale on restart.
-     * REQUIRED — {@code null} rejected in the constructor.
+     * The host MUST refuse after this ({@code COMMAND_EXPIRED}, nothing moves), checked before touching the seller's trade
+     * list. Guards against executing stale after sitting in the Kafka backlog (retention ~3h) while the game-server was down.
      */
     public Instant getDeadline() {
         return deadline;
     }
 
-    /**
-     * Author name of the delivery mail: final, already-localized text with no
-     * placeholders — no locale travels on the wire. REQUIRED, non-blank —
-     * rejected in the constructor.
-     */
+    /** Final, already-localized text with no placeholders; no locale travels on the wire. */
     public String getMailSender() {
         return mailSender;
     }
 
-    /** Subject of the delivery mail; same rules as {@link #getMailSender() mailSender}. */
     public String getMailSubject() {
         return mailSubject;
     }
 
-    /** Body of the delivery mail; same rules as {@link #getMailSender() mailSender}. */
     public String getMailBody() {
         return mailBody;
     }

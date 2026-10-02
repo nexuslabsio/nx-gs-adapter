@@ -30,13 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/**
- * Drives {@link GameDataSyncModule}'s host-readiness gate through the production
- * {@link GameDataSyncModule#defaultDescriptors()} registry, resolving both providers via a real
- * {@link java.util.ServiceLoader}: {@link TestItemTemplateProvider} (the gated Tier-2 provider,
- * registered under {@code META-INF/services} like {@link TestGearScoreRulesetProvider}) and
- * {@link TestGameDataReadinessProvider} (the Tier-2 readiness signal under test).
- */
+/** Drives the readiness gate through the production descriptor registry, resolving providers via a real ServiceLoader. */
 class GameDataReadinessTest {
 
     private static final String ITEM_TOPIC = "kbt.gd.sync.itemtemplate";
@@ -73,8 +67,7 @@ class GameDataReadinessTest {
 
     @AfterEach
     void tearDown() {
-        // Any test that called start() with an unready host arms a real 5s daemon poll — leaving
-        // it running would fire into a finished test and mutate shared state after the fact.
+        // unready start() arms a real 5s daemon poll that would fire into a finished test
         module.onDisconnect();
         TestGameDataReadinessProvider.ready = true;
         TestItemTemplateProvider.snapshot = Collections.emptyList();
@@ -163,9 +156,6 @@ class GameDataReadinessTest {
 
         @Test
         void start_shouldPublishFullBurst_asBeforeTheReadinessFeature() {
-            // TestGameDataReadinessProvider.ready defaults to true — this is the regression
-            // case: a host that reports ready from the start behaves exactly as it did before
-            // the readiness gate existed (see GearScoreDescriptorTest).
             TestItemTemplateProvider.snapshot = Collections.singletonList(itemTemplate(1));
 
             module.onConnect(ctx);
@@ -206,19 +196,12 @@ class GameDataReadinessTest {
             assertTrue(recorded.isEmpty(), "deferred while unready");
 
             TestGameDataReadinessProvider.ready = true;
-            // Drive the burst the way the host itself does — via its own registered
-            // NxGameData.publishSnapshot() call — not via the fallback poll.
             gameData.publishSnapshot();
 
             List<GameDataSyncEvent<?>> itemEvents = eventsFor("itemtemplate");
             assertEquals(2, itemEvents.size(), "exactly one full burst — one UPSERT + one SNAPSHOT_COMPLETE");
-            // The disarm is what actually stops the double burst: readinessPoll is a
-            // ScheduledFuture handle, and cancel()-ing it (done inside runAllSnapshots, before
-            // publishing) guarantees the JDK scheduler never invokes that recurring task again —
-            // so no further tick can ever fire. Re-invoking the package-visible
-            // pollReadinessOnce() by hand afterwards is a distinct, independently-valid resync
-            // trigger (same as a fresh GdResyncCommand), not "the same tick that got cancelled",
-            // so it is expected to publish again rather than proving anything about the poll.
+            // a manual pollReadinessOnce() is an independent resync trigger, so it would publish again; cancel() is
+            // what stops ticks
             assertFalse(module.readinessPollArmed(), "the host's own publish must disarm the fallback poll");
         }
     }
@@ -286,7 +269,6 @@ class GameDataReadinessTest {
         @Test
         void publishSnapshot_shouldReArmThePoll_whenHostGoesUnreadyAgain() {
             TestItemTemplateProvider.snapshot = Collections.singletonList(itemTemplate(1));
-            // TestGameDataReadinessProvider.ready defaults to true.
 
             module.onConnect(ctx);
             module.start();
@@ -295,7 +277,6 @@ class GameDataReadinessTest {
 
             recorded.clear();
             TestGameDataReadinessProvider.ready = false;
-            // Host-driven pass (e.g. a datapack reload notification) while unready again.
             gameData.publishSnapshot();
 
             assertTrue(recorded.isEmpty(), "nothing published while unready again");
@@ -318,11 +299,7 @@ class GameDataReadinessTest {
         }
     }
 
-    /**
-     * Captures the trigger the module registers via {@link NxGameData#registerSnapshotTrigger} so
-     * tests can drive a snapshot the same way a host does — by calling {@link #publishSnapshot()} —
-     * rather than reaching into the module's private scheduling internals.
-     */
+    /** Captures the registered snapshot trigger so tests can drive a pass the way a host does. */
     private static final class CapturingGameData implements NxGameData {
 
         private volatile NxGameDataTrigger trigger;

@@ -13,22 +13,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Enforces the platform-wide UTC contract: every field in any wire DTO
- * (under {@code app.l2nx.gs.adapter.api.kafka.*} and
- * {@code app.l2nx.gs.adapter.api.rest.*}) MUST use {@link java.time.Instant}
- * for timestamps. {@link java.time.OffsetDateTime},
- * {@link java.time.ZonedDateTime}, {@link java.time.LocalDateTime},
- * {@link java.time.LocalDate}, {@link java.time.LocalTime},
- * {@link java.util.Date}, {@link java.util.Calendar},
- * and {@code java.sql.*} time types are forbidden — they carry / lose
- * timezone information unpredictably, and the platform operates strictly
- * on UTC.
- *
- * <p>Client code (schema providers, tenant adapters) MUST translate
- * source-side timestamps via {@code JdbcNulls.nullableInstantFromEpochMillis}
- * or equivalent, never through {@code rs.getTimestamp().toLocalDateTime()}
- * style calls. {@link java.time.Instant} is timezone-free by construction
- * (UTC-equivalent moments) so wire serialization cannot leak host timezone.</p>
+ * Wire DTOs under {@code kafka.*} and {@code rest.*} must use {@link java.time.Instant} for timestamps;
+ * zone-carrying and {@code java.sql.*} types are forbidden because the platform is strictly UTC.
  */
 class WireTimestampConformanceTest {
 
@@ -73,10 +59,8 @@ class WireTimestampConformanceTest {
     }
 
     private static Path locateClassesRoot() {
-        // Gradle default
         Path gradle = Paths.get("build/classes/java/main");
         if (Files.isDirectory(gradle)) return gradle;
-        // Maven fallback (in case)
         Path maven = Paths.get("target/classes");
         if (Files.isDirectory(maven)) return maven;
         return gradle;
@@ -84,17 +68,14 @@ class WireTimestampConformanceTest {
 
     private static void checkClass(Path classesRoot, Path classFile, List<String> violations) {
         String relPath = classesRoot.relativize(classFile).toString().replace('\\', '/');
-        // Strip only the trailing ".class" extension — a plain replace(".class","") would also
-        // mangle package segments containing that substring (e.g. gd/classtemplate).
+        // Not replace(".class", ""): it would mangle package segments like gd/classtemplate.
         String className =
                 relPath.substring(0, relPath.length() - ".class".length()).replace('/', '.');
         Class<?> clazz;
         try {
             clazz = Class.forName(className, false, WireTimestampConformanceTest.class.getClassLoader());
         } catch (ClassNotFoundException | NoClassDefFoundError missing) {
-            // Compiled class file present but its transitive dependency is not
-            // on the test classpath — surface as a violation so the gap can't
-            // hide a real timestamp-field issue in the unloaded class.
+            // Reported as a violation so an unloadable class cannot hide a bad timestamp field.
             violations.add(className + " : could not load for inspection ("
                     + missing.getClass().getSimpleName() + ": " + missing.getMessage() + ")");
             return;

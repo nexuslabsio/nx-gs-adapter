@@ -15,21 +15,9 @@ import java.util.function.ToLongFunction;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 /**
- * Builds one game-data snapshot burst for a single gd entity and forwards it to a
- * {@link GameDataSender}. Payload-agnostic: the caller supplies the entity name, the
- * template collection, and a primary-key extractor, so the same engine publishes
- * any gd entity (itemtemplate, npc, …).
- *
- * <p>A snapshot is a stateless burst keyed by {@code serverId} (raw 16-byte
- * UUID, so the whole burst lands in one partition, in order): one
- * {@link #OP_UPSERT} record per template, then a single
- * {@link #OP_SNAPSHOT_COMPLETE} marker carrying the count. Every record carries the
- * {@code Nx-Message-Type=GameDataSyncEvent} header for polymorphic dispatch on the
- * platform consumer.</p>
- *
- * <p>Never throws into the caller — a send failure is caught and logged.
- * {@code publishSnapshot} returns the number of UPSERTs handed to the sender so the
- * module can track per-entity stats.</p>
+ * Publishes one snapshot burst for a single gd entity: an {@link #OP_UPSERT} per template, then one
+ * {@link #OP_SNAPSHOT_COMPLETE} marker with the count, all keyed by the raw 16-byte {@code serverId} so the
+ * burst stays ordered on one partition. Never throws into the caller.
  */
 public final class GameDataSnapshotPublisher {
 
@@ -37,17 +25,10 @@ public final class GameDataSnapshotPublisher {
 
     private static final String MESSAGE_TYPE = GameDataSyncEvent.class.getSimpleName();
 
-    // gd op vocabulary — mirrors db-sync's SyncEventPublisher.OP_* string constants
-    // (op rides the wire as a String, not a JVM enum).
     public static final String OP_UPSERT = "UPSERT";
     public static final String OP_SNAPSHOT_COMPLETE = "SNAPSHOT_COMPLETE";
 
-    /**
-     * How long a provider may keep answering {@code null} before it stops being "the host is still
-     * booting" and becomes an alarm. Applies only to hosts without a
-     * {@link app.l2nx.gs.adapter.api.spi.provider.GameDataReadinessProvider} — a host that has one is gated by
-     * {@link GameDataSyncModule} and never reaches the null path.
-     */
+    /** Null-provider grace before WARN escalates to ERROR; only hosts without a readiness provider reach the null path. */
     static final long NOT_READY_GRACE_MS = 15L * 60L * 1000L;
 
     private final GameDataSender sender;
@@ -67,15 +48,8 @@ public final class GameDataSnapshotPublisher {
     }
 
     /**
-     * Publish the full burst for one entity's template set.
-     *
-     * @param entity   gd entity name (tags the wire envelope)
-     * @param items    the provider's current template set (must be non-null; empty is legal)
-     * @param pkOf     extracts the primary key from a template
-     * @param serverId partition key (raw-16-byte encoded), keeps the burst on one partition
-     * @param topic    destination topic
-     * @return result carrying the generated {@code syncId} and template count, or
-     * {@code null} when nothing was published (items null / topic absent).
+     * @param items null means "provider has nothing yet" (nothing published); empty is legal and emits count=0
+     * @return {@code null} when nothing was published (items null / topic absent)
      */
     public <T> Result publishSnapshot(
             String entity, Collection<T> items, ToLongFunction<T> pkOf, UUID serverId, String topic) {
@@ -84,19 +58,12 @@ public final class GameDataSnapshotPublisher {
             return null;
         }
         if (items == null) {
-            // null means "nothing to give yet"; aborting (no marker) avoids a count=0
-            // SNAPSHOT_COMPLETE that would reconcile-delete the whole catalog. Empty is legal and
-            // still emits count=0 via the loop below. A host that registers a
-            // GameDataReadinessProvider never gets here — the module gates the pass instead — so
-            // this path serves hosts without that SPI, where the first bursts of a boot are
-            // expected to be null and only a provider stuck null is a real fault.
+            // no marker: a count=0 SNAPSHOT_COMPLETE would reconcile-delete the whole catalog
             reportNullSnapshot(entity);
             return null;
         }
 
         UUID syncId = UUIDv7.generate();
-        // Same raw-16-byte UUID encoding adapter-core stamps on the Nx-Server-Id
-        // header — keeps the whole burst on one partition for a server.
         byte[] key = serverId != null ? NxHeaders.encodeUuid(serverId) : null;
         int count = 0;
         try {
@@ -122,7 +89,7 @@ public final class GameDataSnapshotPublisher {
                     .build();
             send(topic, key, complete);
         } catch (Throwable t) {
-            // marker may not have been sent → report incomplete so the module shows DEGRADED, not a fresh sync
+            // marker may be missing: report incomplete so the module shows DEGRADED
             log.error(
                     "gd-sync snapshot publish threw {} mid-burst (entity '{}', syncId {}) — partial burst sent",
                     t.getClass().getName(),
@@ -132,8 +99,7 @@ public final class GameDataSnapshotPublisher {
             return new Result(syncId, count, false);
         }
 
-        // Only touch existing state: a host with a readiness provider never reaches the null path,
-        // so the success path must not allocate a tracker just to reset it.
+        // get(), not computeIfAbsent: don't allocate a tracker just to reset it
         EscalationTracker tracker = nullTrackers.get(entity);
         if (tracker != null) {
             tracker.reset();
@@ -163,7 +129,6 @@ public final class GameDataSnapshotPublisher {
         }
     }
 
-    // package-visible for tests: the per-entity null history behind the WARN-then-ERROR decision
     EscalationTracker trackerFor(String entity) {
         return nullTrackers.computeIfAbsent(entity, name -> new EscalationTracker(notReadyGraceMs, clock));
     }
@@ -178,9 +143,6 @@ public final class GameDataSnapshotPublisher {
         });
     }
 
-    /**
-     * Outcome of one snapshot burst.
-     */
     public static final class Result {
         private final UUID syncId;
         private final int count;
@@ -200,9 +162,7 @@ public final class GameDataSnapshotPublisher {
             return count;
         }
 
-        /**
-         * {@code true} when the full burst incl. the SNAPSHOT_COMPLETE marker was handed to the sender.
-         */
+        /** {@code true} only when the SNAPSHOT_COMPLETE marker was handed to the sender. */
         public boolean complete() {
             return complete;
         }

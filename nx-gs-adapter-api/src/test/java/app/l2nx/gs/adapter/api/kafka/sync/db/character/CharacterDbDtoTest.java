@@ -146,7 +146,6 @@ class CharacterDbDtoTest {
         assertEquals(2, ch.getClasses().size());
         assertEquals(CharacterClassKind.MAIN, ch.getClasses().get(0).getKind());
         assertEquals(CharacterClassKind.SUB, ch.getClasses().get(1).getKind());
-        // The played class rides classId, never a flag on the roster entry.
         assertEquals(CharacterClass.SOULTAKER, ch.getClassId());
     }
 

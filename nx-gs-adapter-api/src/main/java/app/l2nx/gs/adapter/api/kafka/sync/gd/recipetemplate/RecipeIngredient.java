@@ -3,11 +3,6 @@ package app.l2nx.gs.adapter.api.kafka.sync.gd.recipetemplate;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * One material a {@link RecipeTemplate} consumes — an item reference plus the quantity
- * required. {@code itemTemplateId} is the non-null identity (the FK to the item-template
- * entity); {@code count} is how many units the craft consumes.
- */
 public final class RecipeIngredient {
 
     private final int itemTemplateId;

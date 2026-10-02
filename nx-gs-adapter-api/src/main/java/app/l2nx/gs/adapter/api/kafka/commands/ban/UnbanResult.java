@@ -5,16 +5,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Success payload of {@link UnbanCommand}. Reports whether the requested ban was
- * present and the ids of the ban rows the host cleared.
- *
- * <p>{@link #isRemoved() removed} is {@code false} when no matching ban existed
- * (a no-op success). {@link #getRemovedBanIds() removedBanIds}
- * lists the rows that were deleted — empty when nothing matched or when the ban
- * kind is not persisted as an id-bearing row.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Success payload of {@link UnbanCommand}. {@code removed} is {@code false} for a no-op success (no matching ban);
+ * {@code removedBanIds} is empty when nothing matched or the ban kind is not persisted as an id-bearing row.
  */
 public final class UnbanResult {
 
@@ -27,18 +19,10 @@ public final class UnbanResult {
                 removedBanIds == null ? Collections.<Long>emptyList() : Collections.unmodifiableList(removedBanIds);
     }
 
-    /**
-     * Whether a matching ban existed and was cleared. {@code false} is a no-op
-     * success — the post-condition (no such ban) already held.
-     */
     public boolean isRemoved() {
         return removed;
     }
 
-    /**
-     * Ids of the ban rows cleared by this unban. Never {@code null};
-     * empty when nothing matched or the ban kind is not an id-bearing row.
-     */
     public List<Long> getRemovedBanIds() {
         return removedBanIds;
     }

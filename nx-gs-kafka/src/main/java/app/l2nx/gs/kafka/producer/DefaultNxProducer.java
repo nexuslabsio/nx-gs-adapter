@@ -66,7 +66,7 @@ class DefaultNxProducer implements NxProducer {
     }
 
     private void stamp(Headers headers) {
-        // Fresh RecordHeader per record — sharing one instance across records leaks state via Headers' internal list.
+        // Fresh RecordHeader per record: a shared instance leaks state via the Headers internal list
         for (Header h : staticHeaders) {
             headers.add(new RecordHeader(h.key(), h.value()));
         }

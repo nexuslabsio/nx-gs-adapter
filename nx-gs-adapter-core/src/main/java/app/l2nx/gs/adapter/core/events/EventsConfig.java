@@ -1,16 +1,8 @@
 package app.l2nx.gs.adapter.core.events;
 
 /**
- * Operator-tunable knobs for the built-in events publisher. Resolved by
- * {@code ConfigResolver.resolveEventsConfig()} via the file-first source
- * chain ({@code l2nx.properties} → JVM system property → built-in default).
- *
- * <p>Drop policy default is {@link EventsPublisher.DropPolicy#NEWEST}.
- * {@link EventsPublisher.DropPolicy#OLDEST} is still supported but exhibits
- * eviction contention under multi-threaded producers — head-poll and newcomer-
- * offer are not atomic, so a hot path can over-count {@code droppedTotal} when
- * threads race on a full queue. NEWEST drops the incoming envelope atomically
- * via {@code queue.offer()} returning {@code false}, no eviction race.</p>
+ * OLDEST drop policy is racy under multi-threaded producers (head-poll and newcomer-offer are not atomic),
+ * so it can over-count {@code droppedTotal}; NEWEST drops atomically.
  */
 public final class EventsConfig {
 

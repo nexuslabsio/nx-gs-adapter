@@ -1,12 +1,6 @@
 package app.l2nx.gs.adapter.api.spi.capability;
 
-/**
- * Module-side SAM registered with {@link NxGameData#registerSnapshotTrigger}.
- * Invoked when the host requests a fresh game-data snapshot via
- * {@link NxGameData#publishSnapshot()}. Implementations MUST NOT block beyond a
- * queue / executor submission and MUST NOT throw — the façade invokes them
- * defensively.
- */
+/** Must not block beyond a queue submission or throw. */
 @FunctionalInterface
 public interface NxGameDataTrigger {
 

@@ -8,16 +8,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One class→skill learn entry of a {@link Skill} — a playable class that learns this skill,
- * with the level at which it is acquired and its SP cost. Built by inverting the host's per-class
- * skill trees into a per-skill list, so a skill page can show "which classes learn this".
- *
- * <p>{@code clazz} (the canonical {@link CharacterClass} token) is the class identity — no
- * source-side numeric id. {@code requiredLevel} is the character level required to learn,
- * {@code learnSp} the SP cost, {@code skillLevel} the skill's own level granted by this entry.
- * {@code autoLearn} marks skills granted automatically on level-up; {@code learnedByNpc} marks
- * skills taught by a trainer NPC. {@code requiredItems} lists the items consumed to learn the
- * skill at this entry.</p>
+ * A playable class that learns a {@link Skill}, inverted from the host's per-class skill trees.
+ * {@code clazz} is the identity; {@code skillLevel} is the skill level this entry grants.
  */
 public final class SkillClassLearn {
 
@@ -48,51 +40,32 @@ public final class SkillClassLearn {
                 : Collections.unmodifiableList(new ArrayList<SkillLearnItem>(requiredItems));
     }
 
-    /**
-     * Canonical class that learns the skill; non-null for a playable class.
-     */
     public @Nullable CharacterClass getClazz() {
         return clazz;
     }
 
-    /**
-     * Character level required to learn the skill at this entry.
-     */
     public @Nullable Integer getRequiredLevel() {
         return requiredLevel;
     }
 
-    /**
-     * SP cost to learn the skill at this entry.
-     */
     public @Nullable Long getLearnSp() {
         return learnSp;
     }
 
-    /**
-     * Whether the class receives this skill automatically on reaching {@code requiredLevel}.
-     */
+    /** Granted automatically on reaching {@code requiredLevel}. */
     public @Nullable Boolean getAutoLearn() {
         return autoLearn;
     }
 
-    /**
-     * Whether the skill is taught by a trainer NPC.
-     */
     public @Nullable Boolean getLearnedByNpc() {
         return learnedByNpc;
     }
 
-    /**
-     * The skill level this acquisition entry grants (the skill's own level, e.g. Lv.2).
-     */
     public @Nullable Integer getSkillLevel() {
         return skillLevel;
     }
 
-    /**
-     * Items consumed to learn the skill at this entry; {@code null}/empty = no item cost.
-     */
+    /** {@code null} or empty means no item cost. */
     public @Nullable List<SkillLearnItem> getRequiredItems() {
         return requiredItems;
     }

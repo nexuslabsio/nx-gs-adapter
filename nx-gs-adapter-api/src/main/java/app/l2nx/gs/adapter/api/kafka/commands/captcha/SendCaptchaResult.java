@@ -84,9 +84,8 @@ public final class SendCaptchaResult {
     }
 
     /**
-     * What the host did about the result, host-defined and with no stable key set yet. Ban-like
-     * consequences use the platform ban vocabulary ({@code ban.type}, {@code ban.expiresAt}); a
-     * disconnect is {@code kick=true}. Never null.
+     * Host-defined consequence, no stable key set. Ban-like ones use {@code ban.type} / {@code ban.expiresAt};
+     * a disconnect is {@code kick=true}. Never null.
      */
     public Map<String, String> getMetadata() {
         return metadata;

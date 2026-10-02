@@ -22,23 +22,8 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Public factory for the commands consume subsystem. {@code NxAdapter}
- * calls {@link #start} once per connect cycle to wire up the registry +
- * Kafka consumer + daemon thread, returning a {@link Started} bundle
- * carrying the {@link CommandsConsumer} (for shutdown + heartbeat) and the
- * {@link NxCommands} façade (for {@code ConnectContext.commands()}).
- *
- * <p>Hides {@code CommandTypeRegistry}, {@code NxCommandsImpl},
- * {@code CommandContextImpl}, and {@code HostExecutorImpl} — those are
- * package-private implementation details. Callers depend only on the public
- * {@link NxCommands} interface and the {@link CommandsConsumer} class.</p>
- *
- * <p>When {@link MessagingTopics#getCommandsTopic()} is unconfigured, this
- * factory still produces an {@link NxCommands} façade (so host code's
- * unconditional {@code ctx.commands().on(...)} calls succeed) but DOES NOT
- * spawn a Kafka consumer thread. The {@link CommandsConsumer} returned in
- * that case is {@code null} — the caller (i.e. {@code NxAdapter}) treats
- * that as "commands disabled" for heartbeat purposes.</p>
+ * With no commands topic configured the {@link NxCommands} facade is still produced (so host
+ * {@code ctx.commands().on(...)} calls succeed) but the consumer is {@code null}: commands disabled.
  */
 public final class CommandsBootstrap {
 
@@ -47,13 +32,8 @@ public final class CommandsBootstrap {
     private CommandsBootstrap() {}
 
     /**
-     * Rebuild the consumer in-place behind an existing {@link NxCommands}
-     * façade, preserving its registered handlers across reconnect. Modules
-     * that captured {@code ctx.commands()} from an earlier {@code onConnect}
-     * keep working with no re-registration.
-     *
-     * <p>Caller MUST stop the previous {@link CommandsConsumer} first — this
-     * method only creates the new one.</p>
+     * Rebuilds the consumer behind an existing facade so handlers registered before a reconnect survive.
+     * Caller MUST stop the previous {@link CommandsConsumer} first.
      */
     public static @Nullable CommandsConsumer swap(
             NxCommands facade,
@@ -73,7 +53,6 @@ public final class CommandsBootstrap {
             throw new IllegalArgumentException("swap() requires a facade produced by CommandsBootstrap.start(); got "
                     + (facade == null ? "null" : facade.getClass().getName()));
         }
-        // Reuse the existing registry so previously registered handlers survive.
         CommandTypeRegistry registry = ((NxCommandsImpl) facade).peekRegistry();
         if (registry == null) {
             registry = new CommandTypeRegistry();
@@ -96,34 +75,10 @@ public final class CommandsBootstrap {
     }
 
     /**
-     * Wire up the registry, the {@link NxCommands} façade, and (when
-     * {@code messagingTopics.commandsTopic} is configured) a Kafka consumer
-     * + daemon thread. Returns a {@link Started} bundle.
-     *
-     * @param messagingTopics the platform-issued addressing bundle; may be
-     *                        {@code null} (treated as commands disabled).
-     * @param kafka           platform-issued Kafka config; provides brokers,
-     *                        SASL credentials, etc.
-     * @param clientIdBase    base client id (e.g.
-     *                        {@code nx-gs-adapter-<tenant>-<server>}); the
-     *                        commands consumer appends {@code -commands} for
-     *                        the Kafka {@code client.id} (broker logs only).
-     * @param groupId         Kafka {@code group.id} for the commands consumer.
-     *                        Lives under the per-tenant prefix
-     *                        ({@code <tenant>.gs.commands.<server>}) so the
-     *                        {@code User:<tenant>} principal's group ACL
-     *                        (prefixed on {@code <tenant>.}) covers it.
-     * @param hostExecutor    host's game-side {@link Executor}; may be
-     *                        {@code null} when host code has not registered
-     *                        one — handlers requiring
-     *                        {@code ctx.host().sync(...)} will then throw
-     *                        {@link IllegalStateException} on first hop.
-     * @param events          the {@link NxEvents} façade so handlers can
-     *                        publish side-effect events.
-     * @param replySender     the bridge to the actual Kafka send (production
-     *                        wires this to {@code NxKafka.sendBytesKeyRecord}).
-     * @param config          operator-tunable knobs; falls back to
-     *                        {@link CommandsConfig#defaults()} when {@code null}.
+     * @param groupId must sit under the tenant prefix ({@code <tenant>.gs.commands.<server>}) so the
+     *                tenant principal's group ACL covers it
+     * @param hostExecutor {@code null} if the host registered none; {@code ctx.host().sync(...)} then
+     *                     throws {@link IllegalStateException}
      */
     public static Started start(
             @Nullable MessagingTopics messagingTopics,
@@ -224,12 +179,10 @@ public final class CommandsBootstrap {
             KafkaCredentials kafka, String clientIdBase, String groupId, CommandsConfig config) {
         String clientId = clientIdBase + "-commands";
         Map<String, Object> props = new LinkedHashMap<String, Object>();
-        // Internal defaults (overridable via l2nx.commands.kafka.*)
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 50);
-        // Operator overrides
         props.putAll(config.getKafkaOverrides());
-        // Hard-pinned (security + identity + commit semantics)
+        // pinned after overrides: security, identity and commit semantics must not be tunable
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrap());
         props.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
@@ -240,11 +193,6 @@ public final class CommandsBootstrap {
         return props;
     }
 
-    /**
-     * Tuple of the {@link NxCommands} façade and the optional
-     * {@link CommandsConsumer}. {@code consumer()} is {@code null} when
-     * commands are disabled (no inbound topic).
-     */
     public static final class Started {
 
         private final NxCommands commands;

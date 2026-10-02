@@ -2,10 +2,7 @@ package app.l2nx.gs.adapter.core.lifecycle;
 
 import app.l2nx.gs.log.NxLog;
 
-/**
- * Emits the L2NX startup wordmark and adapter version. Plain text only; host log
- * sinks vary, so no ANSI escape codes.
- */
+/** Plain text only: host log sinks vary, so no ANSI codes. */
 public final class StartupBanner {
 
     private static final String[] WORDMARK = new String[] {

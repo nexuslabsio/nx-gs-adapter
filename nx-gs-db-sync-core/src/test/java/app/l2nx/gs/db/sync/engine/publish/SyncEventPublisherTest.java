@@ -70,8 +70,7 @@ class SyncEventPublisherTest {
 
     @Test
     void encodeKey_shouldMatch_kafkaLongSerializer() {
-        // Cross-check: identical bytes for any long → engine and external
-        // LongSerializer-based writers land on the same partition.
+        // Same bytes as LongSerializer, so writers share a partition.
         try (LongSerializer ls = new LongSerializer()) {
             for (long pk : new long[] {0L, 1L, -1L, 12345L, Long.MIN_VALUE, Long.MAX_VALUE}) {
                 assertArrayEquals(

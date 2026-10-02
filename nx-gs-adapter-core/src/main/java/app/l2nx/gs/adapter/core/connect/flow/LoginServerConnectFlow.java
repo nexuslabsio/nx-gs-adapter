@@ -6,13 +6,6 @@ import app.l2nx.gs.adapter.core.connect.model.TypedConnectOutcome;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * {@link HostConnectFlow} for login-server host-type. POSTs to
- * {@code /api/tenants/loginservers/connect} and deserializes the body into
- * {@link LoginServerConnectResponse}. LS deployments carry no sync-stream
- * topic bundle (the response shape mirrors the gameserver one minus
- * {@code syncTopics}).
- */
 public final class LoginServerConnectFlow implements HostConnectFlow<LoginServerConnectResponse> {
 
     public static final String CONNECT_PATH = "/api/tenants/loginservers/connect";

@@ -4,9 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One item required to learn a skill at a {@link SkillClassLearn} entry — an item-template
- * reference with its required quantity. {@code itemTemplateId} is an FK to the item template
- * (not an instance); {@code itemTemplateCount} is how many are consumed.
+ * Item consumed to learn a skill at a {@link SkillClassLearn} entry; {@code itemTemplateId} references the
+ * template, not an instance.
  */
 public final class SkillLearnItem {
 
@@ -18,16 +17,10 @@ public final class SkillLearnItem {
         this.itemTemplateCount = itemTemplateCount;
     }
 
-    /**
-     * FK to the item template required to learn the skill.
-     */
     public @Nullable Integer getItemTemplateId() {
         return itemTemplateId;
     }
 
-    /**
-     * Required quantity of the item template.
-     */
     public @Nullable Long getItemTemplateCount() {
         return itemTemplateCount;
     }

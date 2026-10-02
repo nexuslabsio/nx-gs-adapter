@@ -226,7 +226,6 @@ class EntityTickLoopTest {
             assertEquals(EntityState.DEGRADED, tracker.currentStatuses().get(0).getState());
             assertEquals(1L, tracker.failedAcks(mapping.entityName()));
             assertEquals(0L, tracker.timedOutAcks(mapping.entityName()));
-            // pk replayed next tick — snapshot must not have advanced for it.
             assertTrue(
                     loop.currentSnapshotKeysForTesting().isEmpty(),
                     "failed-publish PK must not advance into the next snapshot");
@@ -266,15 +265,12 @@ class EntityTickLoopTest {
 
     @Test
     void walkInFlight_shouldDrainAlreadyDoneFuturesCheaply() {
-        // Synchronous ack — every publish completes before ack-walk starts.
         StubMapping mapping = new StubMapping(Collections.singletonMap(1L, 100L));
         CapturingSender sender = new CapturingSender();
         EntityStatsTracker tracker = new EntityStatsTracker();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            // publish-flush-seconds = 0 would normally block forever for pending futures;
-            // since the sender ack'd synchronously, the drain-done pass must classify
-            // everything without ever touching the timeout path.
+            // sender acks synchronously, so the drain pass must classify everything without the timeout path
             EntityTickLoop loop = new EntityTickLoop(
                     mapping,
                     e -> "topic.character",

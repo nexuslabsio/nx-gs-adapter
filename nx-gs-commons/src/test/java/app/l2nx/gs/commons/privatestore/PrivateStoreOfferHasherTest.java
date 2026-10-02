@@ -71,8 +71,7 @@ class PrivateStoreOfferHasherTest {
 
     @Test
     void hash_shouldDistinguishNullEnchantFromZeroEnchant() {
-        // null = "item type has no enchant concept" (consumable / material);
-        // 0 = "enchantable but unenchanted". These MUST hash differently.
+        // null (no enchant concept) must hash differently from 0 (unenchanted)
         long hashNull = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, null, null, 1L, 100L, 57L)));
         long hashZero = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
 
@@ -133,9 +132,7 @@ class PrivateStoreOfferHasherTest {
 
     @Test
     void hash_shouldDistinguishNullFromPresentEmptyAttrs() {
-        // null and empty are normalized to the same sentinel — a host that
-        // sometimes passes empty maps and sometimes nulls must NOT see false
-        // positives in change-detection.
+        // null and empty normalize to the same sentinel to avoid false change-detection positives
         long hashNull = PrivateStoreOfferHasher.hash(Collections.singletonList(row(1L, 0, null, 1L, 100L, 57L)));
         long hashEmpty = PrivateStoreOfferHasher.hash(
                 Collections.singletonList(row(1L, 0, new HashMap<Attribute, Integer>(), 1L, 100L, 57L)));
@@ -162,9 +159,7 @@ class PrivateStoreOfferHasherTest {
 
     @Test
     void hash_shouldChange_whenItemIdChanges() {
-        // Sold-then-relisted twin: same trader/enchant/attrs/count/price/currency,
-        // different instance objId — must still change the hash (spec 065 §2.1),
-        // otherwise the projection keeps a dead objId forever.
+        // relisted twin differing only in objId must change the hash
         OfferRow a = new OfferRow(100L, 1L, 0, null, 1L, 100L, 57L, false);
         OfferRow b = new OfferRow(200L, 1L, 0, null, 1L, 100L, 57L, false);
 

@@ -6,26 +6,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one class a character owns, carried inside
- * {@link CharacterDbDto#getClasses()}. One entry per class: exactly one
- * {@link CharacterClassKind#MAIN}, plus one {@link CharacterClassKind#SUB}
- * per subclass.
+ * Wire DTO for one class a character owns, carried in {@link CharacterDbDto#getClasses()}.
  *
- * <p>The roster is assembled by the schema provider, not by consumers.
- * Builds disagree on where the main class lives — most keep it on the
- * character row with only subclasses in a side table, some also store the
- * main class in that side table under class index {@code 0} — and
- * normalizing that is the adapter's job, so every consumer sees the same
- * roster shape.</p>
- *
- * <p>Which class the character is currently playing is NOT modeled here:
- * it is already given by {@link CharacterDbDto#getClassId()}, and a second
- * representation could disagree with the first.</p>
- *
- * <p>Entries whose source class ID resolves to a value outside
- * {@link CharacterClass}'s canonical set are dropped by the schema
- * provider before assembly — every entry that reaches the wire has a
- * non-null {@code classId}.</p>
+ * Roster shape is normalized by the schema provider (builds differ on where the main class is
+ * stored). The class currently played is {@link CharacterDbDto#getClassId()}, not a flag here.
  */
 public final class CharacterClassDbDto {
 
@@ -48,50 +32,25 @@ public final class CharacterClassDbDto {
         this.sp = sp;
     }
 
-    /**
-     * Class identifier — {@code NOT NULL} on the wire (entries with unknown
-     * source class IDs are dropped by the schema provider).
-     */
+    /** Non-null on the wire: entries with unknown source class ids are dropped by the provider. */
     public CharacterClass getClassId() {
         return classId;
     }
 
-    /**
-     * Whether this is the character's main class or one of its subclasses —
-     * {@code NOT NULL} on the wire.
-     */
     public CharacterClassKind getKind() {
         return kind;
     }
 
-    /**
-     * Level of this class. {@code null} when the tenant does not surface the
-     * source column.
-     */
     public @Nullable Integer getLevel() {
         return level;
     }
 
-    /**
-     * Experience of this class.
-     *
-     * <p>Unhashed ride-along: the source column is read during row mapping but
-     * is deliberately NOT part of {@code hashedColumns()}, because it advances
-     * on every kill and hashing it would storm UPDATEs for every online
-     * character each cycle. So it is never what triggers a sync event — the
-     * value observed is the one persisted at the source's last full store
-     * (logout + periodic autosave), never a per-tick figure.</p>
-     *
-     * <p>{@code null} when the tenant does not surface the column.</p>
-     */
+    /** Unhashed ride-along: never triggers a sync event, value is as of the last full store at the source. */
     public @Nullable Long getExp() {
         return exp;
     }
 
-    /**
-     * SP of this class. Same unhashed ride-along semantics as
-     * {@link #getExp()}.
-     */
+    /** Unhashed ride-along, same as {@link #getExp()}. */
     public @Nullable Long getSp() {
         return sp;
     }

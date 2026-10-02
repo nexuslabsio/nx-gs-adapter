@@ -9,16 +9,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Session-scoped {@link NxGameData} façade — a registry of snapshot triggers
- * bound by the {@code gd-sync} module during {@code onConnect}. Survives
- * reconnect: the captured reference keeps working while the underlying IO
- * executor is swapped on each handshake, and triggers re-register on every
- * fresh connect.
- *
- * <p>{@link #publishSnapshot()} fans out to every registered trigger, each run
- * on the adapter IO executor so the caller (host game thread) never blocks on
- * Kafka latency. Catches {@code Throwable} from triggers to keep the host
- * thread safe.</p>
+ * Trigger registry bound by gd-sync on connect; survives reconnect (IO executor swapped per handshake).
+ * Triggers run on the IO executor so the host game thread never blocks on Kafka; Throwable is caught to protect it.
  */
 public final class NxGameDataImpl implements NxGameData {
 
@@ -29,10 +21,6 @@ public final class NxGameDataImpl implements NxGameData {
 
     public NxGameDataImpl() {}
 
-    /**
-     * Swap the IO executor used to run triggers. Called by adapter-core on every
-     * handshake so the stable façade always dispatches onto the live pool.
-     */
     public void bindExecutor(Executor io) {
         ioExecutor.set(io);
     }
@@ -58,10 +46,6 @@ public final class NxGameDataImpl implements NxGameData {
         log.info("NxGameData snapshot trigger registered ({} total)", triggers.size());
     }
 
-    /**
-     * Drop all registered triggers. Called on reconnect so the gd-sync module
-     * re-registers cleanly instead of stacking duplicate triggers.
-     */
     public void clearTriggers() {
         int count = triggers.size();
         triggers.clear();
@@ -79,8 +63,7 @@ public final class NxGameDataImpl implements NxGameData {
             }
         };
         if (io == null) {
-            // No executor bound yet (pre-wired / test context) — run inline so the
-            // request is not silently dropped.
+            // No executor bound yet (pre-wired / test): run inline so the request isn't dropped
             safe.run();
             return;
         }

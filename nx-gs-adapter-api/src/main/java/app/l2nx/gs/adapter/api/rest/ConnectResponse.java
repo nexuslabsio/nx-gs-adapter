@@ -5,10 +5,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Adapter handshake response — identity bundle plus the Kafka context the adapter
- * needs to bootstrap its client, plus a namespaced {@link SyncTopics} bundle, the
- * heartbeat topic, and a {@link MessagingTopics} bundle for the events / commands
- * surface.
+ * Adapter handshake response: identity, Kafka context, heartbeat topic, and the sync and messaging topic bundles.
  *
  * @see ConnectRequest
  * @see KafkaCredentials
@@ -52,11 +49,7 @@ public final class ConnectResponse {
         return tenantId;
     }
 
-    /**
-     * Authoritative tenant slug — the kebab-case identifier the platform issues to the
-     * tenant. Source of truth for any consumer that needs to compose tenant-scoped names
-     * (e.g. Kafka client IDs); do NOT re-derive from {@code platformUrl}.
-     */
+    /** Authoritative kebab-case tenant slug; use it for tenant-scoped names instead of deriving from {@code platformUrl}. */
     public String getTenantSlug() {
         return tenantSlug;
     }
@@ -77,32 +70,17 @@ public final class ConnectResponse {
         return kafka;
     }
 
-    /**
-     * Heartbeat Kafka topic — fully-qualified topic the adapter publishes
-     * {@code HeartbeatEvent} into (e.g. {@code "<tenant>.gs.heartbeat"}).
-     * {@code null} when the platform omits heartbeat (heartbeat module then
-     * stays inactive).
-     */
+    /** Fully-qualified heartbeat topic (e.g. {@code "<tenant>.gs.heartbeat"}); {@code null} keeps the heartbeat module inactive. */
     public @Nullable String getHeartbeatTopic() {
         return heartbeatTopic;
     }
 
-    /**
-     * Per-namespace per-entity Kafka topic addressing for sync modules.
-     * {@code null} (field absent on the wire) means no sync namespaces are
-     * configured — every sync module ({@code db-sync}, {@code runtime-sync},
-     * {@code dp-sync}) transitions to {@code DISABLED}.
-     */
+    /** Absent ({@code null}) disables every sync module ({@code db-sync}, {@code runtime-sync}, {@code dp-sync}). */
     public @Nullable SyncTopics getSyncTopics() {
         return syncTopics;
     }
 
-    /**
-     * Outbound-events / inbound-commands topic addressing. {@code null} (field
-     * absent on the wire) means messaging is unconfigured — every
-     * {@code NxEvents.publish(...)} call becomes a no-op + DEBUG log, and
-     * inbound commands (Phase 2) stay disabled.
-     */
+    /** Absent ({@code null}) makes {@code NxEvents.publish(...)} a no-op with DEBUG log and disables inbound commands. */
     public @Nullable MessagingTopics getMessagingTopics() {
         return messagingTopics;
     }

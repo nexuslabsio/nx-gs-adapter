@@ -5,11 +5,6 @@ import java.util.Collections;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Package-private list-freezing helper shared by the mail-command DTOs.
- * Defensive copy + unmodifiable wrap; null/empty input collapses to
- * {@link Collections#emptyList()}.
- */
 final class MailLists {
 
     private MailLists() {}

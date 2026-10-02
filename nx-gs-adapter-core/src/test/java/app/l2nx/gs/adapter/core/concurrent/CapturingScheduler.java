@@ -6,11 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 
-/**
- * Hand-rolled stub for both one-shot {@code schedule} and recurring
- * {@code scheduleWithFixedDelay}. Hand-rolled because Mockito on the JDK
- * {@code ScheduledExecutorService} interface is unsafe across the host-JVM range.
- */
+/** Hand-rolled: Mockito on ScheduledExecutorService is unsafe across the host-JVM range. */
 public final class CapturingScheduler implements ScheduledExecutorService {
 
     public static final class OneShot {

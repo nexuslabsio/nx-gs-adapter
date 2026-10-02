@@ -9,18 +9,9 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Closed Olympiad 1v1 match — one event per participant (self-perspective).
- * Both per-participant events share {@link #getMatchId() matchId}.
- *
- * <p>Emitted for every points-changing conclusion including no-fight edge
- * cases (default / disconnect / timeout / both-offline) — see
- * {@link OlympiadMatchReason}. {@link #getFightStartedAt() fightStartedAt}
- * is {@code null} when no combat occurred.</p>
- *
- * <p>{@link #getMetadata() metadata} — optional open string&rarr;string map of
- * build-agnostic attributes about this match. {@code null} when absent;
- * hosts MAY publish arbitrary keys without an API release, and
- * consumers ignore keys they do not understand.</p>
+ * Closed Olympiad 1v1 match; one event per participant (self-perspective), both sharing {@link #getMatchId() matchId}.
+ * <p>Emitted for every points-changing conclusion incl. no-fight cases (see {@link OlympiadMatchReason}); {@link #getFightStartedAt() fightStartedAt} is {@code null} when no combat occurred.
+ * <p>{@link #getMetadata() metadata} is an optional open string-to-string map; {@code null} when absent, consumers ignore unknown keys.
  */
 public final class OlympiadMatchResultEvent {
 
@@ -113,35 +104,22 @@ public final class OlympiadMatchResultEvent {
         return gameType;
     }
 
-    /**
-     * Self-perspective character — partition key (8-byte BE).
-     */
+    /** Self-perspective character; partition key (8-byte BE). */
     public long getCharId() {
         return charId;
     }
 
-    /**
-     * Legacy numeric class id (host numbering). Superseded by
-     * {@link #getClazz() clazz}; retained for back-compat while hosts migrate to
-     * the canonical token. Consumers MUST prefer {@code clazz} when it is non-null.
-     */
+    /** Legacy host-numbered class id; consumers MUST prefer {@link #getClazz() clazz} when non-null. */
     public int getClassId() {
         return classId;
     }
 
-    /**
-     * Canonical, source-agnostic class token. {@code null} from hosts that have
-     * not yet migrated off the numeric {@link #getClassId() classId} (consumers
-     * fall back to it then), or when the source class is not in the canonical
-     * {@link CharacterClass} set.
-     */
+    /** {@code null} from hosts not yet migrated (fall back to {@link #getClassId() classId}) or when the class is outside the canonical {@link CharacterClass} set. */
     public @Nullable CharacterClass getClazz() {
         return clazz;
     }
 
-    /**
-     * Snapshot at match time (clan affiliation can change between matches).
-     */
+    /** Snapshot at match time; clan can change between matches. */
     public @Nullable Long getClanId() {
         return clanId;
     }
@@ -150,20 +128,12 @@ public final class OlympiadMatchResultEvent {
         return opponentCharId;
     }
 
-    /**
-     * Legacy numeric opponent class id (host numbering). Superseded by
-     * {@link #getOpponentClazz() opponentClazz}; consumers MUST prefer the token
-     * when it is non-null.
-     */
+    /** Legacy host-numbered opponent class id; consumers MUST prefer {@link #getOpponentClazz() opponentClazz} when non-null. */
     public int getOpponentClassId() {
         return opponentClassId;
     }
 
-    /**
-     * Canonical, source-agnostic opponent class token. {@code null} pre-migration
-     * (fall back to {@link #getOpponentClassId() opponentClassId}) or for a
-     * non-canonical source class.
-     */
+    /** {@code null} pre-migration (fall back to {@link #getOpponentClassId() opponentClassId}) or for a non-canonical source class. */
     public @Nullable CharacterClass getOpponentClazz() {
         return opponentClazz;
     }
@@ -196,9 +166,6 @@ public final class OlympiadMatchResultEvent {
         return opponentDamageDealt;
     }
 
-    /**
-     * {@code null} when no actual fight occurred.
-     */
     public @Nullable Instant getFightStartedAt() {
         return fightStartedAt;
     }

@@ -10,45 +10,21 @@ import java.util.concurrent.ConcurrentMap;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Host-populated {@code Nx-Message-Type} → handler binding table. Populated
- * via {@link app.l2nx.gs.adapter.api.spi.capability.NxCommands#on(Class, CommandHandler)}
- * calls from host {@code onConnect} callbacks (and any time afterwards — late
- * registration is supported).
- *
- * <p>Routing matches by {@code Class.getSimpleName()} (UTF-8 string). Two
- * distinct classes with the same simple name in the catalog would collide
- * — last registration wins (logged as WARN, the prior binding is replaced).</p>
- *
- * <p>Concurrent: registrations may arrive while the consumer thread is
- * looking up by header. Backed by {@link ConcurrentHashMap} so reads and
- * writes do not stall each other.</p>
- *
- * <p>Package-private. External callers go through
- * {@link app.l2nx.gs.adapter.api.spi.capability.NxCommands} (registration) or do not
- * see this class at all (dispatch is internal).</p>
+ * Routing matches on {@code Class.getSimpleName()}; two classes with the same simple name collide and the
+ * last registration wins. Registration may race with lookup on the consumer thread.
  */
 final class CommandTypeRegistry {
 
     private final ConcurrentMap<String, CommandTypeBinding> bindingsByMessageType =
             new ConcurrentHashMap<String, CommandTypeBinding>();
 
-    /**
-     * Register a handler for the given concrete command class. Overwrites
-     * any previous registration for the same class (last write wins).
-     *
-     * @return {@code true} if a previous binding for the same class simple
-     * name was overwritten; {@code false} for the first registration.
-     */
+    /** @return {@code true} if a previous binding with the same simple name was overwritten */
     <R, C extends NxCommand<R>> boolean register(Class<C> type, CommandHandler<C, R> handler) {
         CommandTypeBinding binding = new CommandTypeBinding(type, handler);
         CommandTypeBinding previous = bindingsByMessageType.put(type.getSimpleName(), binding);
         return previous != null;
     }
 
-    /**
-     * Lookup a binding by {@code Nx-Message-Type} header value. Returns
-     * {@code null} when the type has no registered handler.
-     */
     @Nullable
     CommandTypeBinding lookup(String messageType) {
         if (messageType == null) {
@@ -57,11 +33,7 @@ final class CommandTypeRegistry {
         return bindingsByMessageType.get(messageType);
     }
 
-    /**
-     * Snapshot of registered class simple names, sorted for stable heartbeat
-     * output. Used by {@link CommandsConsumer#currentStats()} for the
-     * {@code registered-types} stats slot.
-     */
+    /** Sorted for stable heartbeat output. */
     List<String> snapshotRegisteredTypes() {
         if (bindingsByMessageType.isEmpty()) {
             return Collections.emptyList();

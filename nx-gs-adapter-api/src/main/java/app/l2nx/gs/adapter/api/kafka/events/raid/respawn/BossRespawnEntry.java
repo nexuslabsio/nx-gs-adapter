@@ -10,39 +10,19 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One tracked raid boss inside a {@link BossRespawnSnapshotEvent}. Describes the
- * boss's current status and, when it is dead, the moment it is scheduled to
- * respawn.
+ * One tracked raid boss in a {@link BossRespawnSnapshotEvent}.
  *
- * <p>Fields:
  * <ul>
- *   <li>{@link #getNpcId() npcId} — REQUIRED. L2 NPC template id; the stable
- *   per-boss key the consumer upserts on. The consumer resolves the boss name
- *   from this id against its own NPC catalog — names are intentionally NOT
- *   carried on the wire.</li>
- *   <li>{@link #getLevel() level} — optional boss level.</li>
- *   <li>{@link #getKind() kind} — REQUIRED. Reuses {@link RaidBossKind}; this
- *   snapshot only ever carries {@link RaidBossKind#RAID RAID} or
- *   {@link RaidBossKind#EPIC EPIC}. Instance bosses are excluded — they have no
- *   server-wide respawn timer.</li>
- *   <li>{@link #getStatus() status} — REQUIRED. Open build-agnostic status
- *   string; canonical values in {@link WellKnownBossStatuses}
- *   ({@code alive} / {@code in_combat} / {@code dead}). Hosts MAY emit additional
- *   non-canonical statuses; consumers map unknown values to "not dead".</li>
- *   <li>{@link #getNextRespawnAt() nextRespawnAt} — optional. Instant of the
- *   next scheduled respawn. Set when {@link #getStatus() status} is
- *   {@link WellKnownBossStatuses#DEAD dead} and the respawn time is known;
- *   {@code null} when the boss is up, or dead with an unknown / unscheduled
- *   respawn.</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic per-boss attributes. {@code null} when absent. Hosts MAY
- *   publish arbitrary keys without an API release; consumers ignore keys they
- *   do not understand.</li>
+ *   <li>{@code npcId} - upsert key; the consumer resolves the name from its own NPC catalog (names are
+ *   NOT on the wire).</li>
+ *   <li>{@code kind} - only {@link RaidBossKind#RAID} or {@link RaidBossKind#EPIC}; instance bosses have
+ *   no server-wide respawn timer.</li>
+ *   <li>{@code status} - open string, canonical values in {@link WellKnownBossStatuses}; consumers map
+ *   unknown values to "not dead".</li>
+ *   <li>{@code nextRespawnAt} - set only when {@code dead} with a known respawn time.</li>
+ *   <li>{@code metadata} - open string map; hosts MAY add keys without an API release, consumers ignore
+ *   unknown ones.</li>
  * </ul>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson / Jackson can deserialize without
- * {@code @JsonProperty}.</p>
  */
 public final class BossRespawnEntry {
 
@@ -72,10 +52,6 @@ public final class BossRespawnEntry {
         this.schedule = schedule;
     }
 
-    /**
-     * L2 NPC template id. The stable per-boss key the platform upserts on inside
-     * a snapshot and resolves the boss name from.
-     */
     public int getNpcId() {
         return npcId;
     }
@@ -84,43 +60,24 @@ public final class BossRespawnEntry {
         return level;
     }
 
-    /**
-     * Coarse classification — {@link RaidBossKind#RAID} or
-     * {@link RaidBossKind#EPIC} for this snapshot.
-     */
     public RaidBossKind getKind() {
         return kind;
     }
 
-    /**
-     * Build-agnostic boss status — see {@link WellKnownBossStatuses} for the
-     * canonical {@code alive} / {@code in_combat} / {@code dead} values.
-     */
     public String getStatus() {
         return status;
     }
 
-    /**
-     * Instant of the next scheduled respawn, or {@code null} when the boss is up
-     * or its respawn is unknown / unscheduled.
-     */
     public @Nullable Instant getNextRespawnAt() {
         return nextRespawnAt;
     }
 
-    /**
-     * Open string→string map of build-agnostic per-boss attributes, or
-     * {@code null} when absent. When non-null the returned map is unmodifiable.
-     */
+    /** Unmodifiable when non-null. */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;
     }
 
-    /**
-     * Recurring respawn rule ("every weekday(s) at HH:MM") for bosses on a fixed
-     * schedule, or {@code null} for respawn-window bosses / patterns that don't
-     * reduce to a weekly rule.
-     */
+    /** {@code null} for respawn-window bosses and patterns that do not reduce to a weekly rule. */
     public @Nullable RecurringSchedule getSchedule() {
         return schedule;
     }

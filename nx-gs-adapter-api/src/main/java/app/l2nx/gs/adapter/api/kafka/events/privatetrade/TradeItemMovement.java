@@ -7,10 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Transferred item line in a {@link PrivateTradeFinishedEvent}. Adena is
- * carried as a regular line (no separate price/currency field).
- */
+/** Transferred item line in a {@link PrivateTradeFinishedEvent}; adena is a regular line (no separate price/currency field). */
 public final class TradeItemMovement {
 
     private final long itemTemplateId;
@@ -39,16 +36,12 @@ public final class TradeItemMovement {
         return itemTemplateId;
     }
 
-    /**
-     * Giver-side inventory item object-id before the exchange.
-     */
+    /** Giver-side inventory object id before the exchange. */
     public long getItemId() {
         return itemId;
     }
 
-    /**
-     * Receiver-side inventory item object-id after the exchange.
-     */
+    /** Receiver-side inventory object id after the exchange. */
     public long getNewItemId() {
         return newItemId;
     }
@@ -57,10 +50,7 @@ public final class TradeItemMovement {
         return count;
     }
 
-    /**
-     * Enchant level. {@code null} when the item type has no enchant concept;
-     * {@code 0} for enchantable-but-unenchanted; {@code > 0} otherwise.
-     */
+    /** {@code null} = no enchant concept; {@code 0} = unenchanted; {@code > 0} = enchanted. */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }

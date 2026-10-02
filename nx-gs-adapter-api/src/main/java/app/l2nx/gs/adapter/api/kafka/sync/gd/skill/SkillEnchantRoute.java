@@ -8,31 +8,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One enchant-route variant of a {@link Skill} — an enchanted level beyond the base
- * ladder. In L2 a max-level skill can be enchanted along one of several routes
- * (power / cost / range / time tracks), each with its own enchant levels
- * ({@code +1..+N}); the core models these as the same skill object with a non-zero
- * sub-level, so a route variant carries the same per-level stats as a base
- * {@link SkillLevel} plus the route coordinates and enchant localization.
- *
- * <p>{@code baseLevel} (the skill level being enchanted), {@code route}, and
- * {@code enchantLevel} are the non-null identity. <b>Invariant:</b> {@code baseLevel}
- * is always the skill's max base level — enchanting is only available once the base
- * ladder is maxed; providers MUST emit {@code maxLevel} here. Stats mirror
- * {@link SkillLevel} (the variant is a full skill object), units carried in the name
- * ({@code *Ms} / {@code *Sec}). {@code enchantName} / {@code enchantDescription} are the
- * enchanted-variant localization. Per-route effects are out of scope — the enchant
- * primarily shifts the numbers carried here.</p>
- *
- * <p>{@code enchantAdena} / {@code enchantExp} / {@code enchantSp} are the costs of
- * applying this enchant step; {@code enchantChanceByCharLevelPercent} is the success
- * chance keyed by the enchanting character's level (e.g. {@code 76 → 82}).</p>
- *
- * <p>{@code attribute} is the offensive element this enchant route adds
- * ({@code FIRE}/{@code WATER}/{@code WIND}/{@code EARTH}/{@code HOLY}/{@code DARK});
- * {@code attributePower} is the element value. Enchant routes like "+3 Fire Attack"
- * supply an element that the base levels do not carry — this is the primary motivation
- * for having attribute per-node rather than on the aggregate header.</p>
+ * One enchant-route variant of a {@link Skill}: an enchanted level beyond the base ladder, carrying the same
+ * per-level stats as {@link SkillLevel} plus route coordinates. {@code baseLevel}, {@code route} and
+ * {@code enchantLevel} are the non-null identity; providers MUST emit the skill's max base level as
+ * {@code baseLevel}, since enchanting is only available once the base ladder is maxed.
  */
 public final class SkillEnchantRoute {
 
@@ -120,24 +99,15 @@ public final class SkillEnchantRoute {
                 : Collections.unmodifiableMap(new LinkedHashMap<Integer, Integer>(enchantChanceByCharLevelPercent));
     }
 
-    /**
-     * The base skill level this enchant route applies to — always the skill's max base
-     * level (see the class invariant).
-     */
+    /** Always the skill's max base level. */
     public int getBaseLevel() {
         return baseLevel;
     }
 
-    /**
-     * Enchant route number (which track — power / cost / time / …).
-     */
     public int getRoute() {
         return route;
     }
 
-    /**
-     * Enchant level within the route ({@code +1..+N}).
-     */
     public int getEnchantLevel() {
         return enchantLevel;
     }
@@ -178,30 +148,18 @@ public final class SkillEnchantRoute {
         return abnormalLevel;
     }
 
-    /**
-     * Abnormal (buff/debuff) duration.
-     */
     public @Nullable Integer getAbnormalTimeSec() {
         return abnormalTimeSec;
     }
 
-    /**
-     * Cast animation time.
-     */
     public @Nullable Integer getHitTimeMs() {
         return hitTimeMs;
     }
 
-    /**
-     * Cool time.
-     */
     public @Nullable Integer getCoolTimeMs() {
         return coolTimeMs;
     }
 
-    /**
-     * Cooldown before reuse.
-     */
     public @Nullable Integer getReuseDelayMs() {
         return reuseDelayMs;
     }
@@ -210,19 +168,11 @@ public final class SkillEnchantRoute {
         return power;
     }
 
-    /**
-     * Offensive element added by this enchant route ({@code FIRE}/{@code WATER}/
-     * {@code WIND}/{@code EARTH}/{@code HOLY}/{@code DARK}); {@code null} when the
-     * route carries no offensive attribute.
-     */
+    /** Element added by the route, e.g. a "+3 Fire Attack" route; {@code null} when it adds none. */
     public @Nullable String getAttribute() {
         return attribute;
     }
 
-    /**
-     * Offensive element power added by this enchant route; {@code null} when
-     * {@code attribute} is null.
-     */
     public @Nullable Integer getAttributePower() {
         return attributePower;
     }
@@ -239,33 +189,19 @@ public final class SkillEnchantRoute {
         return enchantDescription;
     }
 
-    /**
-     * Adena cost to apply this enchant step; {@code null} if the build does not expose it.
-     */
     public @Nullable Long getEnchantAdena() {
         return enchantAdena;
     }
 
-    /**
-     * Experience cost to apply this enchant step; {@code null} if the build does not
-     * expose it.
-     */
     public @Nullable Long getEnchantExp() {
         return enchantExp;
     }
 
-    /**
-     * SP cost to apply this enchant step; {@code null} if the build does not expose it.
-     */
     public @Nullable Long getEnchantSp() {
         return enchantSp;
     }
 
-    /**
-     * Success chance of this enchant step keyed by the enchanting character's level
-     * (e.g. {@code 76 → 82}); levels the build defines no chance for are absent.
-     * {@code null} if the build does not expose chances.
-     */
+    /** Keyed by the enchanting character's level; levels without a defined chance are absent. */
     public @Nullable Map<Integer, Integer> getEnchantChanceByCharLevelPercent() {
         return enchantChanceByCharLevelPercent;
     }

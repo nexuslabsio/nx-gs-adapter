@@ -4,67 +4,21 @@ import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import java.util.Objects;
 
 /**
- * Inbound command instructing the game-server to transfer a stack of items
- * from one character to another by item-instance object-id. Covers all four
- * online/offline source-target combinations transparently to the caller —
- * the handler routes internally based on the live state of the from / to
- * characters.
+ * Moves a stack of items between characters by item-instance object-id; the handler routes internally across all
+ * online/offline combinations.
  *
- * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <Void>}
- * — {@code success()} on a successful transfer; common error replies:</p>
- * <ul>
- *     <li>{@code NOT_FOUND} — source character, target character, or item
- *     instance does not exist.</li>
- *     <li>{@code INVALID_STATE} — item not in a transferable location
- *     (auction, freight, lease, private store, equipped on a frozen
- *     character …), target inventory full / over weight cap, source stack
- *     has fewer items than {@code count}, or otherwise rejected by the
- *     host's transfer policy in the current state.</li>
- *     <li>{@code VALIDATION_FAILED} — wire payload missing a required field
- *     (Gson defaults boxed {@code Long} to {@code null} on missing wire
- *     field; handler MUST check non-null before applying).</li>
- *     <li>{@code INTERNAL_ERROR} — unexpected error during persistence
- *     (clone insert, owner reassign, …).</li>
- * </ul>
+ * <p>{@code NOT_FOUND}: character or item missing. {@code INVALID_STATE}: non-transferable location, target full or
+ * over weight, source stack smaller than {@code count}. {@code VALIDATION_FAILED}: missing field or non-positive
+ * count; Gson bypasses the constructor, so the handler must check. {@code INTERNAL_ERROR}: persistence failure.</p>
  *
- * <p><b>Identity.</b> {@link #getItemId() itemId} is the L2
- * object-id of the specific item instance (NOT the catalog item-template id) —
- * unique per game-server lifetime, identifies one stack. Source character
- * is identified by {@link #getCharIdFrom() charIdFrom}, target by
- * {@link #getCharIdTo() charIdTo}.</p>
+ * <p>Stackables: {@code count} equal to the stack size moves the instance, less splits it. Non-stackables require
+ * {@code count == 1}; others are rejected with {@code VALIDATION_FAILED} or {@code INVALID_STATE}.</p>
  *
- * <p><b>Quantity semantics.</b> {@link #getCount() count} is the number of
- * items to move from the source stack to the target. Builder defaults to
- * {@code 1}. For stackable items: when {@code count} equals the stack size
- * the entire instance moves; when less, the stack is split (a partial stack
- * is created on the target, the source stack is decremented). For
- * non-stackable items {@code count} MUST be {@code 1} — handlers MUST
- * reject other values with {@code VALIDATION_FAILED} or {@code INVALID_STATE}.
- * {@code count <= 0} is rejected at construction (programmatic use); on the
- * wire path handler MUST emit {@code VALIDATION_FAILED} on missing /
- * non-positive values.</p>
+ * <p>Routed by {@code charIdFrom}, which does NOT serialize against commands keyed by {@code charIdTo}; handlers
+ * must not assume exclusive access to the target.</p>
  *
- * <p><b>Required fields.</b> All four fields ({@code charIdFrom},
- * {@code charIdTo}, {@code itemId}, {@code count}) are semantically
- * REQUIRED. The constructor enforces non-null values via
- * {@link IllegalArgumentException} for programmatic construction (tests,
- * host-side replays). Wire-path deserialization bypasses the constructor
- * via Gson — the handler is responsible for null-checking and emitting
- * {@code VALIDATION_FAILED} when a wire field is missing.</p>
- *
- * <p><b>Partitioning.</b> Routed by {@link #getCharIdFrom() charIdFrom} on
- * the commands topic — sequential with other source-character-scoped
- * operations on the same character. Note: this does NOT serialize against
- * concurrent commands keyed by {@code charIdTo} — handlers MUST not assume
- * exclusive access to the target.</p>
- *
- * <p><b>Re-issue safety.</b> Delivery is at-most-once (see
- * {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); what repeats is a caller re-issuing after a
- * reply timeout. The items may already have moved, and the handler cannot tell that apart from a
- * fresh request — deciding whether the transfer landed is the caller's job.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * <p>Delivery is at-most-once (see {@link app.l2nx.gs.adapter.api.spi.capability.CommandHandler}); a re-issue after a reply timeout may find the items already
+ * moved and looks like a fresh request, so the caller decides whether the first transfer landed.</p>
  */
 public final class TransferItemToCharacterCommand implements NxCommand<TransferItemToCharacterResult> {
 
@@ -95,36 +49,20 @@ public final class TransferItemToCharacterCommand implements NxCommand<TransferI
         this.count = count;
     }
 
-    /**
-     * Source character's primary key. REQUIRED. Handler MUST emit
-     * {@code VALIDATION_FAILED} when the wire payload omits this field.
-     */
     public Long getCharIdFrom() {
         return charIdFrom;
     }
 
-    /**
-     * Target character's primary key. REQUIRED. Handler MUST emit
-     * {@code VALIDATION_FAILED} when the wire payload omits this field.
-     */
     public Long getCharIdTo() {
         return charIdTo;
     }
 
-    /**
-     * L2 object-id of the item instance to transfer. REQUIRED. NOT the
-     * catalog item-template id — this is the per-instance unique id.
-     * Handler MUST emit {@code VALIDATION_FAILED} on missing wire data.
-     */
+    /** Per-instance object-id, NOT the catalog item-template id. */
     public Long getItemId() {
         return itemId;
     }
 
-    /**
-     * Number of items to transfer from the source stack. REQUIRED, MUST be
-     * positive. Builder defaults to {@code 1}. Handler MUST emit
-     * {@code VALIDATION_FAILED} when missing or non-positive.
-     */
+    /** Must be positive; the builder defaults to {@code 1}. Non-stackables require {@code 1}. */
     public Long getCount() {
         return count;
     }
@@ -186,9 +124,6 @@ public final class TransferItemToCharacterCommand implements NxCommand<TransferI
             return this;
         }
 
-        /**
-         * Override the default count of 1.
-         */
         public Builder count(Long count) {
             this.count = count;
             return this;

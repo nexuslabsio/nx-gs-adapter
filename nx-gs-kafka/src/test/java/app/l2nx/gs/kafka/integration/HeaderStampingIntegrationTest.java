@@ -29,15 +29,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
-/**
- * Verifies that {@link NxProducer#create(Map, Gson, Map)} stamps the configured
- * static headers on every outbound record across every {@code send(...)} overload
- * and {@link NxProducer#sendRecord(ProducerRecord)}.
- *
- * <p>Uses a raw {@code byte[]} value rather than the {@code NxHeaders} contract
- * from {@code nx-gs-adapter-api} so {@code nx-gs-kafka} stays a generic Kafka
- * facade with no adapter-api dependency on its test classpath.</p>
- */
+/** Raw {@code byte[]} header value keeps nx-gs-kafka free of an nx-gs-adapter-api test dependency. */
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class HeaderStampingIntegrationTest {

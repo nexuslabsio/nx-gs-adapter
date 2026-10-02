@@ -23,7 +23,6 @@ class UUIDv7Test {
     @Test
     void generate_shouldReturnVariantTen() {
         UUID id = UUIDv7.generate();
-        // Variant per RFC 9562 §4.1: top two bits of LSB are 10 — UUID#variant() returns 2.
         assertEquals(2, id.variant());
     }
 

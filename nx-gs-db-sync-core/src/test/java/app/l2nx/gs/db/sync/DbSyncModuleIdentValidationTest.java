@@ -90,7 +90,6 @@ class DbSyncModuleIdentValidationTest {
 
     @Test
     void validateIdentifiers_shouldAcceptParentRefReferencingDeclaredEntity() {
-        // mapping(...) declares entity "clan" — the parent the item refs point at.
         EntityMapping<?> clan =
                 mapping("clan_data", "clan_id", Collections.singletonList("clan_name"), Collections.emptyList());
         EntityMapping<?> item = withParentRefs(

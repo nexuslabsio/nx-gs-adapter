@@ -71,7 +71,6 @@ class TopicResolverTest {
 
         TopicResolver resolver = TopicResolver.fromContext(ctx);
 
-        // Resolves only the db namespace — runtime entries do not leak in.
         assertEquals("bohpts.gs.sync.db.clan", resolver.resolveTopic("clan"));
         assertNull(resolver.resolveTopic("character"));
     }

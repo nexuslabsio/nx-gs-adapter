@@ -34,8 +34,7 @@ class GameDataSyncConfigTest {
     @Test
     void from_shouldClampUpToMinimum_whenPositiveBelowMin() {
         Map<String, String> values = new HashMap<String, String>();
-        // Value resolves to 1 because MIN is 1 — there is no sub-1 positive int,
-        // so this guards the clamp branch explicitly for any future MIN bump.
+        // no sub-1 positive int exists; guards the clamp branch against a future MIN bump
         values.put(GameDataSyncConfig.KEY_RESYNC_INTERVAL_HOURS, "1");
 
         GameDataSyncConfig config = GameDataSyncConfig.from(source(values));

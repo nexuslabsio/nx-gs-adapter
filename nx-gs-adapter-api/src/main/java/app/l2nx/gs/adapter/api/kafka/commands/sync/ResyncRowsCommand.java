@@ -5,55 +5,18 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inbound command instructing the db-sync engine to force a re-sync of
- * selected rows of one entity: the snapshot hash of each targeted PK is
- * invalidated (a sentinel entry is inserted for a PK the snapshot never had,
- * so a platform ghost row gets a {@code DELETED} re-emit) and the next CDC
- * cycle re-publishes them. Pure adapter operation — no host game code
- * involved.
- *
- * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <}{@link ResyncRowsResult}{@code >}
- * — an <b>ack</b> sent after enqueue, carrying the per-entity invalidation
- * counts known at ack time. Per-entity completion follows asynchronously via
- * {@code ResyncCompletedEvent}. Common error replies:</p>
- * <ul>
- *     <li>{@code VALIDATION_FAILED} — missing {@code resyncId} /
- *     {@code entityName}, unknown {@code entityName}, or {@code pks}
- *     missing / empty / over {@link #MAX_PKS} / carrying a null or
- *     non-positive entry (object ids are strictly positive).</li>
- *     <li>{@code UNAVAILABLE} — the db-sync engine is not running.</li>
- * </ul>
- *
- * <p><b>Cascade.</b> When {@link #isCascade() cascade} is {@code true}, the
- * handler resolves — synchronously, before the ack — the rows of every
- * declared entity whose {@code parentRefs()} reference
- * {@link #getEntityName() entityName} ({@code SELECT <pk> FROM <table> WHERE
- * <fkColumn> IN (<pks>)}) and invalidates them alongside the requested rows.
- * Cascading from an entity nothing references is not an error — the result
- * then carries only the target entity.</p>
- *
- * <p><b>Required fields.</b> {@code resyncId}, {@code entityName}, and a
- * non-empty {@code pks} of at most {@link #MAX_PKS} entries — enforced by the
- * constructor for programmatic construction; wire-path Gson bypasses the
- * constructor, the handler re-checks and emits {@code VALIDATION_FAILED}.</p>
- *
- * <p><b>Partitioning.</b> Routed with a {@code null} partition key
- * (round-robin).</p>
- *
- * <p><b>Idempotency.</b> Redelivery merges into the same pending per-entity
- * invalidation set under the same {@code resyncId}; the platform sweep keyed
- * on the completion event is idempotent.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Forces a re-sync of selected rows of one entity: each PK's snapshot hash is invalidated (a sentinel entry is
+ * inserted for a PK the snapshot never had, so a platform ghost row gets {@code DELETED}). Adapter-only.
+ * Reply is an ack after enqueue with per-entity invalidation counts; completion follows via {@code ResyncCompletedEvent}.
+ * Errors: {@code VALIDATION_FAILED} (missing/unknown {@code entityName}, {@code pks} missing/empty/over
+ * {@link #MAX_PKS}/non-positive entry), {@code UNAVAILABLE} (engine not running).
+ * With {@code cascade}, rows of entities whose {@code parentRefs()} reference {@code entityName} are resolved
+ * synchronously before the ack and invalidated too. Partition key is {@code null}; redelivery merges under the same
+ * {@code resyncId}.
  */
 public final class ResyncRowsCommand implements NxCommand<ResyncRowsResult> {
 
-    /**
-     * Hard cap on {@link #getPks() pks} size. Keeps the command record well
-     * under Kafka's default 1 MB and bounds the cascade {@code IN}-list
-     * fan-out; larger repairs use {@link ResyncEntitiesCommand}.
-     */
+    /** Keeps the record well under Kafka's default 1 MB and bounds the cascade {@code IN}-list; larger repairs use {@link ResyncEntitiesCommand}. */
     public static final int MAX_PKS = 1000;
 
     private final UUID resyncId;
@@ -81,38 +44,21 @@ public final class ResyncRowsCommand implements NxCommand<ResyncRowsResult> {
         this.cascade = cascade;
     }
 
-    /**
-     * Platform-generated UUIDv7 identifying the resync operation. REQUIRED.
-     * Echoed on every {@code ResyncCompletedEvent} the forced cycles emit.
-     */
+    /** Echoed on every {@code ResyncCompletedEvent} the forced cycles emit. */
     public UUID getResyncId() {
         return resyncId;
     }
 
-    /**
-     * Target entity name as declared by the adapter's schema provider
-     * ({@code EntityMapping.entityName()}). REQUIRED.
-     */
     public String getEntityName() {
         return entityName;
     }
 
-    /**
-     * Primary keys to invalidate on the target entity. REQUIRED, non-empty,
-     * at most {@link #MAX_PKS} entries. A PK absent from both the snapshot
-     * and the host DB still produces a {@code DELETED} re-emit (sentinel
-     * insert), repairing platform-side ghost rows.
-     */
+    /** A PK absent from both snapshot and host DB still yields a {@code DELETED} re-emit, repairing ghost rows. */
     public List<Long> getPks() {
         return pks;
     }
 
-    /**
-     * When {@code true}, also invalidate rows of every declared entity whose
-     * {@code parentRefs()} reference {@link #getEntityName() entityName} and
-     * whose FK matches one of {@link #getPks() pks}. Defaults to
-     * {@code false} on the wire (Gson primitive default).
-     */
+    /** Defaults to {@code false} on the wire (Gson primitive default). */
     public boolean isCascade() {
         return cascade;
     }

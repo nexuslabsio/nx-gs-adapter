@@ -8,15 +8,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One rule inside a {@link GearScoreRuleGroup} — the atomic "this is worth N gear
- * score" statement the wiki renders as a table row. A rule carries a scalar
- * ({@link #getValue() value} with a {@link #getUnit() unit} and optional
- * {@link #getCap() cap}) and/or a {@link #getScaling() scaling} table; either may be
- * present depending on the rule's shape.
- *
- * <p>{@link #getKey() key} is the domain key the host assigns (e.g.
- * {@code WEAPON_PER_POINT}, {@code PROFILE:WEAPON}, {@code OPTION:25002}) — opaque to
- * the platform, used to correlate the rule with per-entity references.</p>
+ * {@code key} is the host-assigned opaque domain key (e.g. {@code WEAPON_PER_POINT}, {@code PROFILE:WEAPON},
+ * {@code OPTION:25002}) that correlates the rule with per-entity references. Carries a scalar value and/or a scaling table.
  */
 public final class GearScoreRule {
 
@@ -43,48 +36,32 @@ public final class GearScoreRule {
                 scaling == null ? null : Collections.unmodifiableList(new ArrayList<GearScoreScalingStep>(scaling));
     }
 
-    /**
-     * Host-assigned domain key identifying the rule (opaque to the platform).
-     */
     public String getKey() {
         return key;
     }
 
-    /**
-     * Human-readable label for the wiki; {@code null} when none supplied.
-     */
     public @Nullable LocalizedText getLabel() {
         return label;
     }
 
-    /**
-     * Scalar rate / percentage / flat amount; {@code null} for a purely
-     * {@link #getScaling() scaling}-table rule.
-     */
     public @Nullable Double getValue() {
         return value;
     }
 
     /**
-     * Unit of {@link #getValue() value} — closed {@code UPPER_SNAKE_CASE} vocabulary
-     * ({@code PER_POINT} / {@code PERCENT} / {@code FLAT} / {@code PER_LEVEL} /
-     * {@code PER_STEP}); {@code null} when no scalar value is present.
+     * Closed vocabulary: {@code PER_POINT} / {@code PERCENT} / {@code FLAT} / {@code PER_LEVEL} / {@code PER_STEP}.
      */
     public @Nullable String getUnit() {
         return unit;
     }
 
     /**
-     * Optional ceiling on the rule's accumulated gear score; {@code null} when
-     * uncapped.
+     * {@code null} = uncapped.
      */
     public @Nullable Double getCap() {
         return cap;
     }
 
-    /**
-     * Range / step scaling table; {@code null} for a purely scalar rule.
-     */
     public @Nullable List<GearScoreScalingStep> getScaling() {
         return scaling;
     }

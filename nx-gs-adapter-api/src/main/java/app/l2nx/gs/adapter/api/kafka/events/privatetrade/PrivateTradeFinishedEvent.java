@@ -4,16 +4,8 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Closed personal player-to-player trade. Successes only — cancellations
- * and rare post-confirm failures are not emitted.
- *
- * <p>Fields:
- * <ul>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic attributes about this trade. {@code null} when
- *   absent. Hosts MAY publish arbitrary non-canonical keys without an API
- *   release; consumers ignore keys they do not understand.</li>
- * </ul>
+ * Closed personal player-to-player trade; successes only (cancellations and rare post-confirm failures are not emitted).
+ * <p>{@link #getMetadata() metadata} is an optional open string-to-string map; {@code null} when absent, consumers ignore unknown keys.
  */
 public final class PrivateTradeFinishedEvent {
 
@@ -37,10 +29,7 @@ public final class PrivateTradeFinishedEvent {
         return eventId;
     }
 
-    /**
-     * Host-side {@code TradeList} session UUID — distinct from
-     * {@link #getEventId() eventId}, stable across both parties.
-     */
+    /** Host {@code TradeList} session UUID, shared by both parties; distinct from {@link #getEventId() eventId}. */
     public UUID getTradeId() {
         return tradeId;
     }

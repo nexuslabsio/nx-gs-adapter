@@ -3,15 +3,8 @@ package app.l2nx.gs.adapter.api.kafka.events.premiumpurchase.model;
 import java.util.Objects;
 
 /**
- * One currency-line of payment for a single {@link PurchaseItem} or
- * {@link PurchaseService}. Multi-currency lines are first-class — a single
- * purchase line can require, e.g., 20 Coin-of-Luck plus 10M Adena
- * (Giant Codex Mastery on the bohpts custom shop).
- *
- * <p>{@link #getCurrencyItemId()} is the raw L2 item ID
- * (e.g. {@code 4037} for Coin of Luck, {@code 57} for Adena). The platform
- * maps id → human-readable currency name via its own catalog; the wire stays
- * honest about what's actually being charged.</p>
+ * One currency line of payment for a {@link PurchaseItem} or {@link PurchaseService}; multi-currency lines are first-class (e.g. 20 Coin of Luck plus 10M Adena).
+ * <p>{@link #getCurrencyItemId()} is the raw L2 item id ({@code 4037} Coin of Luck, {@code 57} Adena); the platform maps it to a name.
  */
 public final class Payment {
 
@@ -23,22 +16,11 @@ public final class Payment {
         this.qty = qty;
     }
 
-    /**
-     * L2 item ID acting as the currency for this payment line.
-     */
     public long getCurrencyItemId() {
         return currencyItemId;
     }
 
-    /**
-     * Quantity of the currency item charged.
-     *
-     * <p>Soft invariant: {@code qty &gt; 0}. The constructor accepts
-     * {@code 0} and negative values to keep the POJO Gson-friendly, but
-     * producers MUST NOT emit non-positive payments — a "free" line is not
-     * a purchase. Consumer-side validation logs and dedupes; the wire schema
-     * permits the value.</p>
-     */
+    /** Soft invariant: {@code qty &gt; 0}. The constructor accepts {@code 0} / negatives to stay Gson-friendly, but producers MUST NOT emit them; consumers log and dedupe. */
     public long getQty() {
         return qty;
     }

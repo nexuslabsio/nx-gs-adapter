@@ -4,12 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One row of a gear-score scaling table on a {@link GearScoreRule} — a half-open
- * range {@code [from, to]} mapping to a flat {@link #getValue() value}. Used for
- * stepped / range-based bonuses (enchant brackets, aura levels, …).
- *
- * <p>{@link #getTo() to} is {@code null} for the final, open-ended range (covers
- * every value at or above {@link #getFrom() from}).</p>
+ * Inclusive range {@code [from, to]} mapped to a flat value (enchant brackets, aura levels); {@code to} is
+ * {@code null} for the open-ended top range.
  */
 public final class GearScoreScalingStep {
 
@@ -23,23 +19,14 @@ public final class GearScoreScalingStep {
         this.value = value;
     }
 
-    /**
-     * Inclusive lower bound of the range.
-     */
     public int getFrom() {
         return from;
     }
 
-    /**
-     * Inclusive upper bound of the range; {@code null} for an open-ended top range.
-     */
     public @Nullable Integer getTo() {
         return to;
     }
 
-    /**
-     * Gear-score value applied across this range.
-     */
     public double getValue() {
         return value;
     }

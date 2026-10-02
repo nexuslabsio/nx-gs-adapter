@@ -64,10 +64,6 @@ public final class CommandsConsumer {
     private static final long SHUTDOWN_GRACE_MS = 1_000L;
     private static final byte[] FALLBACK_REPLY_TYPE_BYTES = "CommandResult".getBytes(StandardCharsets.UTF_8);
 
-    /**
-     * Bridge to the actual Kafka send. Production wires this to
-     * {@code (record, callback) -> NxKafka.instance().sendBytesKeyRecord(record, callback)}.
-     */
     @FunctionalInterface
     public interface ReplySender {
         void send(ProducerRecord<byte[], Object> record, org.apache.kafka.clients.producer.Callback callback);
@@ -133,11 +129,6 @@ public final class CommandsConsumer {
         this.daemon.setDaemon(true);
     }
 
-    /**
-     * Spawn the consumer daemon and subscribe to {@code inboundTopic}.
-     * Idempotent. Package-private — callers go through
-     * {@link CommandsBootstrap}.
-     */
     void start() {
         if (running) {
             return;
@@ -148,11 +139,6 @@ public final class CommandsConsumer {
         log.info("Commands consumer started — topic={}, replies={}", inboundTopic, repliesTopic);
     }
 
-    /**
-     * Signal the daemon to stop, wake it from any blocking poll, await join
-     * up to {@code shutdownTimeoutMs}, then close the Kafka consumer.
-     * Idempotent.
-     */
     public void stop() {
         if (!running) {
             return;
@@ -176,9 +162,6 @@ public final class CommandsConsumer {
         log.info("Commands consumer stopped");
     }
 
-    /**
-     * Heartbeat slot snapshot for the {@code commands} module.
-     */
     public ModuleStatus currentStatus() {
         CommandsStats stats = currentStats();
         return ModuleStatus.builder()
@@ -188,12 +171,7 @@ public final class CommandsConsumer {
                 .build();
     }
 
-    /**
-     * Consuming with no replies topic is DEGRADED, not ACTIVE: commands still execute but every
-     * reply is dropped, so each caller waits out its timeout and may re-issue a command that already
-     * ran. The counters alone cannot say this — {@code replies-failed} is monotonic, so an operator
-     * reading a rising total cannot tell "all replies lost" from "some replies failed once".
-     */
+    /** No replies topic is DEGRADED: commands run but every reply is dropped, so callers time out and may re-issue. */
     private String currentState() {
         if (!running) {
             return ModuleStates.DISABLED;
@@ -222,8 +200,7 @@ public final class CommandsConsumer {
         try {
             poll();
         } finally {
-            // SafeRunnable swallows whatever escapes here, so without this the module would keep
-            // reporting ACTIVE for a consumer thread that has permanently stopped polling.
+            // SafeRunnable swallows escapes; without this the module would report ACTIVE for a dead thread
             running = false;
         }
     }
@@ -235,7 +212,7 @@ public final class CommandsConsumer {
                 records = kafkaConsumer.poll(Duration.ofMillis(pollTimeoutMs));
             } catch (WakeupException wakeup) {
                 if (!running) {
-                    return; // expected shutdown path
+                    return;
                 }
                 log.warn("Unexpected wakeup on commands consumer");
                 continue;
@@ -274,11 +251,9 @@ public final class CommandsConsumer {
         }
     }
 
-    // package-visible for unit tests; production callers go through pollLoop()
     void processRecord(ConsumerRecord<byte[], byte[]> record) {
         Headers headers = record.headers();
-        // Per-tenant commands topic is shared across game-servers; producers stamp
-        // Nx-Target-Server-Id and the wrong-target / missing-header records get dropped.
+        // topic is shared across game-servers; records without a matching Nx-Target-Server-Id are dropped
         if (!targetsThisServer(headers)) {
             otherServerSkippedTotal.incrementAndGet();
             return;
@@ -291,7 +266,6 @@ public final class CommandsConsumer {
 
         log.info("Inbound command received — type={}, corr={}, payload={}", messageType, correlationId, rawJson);
 
-        // 1. Resolve binding
         if (messageType == null || messageType.isEmpty()) {
             unsupportedTotal.incrementAndGet();
             log.warn(
@@ -324,7 +298,6 @@ public final class CommandsConsumer {
 
         byte[] replyTypeBytes = binding.replyMessageTypeBytes();
 
-        // 2. Deserialize
         NxCommand<?> command;
         try {
             command = gson.fromJson(rawJson, binding.commandClass());
@@ -370,8 +343,7 @@ public final class CommandsConsumer {
             return;
         }
 
-        // 3. Invoke handler — an Error is deliberately not caught here; it unwinds the poll loop,
-        // SafeRunnable logs it, and the consumer stops (module state falls back to DISABLED).
+        // an Error is deliberately not caught: it unwinds the poll loop and stops the consumer
         CommandContextImpl ctx = new CommandContextImpl(
                 correlationId,
                 hostExecutor,
@@ -420,7 +392,6 @@ public final class CommandsConsumer {
                             .build());
         }
 
-        // 4. Reply
         DeferredReplyImpl<?> deferred = ctx.takenDeferredReply();
         if (deferred != null && deferred.isPending(result)) {
             handledTotal.incrementAndGet();
@@ -438,7 +409,7 @@ public final class CommandsConsumer {
             handledTotal.incrementAndGet();
         }
         if (deferred != null) {
-            // The handler took a handle but answered directly; the handle closes with this answer.
+            // handler took a handle but answered directly; the handle closes with this answer
             deferred.completeRaw(result);
             return;
         }
@@ -447,10 +418,7 @@ public final class CommandsConsumer {
 
     void sendReply(UUID correlationId, byte[] replyMessageTypeBytes, CommandResult<?> result) {
         if (repliesTopic == null) {
-            // Spec edge case: commandsTopic configured but commandsRepliesTopic absent.
-            // Increment repliesFailedTotal so the heartbeat surfaces "100% reply loss"
-            // — operators reading {consumed > 0, replies-published == 0} would otherwise
-            // see no failure signal.
+            // counted as failed so the heartbeat surfaces total reply loss
             repliesFailedTotal.incrementAndGet();
             log.debug("Reply for corr={} dropped — repliesTopic not configured", correlationId);
             return;
@@ -471,7 +439,6 @@ public final class CommandsConsumer {
                 }
             });
         } catch (Throwable t) {
-            // send() itself threw synchronously (rare — usually invalid config or producer-closed).
             repliesFailedTotal.incrementAndGet();
             log.error(
                     "Reply send threw for corr={}: {} ({})",
@@ -522,11 +489,7 @@ public final class CommandsConsumer {
         return new String(h.value(), StandardCharsets.UTF_8);
     }
 
-    /**
-     * Read {@link NxHeaders#NX_CORRELATION_ID}. Tolerates missing / malformed
-     * values by generating a fallback UUIDv7 — the handler still gets a
-     * stable id for log tagging, and the WARN log surfaces the misconfiguration.
-     */
+    /** Missing or malformed ids get a fallback UUIDv7 so the handler still has a stable log tag. */
     private UUID readCorrelationId(Headers headers) {
         String raw = readStringHeader(headers, NxHeaders.NX_CORRELATION_ID);
         if (raw == null || raw.isEmpty()) {
@@ -557,8 +520,6 @@ public final class CommandsConsumer {
             Thread.currentThread().interrupt();
         }
     }
-
-    // Test seams — visible only to package.
 
     long consumedTotal() {
         return consumedTotal.get();

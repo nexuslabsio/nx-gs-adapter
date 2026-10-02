@@ -4,19 +4,7 @@ import app.l2nx.gs.log.NxLog;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Daemon-thread factory with a uniform uncaught-exception handler that logs
- * via {@link NxLog} at ERROR — adapter contract requires that no daemon thread
- * dies silently in the host JVM.
- *
- * <p>Two flavors:
- * <ul>
- *     <li>{@link #named(String, NxLog)} — single fixed name, used for one-shot
- *     schedulers (e.g. {@code nx-adapter-connect}).</li>
- *     <li>{@link #counted(String, NxLog)} — {@code prefix-N} for pools where
- *     {@code N} increments per spawned thread.</li>
- * </ul>
- */
+/** Uncaught exceptions are logged at ERROR so no daemon thread dies silently in the host JVM. */
 public final class DaemonThreadFactory implements ThreadFactory {
 
     private final String prefix;

@@ -51,7 +51,6 @@ class FileSnapshotPersistenceTest {
         try (FileSnapshotPersistence p = new FileSnapshotPersistence(dir, 0)) {
             p.flushAll(src);
         }
-        // Corrupt the magic header of the only entity file.
         Path clanFile = dir.resolve("clan.snap");
         try (RandomAccessFile raf = new RandomAccessFile(clanFile.toFile(), "rw")) {
             raf.seek(0L);
@@ -72,11 +71,9 @@ class FileSnapshotPersistenceTest {
         try (FileSnapshotPersistence p = new FileSnapshotPersistence(dir, 0)) {
             p.flushAll(src);
         }
-        // Flip one bit somewhere in the body (past header, before trailing checksum).
         Path clanFile = dir.resolve("clan.snap");
         long fileLen = Files.size(clanFile);
         try (RandomAccessFile raf = new RandomAccessFile(clanFile.toFile(), "rw")) {
-            // Sit somewhere in the entry-bytes region (header is ~14 bytes, trailing checksum 4).
             long target = fileLen - 8L;
             raf.seek(target);
             int b = raf.read();
@@ -98,8 +95,8 @@ class FileSnapshotPersistenceTest {
         try (FileSnapshotPersistence p = new FileSnapshotPersistence(dir, 0)) {
             p.flushAll(src);
         }
-        // Header layout: 4-byte magic + 2-byte version + 2-byte nameLen + nameLen bytes name + 4-byte count.
-        // For entityName "clan" (4 UTF-8 bytes), count offset = 4 + 2 + 2 + 4 = 12.
+        // Count offset for entityName "clan": 4 magic + 2 version + 2 nameLen + 4 name = 12.
+
         Path clanFile = dir.resolve("clan.snap");
         try (RandomAccessFile raf = new RandomAccessFile(clanFile.toFile(), "rw")) {
             raf.seek(12L);
@@ -140,13 +137,11 @@ class FileSnapshotPersistenceTest {
         SnapshotStore src = new SnapshotStore();
         src.putCrc("clan", 1L, 100);
 
-        // Throttle = 1 day — second checkpoint within the day must be a no-op.
         try (FileSnapshotPersistence p = new FileSnapshotPersistence(dir, 24 * 3600)) {
             p.checkpoint("clan", src);
             long firstMtime =
                     Files.getLastModifiedTime(dir.resolve("clan.snap")).toMillis();
 
-            // Mutate, then call checkpoint again — file must NOT update.
             src.putCrc("clan", 2L, 200);
             Thread.sleep(50L); // ensure mtime tick would be observable if we wrote
             p.checkpoint("clan", src);
@@ -154,7 +149,6 @@ class FileSnapshotPersistenceTest {
                     Files.getLastModifiedTime(dir.resolve("clan.snap")).toMillis();
             assertEquals(firstMtime, secondMtime, "throttled checkpoint must not rewrite the file");
 
-            // flushAll ignores the throttle.
             Thread.sleep(50L);
             p.flushAll(src);
             long thirdMtime =
@@ -162,7 +156,6 @@ class FileSnapshotPersistenceTest {
             assertTrue(thirdMtime > secondMtime, "flushAll must write regardless of throttle");
         }
 
-        // Reload and check that flushAll-written content includes the second PK.
         SnapshotStore dst = new SnapshotStore();
         try (FileSnapshotPersistence p = new FileSnapshotPersistence(dir, 0)) {
             p.load(dst);
@@ -180,7 +173,6 @@ class FileSnapshotPersistenceTest {
         } finally {
             first.close();
         }
-        // After releasing the first, a fresh instance must succeed.
         try (FileSnapshotPersistence reborn = new FileSnapshotPersistence(dir, 0)) {
             assertNotNull(reborn);
         }
@@ -191,7 +183,6 @@ class FileSnapshotPersistenceTest {
         FileSnapshotPersistence p = new FileSnapshotPersistence(dir, 0);
         p.close();
         p.close();
-        // After a close, ops must throw — invariant guarded by ensureOpen.
         assertThrows(IllegalStateException.class, () -> p.load(new SnapshotStore()));
     }
 
@@ -205,7 +196,8 @@ class FileSnapshotPersistenceTest {
         }
         byte[] firstFile = Files.readAllBytes(dir.resolve("clan.snap"));
 
-        // Force FileOutputStream(tmp) to fail by parking a directory at the tmp path.
+        // Park a directory at the tmp path to make FileOutputStream(tmp) fail.
+
         Path tmp = dir.resolve("clan.snap.tmp");
         Files.createDirectory(tmp);
 

@@ -4,11 +4,8 @@ import app.l2nx.gs.adapter.api.domain.item.ItemLocation;
 import java.util.Objects;
 
 /**
- * Success payload of {@link CreateItemCommand}. {@link #getItemId() itemId}
- * is the host-assigned object-id of the resulting stack — when an existing
- * stackable stack absorbed the grant, this is that stack's id rather than a
- * fresh one. {@link #getCountCreated() countCreated} echoes the actual
- * delta applied (host MAY clamp on stack-size limits).
+ * {@code itemId} is the host-assigned stack id; if an existing stack absorbed the grant it is that stack's id.
+ * {@code countCreated} is the actual delta (host MAY clamp on stack-size limits).
  */
 public final class CreateItemResult {
 

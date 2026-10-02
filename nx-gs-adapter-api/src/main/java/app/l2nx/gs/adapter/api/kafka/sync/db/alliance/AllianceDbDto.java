@@ -5,19 +5,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one alliance, payload of {@code SyncEvent<AllianceDbDto>} on
- * the per-tenant alliance sync topic.
- *
- * <p>Required: {@link #getId() id} (source-side {@code ally_id}) and
- * {@link #getName() name} (source-side {@code ally_name}). Schema providers
- * MUST drop dirty rows that lack either rather than ship placeholders.</p>
- *
- * <p>L2-derived schemas denormalize alliance state across {@code clan_data}
- * (every member clan carries {@code ally_id}, {@code ally_name},
- * {@code ally_crest_id}); schema providers project this into a per-alliance
- * shape via a view. Builds with a physical {@code ally_data}-like table
- * emit the same wire shape from a plain table. {@code icon} carries the
- * alliance crest as PNG bytes — same convention as {@code ClanDbDto.icon}.</p>
+ * Wire DTO for one alliance, payload of {@code SyncEvent<AllianceDbDto>}. {@code id} and {@code name} are required.
+ * {@code icon} is the crest as PNG bytes, same as {@code ClanDbDto.icon}.
  */
 public final class AllianceDbDto {
 

@@ -32,11 +32,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
-/**
- * Simulates Spring Kafka ReplyingKafkaTemplate protocol:
- * sends a request with kafka_replyTopic + kafka_correlationId headers,
- * verifies that nx-gs-kafka replies with the same correlationId.
- */
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class ReplyIntegrationTest {
@@ -59,32 +54,26 @@ class ReplyIntegrationTest {
     void reply_shouldSendToReplyTopic_withSameCorrelationId() throws Exception {
         NxKafka kafka = buildKafka("test-reply");
 
-        // GS subscribes with reply support
         CountDownLatch handlerCalled = new CountDownLatch(1);
         kafka.subscribe(REQUEST_TOPIC, "g-reply", BalanceRequest.class, (request, replyTo) -> {
             replyTo.reply(new BalanceResponse(request.playerId, 5000));
             handlerCalled.countDown();
         });
 
-        // Simulate Spring-side request with reply headers (binary correlationId)
         UUID correlationUuid = UUID.randomUUID();
         byte[] correlationBytes = uuidToBytes(correlationUuid);
 
         sendRequestWithReplyHeaders(REQUEST_TOPIC, "{\"playerId\":\"player42\"}", REPLY_TOPIC, correlationBytes);
 
-        // Wait for handler to process
         assertTrue(handlerCalled.await(10, TimeUnit.SECONDS), "Handler was not called");
 
-        // Consume reply from reply topic
         ConsumerRecord<String, byte[]> reply = consumeOne(REPLY_TOPIC, "test-reply-consumer");
         assertNotNull(reply, "Reply was not received");
 
-        // Verify correlationId header is preserved
         Header correlationHeader = reply.headers().lastHeader("kafka_correlationId");
         assertNotNull(correlationHeader, "Reply missing kafka_correlationId header");
         assertArrayEquals(correlationBytes, correlationHeader.value());
 
-        // Verify reply body
         String json = new String(reply.value(), StandardCharsets.UTF_8);
         assertTrue(json.contains("\"playerId\":\"player42\""));
         assertTrue(json.contains("\"balance\":5000"));
@@ -104,12 +93,10 @@ class ReplyIntegrationTest {
             latch.countDown();
         });
 
-        // Send message WITHOUT reply headers
         sendPlainMessage(requestTopic, "{\"playerId\":\"player1\"}");
 
         assertTrue(latch.await(10, TimeUnit.SECONDS), "Handler was not called");
 
-        // Reply topic should have no messages
         ConsumerRecord<String, byte[]> reply = consumeOne(replyTopic, "test-noop-consumer");
         assertNull(reply, "Reply should not have been sent");
     }

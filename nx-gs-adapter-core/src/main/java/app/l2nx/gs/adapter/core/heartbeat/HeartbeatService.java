@@ -15,11 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
-/**
- * Publishes a {@link HeartbeatEvent} every {@value #PERIOD_SECONDS} seconds via the
- * supplied {@link KafkaPublisher} on the supplied scheduler. {@code start()} captures
- * {@code connectInstant} fresh each invocation so {@code uptime} is session-scoped.
- */
+/** {@code start()} captures {@code connectInstant} fresh so {@code uptime} is session-scoped. */
 public final class HeartbeatService {
 
     private static final NxLog log = NxLogFactory.getLogger(HeartbeatService.class);
@@ -71,13 +67,11 @@ public final class HeartbeatService {
             previous.future.cancel(false);
         }
         final Instant connectInstant = clock.get();
-        // Wrapped on top of tick()'s own try/catch — an uncaught exception inside a
-        // ScheduledExecutorService task cancels future invocations of that task.
+        // An uncaught exception in a ScheduledExecutorService task cancels all future runs
         Runnable tick = SafeRunnable.wrap(
                 () -> tick(tenantId, tenantSlug, serverId, serverSlug, serverName, heartbeatTopic, connectInstant),
                 log);
-        // Initial delay 0 — fire the first heartbeat right after Kafka connect so the
-        // platform sees the server "alive" without a 60s gap; subsequent ticks every PERIOD_SECONDS.
+        // Delay 0 so the platform doesn't see a 60s gap after connect
         ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(tick, 0L, PERIOD_SECONDS, TimeUnit.SECONDS);
         session.set(new Session(connectInstant, future));
     }
@@ -104,7 +98,6 @@ public final class HeartbeatService {
                 List<ModuleStatus> reported = moduleStatuses.get();
                 modules = reported != null ? reported : Collections.emptyList();
             } catch (Throwable t) {
-                // Registry shouldn't throw, but defending the heartbeat thread is cheap.
                 log.error(
                         "ModuleRegistry.currentStatuses threw {}", t.getClass().getName(), t);
                 modules = Collections.emptyList();

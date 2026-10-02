@@ -6,135 +6,42 @@ import java.util.Map;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
-/**
- * Internal producer interface. Users should call
- * {@link app.l2nx.gs.kafka.NxKafka#send} methods instead.
- */
+/** Internal; use {@link app.l2nx.gs.kafka.NxKafka#send}. */
 public interface NxProducer {
 
-    /**
-     * Sends a message to the topic (fire-and-forget). Errors are logged internally.
-     *
-     * @param topic   Kafka topic name
-     * @param message object to serialize as JSON
-     */
     void send(String topic, Object message);
 
-    /**
-     * Sends a keyed message to the topic (fire-and-forget).
-     * Messages with the same key are guaranteed to land in the same partition.
-     *
-     * @param topic   Kafka topic name
-     * @param key     partition key (e.g. player ID); may be null for round-robin
-     * @param message object to serialize as JSON
-     */
     void send(String topic, String key, Object message);
 
-    /**
-     * Sends a message to the topic with a delivery callback.
-     *
-     * @param topic    Kafka topic name
-     * @param message  object to serialize as JSON
-     * @param callback invoked on the Kafka I/O thread when the broker acknowledges or rejects the record
-     */
     void send(String topic, Object message, Callback callback);
 
-    /**
-     * Sends a keyed message to the topic with a delivery callback.
-     * Messages with the same key are guaranteed to land in the same partition.
-     *
-     * @param topic    Kafka topic name
-     * @param key      partition key (e.g. player ID); may be null for round-robin
-     * @param message  object to serialize as JSON
-     * @param callback invoked on the Kafka I/O thread when the broker acknowledges or rejects the record
-     */
     void send(String topic, String key, Object message, Callback callback);
 
-    /**
-     * Sends a byte-array-keyed message to the topic with a delivery callback.
-     * Used by binary-key consumers (CDC tombstones, primitive-PK keying) where
-     * the key is not a UTF-8 string. Same partition guarantee as the
-     * String-keyed overload — partitioning is on the raw key bytes.
-     *
-     * @param topic    Kafka topic name
-     * @param key      raw partition key bytes; may be null for round-robin
-     * @param message  object to serialize as JSON; null for log-compaction tombstones
-     * @param callback invoked on the Kafka I/O thread when the broker acknowledges or rejects the record
-     */
+    /** Raw-bytes key; a null message sends a log-compaction tombstone. */
     void send(String topic, byte[] key, Object message, Callback callback);
 
-    /**
-     * Sends a pre-built producer record (fire-and-forget). Used internally
-     * for reply messages that need custom headers.
-     *
-     * @param record the producer record to send
-     */
+    /** Used for reply records that need custom headers. */
     void sendRecord(ProducerRecord<String, Object> record);
 
-    /**
-     * Sends a pre-built byte-array-keyed producer record with a delivery
-     * callback. Used by callers that need full control over partition key,
-     * per-record headers, and ack-tracking — e.g. {@code nx-gs-adapter-core}
-     * stamping {@code Nx-Message-Type} per-event on per-character-keyed records.
-     * Static headers are still appended to the record's headers before send.
-     *
-     * @param record   the producer record to send
-     * @param callback invoked on the Kafka I/O thread when the broker acknowledges or rejects the record
-     */
+    /** Static headers are appended to the record before send. */
     void sendBytesKeyRecord(ProducerRecord<byte[], Object> record, Callback callback);
 
-    /**
-     * Blocks until every buffered record has been sent to the broker
-     * (delegates to {@code KafkaProducer.flush()}). Used on the
-     * synchronous-flush path to guarantee a just-sent record reaches the
-     * broker before shutdown teardown.
-     */
+    /** Blocks until buffered records reach the broker. */
     void flush();
 
-    /**
-     * Closes the underlying Kafka producer and releases resources.
-     */
     void close();
 
-    /**
-     * Creates a new producer with the given Kafka client properties.
-     *
-     * @param config Kafka producer configuration properties
-     * @return a new producer instance
-     */
     static NxProducer create(Map<String, Object> config, Gson gson) {
         return new DefaultNxProducer(config, gson);
     }
 
-    /**
-     * Creates a new producer that stamps the given static headers on every
-     * outbound record. Use this overload to attach connection-scoped metadata
-     * (e.g. {@code Nx-Server-Id} resolved once at adapter bootstrap) without
-     * modifying every per-call site.
-     *
-     * <p>The {@code staticHeaders} map is defensively copied; mutations after
-     * construction do not affect the producer.</p>
-     *
-     * @param config        Kafka producer configuration properties
-     * @param gson          Gson instance for value serialization
-     * @param staticHeaders headers added to every {@link ProducerRecord} before
-     *                      send; may be empty but not {@code null}
-     * @return a new producer instance
-     */
+    /** staticHeaders is copied defensively; may be empty, not null. */
     static NxProducer create(Map<String, Object> config, Gson gson, Map<String, byte[]> staticHeaders) {
         return new DefaultNxProducer(config, gson, staticHeaders);
     }
 
     /**
-     * Creates a new producer with a bounded close timeout. The timeout caps how
-     * long {@link #close()} blocks waiting for in-flight records to flush —
-     * critical for JVM shutdown when the broker is unreachable.
-     *
-     * @param config        Kafka producer configuration properties
-     * @param gson          Gson instance for value serialization
-     * @param staticHeaders headers added to every {@link ProducerRecord} before send
-     * @param closeTimeout  bounded wait for in-flight flush on close
-     * @return a new producer instance
+     * closeTimeout caps how long close() blocks on in-flight records, so shutdown cannot hang on an unreachable broker.
      */
     static NxProducer create(
             Map<String, Object> config, Gson gson, Map<String, byte[]> staticHeaders, Duration closeTimeout) {

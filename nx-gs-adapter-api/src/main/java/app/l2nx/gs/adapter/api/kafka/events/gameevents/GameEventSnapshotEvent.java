@@ -4,36 +4,15 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO published to the {@code gameevents} family topic
- * ({@code <tenant>.gs.events.gameevents}) on a host-managed cadence. Carries a
- * point-in-time full snapshot of every configured recurring event (TvT and
- * other mass-PvP / world events) with each event's schedule and run state.
+ * Full snapshot of every configured recurring event, published to {@code <tenant>.gs.events.gameevents} on a
+ * host-managed cadence.
  *
- * <p><b>Full snapshot, not a delta.</b> Each event lists the complete current
- * set of configured events. The platform consumer keeps last-known state per
- * server and replaces it on receipt; an event absent from a newer snapshot is
- * dropped (mark-and-sweep). Because start times are absolute
- * ({@link GameEventEntry#getNextStartAt()} is an {@code Instant}), the platform
- * counts down locally and the cadence can be slow.</p>
+ * <p>Not a delta: the consumer replaces its per-server state on receipt, so an event absent from a newer snapshot is
+ * dropped. Start times are absolute Instants, so the platform counts down locally and the cadence can be slow.</p>
  *
- * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire timestamp is
- * encoded in the upper 48 bits — extractable via
- * {@code app.l2nx.gs.commons.UUIDv7.extractCreatedAt(eventId)}; no separate
- * {@code occurredAt} field. Platform consumers dedupe on the {@code eventId}
- * (at-least-once delivery) and order within-server by the embedded
- * timestamp.</p>
+ * <p>{@code eventId} is a UUIDv7: its upper 48 bits carry the occurrence time (no {@code occurredAt} field), and consumers dedupe on it (at-least-once delivery).</p>
  *
- * <p>The event vocabulary is build-agnostic — each {@link GameEventEntry}
- * carries a host-stable {@code code} plus an optional canonical
- * {@code event_kind} in its metadata (see {@link WellKnownGameEventMetadata}).</p>
- *
- * <p>{@link #getMetadata() metadata} is an optional open string→string map of
- * build-agnostic snapshot-level attributes. {@code null} when absent. Hosts MAY
- * publish arbitrary keys without an API release; consumers ignore keys they do
- * not understand.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson / Jackson can deserialize without
+ * <p>Java-8 POJO; {@code -parameters} preserves constructor parameter names so Jackson / Gson bind without
  * {@code @JsonProperty}.</p>
  */
 public final class GameEventSnapshotEvent {
@@ -50,27 +29,19 @@ public final class GameEventSnapshotEvent {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * Event identity. MUST be a UUIDv7 — the upper 48 bits encode the snapshot
-     * occurrence timestamp.
-     */
     public UUID getEventId() {
         return eventId;
     }
 
     /**
-     * Complete current set of configured events. Always non-null on read;
-     * {@code null} passed to the constructor is normalized to an empty list.
-     * The returned list is unmodifiable.
+     * Never {@code null}: a {@code null} constructor argument becomes an empty list. Unmodifiable.
      */
     public List<GameEventEntry> getEvents() {
         return events;
     }
 
     /**
-     * Optional open string→string map of build-agnostic attributes about this
-     * snapshot. {@code null} when absent. When non-null the returned map is
-     * unmodifiable.
+     * Open snapshot-level attributes, unmodifiable, or {@code null} when absent.
      */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;

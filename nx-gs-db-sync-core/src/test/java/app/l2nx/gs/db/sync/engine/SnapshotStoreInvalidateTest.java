@@ -21,8 +21,8 @@ class SnapshotStoreInvalidateTest {
 
     @Test
     void invalidate_shouldNeverProduceMissingHash_whenFlipWouldHitSentinel() {
-        // crc ^ 1 == MISSING_HASH exactly for this value — the corner the
-        // secondary perturbation exists for.
+        // crc ^ 1 == MISSING_HASH for this value: the corner the secondary perturbation exists for.
+
         int corner = Phase1Hasher.MISSING_HASH ^ 1;
         SnapshotStore store = new SnapshotStore();
         store.putCrc("clan", 1L, corner);
@@ -60,7 +60,6 @@ class SnapshotStoreInvalidateTest {
         SnapshotStore store = new SnapshotStore();
         store.putCrc("clan", 5L, 50);
         store.putCrc("clan", 10L, 100);
-        // Materialize the extreme cache before the sentinel insert.
         assertEquals(5L, store.minPk("clan").getAsLong());
         assertEquals(10L, store.maxPk("clan").getAsLong());
 

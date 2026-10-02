@@ -7,19 +7,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inbound command instructing the game-server to open a "package sell"
- * private store on behalf of a character — an all-or-nothing bundle where a
- * buyer must purchase every listed line in one transaction, rather than
- * picking lines individually as with {@link StartPrivateStoreSellCommand}.
- * Executed by the host's private-store subsystem on the character's game
- * thread; the all-or-nothing purchase semantics are enforced host-side, not
- * on this wire shape.
- *
- * <p>Reply, required/optional fields, and partial-acceptance semantics are
- * identical to {@link StartPrivateStoreSellCommand} — see its Javadoc.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Opens a "package sell" store: a buyer must purchase every line in one transaction (enforced host-side, not on this
+ * wire shape). Reply and fields as in {@link StartPrivateStoreSellCommand}.
  */
 public final class StartPrivateStorePackageSellCommand implements NxCommand<StartPrivateStoreResult> {
 
@@ -40,18 +29,11 @@ public final class StartPrivateStorePackageSellCommand implements NxCommand<Star
         return charId;
     }
 
-    /**
-     * Store banner text shown above the seller. OPTIONAL — {@code null}
-     * falls back to the host's default.
-     */
+    /** {@code null} falls back to the host's default banner. */
     public @Nullable String getTitle() {
         return title;
     }
 
-    /**
-     * Bundled stacks. REQUIRED, non-empty, all-or-nothing at purchase time.
-     * Immutable on read.
-     */
     public List<SellLine> getLines() {
         return lines;
     }

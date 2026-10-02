@@ -3,16 +3,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.db.item;
 import app.l2nx.gs.adapter.api.domain.Attribute;
 import java.util.Objects;
 
-/**
- * Wire DTO for one row of {@code item_elementals} (or its tenant-equivalent),
- * carried inside {@link ItemDbDto#getAttributes()}.
- *
- * <p>Surfaces the elemental kind ({@link Attribute}) and the source-side
- * numeric strength ({@code value}). The composite source-side key is
- * {@code (itemId, elemType)} — the {@code itemId} part is implicit (the
- * parent {@link ItemDbDto}'s {@code id}); only {@code type} disambiguates
- * rows within one item's attributes list.</p>
- */
+/** Wire DTO for one {@code item_elementals} row, carried in {@link ItemDbDto#getAttributes()}. */
 public final class ItemAttributeDbDto {
 
     private final Attribute type;
@@ -23,17 +14,10 @@ public final class ItemAttributeDbDto {
         this.value = value;
     }
 
-    /**
-     * Element kind — {@code NOT NULL} on the source side.
-     */
     public Attribute getType() {
         return type;
     }
 
-    /**
-     * Element strength — {@code NOT NULL} on the source side; source default
-     * {@code -1}.
-     */
     public int getValue() {
         return value;
     }

@@ -4,11 +4,7 @@ import app.l2nx.gs.adapter.core.commands.CommandsConfig;
 import app.l2nx.gs.adapter.core.events.EventsConfig;
 import java.util.Collections;
 
-/**
- * Test-only factory exposing the package-private {@link AdapterConfig} constructor
- * to tests in sibling packages. Lives in {@code src/test/java} so it is not
- * published.
- */
+/** Exposes the package-private AdapterConfig constructor to sibling packages. */
 public final class AdapterConfigFixtures {
 
     public static final String VALID_SERVER_KEY = "nx_sk_abcdefghijklmnopqrstuvwxyz012345";

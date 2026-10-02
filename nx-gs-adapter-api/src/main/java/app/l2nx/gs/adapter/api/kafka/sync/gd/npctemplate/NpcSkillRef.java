@@ -3,13 +3,8 @@ package app.l2nx.gs.adapter.api.kafka.sync.gd.npctemplate;
 import java.util.Objects;
 
 /**
- * A reference to a skill an NPC has — the intrinsic {@code (id, level)} the NPC's datapack
- * template carries. The full skill (name / description / effects) lives in the skills entity;
- * this is only the cross-reference, so it can ship before that entity exists.
- *
- * <p>Both fields are the non-null identity of the reference. The race-marker skill (id
- * {@code 4416} on most cores) is NOT emitted here — the provider consumes it to derive
- * {@link NpcTemplate#getRace()}.</p>
+ * Cross-reference by {@code (id, level)}; the full skill lives in the skills entity. The race-marker skill is not
+ * emitted, it derives {@link NpcTemplate#getRace()}.
  */
 public final class NpcSkillRef {
 

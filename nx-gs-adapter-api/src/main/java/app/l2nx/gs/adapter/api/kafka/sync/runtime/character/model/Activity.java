@@ -8,34 +8,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One entry of {@link CharacterRuntimeDto#getActivities()} — a
- * build-specific, high-level "what the player is occupied with" signal that lives
- * outside the engine AI state machine (e.g. fishing, trading, autofarming).
- *
- * <p>Deliberately a thin, build-agnostic envelope:
- * <ul>
- *   <li>{@link #getType() type} — REQUIRED discriminator. Canonical values in
- *   {@link WellKnownActivities} ({@code fishing} / {@code trade} / …);
- *   open, so a host MAY emit its own activity key without an API release.</li>
- *   <li>{@link #getMetadata() metadata} — optional open {@code String→String}
- *   map of activity-specific extras, mirroring the {@code metadata} maps on the
- *   discrete event DTOs ({@code BossRespawnEntry}, {@code CharacterPresenceEvent},
- *   {@code GameEventEntry}). Canonical keys in
- *   {@link WellKnownActivityMetadata} (e.g. {@code elapsed_seconds},
- *   {@code store_type}); values are stringified (the platform stores the
- *   whole object as JSON and the dashboard parses what it needs). Hosts MAY add
- *   arbitrary keys; consumers ignore keys they do not understand.</li>
- * </ul>
- *
- * <p>The contract intentionally does NOT type any per-activity field (not even
- * {@code elapsed_seconds}) — everything beyond {@code type} is the open
- * {@code metadata} map. This keeps the wire and the platform's JSONB storage
- * agnostic to which core ships which activity. A {@code null} / empty
- * {@code activities} on {@link CharacterRuntimeDto} means "no special
- * activity".</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor parameter
- * names so Gson / Jackson can deserialize without {@code @JsonProperty}.</p>
+ * One entry of {@link CharacterRuntimeDto#getActivities()}: a required open {@code type} (canonical values in
+ * {@link WellKnownActivities}) plus optional open {@code String->String} metadata (keys in {@link WellKnownActivityMetadata}).
+ * Everything beyond {@code type} is deliberately untyped so no core's activities leak into the contract.
  */
 public final class Activity {
 
@@ -48,19 +23,12 @@ public final class Activity {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * Activity discriminator — canonical values in
-     * {@link WellKnownActivities}. REQUIRED.
-     */
     public String getType() {
         return type;
     }
 
     /**
-     * Open {@code String→String} map of activity-specific metadata, or
-     * {@code null} when absent. Canonical keys in
-     * {@link WellKnownActivityMetadata}. When non-null the returned map
-     * is unmodifiable and preserves insertion order.
+     * Null when absent; otherwise unmodifiable and insertion-ordered.
      */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;

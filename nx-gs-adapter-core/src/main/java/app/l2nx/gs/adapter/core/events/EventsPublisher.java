@@ -16,42 +16,17 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Bounded-queue + single-daemon-thread fan-out for outbound events. Caller
- * threads ({@code NxEventsImpl.publishX(...)}) call {@link #enqueue(EventEnvelope)}
- * which is O(1) and never blocks on Kafka latency. The daemon
- * {@code nx-events-publisher} drains the queue, builds a
- * {@link ProducerRecord}, stamps the {@code Nx-Message-Type} header, and
- * hands off to the supplied {@link Sender} (production: {@code NxKafka.sendBytesKeyRecord}).
- *
- * <p>Drop policy on full queue:</p>
- * <ul>
- *     <li>{@link DropPolicy#NEWEST} (default) — drops the incoming envelope
- *     atomically via {@code queue.offer()} returning {@code false}; no
- *     eviction race under multi-threaded producers.</li>
- *     <li>{@link DropPolicy#OLDEST} — evicts the head and admits the new
- *     envelope so recent facts displace stale snapshots. Head-poll and
- *     newcomer-offer are not atomic, so concurrent producers on a full queue
- *     may over-count {@code droppedTotal} (an enqueue can both evict a head
- *     and lose its slot to another caller).</li>
- * </ul>
- *
- * <p>Counters expose the publisher's health via {@link #currentStatus()}
- * for the heartbeat {@code events} module slot.</p>
+ * Bounded queue drained by one daemon thread so callers never block on Kafka latency.
+ * With OLDEST, head-poll and newcomer-offer are not atomic, so concurrent producers may over-count droppedTotal.
  */
 public final class EventsPublisher {
 
     private static final NxLog log = NxLogFactory.getLogger(EventsPublisher.class);
 
-    /**
-     * Daemon-loop wake-up cadence — bounds shutdown-signal latency.
-     */
+    /** Bounds shutdown-signal latency. */
     private static final long POLL_TIMEOUT_MS = 100L;
 
-    /**
-     * Extra grace beyond {@code shutdownDrainMs} to let the daemon observe the
-     * interrupt, run its post-loop shutdown drain, and exit before the join
-     * times out.
-     */
+    /** Lets the daemon finish its post-loop drain before the join times out. */
     private static final long SHUTDOWN_GRACE_MS = 1000L;
 
     private static final ProducerFlusher NO_OP_FLUSHER = () -> {};
@@ -61,21 +36,12 @@ public final class EventsPublisher {
         NEWEST
     }
 
-    /**
-     * Bridge to the actual Kafka send. Production wires this to
-     * {@code (record, callback) -> NxKafka.instance().sendBytesKeyRecord(record, callback)};
-     * tests inject a recording fake.
-     */
     @FunctionalInterface
     public interface Sender {
         void send(ProducerRecord<byte[], Object> record, Callback callback);
     }
 
-    /**
-     * Bridge to a synchronous producer flush. Production wires this to
-     * {@code NxKafka.instance()::flush}; a no-op is used where the producer is
-     * not reachable (tests). Blocks until in-flight sends reach the broker.
-     */
+    /** Blocks until in-flight sends reach the broker. */
     @FunctionalInterface
     public interface ProducerFlusher {
         void flush();
@@ -125,10 +91,6 @@ public final class EventsPublisher {
         this.daemon.setDaemon(true);
     }
 
-    /**
-     * Spawn the publisher daemon. Idempotent. Package-private — callers go
-     * through {@link EventsBootstrap}.
-     */
     void start() {
         if (running) {
             return;
@@ -137,11 +99,7 @@ public final class EventsPublisher {
         daemon.start();
     }
 
-    /**
-     * Stop the publisher. Signals the daemon, waits up to
-     * {@code shutdownDrainMs} for in-flight envelopes to drain, then cancels.
-     * Idempotent.
-     */
+    /** Waits up to {@code shutdownDrainMs} for in-flight envelopes, then cancels. */
     public void stop() {
         if (!running) {
             return;
@@ -155,16 +113,7 @@ public final class EventsPublisher {
         }
     }
 
-    /**
-     * Append an envelope to the publish queue. On full queue, applies the
-     * configured {@link DropPolicy}; never blocks longer than the
-     * {@code ArrayBlockingQueue.offer()} fast path.
-     *
-     * <p>Drop counter accounts for every lost envelope, including races. With
-     * {@link DropPolicy#OLDEST} and concurrent callers, an enqueue may evict
-     * the head AND lose its own envelope to another caller filling the freed
-     * slot first — both losses are counted ({@code droppedTotal += 2}).</p>
-     */
+    /** With OLDEST, an enqueue may evict the head and lose its own envelope to a racing caller; both losses are counted. */
     public void enqueue(@Nullable EventEnvelope envelope) {
         if (envelope == null) {
             return;
@@ -173,18 +122,14 @@ public final class EventsPublisher {
             return;
         }
         if (dropPolicy == DropPolicy.OLDEST) {
-            // Try to evict the head and admit the newcomer. The head poll and
-            // newcomer offer are not atomic — a concurrent caller may fill the
-            // freed slot before our offer lands.
+            // head poll and newcomer offer are not atomic
             boolean evictedHead = (queue.poll() != null);
             if (queue.offer(envelope)) {
-                // Happy path: head evicted (if any), newcomer admitted.
                 if (evictedHead) {
                     droppedTotal.incrementAndGet();
                 }
             } else {
-                // Race lost: we may or may not have evicted a head, but the
-                // newcomer also failed to land. Count every lost envelope.
+                // newcomer lost its slot to a racing caller; count every lost envelope
                 droppedTotal.addAndGet(evictedHead ? 2L : 1L);
             }
         } else {
@@ -193,17 +138,8 @@ public final class EventsPublisher {
     }
 
     /**
-     * Synchronously drain the queue into the sender and block on a producer
-     * flush until in-flight records reach the broker, or {@code timeoutMs}
-     * elapses. Does NOT stop the daemon — this is a flush, not a shutdown; the
-     * daemon may drain concurrently (both feed the same thread-safe sender).
-     *
-     * <p>Never throws (game-exit safety) — a flusher failure is logged and
-     * reported as {@code false}.</p>
-     *
-     * @return {@code true} if the queue emptied and the producer flush returned
-     * within the budget; {@code false} on timeout (records may still be
-     * in flight)
+     * Does NOT stop the daemon; both feed the same thread-safe sender.
+     * Never throws (game-exit safety); returns {@code false} on timeout or flusher failure.
      */
     public boolean flush(long timeoutMs) {
         long deadline = System.currentTimeMillis() + Math.max(0L, timeoutMs);
@@ -227,15 +163,7 @@ public final class EventsPublisher {
         return timeoutMs <= 0 || System.currentTimeMillis() < deadline;
     }
 
-    /**
-     * Build a heartbeat slot snapshot.
-     *
-     * <p>State semantics: {@code ACTIVE} when the daemon is running,
-     * {@code DISABLED} when it has not been started or has been stopped.
-     * A future enhancement may surface {@code DEGRADED} via a rolling
-     * failure-ratio window; operators derive degradation from the raw
-     * counters today.</p>
-     */
+    /** {@code DEGRADED} is never surfaced; operators derive degradation from the raw counters. */
     public ModuleStatus currentStatus() {
         EventsStats stats = EventsStats.builder()
                 .queueDepth(queue.size())
@@ -252,9 +180,6 @@ public final class EventsPublisher {
                 .build();
     }
 
-    /**
-     * True when the family key has a non-empty topic configured.
-     */
     public boolean isFamilyEnabled(String familyKey) {
         String topic = familyTopics.get(familyKey);
         return topic != null && !topic.isEmpty();
@@ -276,7 +201,6 @@ public final class EventsPublisher {
             try {
                 envelope = queue.poll(POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
-                // Either shutdown or interrupt — loop will exit on `running` check.
                 Thread.currentThread().interrupt();
                 continue;
             }
@@ -292,11 +216,10 @@ public final class EventsPublisher {
         while (System.currentTimeMillis() < deadline) {
             EventEnvelope envelope = queue.poll();
             if (envelope == null) {
-                return; // queue empty, drained successfully
+                return;
             }
             doSend(envelope);
         }
-        // Anything left after the deadline is dropped.
         long remaining = queue.size();
         if (remaining > 0) {
             droppedTotal.addAndGet(remaining);
@@ -310,10 +233,7 @@ public final class EventsPublisher {
         String family = envelope.binding.familyKey();
         String topic = familyTopics.get(family);
         if (topic == null || topic.isEmpty()) {
-            // Defensive — NxEventsImpl short-circuits before enqueueing for
-            // disabled families, so we should never reach this branch on the
-            // happy path. Reaching it means someone enqueued via a path that
-            // skipped the short-circuit (e.g. internal tests).
+            // NxEventsImpl short-circuits disabled families; reaching this means a path skipped it
             droppedTotal.incrementAndGet();
             log.debug("events.{} disabled — no topic configured; dropping envelope", family);
             return;
@@ -322,11 +242,7 @@ public final class EventsPublisher {
         try {
             partitionKey = envelope.binding.partitionKeyExtractor().apply(envelope.payload);
         } catch (ClassCastException cce) {
-            // Type-binding mismatch: the registry returned a binding whose
-            // partition extractor casts to a different concrete class than the
-            // payload. Indicates a registry-construction bug, not a runtime
-            // condition. Surface it explicitly rather than letting the generic
-            // Throwable handler swallow the class name.
+            // registry-construction bug; log explicitly instead of letting the generic handler swallow the class name
             failedTotal.incrementAndGet();
             log.error(
                     "Events type-binding mismatch for {}: {}",
@@ -351,8 +267,6 @@ public final class EventsPublisher {
             log.error("Events publish threw for topic {}: {}", topic, t.getMessage(), t);
         }
     }
-
-    // Package-visible accessors for tests.
 
     long publishedTotal() {
         return publishedTotal.get();

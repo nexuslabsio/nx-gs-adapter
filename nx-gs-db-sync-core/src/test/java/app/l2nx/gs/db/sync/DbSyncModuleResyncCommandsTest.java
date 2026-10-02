@@ -77,7 +77,6 @@ class DbSyncModuleResyncCommandsTest {
     void handleResyncEntities_shouldReturnUnavailable_whenEngineNotRunning() {
         module = build(failingJdbc());
         module.onConnect(ctx());
-        // start() not called — engine is null.
 
         CommandResult<ResyncEntitiesResult> result = module.handleResyncEntities(
                 ResyncEntitiesCommand.builder().resyncId(RESYNC_ID).build(), cctx);
@@ -259,7 +258,6 @@ class DbSyncModuleResyncCommandsTest {
     void handleResyncRows_shouldOmitCascade_whenTargetEntityHasNoChildren() {
         module = startedModule(failingJdbc());
 
-        // "item" declares character as parent; nothing declares item as parent.
         CommandResult<ResyncRowsResult> result = module.handleResyncRows(
                 ResyncRowsCommand.builder()
                         .resyncId(RESYNC_ID)
@@ -301,10 +299,6 @@ class DbSyncModuleResyncCommandsTest {
 
         assertEquals("FAILED", module.currentStatus().getState());
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Fixtures
-    // ─────────────────────────────────────────────────────────────────────
 
     private DbSyncModule startedModule(JdbcConnectionSource src) {
         DbSyncModule built = build(src);

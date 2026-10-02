@@ -63,7 +63,6 @@ class WindowPlannerTest {
 
     @Test
     void divideRange_shouldChunk12MItemsInto10Windows_whenRowsPerWindowMatches() {
-        // bohpts x20 reference: 12.2M items split into 10 sliding windows of ~1.22M each.
         long min = 1L;
         long max = 12_200_000L;
         int rowsPerWindow = 1_220_000;
@@ -73,7 +72,6 @@ class WindowPlannerTest {
         assertEquals(10, windows.size());
         assertEquals(min, windows.get(0).fromPk());
         assertEquals(max, windows.get(windows.size() - 1).toPk());
-        // Adjacency
         for (int i = 1; i < windows.size(); i++) {
             assertEquals(
                     windows.get(i - 1).toPk() + 1L,
@@ -89,18 +87,13 @@ class WindowPlannerTest {
 
         List<Window> windows = WindowPlanner.divideRange(min, max, 5);
 
-        // 11 rows → ceil(11/5) = 3 windows
         assertEquals(3, windows.size());
         assertEquals(max, windows.get(windows.size() - 1).toPk());
     }
 
     @Test
     void divideRange_shouldNotReturnSingleWindow_whenSpanOverflowsLongAddition() {
-        // Pre-fix: returned a single Window covering the entire BIGINT range,
-        // defeating chunking entirely. Post-fix: forces chunking — and because
-        // 2^64 / Integer.MAX_VALUE far exceeds MAX_WINDOWS_PER_PLAN, the planner
-        // hits the cap. Either branch is correct; what must NOT happen is the
-        // silent single-window collapse the bug produced.
+        // Must not collapse to one window over the whole BIGINT range; chunking or the plan cap are both acceptable.
         Throwable thrown = null;
         try {
             WindowPlanner.divideRange(Long.MIN_VALUE, Long.MAX_VALUE, Integer.MAX_VALUE);
@@ -112,9 +105,7 @@ class WindowPlannerTest {
 
     @Test
     void plan_shouldReturnEmpty_whenTableEmptyAndSnapshotEmpty() throws SQLException {
-        // MIN/MAX of an empty table both come back NULL — wasNull() == true after
-        // each getLong. With no snapshot keys, the envelope is empty too → empty
-        // window list (engine treats this as "no work this cycle").
+        // Empty table: MIN/MAX are NULL and there are no snapshot keys, so the plan is empty.
         Connection conn = mock(Connection.class);
         Statement st = mock(Statement.class);
         ResultSet rs = mock(ResultSet.class);
@@ -146,11 +137,7 @@ class WindowPlannerTest {
 
     @Test
     void plan_shouldUseSnapshotMin_whenDeletedExtremeWouldShrinkDbRange() throws SQLException {
-        // Snapshot remembers PK=1 and PK=12; the row at PK=12 was just deleted →
-        // DB MIN/MAX collapses to [1, 11]. Pre-fix windowing would partition
-        // [1, 11] and never include PK=12 → tombstone never fires. Post-fix:
-        // envelope = [1, max(11, 12)] = [1, 12] → PK=12 falls into the last
-        // window and gets a tombstone next cycle.
+        // Deleted PK=12 shrinks DB MAX to 11; the snapshot envelope must still cover it so its DELETE fires.
         SnapshotStore snap = new SnapshotStore();
         snap.putCrc("clan", 1L, 100);
         snap.putCrc("clan", 12L, 200);
@@ -164,9 +151,7 @@ class WindowPlannerTest {
 
     @Test
     void plan_shouldUseSnapshotEnvelope_whenAllRowsDeleted() throws SQLException {
-        // DB completely empty (rs.wasNull() = true), but snapshot still holds
-        // 3 PKs from prior cycles. Envelope must equal the snapshot's range
-        // so every leftover PK gets a tombstone on this cycle.
+        // Empty DB but the snapshot holds PKs: the envelope is the snapshot range.
         SnapshotStore snap = new SnapshotStore();
         snap.putCrc("clan", 5L, 100);
         snap.putCrc("clan", 7L, 200);
@@ -181,8 +166,7 @@ class WindowPlannerTest {
 
     @Test
     void plan_shouldExpandEnvelope_whenSnapshotMaxAboveDbMax() throws SQLException {
-        // Symmetric: deleted PK=20 (the prior MAX) → DB MAX shrinks to 18,
-        // but snapshot still has 20. Envelope = [min(1,1), max(18,20)] = [1,20].
+        // Deleted prior MAX: the envelope still reaches the snapshot's 20.
         SnapshotStore snap = new SnapshotStore();
         snap.putCrc("clan", 1L, 100);
         snap.putCrc("clan", 18L, 180);
@@ -197,7 +181,6 @@ class WindowPlannerTest {
 
     @Test
     void divideRange_shouldThrow_whenWindowCountExceedsCap() {
-        // 1M windows × rowsPerWindow=1 across a normal range → cap hit.
         Throwable t =
                 assertThrowsOrNull(() -> WindowPlanner.divideRange(0L, WindowPlanner.MAX_WINDOWS_PER_PLAN + 100L, 1));
         assertNotNull(t, "expected IllegalStateException at cap");
@@ -224,7 +207,6 @@ class WindowPlannerTest {
             assertTrue(w.targeted(), "targeted window must carry an IN-list");
             assertEquals(3, w.pks().size());
             assertEquals(new HashSet<Long>(Arrays.asList(3L, 7L, 99L)), toBoxedSet(w.pks()));
-            // from/to set to min/max so snapshot bucketing can still locate it.
             assertEquals(3L, w.fromPk());
             assertEquals(99L, w.toPk());
         }
@@ -241,7 +223,6 @@ class WindowPlannerTest {
             assertEquals(2, windows.size(), "501..550 spills into a second chunk");
             assertEquals(WindowPlanner.TARGETED_CHUNK_SIZE, windows.get(0).pks().size());
             assertEquals(50, windows.get(1).pks().size());
-            // Every targeted PK appears in exactly one window — no loss, no dup.
             Set<Long> union = new HashSet<Long>();
             for (Window w : windows) {
                 assertTrue(w.targeted());

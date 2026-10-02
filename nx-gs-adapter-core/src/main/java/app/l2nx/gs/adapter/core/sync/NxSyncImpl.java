@@ -11,14 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Session-scoped {@link NxSync} façade — per-entity {@link NxSyncTrigger}
- * registry plus a single {@link NxSyncResyncHandler}, populated by sync modules
- * during {@code onConnect}. Survives reconnect; triggers and the resync handler
- * re-register on each handshake.
- *
- * <p>Catches {@code Throwable} from triggers / the resync handler to keep the
- * game thread safe; unknown entity / no handler is DEBUG-logged (host may call
- * unconditionally).</p>
+ * Survives reconnect (re-registered per handshake); Throwables from triggers/handler are caught to protect the game thread.
+ * Unknown entity or no handler is DEBUG-logged since the host may call unconditionally.
  */
 public final class NxSyncImpl implements NxSync {
 

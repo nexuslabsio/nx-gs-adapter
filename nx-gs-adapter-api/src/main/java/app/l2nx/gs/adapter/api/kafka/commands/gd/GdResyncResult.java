@@ -7,15 +7,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Success payload of {@link GdResyncCommand}. Carries the names of every
- * gd-sync entity scheduled for re-snapshot — the full registered set
- * (itemtemplate, npctemplate, skill, recipe, armorset, soulcrystal, class,
- * instance, …), taken from the live provider registry rather than hardcoded.
- * The ack is schedule-time only; per-entity completion follows asynchronously
- * via the nx-gamedata {@code SNAPSHOT_COMPLETE} markers.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * Entity names scheduled for re-snapshot, taken from the live provider registry. Ack is schedule-time only.
  */
 public final class GdResyncResult {
 
@@ -27,10 +19,7 @@ public final class GdResyncResult {
                 : Collections.unmodifiableList(new ArrayList<String>(acceptedEntities));
     }
 
-    /**
-     * Entity names scheduled for re-snapshot. Never empty on a real ack — an
-     * adapter with zero active gd entities replies {@code UNAVAILABLE} instead.
-     */
+    /** Never empty on a real ack; zero active entities replies {@code UNAVAILABLE} instead. */
     public List<String> getAcceptedEntities() {
         return acceptedEntities;
     }

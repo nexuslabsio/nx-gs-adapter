@@ -7,17 +7,7 @@ import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import java.util.*;
 
-/**
- * Holds the discovered Tier-1 modules and orchestrates their lifecycle. One-shot
- * discovery at adapter bootstrap; cached for the JVM lifetime.
- *
- * <p>Per-module lifecycle health is tracked separately from the module's own
- * self-reported status: when a connect-time hook ({@code onConnect} / {@code start})
- * throws, the registry marks the module {@code FAILED} and short-circuits its future
- * {@code currentStatus()} reports to {@code {name, "FAILED", empty Stats}}. Modules
- * that transition themselves into {@code DEGRADED} (e.g. db-sync's smoke-check
- * failure path) report it via their own {@code currentStatus()} override.</p>
- */
+/** Module health is tracked apart from self-reported status: a throwing onConnect/start marks it FAILED and pins its currentStatus() to {name, "FAILED", empty}. */
 public final class ModuleRegistry {
 
     private static final NxLog log = NxLogFactory.getLogger(ModuleRegistry.class);
@@ -31,12 +21,7 @@ public final class ModuleRegistry {
     private final List<AdapterModule> modules = new ArrayList<AdapterModule>();
     private final Map<String, LifecycleState> states = new HashMap<String, LifecycleState>();
 
-    /**
-     * Run {@link ServiceLoader#load(Class)} for {@link AdapterModule} on
-     * adapter-core's own classloader (avoiding host-CL surprises on JVMs with
-     * non-trivial classloader hierarchies) and cache the result, sorted by
-     * {@link AdapterModule#name()}.
-     */
+    /** Loads on adapter-core's own classloader to avoid host-CL surprises. */
     public void discover() {
         ClassLoader saved = Thread.currentThread().getContextClassLoader();
         try {
@@ -52,10 +37,6 @@ public final class ModuleRegistry {
         }
     }
 
-    /**
-     * Test seam — installs a pre-built module list, skipping ServiceLoader. Sorts
-     * and caches identically to {@link #discover()}.
-     */
     void discoverFrom(List<AdapterModule> input) {
         installFound(new ArrayList<AdapterModule>(input));
     }
@@ -87,12 +68,7 @@ public final class ModuleRegistry {
         }
     }
 
-    /**
-     * Two-phase connect: invoke {@code onConnect(ctx)} on every module, then iterate
-     * again invoking {@code start()} on every module that survived its
-     * {@code onConnect}. {@code onConnect} failure transitions the module to
-     * {@code FAILED} and skips its {@code start()}.
-     */
+    /** Two-phase: start() runs only for modules whose onConnect succeeded; an onConnect failure marks the module FAILED. */
     public void connect(ConnectContext ctx) {
         List<AdapterModule> snapshot = snapshot();
         for (AdapterModule m : snapshot) {
@@ -115,11 +91,7 @@ public final class ModuleRegistry {
         }
     }
 
-    /**
-     * Reverse-discovery-order shutdown: invoke {@code stop()} on every module,
-     * then iterate again invoking {@code onDisconnect()}. Failures are logged
-     * but do not abort the shutdown sequence.
-     */
+    /** Reverse discovery order; failures are logged and don't abort the sequence. */
     public void shutdown() {
         List<AdapterModule> reversed = new ArrayList<AdapterModule>(snapshot());
         Collections.reverse(reversed);
@@ -141,13 +113,7 @@ public final class ModuleRegistry {
         }
     }
 
-    /**
-     * Snapshot of {@link ModuleStatus} per discovered module. For modules the
-     * registry has marked {@code FAILED}, returns {@code {name, "FAILED", empty}}
-     * without touching the module. Otherwise calls {@code module.currentStatus()}
-     * and falls back to {@code {name, "FAILED", empty}} if it throws or returns
-     * {@code null}.
-     */
+    /** Falls back to {name, "FAILED", empty} when the module is marked FAILED, throws, or returns null. */
     public List<ModuleStatus> currentStatuses() {
         List<AdapterModule> snapshot = snapshot();
         List<ModuleStatus> result = new ArrayList<ModuleStatus>(snapshot.size());
@@ -172,10 +138,6 @@ public final class ModuleRegistry {
         return result;
     }
 
-    /**
-     * Test seam / debugging accessor — returns the discovered modules in name-sorted
-     * order. Read-only view; mutation is unsupported.
-     */
     public List<AdapterModule> modules() {
         synchronized (lock) {
             return Collections.unmodifiableList(new ArrayList<AdapterModule>(modules));

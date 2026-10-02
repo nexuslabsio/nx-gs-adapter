@@ -7,40 +7,22 @@ import java.time.OffsetTime;
 import java.time.format.DateTimeFormatter;
 
 /**
- * Pre-configured {@link Gson} factory for nx-gs wire payloads. Registers
- * type adapters for {@link Instant}, {@link Duration} and {@link OffsetTime}
- * so Gson emits ISO-8601 strings (e.g. {@code "2026-05-17T12:00:00Z"} /
- * {@code "PT60S"} / {@code "22:00:00+03:00"}) instead of its default struct
- * form. {@link java.time.DayOfWeek} needs no adapter — Gson serializes enums by
- * name ({@code "MONDAY"}).
- *
- * <p>Use this Gson instance for any Kafka publisher / consumer that serializes
- * nx-gs adapter wire DTOs — {@code DefaultKafkaFactory} wires it into
- * {@code NxKafka.configure().gson(...)} for the singleton.</p>
+ * ISO-8601 adapters for Instant, Duration and OffsetTime; Gson would otherwise emit its default struct form.
  */
 public final class NxGsonAdapters {
 
     private NxGsonAdapters() {}
 
-    /**
-     * Returns a fresh {@link Gson} configured with the standard nx-gs adapters.
-     * Builders may further customize via {@link #builder()}.
-     */
     public static Gson defaultGson() {
         return builder().create();
     }
 
-    /**
-     * Returns a {@link GsonBuilder} pre-registered with the standard
-     * adapters, ready for additional customization before {@code .create()}.
-     */
     public static GsonBuilder builder() {
         JsonSerializer<Instant> instantSer = (src, typeOfSrc, ctx) -> new JsonPrimitive(src.toString());
         JsonDeserializer<Instant> instantDe = (json, typeOfT, ctx) -> Instant.parse(json.getAsString());
         JsonSerializer<Duration> durationSer = (src, typeOfSrc, ctx) -> new JsonPrimitive(src.toString());
         JsonDeserializer<Duration> durationDe = (json, typeOfT, ctx) -> Duration.parse(json.getAsString());
-        // Fixed HH:mm:ss + offset (Z for UTC) — toString() would drop zero seconds,
-        // making the wire format vary; parsing stays lenient via ISO_OFFSET_TIME.
+        // Fixed HH:mm:ssXXX: toString() drops zero seconds, so the wire format would vary; parsing stays lenient
         DateTimeFormatter offsetTimeFmt = DateTimeFormatter.ofPattern("HH:mm:ssXXX");
         JsonSerializer<OffsetTime> offsetTimeSer =
                 (src, typeOfSrc, ctx) -> new JsonPrimitive(src.format(offsetTimeFmt));

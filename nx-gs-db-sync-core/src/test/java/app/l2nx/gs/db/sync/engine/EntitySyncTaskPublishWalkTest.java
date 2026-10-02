@@ -15,11 +15,7 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Test;
 
-/**
- * Publish-walk seam: created/updated/deleted advance the snapshot, failed and
- * deadline-pending publishes are counted into tally slots 3/4 (the
- * force-resync fully-successful gate) and leave the snapshot untouched.
- */
+/** Failed and deadline-pending publishes land in tally slots 3/4 and leave the snapshot untouched. */
 class EntitySyncTaskPublishWalkTest {
 
     private static final RecordMetadata META = new RecordMetadata(new TopicPartition("t", 0), 0L, 0, 0L, 0, 0);
@@ -36,7 +32,7 @@ class EntitySyncTaskPublishWalkTest {
         CompletableFuture<RecordMetadata> failed = new CompletableFuture<RecordMetadata>();
         failed.completeExceptionally(new RuntimeException("publish boom"));
         inFlight.put(2L, failed);
-        inFlight.put(3L, new CompletableFuture<RecordMetadata>()); // never completes
+        inFlight.put(3L, new CompletableFuture<RecordMetadata>());
 
         Long2IntMap pendingCrcAdvance = new Long2IntOpenHashMap();
         ((Long2IntOpenHashMap) pendingCrcAdvance).defaultReturnValue(Phase1Hasher.MISSING_HASH);
@@ -102,8 +98,7 @@ class EntitySyncTaskPublishWalkTest {
                     throw new AssertionError("sender not exercised by the walk");
                 }),
                 entity -> "test.gs.sync.clans",
-                // publishFlushSeconds=1 keeps the deadline wait for the
-                // never-completing future short.
+                // Short deadline wait for the never-completing future.
                 new EngineConfig(60, 500_000, 5, 1));
     }
 }

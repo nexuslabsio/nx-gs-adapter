@@ -89,8 +89,8 @@ Declared via `gradle/libs.versions.toml` at the monorepo root:
   never `import org.slf4j.*` directly.
 - **No compression libs in transitives** — `snappy-java`, `lz4-java`, `zstd-jni` excluded
   in `build.gradle.kts`.
-- **Public API → Javadoc mandatory** — every type a consumer touches (`NxKafka`,
-  `KafkaConfig`, `NxProducer`, `NxConsumer`, `ReplyContext`) carries Javadoc.
+- **Javadoc by substance: semantics, units, null rules, invariants — never a restatement of the name.**
+  Applies to every type a consumer touches (`NxKafka`, `KafkaConfig`, `NxProducer`, `NxConsumer`, `ReplyContext`).
 
 ## Versioning
 

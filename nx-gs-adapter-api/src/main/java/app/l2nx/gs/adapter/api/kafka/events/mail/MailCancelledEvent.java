@@ -4,14 +4,8 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Sender cancelled an outbox mail before the receiver claimed it —
- * attachments are pulled back to the sender and the mail row is deleted.
- *
- * <ul>
- *   <li>{@code metadata} — optional open string→string map of build-agnostic
- *       attributes. {@code null} when absent. Hosts MAY add
- *       arbitrary keys without an API release.</li>
- * </ul>
+ * Sender cancelled an outbox mail before the receiver claimed it: attachments return to the sender and the mail row
+ * is deleted. {@code metadata} is an optional open map ({@code null} when absent).
  */
 public final class MailCancelledEvent {
 

@@ -83,8 +83,7 @@ class GameDataSnapshotPublisherTest {
             publishNull();
             now.set(GRACE_MS);
 
-            // The grace window escalates the WARN to an ERROR log, but that is a severity
-            // decision only — the publish contract (nothing sent, null returned) is unchanged.
+            // escalation is a log severity change only; the publish contract is unchanged
             GameDataSnapshotPublisher.Result result = publishNull();
 
             assertNull(result);

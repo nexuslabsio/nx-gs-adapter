@@ -7,20 +7,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One cast precondition of a {@link Skill} — the build-agnostic projection of a
- * core condition node ({@code <cond>} subtrees in L2J-family datapacks): "requires a
- * blunt weapon", "target must be undead", "caster level ≥ N", and so on.
- *
- * <p>{@code type} is the core condition identifier verbatim (the condition class simple
- * name without the {@code Condition} prefix, e.g. {@code PlayerLevel},
- * {@code TargetRaceId}, {@code UsingItemType}) — free-form like effect handler names,
- * NOT a closed enum; forks add their own. {@code params} are the condition's operands
- * flattened to a string map (the host stringifies whatever its core stores); {@code null}
- * when the condition takes none or the host cannot expose them.</p>
- *
- * <p>Logic composites are flattened by the provider: AND-nodes dissolve into the flat
- * list (every entry must hold); OR / NOT nodes ride as {@code LogicOr} / {@code LogicNot}
- * entries whose {@code params} name the nested condition types.</p>
+ * One cast precondition of a {@link Skill}, projected from a core condition node. {@code type} is the core
+ * condition name without the {@code Condition} prefix (e.g. {@code PlayerLevel}); free-form, forks add their own.
+ * AND-nodes are flattened into the list (all must hold); OR / NOT ride as {@code LogicOr} / {@code LogicNot}
+ * entries whose {@code params} name the nested types.
  */
 public final class SkillCondition {
 
@@ -36,10 +26,7 @@ public final class SkillCondition {
         return type;
     }
 
-    /**
-     * Condition operands as a flat string-keyed map; {@code null} when the condition
-     * takes none or the host cannot expose them.
-     */
+    /** {@code null} when the condition takes none or the host cannot expose them. */
     public @Nullable Map<String, String> getParams() {
         return params;
     }

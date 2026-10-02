@@ -1,9 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.events.chat;
 
 /**
- * Keys the platform reads out of {@link ChatMessageEvent#getMetadata()}. The map itself stays open —
- * a host may add anything and consumers ignore what they do not know — but these keys carry agreed
- * meaning, so they live in the contract rather than as string literals on both sides of the wire.
+ * Keys the platform reads from {@link ChatMessageEvent#getMetadata()}; the map stays open, but these carry agreed meaning.
  */
 public final class ChatMetadataKeys {
 

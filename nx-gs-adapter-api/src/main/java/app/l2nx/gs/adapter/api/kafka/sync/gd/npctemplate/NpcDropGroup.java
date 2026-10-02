@@ -8,12 +8,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One reward group of an NPC's drop list — a category, a group-selection chance, and the items
- * that may drop once the group is selected. Carried in {@link NpcTemplate#getDrops()}.
- *
- * <p>{@code groupChancePercent} is the probability the group is chosen ({@code [0, 100]}); each
- * {@link NpcDropItem} then rolls its own {@code chancePercent}. {@code groupIndex} orders groups
- * within the NPC's list. All fields {@link Nullable}.</p>
+ * {@code groupChancePercent} in {@code [0, 100]} selects the group, then each {@link NpcDropItem} rolls its own chance.
  */
 public final class NpcDropGroup {
 

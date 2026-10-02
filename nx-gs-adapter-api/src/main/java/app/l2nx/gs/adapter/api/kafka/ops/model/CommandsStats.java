@@ -7,49 +7,18 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Heartbeat slot reporting health of the built-in {@code commands} module —
- * the inbound Kafka consumer + dispatch table that drives
- * {@link app.l2nx.gs.adapter.api.spi.capability.NxCommands} handler invocations.
- *
- * <p>Lives inside {@link ModuleStatus.Stats} alongside {@code pool} (for
- * DB-reading sync modules), {@code entities} (for per-entity sync progress),
- * and {@code events} (for outbound publisher health). Producer side:
- * {@code nx-gs-adapter-core}'s {@code CommandsConsumer.currentStatus()}.</p>
- *
- * <p>Counter taxonomy (cumulative since adapter start):</p>
+ * Heartbeat slot for the built-in {@code commands} module (inbound consumer + dispatch).
+ * All counters are cumulative since adapter start.
  * <ul>
- *     <li>{@code consumed-total} — records pulled from Kafka.</li>
- *     <li>{@code other-server-skipped-total} — records dropped because the
- *     {@code Nx-Target-Server-Id} header did not match this adapter's own
- *     server id (cross-server multiplexing on the shared per-tenant commands
- *     topic) or the header was missing/malformed.</li>
- *     <li>{@code handled-total} — records dispatched to a handler that returned
- *     a {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult} (success
- *     OR business error). Excludes records that hit
- *     {@code unsupported / validation / internal} branches.</li>
- *     <li>{@code unsupported-total} — records the dispatcher could not route:
- *     missing {@code Nx-Message-Type} header OR the header value has no
- *     registered handler. Reply emitted with
- *     {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#UNSUPPORTED_COMMAND}.</li>
- *     <li>{@code validation-failed-total} — Gson deserialization failures.
- *     Reply emitted with
- *     {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#VALIDATION_FAILED}.</li>
- *     <li>{@code internal-errors-total} — handler {@code RuntimeException}
- *     count. Reply emitted with
- *     {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#INTERNAL_ERROR}.</li>
- *     <li>{@code replies-published-total} — Kafka acks for reply records.</li>
- *     <li>{@code replies-failed-total} — Kafka send-callback errors on reply
- *     records.</li>
- *     <li>{@code commit-failures-total} — manual offset commit errors. Records
- *     stay uncommitted; redelivery on next poll.</li>
- *     <li>{@code deferred-open} — gauge of deferred replies taken and not yet completed.</li>
- *     <li>{@code deferred-expired-total} — deferred replies the adapter closed because the host
- *     never completed them; a rising value is a host bug.</li>
+ *     <li>{@code otherServerSkippedTotal} - dropped for a non-matching or missing/malformed {@code Nx-Target-Server-Id}.</li>
+ *     <li>{@code handledTotal} - handler returned a result (success or business error); excludes unsupported, validation and internal branches.</li>
+ *     <li>{@code unsupportedTotal} - no {@code Nx-Message-Type} header or no registered handler.</li>
+ *     <li>{@code validationFailedTotal} - payload deserialization failed.</li>
+ *     <li>{@code internalErrorsTotal} - handler threw {@code RuntimeException}.</li>
+ *     <li>{@code commitFailuresTotal} - offset commit failed; the record is redelivered on next poll.</li>
+ *     <li>{@code deferredOpen} - gauge of deferred replies not yet completed.</li>
+ *     <li>{@code deferredExpiredTotal} - deferred replies closed by the adapter because the host never completed them (host bug when rising).</li>
  * </ul>
- *
- * <p>{@code registered-types} is a snapshot list of registered command class
- * simple names — debugging aid for "why is this command going UNSUPPORTED?"
- * checks. Static across runtime once {@code onConnect} completes.</p>
  */
 public final class CommandsStats {
 
@@ -137,10 +106,7 @@ public final class CommandsStats {
         return deferredExpiredTotal;
     }
 
-    /**
-     * Snapshot of {@code Nx-Message-Type} class simple names registered with
-     * {@code NxCommands.on(...)} at heartbeat tick time. Empty when none.
-     */
+    /** Registered command class simple names at heartbeat time; empty when none. */
     public List<String> getRegisteredTypes() {
         return registeredTypes == null ? Collections.emptyList() : registeredTypes;
     }

@@ -3,28 +3,8 @@ package app.l2nx.gs.adapter.api.kafka.ops.model;
 import java.util.Objects;
 
 /**
- * Snapshot of a JDBC connection-pool's active / idle / total / waiting counters.
- * Wire-shape value surfaced inside {@link ModuleStatus.Stats#getPool()} and
- * produced by Tier-3 SPI
- * {@code app.l2nx.gs.adapter.api.spi.provider.JdbcConnectionSource#stats()}.
- *
- * <p>All fields are {@link Integer} (nullable) — pool implementations expose
- * different subsets of metrics. HikariCP / Tomcat JDBC / DBCP2 use the
- * {@code active}/{@code idle}/{@code total}/{@code waiting} naming convention;
- * legacy pools that only expose busy / idle counters leave {@code total} and
- * {@code waiting} {@code null}. Wire shape: integer fields are emitted as
- * numbers; absent fields are emitted as JSON {@code null}.</p>
- *
- * <p>Field semantics:</p>
- * <ul>
- *     <li>{@code active} — connections currently borrowed and in use.</li>
- *     <li>{@code idle} — connections in the pool but not borrowed.</li>
- *     <li>{@code total} — sum of {@code active} + {@code idle}; informational
- *     summary for pools that report it natively.</li>
- *     <li>{@code waiting} — threads blocked waiting for a connection. Nonzero
- *     here is a backpressure signal: the pool is saturated and consumers are
- *     queued.</li>
- * </ul>
+ * JDBC pool counters inside {@link ModuleStatus.Stats#getPool()}. All fields are nullable and emitted as JSON {@code null} when the pool does not expose them.
+ * A nonzero {@code waiting} means the pool is saturated.
  */
 public final class PoolStats {
 

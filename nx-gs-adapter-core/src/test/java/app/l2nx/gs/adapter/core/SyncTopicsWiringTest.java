@@ -16,15 +16,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Verifies that {@code syncTopics} in a {@code ConnectResponse} survives the
- * adapter-core handshake plumbing and arrives at a registered
- * {@code AdapterModule.onConnect(ctx)} via {@code ctx.syncTopics()}.
- *
- * <p>Discovery is exercised through the real {@link java.util.ServiceLoader} path —
- * {@link CapturingAdapterModule} is registered via
- * {@code src/test/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule}.</p>
- */
 class SyncTopicsWiringTest {
 
     @BeforeEach
@@ -32,9 +23,7 @@ class SyncTopicsWiringTest {
         NxAdapter.resetForTesting();
         CapturingAdapterModule.reset();
         NxAdapter.primeModuleRegistryForTesting();
-        // Sanity check: assert no leaked context from a prior test that exercised
-        // ServiceLoader against the global META-INF registration. If this trips,
-        // CapturingAdapterModule is being driven from a test that didn't reset() it.
+        // Guards against a leaked CapturingAdapterModule context from a test that didn't reset()
         assertNull(
                 CapturingAdapterModule.lastContext(),
                 "CapturingAdapterModule leaked context from a prior test — reset() in @BeforeEach");
@@ -80,10 +69,8 @@ class SyncTopicsWiringTest {
 
     @Test
     void initKafka_shouldStillConnectSyncModule_whenEventsBootstrapThrows() {
-        // Regression: an events-bootstrap failure (e.g. NoClassDefFoundError from an
-        // adapter-api/adapter-core version skew on the host classpath) must not abort
-        // sync-module discovery — otherwise heartbeat reports empty enabledModules and
-        // all DB/runtime sync silently stops.
+        // Regression: an events-bootstrap failure (api/core version skew) must not abort sync-module discovery,
+        // else heartbeat reports empty enabledModules and all sync silently stops
         NxAdapter.failEventsBootstrapForTesting(true);
         SyncTopics topics = SyncTopics.builder()
                 .db(java.util.Collections.singletonMap("character", "bohpts.gs.sync.db.character"))

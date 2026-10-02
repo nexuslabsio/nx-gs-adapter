@@ -8,19 +8,8 @@ import app.l2nx.gs.log.NxLogFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Adapter-core implementation of {@link NxCommands}. Forwards every
- * {@code on(...)} call to {@link CommandTypeRegistry#register}; logs WARN on
- * duplicate-class re-registration to surface "two modules accidentally claim
- * the same handler" misconfigurations.
- *
- * <p>The façade survives reconnect: {@code NxAdapter} caches a single
- * instance per JVM and calls {@link #swap(CommandTypeRegistry)} to retarget
- * the underlying registry. Modules that captured {@code ctx.commands()} from
- * an earlier {@code onConnect} keep working without re-acquiring the
- * façade.</p>
- *
- * <p>Package-private. External callers acquire an {@link NxCommands} handle
- * via {@code ConnectContext.commands()} — they never see this class directly.</p>
+ * The facade survives reconnect: {@link #swap(CommandTypeRegistry)} retargets the registry so modules that
+ * captured {@code ctx.commands()} earlier keep working.
  */
 final class NxCommandsImpl implements NxCommands {
 

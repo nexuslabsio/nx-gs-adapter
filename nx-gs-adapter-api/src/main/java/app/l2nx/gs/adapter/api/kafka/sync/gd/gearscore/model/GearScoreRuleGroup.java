@@ -9,13 +9,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A category of gear-score rules inside a {@link GearScoreRuleset} — the wiki
- * renders one table per group. Every build maps its gear-score system into these
- * categories.
- *
- * <p>{@link #getCategory() category} is a closed {@code UPPER_SNAKE_CASE} vocabulary:
- * {@code LEVEL} / {@code ATTRIBUTE} / {@code AUGMENT} / {@code ENCHANT_PROFILE} /
- * {@code SET_BONUS} / {@code AURA} / {@code ACHIEVEMENT} / {@code SKILL}.</p>
+ * {@code category} is a closed vocabulary (see {@link GearScoreRuleset}): {@code LEVEL} / {@code ATTRIBUTE} / {@code AUGMENT} / {@code ENCHANT_PROFILE} /
+ * {@code SET_BONUS} / {@code AURA} / {@code ACHIEVEMENT} / {@code SKILL}.
  */
 public final class GearScoreRuleGroup {
 
@@ -37,29 +32,20 @@ public final class GearScoreRuleGroup {
                 : Collections.unmodifiableList(new ArrayList<GearScoreRule>(rules));
     }
 
-    /**
-     * Group category — closed {@code UPPER_SNAKE_CASE} vocabulary.
-     */
     public String getCategory() {
         return category;
     }
 
-    /**
-     * Group heading for the wiki.
-     */
     public LocalizedText getLabel() {
         return label;
     }
 
-    /**
-     * Optional group description; {@code null} when none supplied.
-     */
     public @Nullable LocalizedText getDescription() {
         return description;
     }
 
     /**
-     * Rules in this group; never {@code null} (empty when the group carries none).
+     * Never {@code null}.
      */
     public List<GearScoreRule> getRules() {
         return rules;

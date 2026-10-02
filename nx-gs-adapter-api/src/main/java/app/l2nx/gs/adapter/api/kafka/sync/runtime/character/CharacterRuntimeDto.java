@@ -12,72 +12,14 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one player character's volatile runtime state — payload of
- * {@code SyncEvent<CharacterRuntimeDto>} on the platform-supplied per-tenant
- * runtime character sync topic
- * ({@code <tenant>.gs.sync.runtime.character}).
+ * Volatile runtime state of one character; payload of {@code SyncEvent<CharacterRuntimeDto>}. Shares {@code id}
+ * with {@code CharacterDbDto}; only {@code id} is required.
  *
- * <p>Sibling of {@code app.l2nx.gs.adapter.api.kafka.sync.db.character.CharacterDbDto}
- * (DB-derived persistent character state). Both DTOs share {@code id} (source-side
- * {@code charId} / {@code objectId}) so platform consumers can join the two streams
- * by primary key.</p>
+ * <p>{@code online} null/omitted means ONLINE; explicit {@code false} is a one-shot tombstone with everything else null.
+ * An offline trader is not a tombstone: it ticks with {@code online=false} and an {@link WellKnownActivities#OFFLINE_TRADE} activity.</p>
  *
- * <p>Only {@link #getId() id} is required; everything else is optional. Different
- * tenants populate different subsets — e.g. cores without a vitality mechanic
- * leave {@code curVit}/{@code maxVit} null. Null fields are omitted from the
- * Gson wire when {@code serializeNulls=false} on the platform-side producer.</p>
- *
- * <p>Presence ({@link #getOnline() online}) drives platform-side reconciliation
- * of the per-character "is this player currently logged in" signal. Wire
- * convention picked for byte-budget at high-load tick rates:
- * <ul>
- *   <li>Regular live-state row: {@code online} left {@code null} — the producer
- *   omits it from the JSON. Platform consumers MUST treat omitted /
- *   {@code null} as {@code online=true} (the historical wire emitted runtime
- *   rows only for online characters).</li>
- *   <li>One-shot offline tombstone: {@code online=false} explicit, vitals /
- *   coordinates all {@code null} (also omitted from the JSON). The row exists
- *   only to flip platform-side presence to "offline".</li>
- *   <li>{@code online=true} explicit is permitted but redundant — producers
- *   should prefer {@code null} for the regular ONLINE case to save bytes.</li>
- * </ul>
- * Why a runtime-channel signal and not a CDC column on {@code CharacterDbDto}:
- * login / logout would inflate CDC UPDATE volume per cycle, and CDC tick
- * cadence is too coarse to surface presence reactively.</p>
- *
- * <p>Activity signals ({@link #getAiStatus() aiStatus},
- * {@link #getActivities() activities}) describe "what the character
- * is doing" for dashboard / presence consumers. They are <b>independent</b> —
- * no precedence between them is implied by the wire:
- * <ul>
- *   <li>{@code aiStatus} — engine-native control intention (canonical values in
- *   {@link WellKnownAiStatuses}). Transient: flips with movement / combat much
- *   like {@code x}/{@code y}/{@code z}.</li>
- *   <li>{@code activities} — build-specific sustained activities as a
- *   <b>list</b> of structured {@link Activity} entries ({@code type} +
- *   open {@code metadata}; e.g. fishing with elapsed-time / penalty-tier
- *   metadata, or autofarming with remaining-time metadata). A character can be
- *   in several at once (e.g. autofarming while fishing), so the wire carries
- *   them as a JSON array. Long-lived; {@code null} / omitted when the character
- *   is not in any special activity. The activity set varies per core, so each
- *   entry is open: hosts emit their own type / metadata keys and consumers
- *   tolerate unknown values.</li>
- * </ul>
- * {@code aiStatus} is {@code null} on offline tombstones and on hosts that do
- * not populate it. {@code activities} is likewise {@code null} on tombstones,
- * but NOT on an offline trader: a core that keeps abandoned stores running in
- * the world reports those characters as regular ticks with
- * {@code online = false} and an {@link WellKnownActivities#OFFLINE_TRADE}
- * activity, so "not online" and "carries no data" are distinct states.</p>
- *
- * <p>Inventory capacity ({@link #getCurInventorySlots() curInventorySlots} /
- * {@link #getMaxInventorySlots() maxInventorySlots}, their quest-inventory
- * counterparts, and {@link #getCurWeight() curWeight} / {@link #getMaxWeight()
- * maxWeight}) rides this runtime channel rather than the {@code CharacterDbDto}
- * CDC stream because the cap itself is stat-derived (race / access level /
- * bonuses / purchased expansions) and cannot be read off a persistent character
- * row. As with the other runtime-only fields, consumers keep the last-known
- * values after logout — offline tombstones carry {@code null} for all six.</p>
+ * <p>{@code aiStatus} and {@code activities} are independent signals, both null on tombstones. Inventory and weight
+ * caps ride this channel because they are stat-derived; consumers keep last-known values after logout.</p>
  */
 public final class CharacterRuntimeDto {
 
@@ -108,15 +50,10 @@ public final class CharacterRuntimeDto {
     private final @Nullable Integer maxWeight;
 
     /**
-     * Canonical constructor. Prefer {@link #builder()} — positional construction
-     * of 24 mostly-nullable fields is error-prone.
+     * Prefer {@link #builder()}.
      *
-     * <p>MUST remain the only non-default constructor on this class. The DTO
-     * carries no binder annotations and relies on implicit constructor-parameter
-     * names (this module compiles with {@code -parameters}); a second
-     * constructor — even a back-compat overload — makes creator detection
-     * ambiguous, and consumers then fail to deserialize the whole channel. Grow
-     * the wire by appending parameters here, never by overloading.</p>
+     * <p>Must stay the only non-default constructor: the DTO binds by implicit parameter names, and an overload makes
+     * creator detection ambiguous so consumers fail to deserialize the whole channel. Grow the wire by appending parameters.</p>
      */
     public CharacterRuntimeDto(
             long id,
@@ -175,27 +112,16 @@ public final class CharacterRuntimeDto {
         return activities == null ? null : Collections.unmodifiableList(new ArrayList<Activity>(activities));
     }
 
-    /**
-     * Primary key — source {@code charId} / {@code objectId}, {@code NOT NULL}.
-     * Same value as {@code CharacterDbDto.id} for platform-side join.
-     */
     public long getId() {
         return id;
     }
 
     /**
-     * Whether this row carries observed state, as opposed to being the one-shot offline tombstone a
-     * producer emits when a character leaves the world — that row is {@code id} plus
-     * {@code online=false} and nothing else.
+     * Whether this row carries observed state rather than being the offline tombstone (only {@code id} and
+     * {@code online=false}). Not the same as {@link #getOnline() online}: offline traders carry real vitals.
      *
-     * <p>Deliberately NOT the same question as {@link #getOnline() online}: a core that keeps
-     * abandoned private stores running reports those characters with real vitals and an
-     * {@link WellKnownActivities#OFFLINE_TRADE} activity while {@code online} is {@code false}. A
-     * consumer that gates persistence on presence would drop those rows on the floor.
-     *
-     * <p>Lives here rather than in a consumer because it enumerates this class's own fields:
-     * whoever adds a volatile field to the wire sees the predicate in the same file and extends it.
-     * A field forgotten here turns an ordinary tick into a tombstone for every consumer at once.
+     * <p>Enumerates this class's own fields so a newly added volatile field gets added here; a missed field turns an
+     * ordinary tick into a tombstone for every consumer.</p>
      */
     public boolean carriesState() {
         return curHp != null
@@ -248,8 +174,7 @@ public final class CharacterRuntimeDto {
     }
 
     /**
-     * Current vitality (stamina) — L2-specific mechanic. {@code null} on cores
-     * without vitality.
+     * Null on cores without vitality.
      */
     public @Nullable Integer getCurVit() {
         return curVit;
@@ -272,160 +197,85 @@ public final class CharacterRuntimeDto {
     }
 
     /**
-     * Presence marker. {@code null} or {@code true} on regular live-state rows
-     * (producer convention: omit from the wire for byte-budget). Explicit
-     * {@code false} on one-shot offline tombstones — vitals / coordinates are
-     * typically {@code null} on those. Platform consumers MUST treat omitted /
-     * {@code null} as {@code online=true} for back-compat with legacy
-     * providers and the byte-optimized regular path.
+     * Null/omitted is read as ONLINE; see {@link #isOnlineEffective()}.
      */
     public @Nullable Boolean getOnline() {
         return online;
     }
 
     /**
-     * Engine-native AI control intention — the reactive server-side state the
-     * core puts the character in (idle / moving / attack / cast / …). Open
-     * string; canonical lower_snake_case values in {@link WellKnownAiStatuses}.
-     * {@code null} when the host does not report it or on offline tombstones.
-     * Transient by nature — flips with movement / combat. Independent of
-     * {@link #getActivities() activities}.
+     * Open string; canonical values in {@link WellKnownAiStatuses}. Null when unreported or on tombstones.
      */
     public @Nullable String getAiStatus() {
         return aiStatus;
     }
 
     /**
-     * The class the character is currently playing — a subclass whenever one
-     * is active, the main class otherwise. Identifies which class
-     * {@link #getLevel()}, {@link #getExp()} and {@link #getSp()} describe, so
-     * a consumer can route the tick to the right per-class row instead of
-     * inferring it from the coarser CDC snapshot. {@code null} when the source
-     * ID falls outside {@link CharacterClass}'s canonical set and on offline
-     * tombstones.
+     * Class that {@link #getLevel()}, {@link #getExp()} and {@link #getSp()} describe (the subclass when one is active).
+     * Null when the source ID is outside {@link CharacterClass} and on tombstones.
      */
     public @Nullable CharacterClass getClassId() {
         return classId;
     }
 
     /**
-     * Level of the class named by {@link #getClassId()} — NOT the main class's
-     * level when a subclass is active. {@code null} on offline tombstones.
+     * Level of the class named by {@link #getClassId()}, not necessarily the main class.
      */
     public @Nullable Integer getLevel() {
         return level;
     }
 
-    /**
-     * SP of the class named by {@link #getClassId()}. Volatile runtime state,
-     * same channel rationale as {@link #getExp()}. {@code null} on cores that
-     * do not expose SP and on offline tombstones.
-     */
     public @Nullable Long getSp() {
         return sp;
     }
 
     /**
-     * Raw experience points of the class named by {@link #getClassId()} — the
-     * absolute EXP total accumulated on that class, NOT a within-level delta
-     * and NOT the main class's EXP when a subclass is active. Volatile runtime
-     * state (climbs with every kill / quest), which is why it rides the runtime
-     * sync channel rather than the coarser CDC stream. {@code null} on cores
-     * that do not expose the character's EXP and on offline tombstones. A
-     * consumer derives "% progress within the current level" by joining this
-     * value against a per-server level→required-exp table:
-     * {@code pct = (exp - requiredExp[level]) / (requiredExp[level + 1] - requiredExp[level])}.
+     * Absolute EXP total of the class named by {@link #getClassId()}, not a within-level delta.
      */
     public @Nullable Long getExp() {
         return exp;
     }
 
     /**
-     * Occupied regular inventory slots — one slot per item stack (a stack of
-     * N items still counts as 1), equipped items included. Quest items are
-     * NOT counted here — they occupy a separate quest inventory with its own
-     * cap (see {@link #getCurQuestInventorySlots() curQuestInventorySlots}).
-     * {@code null} when the host does not report it and on offline
-     * tombstones.
+     * One slot per item stack, equipped items included; quest items are counted separately.
      */
     public @Nullable Integer getCurInventorySlots() {
         return curInventorySlots;
     }
 
-    /**
-     * Regular inventory slot cap for this character. Varies per character
-     * (race / access level / stat bonuses / purchased expansions), so it is
-     * per-character runtime state rather than a server constant. {@code null}
-     * when the host does not report it and on offline tombstones.
-     */
     public @Nullable Integer getMaxInventorySlots() {
         return maxInventorySlots;
     }
 
-    /**
-     * Occupied quest inventory slots — quest items only, tracked separately
-     * from the regular inventory. {@code null} when the host does not report
-     * it and on offline tombstones.
-     */
     public @Nullable Integer getCurQuestInventorySlots() {
         return curQuestInventorySlots;
     }
 
-    /**
-     * Quest inventory slot cap. {@code null} when the host does not report it
-     * and on offline tombstones.
-     */
     public @Nullable Integer getMaxQuestInventorySlots() {
         return maxQuestInventorySlots;
     }
 
     /**
-     * Current carried weight — the sum of {@code itemWeight * count} across
-     * the whole inventory (regular items, equipped items, and quest items),
-     * minus any build-specific weight-penalty reduction. {@code null} when
-     * the host does not report it and on offline tombstones.
+     * Sum of {@code itemWeight * count} over all items including quest items, minus any build-specific penalty reduction.
      */
     public @Nullable Integer getCurWeight() {
         return curWeight;
     }
 
-    /**
-     * Carry-weight cap for this character, derived from stats / bonuses and
-     * therefore per-character runtime state rather than a server constant.
-     * {@code null} when the host does not report it and on offline
-     * tombstones.
-     */
     public @Nullable Integer getMaxWeight() {
         return maxWeight;
     }
 
     /**
-     * Build-specific sustained activities — the high-level "what the player is
-     * occupied with" signals that live outside the engine AI state machine
-     * (e.g. fishing, trading, autofarming). A <b>list</b> of structured
-     * {@link Activity} entries because a character can be in several at
-     * once (e.g. autofarming while fishing). Each entry carries a required
-     * {@code type} discriminator (canonical values in
-     * {@link WellKnownActivities}) plus an open {@code metadata} map for
-     * activity-specific extras (canonical keys in
-     * {@link WellKnownActivityMetadata}). The set varies per core, so the
-     * envelope stays agnostic — hosts emit their own type / keys and consumers
-     * tolerate unknowns. {@code null} when the character is in no special
-     * activity, the host does not report it, or on offline tombstones; when
-     * non-null the returned list is unmodifiable. Independent of
-     * {@link #getAiStatus() aiStatus} — no precedence between the two.
+     * Null when there are none, the host does not report them, or on tombstones; otherwise unmodifiable.
+     * Independent of {@link #getAiStatus() aiStatus}; metadata keys in {@link WellKnownActivityMetadata}.
      */
     public @Nullable List<Activity> getActivities() {
         return activities;
     }
 
     /**
-     * Resolves the {@link #getOnline() online} wire field to a primitive
-     * presence value per the wire convention: omitted / {@code null} /
-     * {@code true} all mean ONLINE; only an explicit {@code false} (one-shot
-     * offline tombstone) means OFFLINE. Single point of truth for consumers
-     * — keeps the {@code null = ONLINE} byte-budget rule from leaking into
-     * every call site.
+     * True for null/true, false only for an explicit {@code false} tombstone.
      */
     public boolean isOnlineEffective() {
         return online == null || online;
@@ -639,112 +489,64 @@ public final class CharacterRuntimeDto {
             return this;
         }
 
-        /**
-         * Engine-native AI control intention — canonical values in
-         * {@link WellKnownAiStatuses}. Open string; {@code null} when not reported.
-         */
         public Builder aiStatus(@Nullable String aiStatus) {
             this.aiStatus = aiStatus;
             return this;
         }
 
-        /**
-         * Character's current raw (absolute) experience total, on the class named
-         * by {@link #classId(CharacterClass)}. {@code null} when the host does not
-         * expose it or on offline tombstones.
-         */
         public Builder exp(@Nullable Long exp) {
             this.exp = exp;
             return this;
         }
 
-        /**
-         * The class the character is currently playing — names which class
-         * {@link #level(Integer)}, {@link #exp(Long)} and {@link #sp(Long)}
-         * describe. {@code null} on offline tombstones.
-         */
         public Builder classId(@Nullable CharacterClass classId) {
             this.classId = classId;
             return this;
         }
 
-        /**
-         * Level of the currently played class. {@code null} on offline tombstones.
-         */
         public Builder level(@Nullable Integer level) {
             this.level = level;
             return this;
         }
 
-        /**
-         * SP of the currently played class. {@code null} when the host does not
-         * expose it or on offline tombstones.
-         */
         public Builder sp(@Nullable Long sp) {
             this.sp = sp;
             return this;
         }
 
         /**
-         * Build-specific sustained activities — a list of structured
-         * {@link Activity} entries ({@code type} + open {@code metadata}).
-         * {@code null} when the character is in no special activity. Defensively
-         * copied on {@link #build()}.
+         * Defensively copied on {@link #build()}.
          */
         public Builder activities(@Nullable List<Activity> activities) {
             this.activities = activities;
             return this;
         }
 
-        /**
-         * Occupied regular inventory slots (quest items excluded). {@code null}
-         * when not reported.
-         */
         public Builder curInventorySlots(@Nullable Integer curInventorySlots) {
             this.curInventorySlots = curInventorySlots;
             return this;
         }
 
-        /**
-         * Regular inventory slot cap — per-character runtime state (varies by
-         * race / access level / bonuses / expansions). {@code null} when not
-         * reported.
-         */
         public Builder maxInventorySlots(@Nullable Integer maxInventorySlots) {
             this.maxInventorySlots = maxInventorySlots;
             return this;
         }
 
-        /**
-         * Occupied quest inventory slots. {@code null} when not reported.
-         */
         public Builder curQuestInventorySlots(@Nullable Integer curQuestInventorySlots) {
             this.curQuestInventorySlots = curQuestInventorySlots;
             return this;
         }
 
-        /**
-         * Quest inventory slot cap. {@code null} when not reported.
-         */
         public Builder maxQuestInventorySlots(@Nullable Integer maxQuestInventorySlots) {
             this.maxQuestInventorySlots = maxQuestInventorySlots;
             return this;
         }
 
-        /**
-         * Current carried weight — sum of {@code itemWeight * count} across
-         * regular, equipped, and quest items, minus any weight-penalty
-         * reduction. {@code null} when not reported.
-         */
         public Builder curWeight(@Nullable Integer curWeight) {
             this.curWeight = curWeight;
             return this;
         }
 
-        /**
-         * Carry-weight cap — per-character runtime state derived from stats /
-         * bonuses. {@code null} when not reported.
-         */
         public Builder maxWeight(@Nullable Integer maxWeight) {
             this.maxWeight = maxWeight;
             return this;

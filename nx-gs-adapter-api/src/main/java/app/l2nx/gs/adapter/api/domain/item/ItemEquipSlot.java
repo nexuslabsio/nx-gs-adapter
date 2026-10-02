@@ -1,13 +1,8 @@
 package app.l2nx.gs.adapter.api.domain.item;
 
 /**
- * Equipment slot an item occupies — the canonical, build-agnostic equip-slot
- * vocabulary. A shared item-domain enum (not tied to one wire DTO); a provider maps
- * its core's internal slot representation (bitmask, code, or name) onto these.
- *
- * <p>{@code null} on the wire means the item is not equippable (or the build supplied
- * no slot). Dual-target slots (an item that fits either of a pair) are single
- * canonical constants: {@link #EAR}, {@link #FINGER}, {@link #CHEST_LEGS}.</p>
+ * Equipment slot of an item; {@code null} on the wire means not equippable or no slot supplied.
+ * Either-of-a-pair slots are single constants: {@link #EAR}, {@link #FINGER}, {@link #CHEST_LEGS}.
  */
 public enum ItemEquipSlot {
     R_HAND,

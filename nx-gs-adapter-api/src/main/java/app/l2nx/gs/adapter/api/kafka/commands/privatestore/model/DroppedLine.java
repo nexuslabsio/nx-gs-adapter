@@ -1,16 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.commands.privatestore.model;
 
-import app.l2nx.gs.adapter.api.kafka.commands.privatestore.StartPrivateStoreResult;
 import java.util.Objects;
 
-/**
- * One line of a {@link StartPrivateStoreResult#getDropped() dropped} report:
- * a requested {@link SellLine} the host rejected when opening the store, with
- * a short host-supplied reason.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
- */
+/** A {@link SellLine} the host rejected when opening the store. */
 public final class DroppedLine {
 
     private final int itemId;
@@ -24,19 +16,13 @@ public final class DroppedLine {
         this.reason = reason;
     }
 
-    /**
-     * Inventory instance object-id of the rejected {@link SellLine}.
-     */
     public int getItemId() {
         return itemId;
     }
 
     /**
-     * Host-supplied rejection reason as a stable {@code UPPER_SNAKE_CASE} token.
-     * Open enum: known tokens are {@code NOT_FOUND}, {@code NOT_TRADEABLE},
-     * {@code ITEM_BLOCKED}, {@code EQUIPPED}, {@code BAD_COUNT},
-     * {@code PRICE_OVERFLOW}, and {@code REJECTED}. The set is not closed —
-     * consumers MUST tolerate unknown tokens (treat as a generic rejection).
+     * Open {@code UPPER_SNAKE_CASE} token (known: {@code NOT_FOUND}, {@code NOT_TRADEABLE}, {@code ITEM_BLOCKED},
+     * {@code EQUIPPED}, {@code BAD_COUNT}, {@code PRICE_OVERFLOW}, {@code REJECTED}); consumers MUST tolerate unknown tokens.
      */
     public String getReason() {
         return reason;

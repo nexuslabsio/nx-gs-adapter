@@ -1,11 +1,8 @@
 package app.l2nx.gs.adapter.api.kafka.ops.model;
 
 /**
- * Canonical values for {@link ModuleStatus#getState()}. The wire type stays
- * {@code String} rather than a JVM enum deliberately — an unrecognised value
- * published by a newer adapter must deserialize cleanly on an older consumer
- * instead of breaking it. Consumers SHOULD treat any value outside this set as
- * degraded rather than failing outright.
+ * Canonical values for {@link ModuleStatus#getState()}. The wire type is {@code String}, not an enum, so a newer adapter's unknown value still deserializes on an older consumer.
+ * Consumers SHOULD treat unknown values as degraded.
  */
 public final class ModuleStates {
 

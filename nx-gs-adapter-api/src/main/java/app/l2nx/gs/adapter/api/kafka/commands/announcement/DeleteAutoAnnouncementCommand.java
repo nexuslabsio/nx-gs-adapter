@@ -4,29 +4,10 @@ import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import java.util.Objects;
 
 /**
- * Inbound command instructing the game-server to delete one row from its
- * native {@code auto_announcements} table (or equivalent). Used for two
- * platform flows: an operator deleting a {@code GAME}-origin row directly
- * ("delete in game"), and the {@code GAME}→{@code L2NX} transfer flow, where
- * the platform first creates its own copy of the announcement and then issues
- * this command to remove the now-redundant source row so it is not
- * re-ingested by the next db-sync cycle.
+ * Deletes one row from the host's native {@code auto_announcements} table. Used for operator "delete in game"
+ * and the GAME->L2NX transfer, where the source row is removed so the next db-sync does not re-ingest it.
  *
- * <p>Reply: {@link app.l2nx.gs.adapter.api.kafka.commands.CommandResult}{@code <Void>}
- * — {@code ok()} on a successful delete (no typed payload; the caller
- * already knows the {@code gameId} it asked to delete). Common error
- * replies:</p>
- * <ul>
- *     <li>{@code NOT_FOUND} — no row with the given {@code gameId} exists.</li>
- *     <li>{@code INTERNAL_ERROR} — delete failed host-side.</li>
- * </ul>
- *
- * <p><b>Identity.</b> {@link #getGameId() gameId} is the host's native
- * {@code auto_announcements} row id — the same value surfaced as
- * {@code AutoAnnouncementDbDto.id} on the db-sync mirror stream. REQUIRED.</p>
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
+ * <p>Reply: {@code CommandResult<Void>}; {@code NOT_FOUND} if no such row, {@code INTERNAL_ERROR} on host-side failure.</p>
  */
 public final class DeleteAutoAnnouncementCommand implements NxCommand<Void> {
 
@@ -36,10 +17,7 @@ public final class DeleteAutoAnnouncementCommand implements NxCommand<Void> {
         this.gameId = gameId;
     }
 
-    /**
-     * Id of the {@code auto_announcements} row to delete on the host.
-     * REQUIRED.
-     */
+    /** Host's native row id; same value as {@code AutoAnnouncementDbDto.id} on the db-sync stream. */
     public long getGameId() {
         return gameId;
     }

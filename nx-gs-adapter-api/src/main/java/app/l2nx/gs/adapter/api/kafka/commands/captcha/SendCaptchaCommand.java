@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Inbound command starting the host's human-verification check on an online character.
  *
- * <p>Reply: {@link CommandResult}{@code <}{@link SendCaptchaResult}{@code >}, <b>deferred</b> — it
+ * <p>Reply: {@link CommandResult}{@code <}{@link SendCaptchaResult}{@code >}, deferred - it
  * arrives when the check ends, minutes after the command. A check that cannot start replies at once:
  * {@code VALIDATION_FAILED}, {@code NOT_FOUND} (no such character or not in the world),
  * {@code INVALID_STATE} with {@code reason} {@code ALREADY_ACTIVE} / {@code SERVER_PLAYS_CHARACTER},
@@ -36,18 +36,12 @@ public final class SendCaptchaCommand implements NxCommand<SendCaptchaResult> {
         return characterId;
     }
 
-    /**
-     * Staff login or service label of whoever asked for the check; echoed in the result so a
-     * consumer can attribute checks it did not start.
-     */
+    /** Staff login or service label of whoever asked; echoed in the result so consumers can attribute checks they did not start. */
     public @Nullable String getIssuedBy() {
         return issuedBy;
     }
 
-    /**
-     * Staff-only note: never shown in-game, logged by the host, surfaced on the platform's command
-     * audit.
-     */
+    /** Staff-only note: never shown in-game, logged by the host and surfaced on the platform command audit. */
     public @Nullable String getStaffNotes() {
         return staffNotes;
     }

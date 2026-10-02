@@ -4,13 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One item entry inside an NPC {@link NpcDropGroup} — the item that may drop plus its count
- * range and individual roll chance.
- *
- * <p>{@code itemTemplateId} is the non-null identity (references the item-template entity).
- * {@code min}/{@code max} are the count range ({@code Long} — adena-style stacks can exceed
- * {@code int}). {@code chancePercent} is the per-item probability in {@code [0, 100]} (the
- * provider normalizes its core's internal basis into percent).</p>
+ * {@code min}/{@code max} are {@code Long} since adena-style stacks exceed {@code int}; {@code chancePercent} is in
+ * {@code [0, 100]} (provider normalizes its core's basis).
  */
 public final class NpcDropItem {
 

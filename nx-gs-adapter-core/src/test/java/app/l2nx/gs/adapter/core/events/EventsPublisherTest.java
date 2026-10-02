@@ -59,16 +59,13 @@ class EventsPublisherTest {
         assertNotNull(record);
         assertEquals("acme.gs.events.premiumpurchase", record.topic());
 
-        // Partition key is 8 raw BE bytes of characterId.
         long extracted = ByteBuffer.wrap(record.key()).getLong();
         assertEquals(42L, extracted);
 
-        // Nx-Message-Type header carries the simple class name.
         Header header = record.headers().lastHeader(NxHeaders.NX_MESSAGE_TYPE);
         assertNotNull(header);
         assertEquals("PremiumPurchaseEvent", new String(header.value(), java.nio.charset.StandardCharsets.UTF_8));
 
-        // Successful ack increments publishedTotal.
         Thread.sleep(50);
         assertEquals(1L, publisher.publishedTotal());
         assertEquals(0L, publisher.droppedTotal());
@@ -77,7 +74,6 @@ class EventsPublisherTest {
 
     @Test
     void enqueue_shouldDropOldest_whenQueueIsFull() {
-        // Use a non-started publisher to inspect raw queue / counter behavior.
         publisher = new EventsPublisher(
                 Collections.emptyMap(),
                 noopSender(),
@@ -87,7 +83,6 @@ class EventsPublisherTest {
 
         publisher.enqueue(envelope(1L, binding));
         publisher.enqueue(envelope(2L, binding));
-        // Queue full — third enqueue evicts the head (envelope 1).
         publisher.enqueue(envelope(3L, binding));
 
         assertEquals(2, publisher.queueDepth());
@@ -96,8 +91,6 @@ class EventsPublisherTest {
 
     @Test
     void enqueue_shouldEvictOldestEnvelope_inDropOldestMode_verifyingOrder() throws InterruptedException {
-        // Capacity 2, three enqueues ordered 1→2→3. After eviction the daemon
-        // should drain envelopes 2 and 3 in that order; envelope 1 is gone.
         ConcurrentLinkedQueue<Long> drained = new ConcurrentLinkedQueue<Long>();
         CountDownLatch latch = new CountDownLatch(2);
         EventsPublisher.Sender sender = (record, callback) -> {
@@ -108,17 +101,14 @@ class EventsPublisherTest {
 
         Map<String, String> topics = Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase");
         EventTypeRegistry registry = new EventTypeRegistry();
-        // shutdownDrainMs=0 keeps tearDown.stop() fast; daemon-poll grace is enough
-        // to drain 2 envelopes before assertion.
+        // shutdownDrainMs=0 keeps tearDown fast; daemon-poll grace suffices to drain
         publisher = new EventsPublisher(topics, sender, cfg(2, EventsPublisher.DropPolicy.OLDEST, 0L), registry);
         EventTypeBinding binding = registry.lookup(PremiumPurchaseEvent.class);
 
-        // Enqueue all three BEFORE starting the daemon — otherwise the daemon may
-        // drain 1 before 3 arrives, leaving 2+3 in queue without an eviction race.
+        // enqueue before start: otherwise the daemon may drain 1 before 3 arrives, hiding the eviction
         publisher.enqueue(envelope(1L, binding));
         publisher.enqueue(envelope(2L, binding));
         publisher.enqueue(envelope(3L, binding));
-        // Eviction has happened on the caller thread; queue now holds 2, 3.
         publisher.start();
 
         assertTrue(latch.await(2, TimeUnit.SECONDS), "daemon did not drain in 2s");
@@ -160,7 +150,6 @@ class EventsPublisherTest {
 
     @Test
     void doSend_shouldDrop_whenFamilyTopicMissing() throws InterruptedException {
-        // No topic for "premiumpurchase" → enqueued envelopes drop on the daemon thread.
         publisher = new EventsPublisher(
                 Collections.emptyMap(),
                 noopSender(),
@@ -171,7 +160,6 @@ class EventsPublisherTest {
         EventTypeBinding binding = new EventTypeRegistry().lookup(PremiumPurchaseEvent.class);
         publisher.enqueue(envelope(99L, binding));
 
-        // Wait briefly for daemon to drain.
         long deadline = System.currentTimeMillis() + 1000;
         while (System.currentTimeMillis() < deadline && publisher.droppedTotal() == 0) {
             Thread.sleep(20);
@@ -254,7 +242,6 @@ class EventsPublisherTest {
 
         Map<String, String> topics = Collections.singletonMap("premiumpurchase", "acme.gs.events.premiumpurchase");
         EventTypeRegistry registry = new EventTypeRegistry();
-        // Non-started publisher — flush() drains synchronously on the calling thread.
         publisher =
                 new EventsPublisher(topics, sender, flusher, cfg(10, EventsPublisher.DropPolicy.NEWEST, 0L), registry);
         EventTypeBinding binding = registry.lookup(PremiumPurchaseEvent.class);

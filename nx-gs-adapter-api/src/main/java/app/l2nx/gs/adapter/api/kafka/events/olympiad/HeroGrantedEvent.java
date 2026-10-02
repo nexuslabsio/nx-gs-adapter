@@ -5,36 +5,11 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO published to the {@code olympiad} family topic
- * ({@code <tenant>.gs.events.olympiad}) when a character is crowned hero at
- * the end of an Olympiad cycle. One event per crowned hero.
- *
- * <p>Rides the same family as {@link OlympiadMatchResultEvent} — a multi-event
- * family dispatched on the {@code Nx-Message-Type} header — and shares its
- * partition key, {@link #getCharId() charId} (8-byte big-endian), so a
- * character's match history and hero crownings land on one partition in
- * occurrence order.</p>
- *
- * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The crowning timestamp is
- * encoded in the upper 48 bits — extractable via
- * {@code app.l2nx.gs.commons.UUIDv7.extractCreatedAt(eventId)}; no separate
- * {@code crownedAt} field. Platform consumers dedupe on {@code eventId}
- * (at-least-once delivery).</p>
- *
- * <p>Character / clan names are intentionally NOT carried — the platform joins
- * on {@link #getCharId() charId} / {@link #getClanId() clanId} against the
- * character / clan CDC streams. Current "is this character a hero right now"
- * lives on the CDC {@code CharacterDbDto.hero} flag; this event is the durable
- * historical record of each crowning.</p>
- *
- * <p>{@link #getMetadata() metadata} — optional open string→string map of
- * build-agnostic attributes about this crowning. {@code null} when absent;
- * hosts MAY add arbitrary keys without an API release, and consumers ignore
- * keys they do not understand.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson / Jackson can deserialize without
- * {@code @JsonProperty}.</p>
+ * Character crowned hero at the end of an Olympiad cycle; one event per hero, on the {@code olympiad} family topic.
+ * <p>Partitioned by {@link #getCharId() charId} (8-byte BE) like {@link OlympiadMatchResultEvent}, so a character's matches and crownings stay ordered.
+ * <p>{@link #getEventId() eventId} MUST be a UUIDv7 (upper 48 bits encode the timestamp); consumers dedupe on it (at-least-once).
+ * <p>Names are not carried - join on charId / clanId via CDC. Current hero state is CDC {@code CharacterDbDto.hero}; this event is the historical record.
+ * <p>{@link #getMetadata() metadata} is an optional open string-to-string map; {@code null} when absent, consumers ignore unknown keys.
  */
 public final class HeroGrantedEvent {
 
@@ -64,63 +39,33 @@ public final class HeroGrantedEvent {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * Event identity. MUST be a UUIDv7 — the upper 48 bits encode the crowning
-     * timestamp.
-     */
     public UUID getEventId() {
         return eventId;
     }
 
-    /**
-     * Crowned character's {@code objectId} — partition key (8-byte big-endian),
-     * shared with {@link OlympiadMatchResultEvent}.
-     */
     public long getCharId() {
         return charId;
     }
 
-    /**
-     * Legacy numeric class id the character was crowned hero with. Source-side
-     * (host) numbering. Superseded by {@link #getClazz() clazz}; retained for
-     * back-compat while hosts migrate to the canonical token. Consumers MUST
-     * prefer {@code clazz} when it is non-null.
-     */
+    /** Legacy host-numbered class id; consumers MUST prefer {@link #getClazz() clazz} when non-null. */
     public int getClassId() {
         return classId;
     }
 
-    /**
-     * Canonical, source-agnostic class token the character was crowned hero
-     * with. {@code null} from hosts that have not yet migrated off the numeric
-     * {@link #getClassId() classId} (consumers fall back to it then), or when
-     * the source class is not in the canonical {@link CharacterClass} set.
-     */
+    /** {@code null} from hosts not yet migrated (fall back to {@link #getClassId() classId}) or when the class is outside the canonical {@link CharacterClass} set. */
     public @Nullable CharacterClass getClazz() {
         return clazz;
     }
 
-    /**
-     * Clan affiliation snapshot at crowning. {@code null} when the character
-     * has no clan or the host could not resolve it best-effort (e.g. an offline
-     * winner) — platform consumers join on the clan CDC stream when needed.
-     */
+    /** {@code null} when the character has no clan or the host could not resolve it (e.g. offline winner). */
     public @Nullable Long getClanId() {
         return clanId;
     }
 
-    /**
-     * Olympiad cycle this character was crowned hero for.
-     */
     public int getOlympiadCycle() {
         return olympiadCycle;
     }
 
-    /**
-     * Optional open string→string map of build-agnostic attributes about this
-     * crowning. {@code null} when absent; hosts MAY add arbitrary keys without
-     * an API release.
-     */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;
     }

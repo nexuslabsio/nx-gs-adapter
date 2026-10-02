@@ -13,20 +13,12 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Phase 1 of the CRC32 CDC protocol. {@link #hashPrimary} returns (PK → CRC32);
- * {@link #hashChild} returns (parent PK → XOR-aggregate CRC32) — XOR is order-
- * insensitive so child row order has no bearing on the hash.
- *
- * <p>Both variants run against a {@link Connection} already inside the
- * caller's consistent-snapshot transaction. The engine opens one
- * transaction per window for primary + every child to keep the entire
- * window-CRC bit-exact under concurrent writes.</p>
+ * Phase 1: {@link #hashPrimary} returns PK to CRC32, {@link #hashChild} returns parent PK to XOR-aggregated CRC32 (row-order insensitive).
+ * Runs inside the caller's per-window consistent-snapshot transaction so primary + children stay bit-exact under concurrent writes.
  */
 public final class Phase1Hasher {
 
-    /**
-     * Sentinel marking "no entry" — distinct from a legit CRC32 of 0.
-     */
+    /** Marks "no entry"; distinct from a legit CRC32 of 0. */
     public static final int MISSING_HASH = Integer.MIN_VALUE;
 
     public Long2IntMap hashPrimary(
@@ -110,7 +102,7 @@ public final class Phase1Hasher {
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         long pk = rs.getLong(1);
-                        // CRC32 / BIT_XOR(CRC32) returns BIGINT UNSIGNED; narrow to int — bit-exact.
+                        // BIGINT UNSIGNED narrowed to int, bit-exact.
                         int crc = (int) rs.getLong(2);
                         result.put(pk, crc);
                     }
@@ -140,7 +132,7 @@ public final class Phase1Hasher {
             }
             try {
                 ps.setQueryTimeout(queryTimeoutSeconds);
-                // Bounded IN-list — plain fetch, no MySQL Integer.MIN_VALUE streaming cursor (range-scan only).
+                // Bounded IN-list: plain fetch, no streaming cursor.
                 ps.setFetchSize(fetchSize);
                 for (int i = 0; i < keys.size(); i++) {
                     ps.setLong(i + 1, keys.getLong(i));
@@ -148,7 +140,7 @@ public final class Phase1Hasher {
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         long pk = rs.getLong(1);
-                        // CRC32 / BIT_XOR(CRC32) returns BIGINT UNSIGNED; narrow to int — bit-exact.
+                        // BIGINT UNSIGNED narrowed to int, bit-exact.
                         int crc = (int) rs.getLong(2);
                         result.put(pk, crc);
                     }
@@ -163,11 +155,8 @@ public final class Phase1Hasher {
     }
 
     /**
-     * MySQL Connector/J ignores positive {@code fetchSize} and only honors
-     * {@code Integer.MIN_VALUE} (streaming row-by-row). MariaDB Connector/J 3.x
-     * rejects the same sentinel ({@code SQLException: invalid fetch size}) —
-     * see {@link JdbcDialect#MARIADB}. Pgjdbc and most other drivers treat
-     * positive {@code fetchSize} as a server-side cursor batch hint.
+     * MySQL Connector/J honors only {@code Integer.MIN_VALUE} (streaming); MariaDB 3.x rejects it (see {@link JdbcDialect#MARIADB});
+     * other drivers treat a positive value as a server-side cursor batch hint.
      */
     static void applyFetchSize(Statement ps, int fetchSize, JdbcDialect dialect) throws SQLException {
         if (dialect == JdbcDialect.MYSQL) {

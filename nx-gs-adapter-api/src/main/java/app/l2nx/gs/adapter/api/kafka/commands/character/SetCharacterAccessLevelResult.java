@@ -3,12 +3,6 @@ package app.l2nx.gs.adapter.api.kafka.commands.character;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Success payload of {@link SetCharacterAccessLevelCommand}.
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
- */
 public final class SetCharacterAccessLevelResult {
 
     private final Long charId;
@@ -34,26 +28,17 @@ public final class SetCharacterAccessLevelResult {
         return charId;
     }
 
-    /**
-     * The level as the host stored it, in the same vocabulary (an int build
-     * echoes the canonical numeric text).
-     */
+    /** As stored by the host; an int build echoes the canonical numeric text. */
     public String getAccessLevel() {
         return accessLevel;
     }
 
-    /**
-     * The level before the write, {@code null} when the host could not read
-     * it.
-     */
+    /** Level before the write; {@code null} when the host could not read it. */
     public @Nullable String getPreviousAccessLevel() {
         return previousAccessLevel;
     }
 
-    /**
-     * {@code true} when applied to a live session (full effect on next login, as
-     * in-game); {@code false} when written to the offline row.
-     */
+    /** {@code true} when applied to a live session (full effect on next login, as in-game); {@code false} for the offline row. */
     public boolean isWasOnline() {
         return wasOnline;
     }

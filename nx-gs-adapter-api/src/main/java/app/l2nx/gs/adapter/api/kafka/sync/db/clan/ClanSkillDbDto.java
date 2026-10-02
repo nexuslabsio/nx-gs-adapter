@@ -2,16 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.db.clan;
 
 import java.util.Objects;
 
-/**
- * Wire DTO for one row of {@code clan_skills} (or its tenant-equivalent),
- * carried inside {@link ClanDbDto#getSkills()}.
- *
- * <p>Only the identifying-and-versioning pair is surfaced on the wire:
- * {@code id} (which skill, source {@code skill_id}) and {@code level}
- * (current level). Other source-side columns ({@code skill_name},
- * {@code sub_pledge_id}) are intentionally not modeled — they are display /
- * partitioning details that platform consumers don't need.</p>
- */
+/** Wire DTO for one {@code clan_skills} row, carried in {@link ClanDbDto#getSkills()}. */
 public final class ClanSkillDbDto {
 
     private final int id;
@@ -22,17 +13,10 @@ public final class ClanSkillDbDto {
         this.level = level;
     }
 
-    /**
-     * Skill identifier — source {@code skill_id}, {@code NOT NULL}.
-     */
     public int getId() {
         return id;
     }
 
-    /**
-     * Skill level — {@code NOT NULL} on the source side; source default
-     * {@code 0}.
-     */
     public int getLevel() {
         return level;
     }

@@ -4,21 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One drop entry inside a {@link RaidKillEvent} — the host's record of what
- * the raid actually rolled, not the static template drop table.
- *
- * <p>Captures only what was emitted: {@code itemId}, {@code count}, and an
- * optional {@code enchantLevel}. Drop-claim tracking (which character
- * eventually picked the item up) is intentionally out of scope for the
- * v1 wire — it would be a follow-up multi-event pivot (e.g.
- * {@code RaidDropClaimedEvent}) on the same {@code raid} family.</p>
- *
- * <p>Stack quantity is {@code long} because raid kills frequently drop adena
- * counts that overflow {@code int} (Antharas / Valakas).</p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson / Jackson can deserialize without
- * {@code @JsonProperty}.</p>
+ * One drop entry of a {@link RaidKillEvent}: what the raid actually rolled, not the template drop table.
+ * Drop-claim tracking is out of scope.
  */
 public final class RaidDropItem {
 
@@ -32,25 +19,16 @@ public final class RaidDropItem {
         this.enchantLevel = enchantLevel;
     }
 
-    /**
-     * L2 item template id of the dropped stack.
-     */
     public int getItemId() {
         return itemId;
     }
 
-    /**
-     * Stack quantity. {@code >= 1} for valid entries; producers MUST NOT emit
-     * a zero-count drop.
-     */
+    /** {@code >= 1}; producers MUST NOT emit a zero-count drop. {@code long} because adena stacks overflow {@code int}. */
     public long getCount() {
         return count;
     }
 
-    /**
-     * Enchant level of the dropped item, when the type is enchantable; {@code null}
-     * for adena, materials, recipes, and anything unenchantable.
-     */
+    /** {@code null} for unenchantable items (adena, materials, recipes). */
     public @Nullable Integer getEnchantLevel() {
         return enchantLevel;
     }

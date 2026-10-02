@@ -24,7 +24,7 @@ class EntitySyncTaskTest {
     @Test
     void runCycle_shouldReturnDegraded_whenTopicMissing() throws SQLException {
         JdbcConnectionSource source = mock(JdbcConnectionSource.class);
-        // No borrow expected — degraded short-circuits before getConnection.
+        // Degraded short-circuits before getConnection.
 
         EntitySyncTask task = new EntitySyncTask(
                 clanMapping(),

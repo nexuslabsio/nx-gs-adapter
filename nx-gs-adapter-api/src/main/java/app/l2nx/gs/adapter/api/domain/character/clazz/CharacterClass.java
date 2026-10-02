@@ -1,24 +1,12 @@
 package app.l2nx.gs.adapter.api.domain.character.clazz;
 
 /**
- * Player character class — canonical Salvation/High-Five class set surfaced on the wire.
- * 103 entries. A pure, source-agnostic vocabulary: the enum carries class identity only, by
- * canonical token. The source-side numeric class id is deliberately NOT modeled here — that
- * mapping is a host detail and lives in the host provider; display names / translations are
- * platform data and live consumer-side (keyed by the token).
+ * Canonical Salvation/High-Five class set, identity by token only; numeric ids and display names
+ * live in the host provider and consumers.
  *
- * <p>Naming convention: race prefix only on overlapping base names ({@code FIGHTER},
- * {@code MAGE}, {@code SOLDIER}). Higher-tier class names are unique enough to stand alone,
- * except where the L2 source itself disambiguates (e.g. {@code ELVEN_KNIGHT} vs {@code KNIGHT},
- * {@code DARK_WIZARD} vs {@code WIZARD}, {@code SHILLIEN_ORACLE} vs {@code ORACLE}). Kamael
- * gendered classes keep the gender prefix ({@code MALE_SOULBREAKER}, {@code FEMALE_SOULHOUND}).
- *
- * <p>A non-canonical / custom-fork class is a contract gap: add the constant here (and to the
- * host id→enum mapping) rather than surfacing it as {@code null}.
+ * <p>A custom-fork class missing here is a contract gap: add the constant, do not emit {@code null}.</p>
  */
 public enum CharacterClass {
-
-    // BASIC — newborn, no profession yet
     HUMAN_FIGHTER,
     HUMAN_MAGE,
     ELVEN_FIGHTER,
@@ -31,7 +19,6 @@ public enum CharacterClass {
     KAMAEL_MALE_SOLDIER,
     KAMAEL_FEMALE_SOLDIER,
 
-    // FIRST profession
     WARRIOR,
     KNIGHT,
     ROGUE,
@@ -53,7 +40,6 @@ public enum CharacterClass {
     TROOPER,
     WARDER,
 
-    // SECOND profession
     GLADIATOR,
     WARLORD,
     PALADIN,
@@ -91,7 +77,6 @@ public enum CharacterClass {
     ARBALESTER,
     INSPECTOR,
 
-    // THIRD profession
     DUELIST,
     DREADNOUGHT,
     PHOENIX_KNIGHT,

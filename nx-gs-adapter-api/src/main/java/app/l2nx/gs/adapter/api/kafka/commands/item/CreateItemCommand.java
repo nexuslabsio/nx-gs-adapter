@@ -6,16 +6,12 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inbound command instructing the game-server to grant a fresh item stack to
- * a character. {@link #getItemTemplateId() itemTemplateId} is the catalog
- * template (e.g. {@code 57} = adena), NOT a stack object-id.
+ * Grants a fresh item stack to a character. {@code itemTemplateId} is the catalog template (e.g. {@code 57} = adena),
+ * NOT a stack object-id.
  *
- * <p>{@link #getEnchantLevel() enchantLevel} (optional, default {@code 0}) is
- * meaningful for non-stackable equipment; stackable templates ignore it.
- * {@link #getLocation() location} (optional, default {@link ItemLocation#INVENTORY})
- * picks the destination container. The handler MAY reject locations that
- * cannot be created into (e.g. {@code EQUIP}, {@code PET_EQUIP}, {@code MAIL})
- * with {@link app.l2nx.gs.adapter.api.kafka.commands.CommandStatus#INVALID_STATE}.</p>
+ * <p>{@code enchantLevel} (default {@code 0}) applies to non-stackable equipment only. {@code location} defaults to
+ * {@link ItemLocation#INVENTORY}; the handler MAY reject non-creatable ones ({@code EQUIP}, {@code PET_EQUIP}, {@code MAIL})
+ * with {@code INVALID_STATE}.</p>
  */
 public final class CreateItemCommand implements NxCommand<CreateItemResult> {
 

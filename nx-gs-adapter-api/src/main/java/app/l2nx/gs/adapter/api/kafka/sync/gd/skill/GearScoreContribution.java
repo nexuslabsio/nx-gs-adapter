@@ -7,22 +7,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One gear-score contribution a skill grants — a sub-DTO of {@link Skill}. A skill
- * may carry several contributions (e.g. a flat bonus for owning it plus a per-level
- * bonus), so {@link Skill#getGearScoreContributions()} is a list.
- *
- * <p>{@link #getKind() kind} is a closed {@code UPPER_SNAKE_CASE} vocabulary that
- * selects how {@link #getValue() value} scales:</p>
- * <ul>
- *   <li>{@code OWNED} — flat bonus for the character merely having the skill;
- *   {@code value} applied once.</li>
- *   <li>{@code PER_LEVEL} — {@code value} multiplied by the skill's level.</li>
- *   <li>{@code ENCHANT} — {@code value} multiplied by the skill's enchant step;
- *   frequently class-bound.</li>
- * </ul>
- *
- * <p>{@link #getClassIds() classIds} restricts the contribution to specific
- * playable classes — {@code null} means it applies to every class.</p>
+ * One gear-score contribution a skill grants; a skill may carry several (e.g. an owning bonus plus a per-level one).
+ * {@link #getClassIds() classIds} restricts it to specific classes; {@code null} means every class.
  */
 public final class GearScoreContribution {
 
@@ -36,26 +22,16 @@ public final class GearScoreContribution {
         this.classIds = classIds == null ? null : Collections.unmodifiableList(new ArrayList<Integer>(classIds));
     }
 
-    /**
-     * Scaling kind — closed {@code UPPER_SNAKE_CASE} vocabulary
-     * ({@code OWNED} / {@code PER_LEVEL} / {@code ENCHANT}).
-     */
+    /** {@code OWNED} (flat), {@code PER_LEVEL} (times skill level) or {@code ENCHANT} (times enchant step). */
     public String getKind() {
         return kind;
     }
 
-    /**
-     * Gear-score points per the {@link #getKind() kind}'s unit (flat for
-     * {@code OWNED}, per level for {@code PER_LEVEL}, per enchant step for
-     * {@code ENCHANT}).
-     */
+    /** Points in the unit of {@link #getKind() kind}. */
     public int getValue() {
         return value;
     }
 
-    /**
-     * Classes this contribution applies to; {@code null} means all classes.
-     */
     public @Nullable List<Integer> getClassIds() {
         return classIds;
     }

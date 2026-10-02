@@ -9,32 +9,17 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
-/**
- * Shared {@link EntityMapping} builders for engine tests. Each builder is
- * stateless and returns a fresh mapping per call; tests should not share
- * the same mapping across cycles unless they explicitly want to.
- */
+/** Shared {@link EntityMapping} builders; each call returns a fresh mapping. */
 public final class TestMappings {
 
     private TestMappings() {}
 
-    /**
-     * Single-table {@code clan_data} mapping — no children, mirrors the
-     * pre-multi-source MVP shape. Used by tests that only need a typed
-     * {@link EntityMapping<ClanDbDto>} surface and do not exercise child rows.
-     */
+    /** Single-table {@code clan_data} mapping with no children. */
     public static EntityMapping<ClanDbDto> clanOnly() {
         return clanWithChildren(Collections.emptyList());
     }
 
-    /**
-     * Clan mapping with the full bohpts shape: primary {@code clan_data}
-     * (sentinel-zero → null for {@code leader_id} / {@code ally_id}) +
-     * one child {@code clan_skills} (FK {@code clan_id}, hashed
-     * {@code skill_id, skill_level}). {@code mapEntity} assembles a
-     * {@link ClanDbDto} with a fully populated {@link ClanDbDto#getSkills() skills}
-     * list.
-     */
+    /** Full bohpts clan shape: {@code clan_data} (zero leader_id/ally_id map to null) plus child {@code clan_skills}. */
     public static EntityMapping<ClanDbDto> clanWithSkills() {
         ChildSource<TestClanSkillRow> skills = new ChildSource<TestClanSkillRow>() {
             @Override
@@ -137,11 +122,7 @@ public final class TestMappings {
         };
     }
 
-    /**
-     * Generic stub mapping with a custom primary source (no children, no
-     * Phase-2 row mapping). Good enough for tests that only exercise the
-     * planner / hasher SQL surface.
-     */
+    /** Stub mapping with a custom primary source; no children, no Phase-2 row mapping. */
     public static EntityMapping<Object> stub(
             final String entity, final String table, final String pk, final List<String> hashed) {
         final PrimarySource<Object> primary = new PrimarySource<Object>() {
@@ -197,10 +178,6 @@ public final class TestMappings {
         return v == 0L ? null : v;
     }
 
-    /**
-     * Package-private primary-row record used by the clan mapping in tests.
-     * Mirrors the bohpts impl's private {@code ClanRow}.
-     */
     static final class TestClanRow {
         final long clanId;
         final String clanName;

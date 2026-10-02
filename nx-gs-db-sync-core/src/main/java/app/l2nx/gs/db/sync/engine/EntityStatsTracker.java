@@ -10,17 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Holds the latest {@link EntityStats} per entity. Writers are
- * {@link EntitySyncTask}s (one thread per entity); readers are heartbeat
- * threads. Per-entity stats are stored in a {@link ConcurrentHashMap} so a
- * reader walking the keys observes the latest committed value for each entity
- * without blocking writers.
- *
- * <p>{@link #recordCycleResult} also drives the {@code consecutiveErrors}
- * counter: increments on {@link EntityState#DEGRADED}, resets to 0 on
- * {@link EntityState#HEALTHY}.</p>
- */
+/** Latest {@link EntityStats} per entity: one writer thread per entity, heartbeat readers never block writers. */
 public final class EntityStatsTracker {
 
     private final Map<String, EntityStats> latest = new ConcurrentHashMap<String, EntityStats>();
@@ -50,19 +40,12 @@ public final class EntityStatsTracker {
                         .build())
                 .consecutiveErrors(errors)
                 .build();
-        // Order slot first, then stats — a reader between the two writes either misses
-        // the entity entirely (acceptable) or sees a complete (order, stats) pair.
-        // The reverse would let a reader observe stats with no order entry and silently
-        // drop the entity from the snapshot.
+        // Order slot first: a reader between the writes misses the entity at worst, never sees stats without an order
+        // entry.
         entityOrder.computeIfAbsent(entityName, k -> orderCursor.getAndIncrement());
         latest.put(entityName, stats);
     }
 
-    /**
-     * Snapshot of every recorded entity, ordered by the entity's first-record
-     * insertion order. Returns an immutable list; entries themselves are
-     * immutable {@link EntityStats}.
-     */
     public List<EntityStats> currentStatuses() {
         if (latest.isEmpty()) {
             return Collections.emptyList();

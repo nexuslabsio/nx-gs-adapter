@@ -34,11 +34,6 @@ class CommandsConsumerTest {
         }
     }
 
-    /**
-     * Captures every reply record sent and synchronously invokes its callback.
-     * Callback is invoked with success metadata by default; tests that need
-     * failure semantics can swap.
-     */
     static final class CapturingReplySender implements CommandsConsumer.ReplySender {
         final List<ProducerRecord<byte[], Object>> sent = new ArrayList<>();
         boolean simulateFailure = false;
@@ -377,7 +372,6 @@ class CommandsConsumerTest {
         });
         CommandsConsumer consumer = build("out");
 
-        // null target → no NX_TARGET_SERVER_ID header stamped
         consumer.processRecord(recordWithHeaders(
                 "in", "FakeCommand", UUID.randomUUID(), "{\"charId\":1}".getBytes(StandardCharsets.UTF_8), null));
 

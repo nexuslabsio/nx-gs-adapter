@@ -5,55 +5,24 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO published to the {@code raid} family topic
- * ({@code <tenant>.gs.events.raid}) when an {@code Attackable.isRaid() &&
- * !isRaidMinion()} target dies. One event per kill, regardless of fight
- * scale — a Valakas raid involving multiple command channels and a daily
- * instance boss killed by one party emit the same shape.
+ * Published to the {@code raid} family topic when a non-minion raid boss dies. One event per kill,
+ * regardless of fight scale.
  *
- * <p>{@link #getEventId() eventId} MUST be a UUIDv7. The wire kill-timestamp
- * is encoded in the upper 48 bits — extractable via
- * {@code app.l2nx.gs.commons.UUIDv7.extractCreatedAt(eventId)}; no separate
- * {@code killedAt} field. Platform consumers dedupe on {@code eventId}
- * (at-least-once delivery). Partition key on the wire is the
- * {@link #getBossNpcId() bossNpcId} (8-byte big-endian) — per-boss kill
- * history lands on one partition for ordered consumption.</p>
+ * <p>{@code eventId} MUST be a UUIDv7 (upper 48 bits = kill timestamp); consumers dedupe on it
+ * (at-least-once). Partition key is {@code bossNpcId} (8-byte big-endian), so per-boss history is ordered.</p>
  *
- * <p>Three {@link RaidActor} reference points share one shape (charId +
- * affiliation + per-raid damage contribution):
  * <ul>
- *   <li>{@link #getLastHit() lastHit} — final-blow character. {@code null}
- *   when the last hit came from a non-player source (trap, owner-less
- *   summon, kill curse). Narrative only — does NOT confer drop rights in L2.</li>
- *   <li>{@link #getDropOwner() dropOwner} — host-side
- *   {@code mainDamageDealer} who received drop protection on the rolled
- *   loot. Group-first semantics: when {@code dropOwner.partyId} is non-null,
- *   drop rights belong to that party (consumer aggregates analytics by
- *   {@code partyId} / {@code commandChannelId}), and {@code dropOwner.charId}
- *   identifies the L2 representative of that group (may differ across kills
- *   of the same party — do NOT aggregate by it). When
- *   {@code dropOwner.partyId} is null the kill was solo and
- *   {@code dropOwner.charId} IS the drop owner directly.
- *   {@code null} when no resolvable player damager (admin kill, instant
- *   kill with empty aggro list).</li>
- *   <li>{@link #getParticipants() participants} — one
- *   {@code RaidActor} per character who took part in the kill. A character
- *   qualifies via the host aggro list (damage <em>or</em> hate accrued —
- *   the latter covers healers / tanks / aggro-skill users who never landed
- *   their own damage) <em>or</em> via Party / CommandChannel membership of
- *   any aggro-list contributor (covers pure buffers grouped with the actual
- *   fighters). Producers SHOULD emit sorted by
- *   {@link RaidActor#getDamageDealt() damageDealt} desc as a consumer
- *   convenience — support entries (damage=0) park at the tail.</li>
- *   <li>{@link #getMetadata() metadata} — optional open string→string map of
- *   build-agnostic attributes about this kill. {@code null} when absent;
- *   hosts MAY add arbitrary keys without an API release and consumers
- *   ignore keys they do not understand.</li>
- * </ul></p>
- *
- * <p>Java-8 POJO; {@code -parameters} javac flag preserves constructor
- * parameter names so Gson / Jackson can deserialize without
- * {@code @JsonProperty}.</p>
+ *   <li>{@code lastHit} - final-blow character; {@code null} for non-player sources (trap, owner-less
+ *   summon). Does NOT confer drop rights.</li>
+ *   <li>{@code dropOwner} - host {@code mainDamageDealer} holding drop protection. Group-first: when
+ *   {@code partyId} is non-null the party owns the drop and {@code charId} is just its representative
+ *   (do NOT aggregate by it); when null the kill was solo and {@code charId} is the owner. {@code null}
+ *   when no resolvable player damager (admin kill, empty aggro list).</li>
+ *   <li>{@code participants} - characters on the aggro list (damage or hate) plus Party / CommandChannel
+ *   teammates of any contributor. Producers SHOULD sort by {@code damageDealt} desc.</li>
+ *   <li>{@code metadata} - open string map; hosts MAY add keys without an API release, consumers ignore
+ *   unknown ones.</li>
+ * </ul>
  */
 public final class RaidKillEvent {
 
@@ -95,92 +64,52 @@ public final class RaidKillEvent {
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
     }
 
-    /**
-     * Event identity. MUST be a UUIDv7 — the upper 48 bits encode the kill
-     * occurrence timestamp.
-     */
+    /** MUST be a UUIDv7. */
     public UUID getEventId() {
         return eventId;
     }
 
-    /**
-     * L2 NPC template id of the raid (e.g. {@code 29028} = Valakas).
-     */
     public int getBossNpcId() {
         return bossNpcId;
     }
 
-    /**
-     * Display name at kill time; optional, platform can resolve from its
-     * NPC catalog when {@code null}.
-     */
+    /** {@code null}: platform resolves from its NPC catalog. */
     public @Nullable String getBossName() {
         return bossName;
     }
 
-    /**
-     * Boss level at spawn; optional.
-     */
     public @Nullable Integer getBossLevel() {
         return bossLevel;
     }
 
-    /**
-     * Coarse classification — see {@link RaidBossKind} for detection rules.
-     */
     public RaidBossKind getBossKind() {
         return bossKind;
     }
 
-    /**
-     * Instance world id when killed inside a reflection / instance zone;
-     * {@code null} for open-world kills.
-     */
+    /** {@code null} for open-world kills. */
     public @Nullable Long getInstanceId() {
         return instanceId;
     }
 
-    /**
-     * Final-blow character. {@code null} when the last hit came from a
-     * non-player source.
-     */
+    /** {@code null} when the last hit came from a non-player source. */
     public @Nullable RaidActor getLastHit() {
         return lastHit;
     }
 
-    /**
-     * Drop-rights actor — group-first semantics, see class-level Javadoc.
-     */
     public @Nullable RaidActor getDropOwner() {
         return dropOwner;
     }
 
-    /**
-     * Per-character contribution records — one {@link RaidActor} per
-     * character who fought the raid. Includes everyone with damage or
-     * hate on the aggro list plus their Party / CommandChannel teammates
-     * (supports who buffed without engaging directly). Always non-null on
-     * read; {@code null} passed to the constructor is normalized to an
-     * empty list.
-     */
+    /** Never null; a {@code null} constructor argument becomes an empty list. */
     public List<RaidActor> getParticipants() {
         return participants;
     }
 
-    /**
-     * Per-drop records — what the raid actually rolled. Always non-null on
-     * read; {@code null} passed to the constructor is normalized to an empty
-     * list.
-     */
+    /** Never null; a {@code null} constructor argument becomes an empty list. */
     public List<RaidDropItem> getDrops() {
         return drops;
     }
 
-    /**
-     * Optional open string→string attributes about this kill — {@code null}
-     * when absent. Hosts MAY add arbitrary keys without
-     * an API release; consumers ignore keys they do not understand.
-     */
     public @Nullable Map<String, String> getMetadata() {
         return metadata;
     }

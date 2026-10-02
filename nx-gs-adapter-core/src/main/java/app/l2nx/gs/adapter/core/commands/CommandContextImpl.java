@@ -10,16 +10,8 @@ import java.util.concurrent.Executor;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Per-invocation {@link CommandContext} implementation. Created by
- * {@link CommandsConsumer} for each polled record, passed to the handler,
- * discarded when the handler returns — except for a deferred reply it handed out, which lives on in
+ * Per-record; discarded when the handler returns, except a deferred reply it handed out, which lives on in
  * {@link DeferredReplies}.
- *
- * <p>{@link #host()}, {@link #events()}, {@link #io()}, and {@link #sync()}
- * are session-scoped — one instance each held by the consumer.
- * {@link #correlationId()} is per-record.</p>
- *
- * <p>Package-private. External code only sees {@link CommandContext}.</p>
  */
 final class CommandContextImpl implements CommandContext {
 

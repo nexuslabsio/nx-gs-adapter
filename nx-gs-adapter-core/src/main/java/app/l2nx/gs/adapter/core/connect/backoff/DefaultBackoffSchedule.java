@@ -3,12 +3,7 @@ package app.l2nx.gs.adapter.core.connect.backoff;
 import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * Canonical retry schedule: {@code 30s → 1m → 2m → 5m}, capped at 5m for all
- * subsequent attempts. Each emitted delay carries ±25% uniform jitter so a
- * platform-wide outage doesn't thundering-herd N adapter instances onto the
- * same broker tick.
- */
+/** 30s → 1m → 2m → 5m, then capped; ±25% jitter so a platform outage doesn't thundering-herd all adapters. */
 public final class DefaultBackoffSchedule implements BackoffSchedule {
 
     private static final Duration[] STEPS =

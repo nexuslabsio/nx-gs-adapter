@@ -7,19 +7,17 @@ public final class NxLogFactory {
     static {
         boolean available = false;
         try {
-            // SLF4J 1.7.x: StaticLoggerBinder exists when a binding (logback, log4j-slf4j, etc.) is present
+            // SLF4J 1.7.x exposes StaticLoggerBinder when a binding is present
             Class.forName("org.slf4j.impl.StaticLoggerBinder");
             available = true;
         } catch (ClassNotFoundException e) {
-            // SLF4J 2.x: uses ServiceLoader instead of StaticLoggerBinder
-            // Check if LoggerFactory resolves to a real provider (not NOPLoggerFactory)
+            // SLF4J 2.x uses ServiceLoader: check LoggerFactory is not the NOP one
             try {
                 Class<?> factoryClass = Class.forName("org.slf4j.LoggerFactory");
                 Object loggerFactory =
                         factoryClass.getMethod("getILoggerFactory").invoke(null);
                 available = !loggerFactory.getClass().getName().equals("org.slf4j.helpers.NOPLoggerFactory");
             } catch (Exception ignored) {
-                // SLF4J not on classpath at all, or no provider — use console fallback
             }
         }
         SLF4J_AVAILABLE = available;
@@ -38,7 +36,6 @@ public final class NxLogFactory {
         return new ConsoleNxLog(clazz);
     }
 
-    // Visible for testing
     static boolean isSlf4jAvailable() {
         return SLF4J_AVAILABLE;
     }

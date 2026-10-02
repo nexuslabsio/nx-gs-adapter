@@ -2,9 +2,7 @@ package app.l2nx.gs.db.sync.engine.persist;
 
 import app.l2nx.gs.db.sync.engine.SnapshotStore;
 
-/**
- * No-op {@link SnapshotPersistence} — used by tests that don't need disk I/O.
- */
+/** For tests that need no disk I/O. */
 public final class NoopSnapshotPersistence implements SnapshotPersistence {
 
     public static final NoopSnapshotPersistence INSTANCE = new NoopSnapshotPersistence();

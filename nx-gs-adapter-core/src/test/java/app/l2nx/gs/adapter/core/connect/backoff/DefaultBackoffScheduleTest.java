@@ -20,7 +20,6 @@ class DefaultBackoffScheduleTest {
         long quarter = baseMs / 4;
         long min = baseMs - quarter;
         long max = baseMs + quarter;
-        // Sample multiple times to catch jitter at both edges.
         for (int i = 0; i < 50; i++) {
             long ms = schedule.next(attempt).toMillis();
             assertTrue(
@@ -31,7 +30,6 @@ class DefaultBackoffScheduleTest {
 
     @Test
     void next_shouldEmitVariedDelays_acrossInvocations() {
-        // With ±25% jitter on a 30s base, 25 samples must produce >1 distinct value.
         Set<Long> distinct = new HashSet<>();
         for (int i = 0; i < 25; i++) {
             distinct.add(schedule.next(1).toMillis());

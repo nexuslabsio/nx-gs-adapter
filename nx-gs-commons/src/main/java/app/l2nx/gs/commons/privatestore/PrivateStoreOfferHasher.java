@@ -5,13 +5,7 @@ import app.l2nx.gs.commons.hash.Fnv1a64;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Order-independent FNV-1a64 hash over a private-store order book — used
- * by snapshot daemons for change-detection (equal hash → skip emit).
- *
- * <p>Non-cryptographic; rare collisions cost one missed tick, the next
- * change recovers consistency. Stateless and thread-safe.</p>
- */
+/** Order-independent; collisions are rare and cost at most one missed change-detection tick. */
 public final class PrivateStoreOfferHasher {
 
     private static final Comparator<OfferRow> CANONICAL_ORDER = (a, b) -> {
@@ -25,8 +19,7 @@ public final class PrivateStoreOfferHasher {
         if (c != 0) return c;
         c = Long.compare(a.currencyItemTemplateId, b.currencyItemTemplateId);
         if (c != 0) return c;
-        // Total tie-breaker: itemId is unique per instance, so equal rows are
-        // impossible past this point (spec 065 §2.1).
+        // itemId is unique per instance, so ties are impossible past this point
         return Long.compare(a.itemId, b.itemId);
     };
 
@@ -38,9 +31,6 @@ public final class PrivateStoreOfferHasher {
 
     private PrivateStoreOfferHasher() {}
 
-    /**
-     * Empty input yields a stable sentinel distinct from any non-empty set.
-     */
     public static long hash(List<OfferRow> offers) {
         ArrayList<OfferRow> sorted = new ArrayList<OfferRow>(offers);
         Collections.sort(sorted, CANONICAL_ORDER);
@@ -48,10 +38,7 @@ public final class PrivateStoreOfferHasher {
         long h = Fnv1a64.start();
         h = Fnv1a64.mix(h, sorted.size());
         for (OfferRow r : sorted) {
-            // Must be hashed: a sold-then-relisted twin (same template/enchant/
-            // price, different instance) would otherwise produce an identical
-            // hash and never republish, leaving the projection with a dead
-            // objId (spec 065 §2.1).
+            // Hashed so a sold-then-relisted twin (different instance) changes the hash and republishes
             h = Fnv1a64.mix(h, r.itemId);
             h = Fnv1a64.mix(h, r.traderId);
             h = mixNullableInteger(h, r.enchantLevel);
@@ -59,8 +46,7 @@ public final class PrivateStoreOfferHasher {
             h = Fnv1a64.mix(h, r.count);
             h = Fnv1a64.mix(h, r.unitPrice);
             h = Fnv1a64.mix(h, r.currencyItemTemplateId);
-            // Must be hashed: a SELL<->PACKAGE_SELL re-seat with identical
-            // items/prices otherwise produces the same hash and never republishes.
+            // Hashed so a SELL<->PACKAGE_SELL re-seat with identical items/prices republishes
             h = Fnv1a64.mix(h, r.packaged);
         }
         return h;

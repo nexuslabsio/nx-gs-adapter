@@ -21,8 +21,7 @@ class PrivateStoreSideTest {
 
     @Test
     void name_shouldMatchEnumLiteral() {
-        // Wire reflects the enum literal (Gson default) — pin the format so a
-        // refactor renaming the constants surfaces here, not on the platform side.
+        // Pins the enum-literal wire format so a constant rename fails here, not on the platform.
         assertEquals("ASK", PrivateStoreSide.ASK.name());
         assertEquals("BID", PrivateStoreSide.BID.name());
     }

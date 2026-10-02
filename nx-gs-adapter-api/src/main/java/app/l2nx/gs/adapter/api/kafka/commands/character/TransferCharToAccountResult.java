@@ -2,14 +2,6 @@ package app.l2nx.gs.adapter.api.kafka.commands.character;
 
 import java.util.Objects;
 
-/**
- * Success payload of {@link TransferCharToAccountCommand}. Echoes the rebound
- * character + the new account name, plus a flag indicating whether a
- * force-logout was needed (the character was online at command time).
- *
- * <p>Java 8 POJO; final fields; hand-written builder; Gson-friendly via
- * {@code -parameters}-preserved constructor parameter names.</p>
- */
 public final class TransferCharToAccountResult {
 
     private final Long charId;
@@ -36,11 +28,7 @@ public final class TransferCharToAccountResult {
         return newAccountName;
     }
 
-    /**
-     * {@code true} when the character was online at handler-invocation time
-     * and the host issued a force-logout before the rebind. {@code false}
-     * when the character was already offline.
-     */
+    /** {@code true} when the character was online and the host force-logged it out before the rebind. */
     public boolean isWasLoggedOut() {
         return wasLoggedOut;
     }

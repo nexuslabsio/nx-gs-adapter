@@ -17,13 +17,8 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Phase 2: fetches row data for PKs whose aggregate CRC32 changed. PK lists
- * are chunked at {@value #CHUNK_SIZE}; the last (smaller) chunk pads to the
- * fixed placeholder count by repeating its final PK — IN(...) dedupes server-
- * side, the prepared-statement string stays cache-stable across chunks.
- *
- * <p>Phase-2 missing rows (present in Phase 1, gone now) are a silent no-op —
- * next cycle's Phase-1 catches the deletion.</p>
+ * Phase 2: fetches rows for changed PKs in chunks of {@value #CHUNK_SIZE}; the last chunk pads by repeating its final PK
+ * (IN dedupes) to keep the prepared statement cache-stable. Rows missing here are a silent no-op, caught by the next Phase-1.
  */
 public final class Phase2Fetcher {
 
@@ -97,7 +92,6 @@ public final class Phase2Fetcher {
                 Object row = child.mapRow(rs);
                 List<Object> bucket = result.get(fk);
                 if (bucket == null) {
-                    // Presize for the common per-parent fanout.
                     bucket = new ArrayList<Object>(8);
                     result.put(fk, bucket);
                 }
@@ -174,10 +168,6 @@ public final class Phase2Fetcher {
         return sql.toString();
     }
 
-    /**
-     * Iterate-and-copy helper for callers that hold a primitive {@code LongSet}
-     * but need a deterministic-ordered {@link LongList} for chunking.
-     */
     public static LongList toList(it.unimi.dsi.fastutil.longs.LongSet keys) {
         it.unimi.dsi.fastutil.longs.LongArrayList list = new it.unimi.dsi.fastutil.longs.LongArrayList(keys.size());
         LongIterator it = keys.iterator();

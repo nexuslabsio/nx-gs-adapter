@@ -4,13 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Social-clan membership of an NPC — same-faction NPCs within {@code range} assist each
- * other in combat. Carried as {@link NpcTemplate#getFaction()}; the whole object is
- * omitted when the NPC belongs to no faction.
- *
- * <p>{@code name} is the host's faction identifier kept verbatim (e.g. {@code orc_clan} —
- * a free identifier, not an enum-like token); {@code range} is the assist radius in world
- * units.</p>
+ * Same-faction NPCs within {@code range} (world units) assist each other. {@code name} is the host's identifier
+ * kept verbatim, not an enum-like token.
  */
 public final class NpcFaction {
 

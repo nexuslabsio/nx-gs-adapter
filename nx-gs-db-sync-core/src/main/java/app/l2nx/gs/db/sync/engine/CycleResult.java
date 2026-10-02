@@ -4,16 +4,8 @@ import app.l2nx.gs.adapter.api.kafka.ops.model.EntityState;
 import java.util.Objects;
 
 /**
- * Outcome of one {@link EntitySyncTask} run, surfaced to
- * {@link EntityStatsTracker}. Counters are post-publish-walk: only PKs whose
- * Kafka publish succeeded contribute to {@code created/updated/deleted}; failed
- * publishes leave the snapshot untouched and are replayed on the next cycle.
- *
- * <p>{@code failedPublishes} / {@code pendingPublishes} count the publishes
- * that did NOT succeed within the cycle (failed exceptionally / still pending
- * past the flush deadline). The force-resync completion gate requires both to
- * be zero on top of a HEALTHY state — a cycle whose every publish failed
- * still reports HEALTHY, so state alone cannot prove full publication.</p>
+ * Outcome of one {@link EntitySyncTask} run; counters count only ack'd publishes. The resync completion gate also needs
+ * {@code failedPublishes} and {@code pendingPublishes} to be zero, because a cycle with every publish failed still reports HEALTHY.
  */
 public final class CycleResult {
 

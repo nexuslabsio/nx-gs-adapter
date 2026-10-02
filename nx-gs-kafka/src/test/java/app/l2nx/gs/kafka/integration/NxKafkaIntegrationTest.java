@@ -81,7 +81,6 @@ class NxKafkaIntegrationTest {
 
         assertTrue(kafka.isConnected());
 
-        // Pause the container to simulate broker going down
         DockerClientFactory.instance()
                 .client()
                 .pauseContainerCmd(KAFKA.getContainerId())
@@ -97,7 +96,6 @@ class NxKafkaIntegrationTest {
                     .exec();
         }
 
-        // Wait for reconnection
         awaitState(KafkaState.CONNECTED, 15000);
         assertTrue(kafka.isConnected());
     }

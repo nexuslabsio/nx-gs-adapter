@@ -12,26 +12,9 @@ import java.util.concurrent.Executor;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Identity bundle handed to every {@link AdapterModule#onConnect(ConnectContext)} call
- * after a successful platform handshake. Modules cache only the bits they need;
- * the context itself is immutable.
- *
- * <p>Phase 1 carried identity only. Phase 2 added {@link #getSyncTopics()} —
- * namespaced per-entity Kafka topic names delivered by the platform via
- * {@code ConnectResponse.syncTopics}; consumed by sync modules
- * ({@code db-sync}, {@code runtime-sync}). Phase 3 added {@link #events()} —
- * the {@link NxEvents} capability for per-family discrete-fact fanout to
- * {@code <tenant>.gs.events.<family>} topics. Phase 4 adds {@link #commands()} —
- * the {@link NxCommands} capability for registering inbound command handlers
- * dispatched off the {@code <tenant>.gs.commands} topic. Phase 5 adds
- * {@link #io()} — an adapter-owned bounded {@link Executor} for module /
- * handler-side blocking IO (JDBC, HTTP).</p>
- *
- * <p>{@link #events()}, {@link #commands()}, and {@link #io()} are excluded
- * from {@link #equals(Object)} / {@link #hashCode()} / {@link #toString()} —
- * they are service handles, not part of the value-typed identity bundle. Two
- * contexts with the same identity bits compare equal regardless of which
- * implementations they wrap.</p>
+ * Handshake identity plus capability handles passed to {@link AdapterModule#onConnect}.
+ * Capability handles ({@code events}, {@code commands}, {@code io}, {@code sync}, {@code gameData}) are
+ * excluded from equals/hashCode/toString: contexts with the same identity bits are equal.
  */
 public final class ConnectContext {
 
@@ -70,8 +53,7 @@ public final class ConnectContext {
         this.syncTopics = syncTopics == null ? new SyncTopics(null, null, null) : syncTopics;
         this.events = events == null ? NoOpEvents.INSTANCE : events;
         this.commands = commands == null ? NoOpCommands.INSTANCE : commands;
-        // Direct-run fallback keeps ctx.io().execute(r) usable in tests / pre-wired contexts;
-        // production adapter-core injects a bounded pool.
+        // direct-run fallback; production injects a bounded pool
         this.io = io == null ? DirectExecutor.INSTANCE : io;
         this.sync = sync == null ? NoOpSync.INSTANCE : sync;
         this.gameData = gameData == null ? NoOpGameData.INSTANCE : gameData;
@@ -101,77 +83,38 @@ public final class ConnectContext {
         return adapterVersion;
     }
 
-    /**
-     * Namespaced per-entity Kafka topic addressing for sync modules. Always
-     * non-null — a {@code null} {@code ConnectResponse.syncTopics} on the wire
-     * is normalized here to an empty {@link SyncTopics} (every namespace
-     * resolves to an empty map). Modules read their namespace via
-     * {@code getSyncTopics().getDb()} / {@code .getRuntime()} / {@code .getGd()}
-     * and treat empty as {@code DISABLED}.
-     */
+    /** Never null: an absent wire value becomes empty {@link SyncTopics}; modules treat empty as DISABLED. */
     public SyncTopics getSyncTopics() {
         return syncTopics;
     }
 
-    /**
-     * Per-family discrete-fact fanout capability. Always non-null — a
-     * {@code null} passed to the constructor is normalized to a no-op
-     * implementation that swallows every publish call (with a DEBUG log entry).
-     * Host code calls {@code ctx.events().publish(event)}; the runtime type
-     * of {@code event} routes to the correct family via the adapter-core
-     * type registry. Adding a new event type is a one-line registration —
-     * no SPI change.
-     */
+    /** Never null: no-op (publishes dropped) when not wired. The event's runtime type selects the family. */
     public NxEvents events() {
         return events;
     }
 
-    /**
-     * Inbound command-handler registration capability. Always non-null — a
-     * {@code null} passed to the constructor is normalized to a no-op
-     * implementation that drops registrations silently. Host code calls
-     * {@code ctx.commands().on(KickCommand.class, handler)} from its
-     * {@code onConnect} callback; the adapter dispatches inbound records
-     * to the registered handler by {@code Nx-Message-Type} header lookup.
-     */
+    /** Never null: no-op (registrations dropped) when not wired. Dispatch is by {@code Nx-Message-Type}. */
     public NxCommands commands() {
         return commands;
     }
 
     /**
-     * Adapter-owned IO executor. Use for blocking IO (JDBC, HTTP) issued from
-     * module / handler-side code. NOT the game-thread executor — modules
-     * needing game-state reads/writes go through {@link CommandContext#host()}
-     * on a per-invocation basis. Backed by a small bounded pool sized by
-     * {@code l2nx.io.workers} (default =
-     * {@code max(2, Runtime.getRuntime().availableProcessors() / 2)}); a
-     * {@code null} passed to the constructor falls back to a direct-run
-     * executor so calls remain safe in tests / pre-wired contexts.
+     * Never null: direct-run executor when not wired, otherwise a bounded pool ({@code l2nx.io.workers}) for blocking IO.
+     * Not the game thread; use {@link CommandContext#host()} for that.
      */
     public Executor io() {
         return io;
     }
 
     /**
-     * Out-of-band sync request capability. Modules with sync responsibilities
-     * register triggers via {@link NxSync#registerTrigger(String, NxSyncTrigger)}
-     * during {@code onConnect}; host code calls
-     * {@code ctx.sync().requestNow(entity, pk)} to demand an immediate sync
-     * pass for a specific entity instance. Always non-null — a {@code null}
-     * passed to the constructor is normalized to a no-op implementation that
-     * silently drops requests.
+     * Never null: no-op when not wired. Register triggers via {@link NxSync#registerTrigger(String, NxSyncTrigger)}
+     * during {@code onConnect}.
      */
     public NxSync sync() {
         return sync;
     }
 
-    /**
-     * Game-data sync capability. Modules / host hooks call
-     * {@code ctx.gameData().publishSnapshot()} to trigger a fresh full snapshot of
-     * static game-data templates onto the {@code gd} stream (e.g. after a datapack
-     * reload). Always non-null — a {@code null} passed to the constructor is
-     * normalized to a no-op that drops the request.
-     */
+    /** Never null: no-op when not wired. {@code publishSnapshot()} republishes static templates on the {@code gd} stream. */
     public NxGameData gameData() {
         return gameData;
     }

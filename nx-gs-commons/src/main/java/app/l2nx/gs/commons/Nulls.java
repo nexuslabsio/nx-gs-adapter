@@ -2,11 +2,6 @@ package app.l2nx.gs.commons;
 
 import org.jspecify.annotations.Nullable;
 
-/**
- * Sentinel-to-null conversions. Pure transformations, no I/O. Useful when the
- * source representation uses {@code 0} as "no relation / no value" sentinel
- * (common L2J convention) and the consumer wants {@code null} instead.
- */
 public final class Nulls {
 
     private Nulls() {}

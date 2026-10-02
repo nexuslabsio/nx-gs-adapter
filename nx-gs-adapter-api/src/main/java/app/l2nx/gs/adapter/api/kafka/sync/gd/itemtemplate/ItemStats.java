@@ -6,16 +6,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Stats block of an {@link ItemTemplate} — the gameplay numbers that make a weapon a
- * weapon / armor armor. Carried as a nested object so etc-items (no stat profile) simply
- * omit it ({@code stats == null} on this object, and the object itself may be omitted on
- * the template).
- *
- * <p>{@link #getStats()} is the single home for every stat value — combat numbers,
- * elemental power/resist, base-stat bonuses, and weapon mechanics (soulshot/spiritshot
- * count, MP-per-attack, random damage, attack range) — keyed by the canonical
- * {@link Stat} token name. {@code magicWeapon} is the only stat datum kept out of the
- * map (it is a boolean, not a magnitude).</p>
+ * Every stat value lives in {@link #getStats()} keyed by {@link Stat} token; {@code magicWeapon} stays out of it
+ * as a boolean, not a magnitude.
  */
 public final class ItemStats {
 
@@ -32,11 +24,7 @@ public final class ItemStats {
     }
 
     /**
-     * Every stat the item carries, keyed by the canonical {@link Stat} token name
-     * (e.g. {@code P_ATK}, {@code MAX_HP}, {@code FIRE_RES}, {@code SOULSHOT_COUNT}).
-     * {@code null} when the item carries no stats. The producer maps its build-specific
-     * stat representation onto {@link Stat} tokens; unmappable stats are dropped so
-     * the key set stays within the closed vocabulary.
+     * Unmappable source stats are dropped so keys stay within the closed vocabulary.
      */
     public @Nullable Map<String, Double> getStats() {
         return stats;

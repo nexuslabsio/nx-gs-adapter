@@ -4,13 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Upgrade / modification mechanics of an {@link ItemTemplate} — "how this item can
- * be improved or converted": enchanting, attribute (element) infusion, and
- * crystallization. Grouped so the upgrade surface is one cohesive object.
- *
- * <p>All fields {@link Nullable}; a build that lacks a mechanic (no attribute
- * system pre-Gracia, no grade/crystal system) leaves the corresponding field
- * {@code null}. All values are server-side / memory-sourced (Phase 1).</p>
+ * Enchant / attribute / crystallize mechanics; a field is {@code null} when the build lacks the mechanic
+ * (e.g. no attribute system pre-Gracia).
  */
 public final class ItemUpgrade {
 
@@ -34,38 +29,24 @@ public final class ItemUpgrade {
     }
 
     /**
-     * Whether the item may be enchanted at all (server {@code enchant_enabled} flag);
-     * {@code null} = unknown. The datapack carries no per-item max enchant level — that
-     * is a global server config — so this is a boolean capability, not a level.
+     * Capability, not a level: max enchant is global server config.
      */
     public @Nullable Boolean getEnchantable() {
         return enchantable;
     }
 
-    /**
-     * Pre-enchanted base level at creation; {@code null}/0 = none.
-     */
     public @Nullable Integer getDefaultEnchantLevel() {
         return defaultEnchantLevel;
     }
 
-    /**
-     * Can receive an attribute (element); business vocabulary: element → attribute.
-     */
     public @Nullable Boolean getAttributable() {
         return attributable;
     }
 
-    /**
-     * Can be crystallized (≠ {@link #getCrystalCount()}).
-     */
     public @Nullable Boolean getCrystallizable() {
         return crystallizable;
     }
 
-    /**
-     * Number of crystals produced on crystallization.
-     */
     public @Nullable Integer getCrystalCount() {
         return crystalCount;
     }

@@ -8,10 +8,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/**
- * Immutable configuration for {@link NxKafka}. Created via {@link Builder}
- * obtained from {@link NxKafka#configure()}.
- */
 public final class KafkaConfig {
 
     private final String brokers;
@@ -66,11 +62,6 @@ public final class KafkaConfig {
         return properties;
     }
 
-    /**
-     * Static Kafka headers stamped on every record produced by this client.
-     * Used to attach connection-scoped metadata (e.g. {@code Nx-Server-Id})
-     * once at adapter bootstrap without modifying every per-call site.
-     */
     public Map<String, byte[]> getProducerStaticHeaders() {
         return producerStaticHeaders;
     }
@@ -83,22 +74,6 @@ public final class KafkaConfig {
         return stateChangeListener;
     }
 
-    /**
-     * Fluent builder for NxKafka configuration.
-     *
-     * <pre>{@code
-     * NxKafka kafka = NxKafka.configure()
-     *     .brokers("kafka1:9092,kafka2:9092")
-     *     .clientId("bohpts-x20")
-     *     .connectTimeout(5, TimeUnit.SECONDS)
-     *     .reconnect(true)
-     *     .reconnectInterval(30, TimeUnit.SECONDS)
-     *     .gson(new GsonBuilder().setDateFormat("yyyy-MM-dd").create())
-     *     .onStateChange(state -> log.info("Kafka: {}", state))
-     *     .property("security.protocol", "PLAINTEXT")
-     *     .build();
-     * }</pre>
-     */
     public static final class Builder {
 
         private String brokers;
@@ -114,106 +89,65 @@ public final class KafkaConfig {
 
         Builder() {}
 
-        /**
-         * Kafka bootstrap servers (required). Comma-separated, e.g. {@code "kafka1:9092,kafka2:9092"}.
-         */
         public Builder brokers(String brokers) {
             this.brokers = brokers;
             return this;
         }
 
-        /**
-         * Kafka client identifier, used in broker logs. Default: {@code "nx-gs-kafka"}.
-         */
         public Builder clientId(String clientId) {
             this.clientId = clientId;
             return this;
         }
 
-        /**
-         * Timeout for the initial connection check via AdminClient. Default: 5 seconds.
-         */
         public Builder connectTimeout(long timeout, TimeUnit unit) {
             this.connectTimeoutMs = unit.toMillis(timeout);
             return this;
         }
 
-        /**
-         * Enable background health-check and automatic reconnection. Default: {@code true}.
-         */
         public Builder reconnect(boolean reconnect) {
             this.reconnect = reconnect;
             return this;
         }
 
-        /**
-         * Interval between background health checks. Default: 30 seconds.
-         */
         public Builder reconnectInterval(long interval, TimeUnit unit) {
             this.reconnectIntervalMs = unit.toMillis(interval);
             return this;
         }
 
         /**
-         * Bounded wait for the producer to flush in-flight records on shutdown.
-         * Default: 10 seconds. Prevents the JVM shutdown hook from hanging when
-         * the broker is unreachable.
-         *
-         * <p>This close is what actually gets in-flight command replies onto the
-         * wire at shutdown — the commands engine sends them fire-and-forget and
-         * does not drain them itself. Operators running
-         * {@code nx-gs-adapter-core} MUST keep this {@code >=}
-         * {@code l2nx.events.shutdown-drain-timeout-ms}, otherwise reply and
-         * event sends are truncated mid-flight and their callers time out.</p>
+         * Must be >= l2nx.events.shutdown-drain-timeout-ms: this close is what flushes
+         * fire-and-forget replies and events at shutdown, otherwise they are truncated.
          */
         public Builder producerCloseTimeout(Duration timeout) {
             this.producerCloseTimeout = timeout;
             return this;
         }
 
-        /**
-         * Custom Gson instance for JSON serialization/deserialization. Default: {@code new Gson()}.
-         */
         public Builder gson(Gson gson) {
             this.gson = gson;
             return this;
         }
 
-        /**
-         * Callback invoked when connection state changes (e.g. CONNECTED → DISCONNECTED).
-         * Called on the health-check thread — dispatch to game thread if needed.
-         */
+        /** Runs on the health-check thread; hand off to the game thread if needed. */
         public Builder onStateChange(Consumer<KafkaState> listener) {
             this.stateChangeListener = listener;
             return this;
         }
 
-        /**
-         * Sets a raw Kafka client property passed to both AdminClient and Producer.
-         */
+        /** Raw Kafka property for AdminClient, producer and consumers; overrides library defaults. */
         public Builder property(String key, Object value) {
             this.properties.put(key, value);
             return this;
         }
 
-        /**
-         * Adds a static Kafka header stamped on every record produced by the
-         * resulting client. Pre-encoded {@code byte[]} value is reused per record
-         * — caller is responsible for the encoding (e.g. raw 16-byte UUID for
-         * {@code Nx-Server-Id}).
-         */
+        /** Value bytes are shared across records; the caller encodes them and must not mutate. */
         public Builder producerStaticHeader(String name, byte[] value) {
             this.producerStaticHeaders.put(name, value);
             return this;
         }
 
         /**
-         * Validates the configuration, connects to Kafka, and initializes the singleton.
-         * If the broker is unreachable, the state is set to {@code DISCONNECTED}
-         * (no exception thrown) and background reconnection starts if enabled.
-         *
-         * @return the initialized {@link NxKafka} singleton
-         * @throws KafkaException if brokers are not set or NxKafka is already configured
+         * Does not throw when brokers are unreachable: state becomes DISCONNECTED and reconnect starts if enabled.
          */
         public NxKafka build() {
             if (brokers == null || brokers.trim().isEmpty()) {

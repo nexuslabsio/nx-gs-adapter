@@ -42,9 +42,6 @@ class NxAdapterTest {
         List<AdapterState> captured = new ArrayList<>();
         NxAdapter.onStateChange(captured::add);
 
-        // No l2nx.gs-key in sysprops, no l2nx.properties on test classpath →
-        // ConfigResolver throws IllegalStateException → start() must catch and
-        // transition to FAILED.
         NxAdapter result = assertDoesNotThrow(NxAdapter::start);
 
         assertNotNull(result);
@@ -75,8 +72,6 @@ class NxAdapterTest {
             throw new RuntimeException("boom");
         });
 
-        // start() with no config → FAILED transition fires the throwing callback;
-        // start() must still complete without rethrowing.
         assertDoesNotThrow(NxAdapter::start);
         assertEquals(AdapterState.FAILED, NxAdapter.state());
     }
@@ -86,12 +81,12 @@ class NxAdapterTest {
         java.util.concurrent.atomic.AtomicInteger transitions = new java.util.concurrent.atomic.AtomicInteger();
         NxAdapter.onStateChange(s -> transitions.incrementAndGet());
 
-        NxAdapter.start(); // first call: config error → 1 transition (FAILED)
+        NxAdapter.start();
         AdapterState afterFirst = NxAdapter.state();
         int afterFirstCount = transitions.get();
 
-        NxAdapter.start(); // second call: must be a no-op
-        NxAdapter.start(); // third call too
+        NxAdapter.start();
+        NxAdapter.start();
 
         assertEquals(afterFirst, NxAdapter.state(), "state must not change on duplicate start()");
         assertEquals(afterFirstCount, transitions.get(), "duplicate start() must not emit additional transitions");
