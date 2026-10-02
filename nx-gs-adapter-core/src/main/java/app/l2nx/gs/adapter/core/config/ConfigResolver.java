@@ -65,6 +65,7 @@ public final class ConfigResolver {
     static final String KEY_COMMANDS_POLL_TIMEOUT_MS = "l2nx.commands.poll-timeout-ms";
     static final String KEY_COMMANDS_SHUTDOWN_TIMEOUT_MS = "l2nx.commands.shutdown-timeout-ms";
     static final String KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS = "l2nx.commands.host-sync-timeout-ms";
+    static final String KEY_COMMANDS_DEFERRED_REPLY_MAX_MS = "l2nx.commands.deferred-reply-max-ms";
     static final String KEY_COMMANDS_KAFKA_PREFIX = "l2nx.commands.kafka.";
 
     private static final String SERVER_KEY_PREFIX = "nx_sk_";
@@ -176,8 +177,15 @@ public final class ConfigResolver {
             throw new IllegalStateException("Invalid value for '" + KEY_COMMANDS_HOST_SYNC_TIMEOUT_MS + "': "
                     + hostSyncTimeoutMs + " (expected positive integer)");
         }
+        long deferredReplyMaxMs =
+                resolveLong(KEY_COMMANDS_DEFERRED_REPLY_MAX_MS, CommandsConfig.DEFAULT_DEFERRED_REPLY_MAX_MS);
+        if (deferredReplyMaxMs < 1) {
+            throw new IllegalStateException("Invalid value for '" + KEY_COMMANDS_DEFERRED_REPLY_MAX_MS + "': "
+                    + deferredReplyMaxMs + " (expected positive integer)");
+        }
         Map<String, Object> kafkaOverrides = resolveCommandsKafkaOverrides();
-        return new CommandsConfig(pollTimeoutMs, shutdownTimeoutMs, hostSyncTimeoutMs, kafkaOverrides);
+        return new CommandsConfig(
+                pollTimeoutMs, shutdownTimeoutMs, hostSyncTimeoutMs, deferredReplyMaxMs, kafkaOverrides);
     }
 
     private Map<String, Object> resolveCommandsKafkaOverrides() {

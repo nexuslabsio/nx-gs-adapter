@@ -87,6 +87,7 @@ class CommandsConsumerTest {
                 Runnable::run,
                 new app.l2nx.gs.adapter.core.sync.NxSyncImpl(),
                 registry,
+                new DeferredReplies(CommandsConfig.DEFAULT_DEFERRED_REPLY_MAX_MS),
                 mockConsumer,
                 sender,
                 AdapterGson.create(),

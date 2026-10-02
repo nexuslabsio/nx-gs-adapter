@@ -66,6 +66,7 @@ public final class CommandsBootstrap {
             Executor ioExecutor,
             NxEvents events,
             NxSync sync,
+            DeferredReplies deferredReplies,
             CommandsConsumer.ReplySender replySender,
             @Nullable CommandsConfig config) {
         if (!(facade instanceof NxCommandsImpl)) {
@@ -88,6 +89,7 @@ public final class CommandsBootstrap {
                 ioExecutor,
                 events,
                 sync,
+                deferredReplies,
                 replySender,
                 config,
                 registry);
@@ -133,6 +135,7 @@ public final class CommandsBootstrap {
             Executor ioExecutor,
             NxEvents events,
             NxSync sync,
+            DeferredReplies deferredReplies,
             CommandsConsumer.ReplySender replySender,
             @Nullable CommandsConfig config) {
         CommandTypeRegistry registry = new CommandTypeRegistry();
@@ -147,6 +150,7 @@ public final class CommandsBootstrap {
                 ioExecutor,
                 events,
                 sync,
+                deferredReplies,
                 replySender,
                 config,
                 registry);
@@ -163,6 +167,7 @@ public final class CommandsBootstrap {
             Executor ioExecutor,
             NxEvents events,
             NxSync sync,
+            DeferredReplies deferredReplies,
             CommandsConsumer.ReplySender replySender,
             @Nullable CommandsConfig config,
             CommandTypeRegistry registry) {
@@ -206,6 +211,7 @@ public final class CommandsBootstrap {
                 ioExecutor,
                 sync,
                 registry,
+                deferredReplies,
                 kafkaConsumer,
                 replySender,
                 gson,

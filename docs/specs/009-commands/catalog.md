@@ -190,7 +190,7 @@ not deduped: one open check per character, a second command is `INVALID_STATE`. 
 
 | Field        | Type      | Required | Notes                                                     |
 | ------------ | --------- | -------- | --------------------------------------------------------- |
-| `charId`     | `Long`    | yes      | Target character's primary key                            |
+| `characterId`     | `Long`    | yes      | Target character's primary key                            |
 | `issuedBy`   | `String?` | no       | Staff login or service label; echoed in the result        |
 | `staffNotes` | `String?` | no       | Internal staff note; not shown to the player              |
 
@@ -198,7 +198,7 @@ not deduped: one open check per character, a second command is `INVALID_STATE`. 
 
 | Field        | Type                       | Notes                                                                     |
 | ------------ | -------------------------- | ------------------------------------------------------------------------- |
-| `charId`     | `Long`                     | Echo                                                                      |
+| `characterId`     | `Long`                     | Echo                                                                      |
 | `issuedBy`   | `String?`                  | Echo                                                                      |
 | `outcome`    | `String`                   | `WellKnownCaptchaOutcomes`: `PASSED`, `FAILED_WRONG`, `FAILED_TIMEOUT`, `LOGOUT`, `ABORTED` |
 | `startedAt`  | `Instant`                  | Host clock, UTC                                                           |
@@ -211,7 +211,7 @@ not deduped: one open check per character, a second command is `INVALID_STATE`. 
 
 | Status              | When                                                                                   |
 | ------------------- | -------------------------------------------------------------------------------------- |
-| `VALIDATION_FAILED` | `charId` missing / out of range                                                        |
+| `VALIDATION_FAILED` | `characterId` missing / out of range                                                        |
 | `NOT_FOUND`         | No such character, or not in the world                                                 |
 | `INVALID_STATE`     | `reason=ALREADY_ACTIVE` (check open) / `reason=SERVER_PLAYS_CHARACTER` (auto-play on)  |
 | `RATE_LIMITED`      | Per-character cooldown between checks                                                  |

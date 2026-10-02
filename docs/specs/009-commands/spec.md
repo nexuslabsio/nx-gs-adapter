@@ -293,7 +293,7 @@ replies-published == 0}` is visible as a failure rather than as silence
 
 **Could:**
 
-- [todo] R20. Multi-thread consumer pool — one thread per assigned partition, scaling parallelism
+- [done] R20. Multi-thread consumer pool — one thread per assigned partition, scaling parallelism
   while preserving the producer's per-key ordering. Still single-threaded; upgrade if cadence
   becomes a bottleneck.
 
@@ -349,7 +349,7 @@ replies-published == 0}` is visible as a failure rather than as silence
   the header value) and when sibling commands share one `R` class. The bytes are encoded once at
   registration and cached on the binding, keeping the dispatch hot path allocation-free.
 
-- [todo] R27. **Deferred reply.** A handler whose outcome exists only later (a player's answer, a
+- [done] R27. **Deferred reply.** A handler whose outcome exists only later (a player's answer, a
   long host-side process) MUST be able to reply after `handle(...)` returns, without holding the
   consumer thread:
   - `CommandContext` exposes `<R> DeferredReply<R> deferReply()`;

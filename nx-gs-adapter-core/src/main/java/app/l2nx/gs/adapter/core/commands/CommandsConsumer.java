@@ -45,7 +45,9 @@ import org.jspecify.annotations.Nullable;
  * <p><b>At-most-once.</b> {@code commitSync} runs BEFORE dispatch — a
  * crash or commit failure mid-batch drops the in-flight records (no
  * redelivery). Caller times out, operator re-issues. Handlers do NOT
- * need to be idempotent. Reply sends are fire-and-forget.</p>
+ * need to be idempotent. Reply sends are fire-and-forget. A handler that takes a
+ * {@link CommandContext#deferReply() deferred reply} replies later from any thread; the
+ * handle outlives this consumer in {@link DeferredReplies}.</p>
  *
  * <p>Error boundaries: unknown {@code Nx-Message-Type} →
  * {@link CommandStatus#UNSUPPORTED_COMMAND}; Gson failure →
@@ -79,6 +81,7 @@ public final class CommandsConsumer {
     private final Executor ioExecutor;
     private final NxSync sync;
     private final CommandTypeRegistry registry;
+    private final DeferredReplies deferredReplies;
     private final Consumer<byte[], byte[]> kafkaConsumer;
     private final ReplySender replySender;
     private final Gson gson;
@@ -107,6 +110,7 @@ public final class CommandsConsumer {
             Executor ioExecutor,
             NxSync sync,
             CommandTypeRegistry registry,
+            DeferredReplies deferredReplies,
             Consumer<byte[], byte[]> kafkaConsumer,
             ReplySender replySender,
             Gson gson,
@@ -119,6 +123,7 @@ public final class CommandsConsumer {
         this.ioExecutor = ioExecutor;
         this.sync = sync;
         this.registry = registry;
+        this.deferredReplies = deferredReplies;
         this.kafkaConsumer = kafkaConsumer;
         this.replySender = replySender;
         this.gson = gson;
@@ -207,6 +212,8 @@ public final class CommandsConsumer {
                 .repliesPublishedTotal(repliesPublishedTotal.get())
                 .repliesFailedTotal(repliesFailedTotal.get())
                 .commitFailuresTotal(commitFailuresTotal.get())
+                .deferredOpen(deferredReplies.openCount())
+                .deferredExpiredTotal(deferredReplies.expiredTotal())
                 .registeredTypes(registry.snapshotRegisteredTypes())
                 .build();
     }
@@ -365,7 +372,15 @@ public final class CommandsConsumer {
 
         // 3. Invoke handler — an Error is deliberately not caught here; it unwinds the poll loop,
         // SafeRunnable logs it, and the consumer stops (module state falls back to DISABLED).
-        CommandContext ctx = new CommandContextImpl(correlationId, hostExecutor, events, ioExecutor, sync);
+        CommandContextImpl ctx = new CommandContextImpl(
+                correlationId,
+                hostExecutor,
+                events,
+                ioExecutor,
+                sync,
+                deferredReplies,
+                replyTypeBytes,
+                this::sendReply);
         @SuppressWarnings({"unchecked", "rawtypes"})
         CommandHandler handler = binding.handler();
         CommandResult<?> result;
@@ -406,6 +421,11 @@ public final class CommandsConsumer {
         }
 
         // 4. Reply
+        DeferredReplyImpl<?> deferred = ctx.takenDeferredReply();
+        if (deferred != null && deferred.isPending(result)) {
+            handledTotal.incrementAndGet();
+            return;
+        }
         if (result == null) {
             internalErrorsTotal.incrementAndGet();
             log.warn(
@@ -417,10 +437,15 @@ public final class CommandsConsumer {
         } else {
             handledTotal.incrementAndGet();
         }
+        if (deferred != null) {
+            // The handler took a handle but answered directly; the handle closes with this answer.
+            deferred.completeRaw(result);
+            return;
+        }
         sendReply(correlationId, replyTypeBytes, result);
     }
 
-    private void sendReply(UUID correlationId, byte[] replyMessageTypeBytes, CommandResult<?> result) {
+    void sendReply(UUID correlationId, byte[] replyMessageTypeBytes, CommandResult<?> result) {
         if (repliesTopic == null) {
             // Spec edge case: commandsTopic configured but commandsRepliesTopic absent.
             // Increment repliesFailedTotal so the heartbeat surfaces "100% reply loss"

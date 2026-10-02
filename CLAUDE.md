@@ -45,11 +45,11 @@ implements (`DbSchemaProvider`, `RuntimeStateProvider`, the gd catalog providers
 `JdbcConnectionSource`. All of them are declared in `:nx-gs-adapter-api` so a host provider depends
 on the contracts artifact alone.
 
-**External Tier-1 consumer.** `nx-sac-agent-adapter` (repo `nx-sac`) implements `AdapterModule` from
-outside this repository: it is the packet-capture agent of L2NX SAC, living in the same game JVM. It
-uses the module lifecycle only — its Kafka producer, queue and thread are its own, and no adapter
-runtime resource is shared with it. Keep Tier-1 SPI changes backwards compatible or coordinate with
-`nx-sac/docs/specs/003-sac-agent.md`.
+**Planned external Tier-1 consumer.** `nx-sac-agent-adapter` (repo `nx-sac`) is planned to implement
+`AdapterModule` from outside this repository. Today the SAC packet-capture agent is started by the
+host itself (bohpts `GameServerInitializer`, `nx-sac/docs/specs/003-sac-agent.md` §11) and does not
+depend on the adapter. Once it lands it uses the module lifecycle only — its Kafka producer, queue
+and thread are its own. Keep Tier-1 SPI changes backwards compatible or coordinate with that spec.
 
 ## Cross-cutting gotchas
 
@@ -97,6 +97,7 @@ Adapter-owned threads (all daemon — never block JVM exit):
 | `nx-gs-kafka-health`     | 1            | Persistent `AdminClient.describeCluster` health ticks |
 | `nx-events-publisher`    | 1            | Bounded-queue fan-out for `NxEvents`                  |
 | `nx-commands-consumer`   | 1            | Kafka poll + dispatch for `NxCommands`                |
+| `nx-commands-deferred`   | 0-1          | Expiry timer for open deferred replies (lazy)         |
 | `nx-io-N`                | configurable | Adapter-owned IO pool (`ctx.io()` for JDBC/HTTP hops) |
 | `nx-cdc-pool-<schema>-N` | configurable | Shared CDC engine pool (db-sync, all entities)        |
 | `nx-runtime-sync-pool-N` | configurable | Shared runtime-sync engine pool (all entities)        |

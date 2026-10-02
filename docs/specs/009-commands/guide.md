@@ -581,7 +581,7 @@ for them: take a deferred reply and complete it later (spec R27).
 
 ```java
 nx.commands().on(SendCaptchaCommand.class, (cmd, ctx) -> {
-    StartResult started = ctx.host().sync(() -> captcha.start(cmd.getCharId(), listener));
+    StartResult started = ctx.host().sync(() -> captcha.start(cmd.getCharacterId(), listener));
     if (started != StartResult.STARTED) {
         return toError(started);              // immediate reply, no handle taken
     }

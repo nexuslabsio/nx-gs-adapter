@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api.spi;
 
 import app.l2nx.gs.adapter.api.spi.capability.CommandHandler;
+import app.l2nx.gs.adapter.api.spi.capability.DeferredReply;
 import app.l2nx.gs.adapter.api.spi.capability.HostExecutor;
 import app.l2nx.gs.adapter.api.spi.capability.NxEvents;
 import app.l2nx.gs.adapter.api.spi.capability.NxSync;
@@ -71,4 +72,11 @@ public interface CommandContext {
      * for the requested entity.
      */
     NxSync sync();
+
+    /**
+     * Takes the deferred reply for this command: the handler returns {@link DeferredReply#pending()}
+     * and completes the handle later from any thread. Repeated calls return the same handle. Take it
+     * only once the work has really started; an early rejection is an ordinary immediate result.
+     */
+    <R> DeferredReply<R> deferReply();
 }

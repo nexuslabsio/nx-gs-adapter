@@ -30,8 +30,8 @@ Root package `app.l2nx.gs.adapter.api`.
 | `kafka.sync.runtime.<entity>` | volatile runtime-state DTOs                                                                                                       | 006        |
 | `kafka.events.<family>`       | outbound discrete-fact / snapshot event DTOs, grouped by family                                                                   | per family |
 | `kafka.commands.<group>`      | inbound command DTOs; the package root holds `NxCommand`, `CommandResult`, `CommandStatus` (+ nested `Tier`) and `CommandProblem` | 009        |
-| `kafka.ops`                   | heartbeat and telemetry payloads (`ModuleStatus`, `EntityStats`, …)                                                               | 001        |
-| `spi`                         | the SPI tiers + capability interfaces (see below)                                                                                 | 002        |
+| `kafka.ops`                   | `HeartbeatEvent`; its stats and state payloads in `kafka.ops.model`                                                              | 001        |
+| `spi`                         | `AdapterModule`, the two contexts, package-private `NoOp*`; sub-packages `provider`, `model`, `capability`                       | 002, 034   |
 
 Current entity / family / group names (the directory listing is authoritative — check it before
 assuming):
@@ -43,22 +43,31 @@ assuming):
 - **events**: `account`, `castle`, `character`, `characterlog`, `chat`, `gameevents`, `leveldata`,
   `mail`, `olympiad`, `premiumpurchase`, `privatestore`, `privatetrade`, `raid`, `schedule`,
   `serveronline`, `sync`
-- **commands**: `announcement`, `ban`, `character`, `gd`, `item`, `mail`, `privatestore`, `sync`,
-  `telegram`
+- **commands**: `announcement`, `ban`, `captcha`, `character`, `gd`, `item`, `mail`, `privatestore`,
+  `sync`, `telegram`
 
 The command group is a code-organization bucket only — the commands topic stays single.
 
+Layout rule (spec 034): inside a slice, two or more supporting types of one kind (value objects,
+enums, `WellKnown*` vocabularies) live in `model/`; the slice root keeps its commands / events and
+singles. Package-private helpers (`*Lists`, `NoOp*`) stay with the classes that use them — moving
+them would force them public. Entity DTO aggregates (`sync.db.*`, `sync.gd.skill`,
+`sync.gd.npctemplate`) stay flat.
+
 ## SPI tiers
 
-- **Tier-1** `AdapterModule` — a module plugged into adapter-core via `ServiceLoader`.
-- **Tier-2** — the per-domain provider SPIs a host implements: `DbSchemaProvider` (+ `EntityMapping`,
+- **Tier-1** `AdapterModule` (`spi`) — a module plugged into adapter-core via `ServiceLoader`.
+- **Tier-2** (`spi.provider`, mapping types in `spi.model`) — the per-domain provider SPIs a host
+  implements: `DbSchemaProvider` (+ `EntityMapping`,
   `PrimarySource`, `ChildSource`, `ParentRef`), `RuntimeStateProvider` (+ `RuntimeEntityMapping`,
   `RuntimeRow`), and the gd catalog providers (`ItemTemplateProvider`, `SkillProvider`, …, plus the
   singleton `GearScoreRulesetProvider` and the optional `GameDataReadinessProvider` — absent means
   "always ready", see spec 030).
-- **Tier-3** `JdbcConnectionSource` — how a host hands the adapter a pooled connection.
-- **Capabilities** handed to modules through `ConnectContext` / `CommandContext`: `NxEvents`,
-  `NxCommands` (+ `CommandHandler`, `HostExecutor`), `NxSync`, `NxGameData`. Each ships a `NoOp*`
+- **Tier-3** `JdbcConnectionSource` (`spi.provider`) — how a host hands the adapter a pooled
+  connection.
+- **Capabilities** (`spi.capability`) handed to modules through `ConnectContext` / `CommandContext`:
+  `NxEvents`, `NxCommands` (+ `CommandHandler`, `HostExecutor`, `DeferredReply`), `NxSync`,
+  `NxGameData`. Each ships a `NoOp*`
   fallback so a context wired without that runtime never returns null.
 
 They all live here so a host provider depends on the contracts artifact alone.

@@ -42,6 +42,9 @@ import org.jspecify.annotations.Nullable;
  *     records.</li>
  *     <li>{@code commit-failures-total} — manual offset commit errors. Records
  *     stay uncommitted; redelivery on next poll.</li>
+ *     <li>{@code deferred-open} — gauge of deferred replies taken and not yet completed.</li>
+ *     <li>{@code deferred-expired-total} — deferred replies the adapter closed because the host
+ *     never completed them; a rising value is a host bug.</li>
  * </ul>
  *
  * <p>{@code registered-types} is a snapshot list of registered command class
@@ -59,6 +62,8 @@ public final class CommandsStats {
     private final long repliesPublishedTotal;
     private final long repliesFailedTotal;
     private final long commitFailuresTotal;
+    private final long deferredOpen;
+    private final long deferredExpiredTotal;
     private final @Nullable List<String> registeredTypes;
 
     public CommandsStats(
@@ -71,6 +76,8 @@ public final class CommandsStats {
             long repliesPublishedTotal,
             long repliesFailedTotal,
             long commitFailuresTotal,
+            long deferredOpen,
+            long deferredExpiredTotal,
             @Nullable List<String> registeredTypes) {
         this.consumedTotal = consumedTotal;
         this.otherServerSkippedTotal = otherServerSkippedTotal;
@@ -81,6 +88,8 @@ public final class CommandsStats {
         this.repliesPublishedTotal = repliesPublishedTotal;
         this.repliesFailedTotal = repliesFailedTotal;
         this.commitFailuresTotal = commitFailuresTotal;
+        this.deferredOpen = deferredOpen;
+        this.deferredExpiredTotal = deferredExpiredTotal;
         this.registeredTypes = freeze(registeredTypes);
     }
 
@@ -120,6 +129,14 @@ public final class CommandsStats {
         return commitFailuresTotal;
     }
 
+    public long getDeferredOpen() {
+        return deferredOpen;
+    }
+
+    public long getDeferredExpiredTotal() {
+        return deferredExpiredTotal;
+    }
+
     /**
      * Snapshot of {@code Nx-Message-Type} class simple names registered with
      * {@code NxCommands.on(...)} at heartbeat tick time. Empty when none.
@@ -139,6 +156,8 @@ public final class CommandsStats {
                 .repliesPublishedTotal(repliesPublishedTotal)
                 .repliesFailedTotal(repliesFailedTotal)
                 .commitFailuresTotal(commitFailuresTotal)
+                .deferredOpen(deferredOpen)
+                .deferredExpiredTotal(deferredExpiredTotal)
                 .registeredTypes(registeredTypes);
     }
 
@@ -167,6 +186,8 @@ public final class CommandsStats {
                 && repliesPublishedTotal == that.repliesPublishedTotal
                 && repliesFailedTotal == that.repliesFailedTotal
                 && commitFailuresTotal == that.commitFailuresTotal
+                && deferredOpen == that.deferredOpen
+                && deferredExpiredTotal == that.deferredExpiredTotal
                 && Objects.equals(registeredTypes, that.registeredTypes);
     }
 
@@ -182,6 +203,8 @@ public final class CommandsStats {
                 repliesPublishedTotal,
                 repliesFailedTotal,
                 commitFailuresTotal,
+                deferredOpen,
+                deferredExpiredTotal,
                 registeredTypes);
     }
 
@@ -196,6 +219,8 @@ public final class CommandsStats {
                 + ", repliesPublished=" + repliesPublishedTotal
                 + ", repliesFailed=" + repliesFailedTotal
                 + ", commitFailures=" + commitFailuresTotal
+                + ", deferredOpen=" + deferredOpen
+                + ", deferredExpired=" + deferredExpiredTotal
                 + ", registeredTypes=" + registeredTypes + "]";
     }
 
@@ -209,6 +234,8 @@ public final class CommandsStats {
         private long repliesPublishedTotal;
         private long repliesFailedTotal;
         private long commitFailuresTotal;
+        private long deferredOpen;
+        private long deferredExpiredTotal;
         private @Nullable List<String> registeredTypes;
 
         public Builder consumedTotal(long v) {
@@ -256,6 +283,16 @@ public final class CommandsStats {
             return this;
         }
 
+        public Builder deferredOpen(long v) {
+            this.deferredOpen = v;
+            return this;
+        }
+
+        public Builder deferredExpiredTotal(long v) {
+            this.deferredExpiredTotal = v;
+            return this;
+        }
+
         public Builder registeredTypes(@Nullable List<String> registeredTypes) {
             this.registeredTypes = registeredTypes;
             return this;
@@ -272,6 +309,8 @@ public final class CommandsStats {
                     repliesPublishedTotal,
                     repliesFailedTotal,
                     commitFailuresTotal,
+                    deferredOpen,
+                    deferredExpiredTotal,
                     registeredTypes);
         }
     }

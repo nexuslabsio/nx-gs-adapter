@@ -33,10 +33,10 @@ uses it.
 
 ### Wire
 
-- [todo] R1. `nx-gs-adapter-api.kafka.commands.captcha.SendCaptchaCommand` MUST ship as
+- [done] R1. `nx-gs-adapter-api.kafka.commands.captcha.SendCaptchaCommand` MUST ship as
   `NxCommand<SendCaptchaResult>`. Final Java-8 POJO + builder; constructor enforces non-null
-  `charId` (the handler re-validates, Gson bypasses the constructor). Fields:
-  - `Long charId` — REQUIRED. Target character.
+  `characterId` (the handler re-validates, Gson bypasses the constructor). Fields:
+  - `Long characterId` — REQUIRED. Target character (platform canon `characterId`; the legacy `charId` of older commands is not reused).
   - `@Nullable String issuedBy` — who asked for the check: a staff login, or a service label such
     as `sac-sentinel`. Echoed in the result so a consumer can attribute checks it did not start.
   - `@Nullable String staffNotes` — staff-only note, never shown to the player (same convention as
@@ -45,9 +45,9 @@ uses it.
   Not idempotent, and needs no dedup: a second delivery while a check is open is rejected as
   `INVALID_STATE` (one open check per character), and the rail is at-most-once anyway.
 
-- [todo] R2. `SendCaptchaResult` MUST ship as the success payload. It is produced once, when the
+- [done] R2. `SendCaptchaResult` MUST ship as the success payload. It is produced once, when the
   check ends — never as an intermediate progress update:
-  - `Long charId`, `@Nullable String issuedBy` — echo.
+  - `Long characterId`, `@Nullable String issuedBy` — echo.
   - `String outcome` — open string, UPPER_SNAKE, canonical values in
     `kafka.commands.captcha.model.WellKnownCaptchaOutcomes`:
     - `PASSED` — answered enough rounds correctly;
@@ -66,7 +66,7 @@ uses it.
   - `Map<String, String> metadata` — host-defined consequences and context; never null, may be
     empty. The key set is **not stable** (see R4).
 
-- [todo] R3. `kafka.commands.captcha.model.CaptchaRoundResult` — one picture:
+- [done] R3. `kafka.commands.captcha.model.CaptchaRoundResult` — one picture:
   - `int index` — 1-based position in the check.
   - `String questionType` — host vocabulary, UPPER_SNAKE (bohpts: `MAX_AREA`, `MIN_AREA`,
     `ODD_COLOR`, `SHAPE_COUNT`, `MISSING_KIND`). The platform stores it verbatim.
@@ -76,7 +76,7 @@ uses it.
   - `@Nullable Long answerTimeMs` — from the moment the picture was sent to the click, measured on
     the host, so it excludes Kafka and platform latency; `null` when the round timed out.
 
-- [todo] R4. `metadata` carries what the host did about the result. Until the format is agreed
+- [done] R4. `metadata` carries what the host did about the result. Until the format is agreed
   (see [`TODO.md`](../TODO.md) §1) no `WellKnown*` class is shipped and the keys are host-defined.
   Hosts SHOULD align ban-like consequences with the platform ban vocabulary: `ban.type` (a value
   from `WellKnownBanTypes`), `ban.expiresAt` (ISO-8601 instant); a disconnect is `kick=true`.
@@ -84,13 +84,13 @@ uses it.
 
 ### Rail behaviour
 
-- [todo] R5. The handler uses the deferred reply (`commands` R27): it starts the check, takes
+- [done] R5. The handler uses the deferred reply (`commands` R27): it starts the check, takes
   `ctx.deferReply()` and returns the deferred marker; the host completes the reply when the check
   ends, from whatever thread ends it. A check that cannot start replies immediately with an error
   (R6) and takes no deferred reply.
 
-- [todo] R6. Immediate errors (statuses are `commands` R23):
-  - `VALIDATION_FAILED` — `charId` missing / out of the host's id range.
+- [done] R6. Immediate errors (statuses are `commands` R23):
+  - `VALIDATION_FAILED` — `characterId` missing / out of the host's id range.
   - `NOT_FOUND` — no such character, or the character is not in the world.
   - `INVALID_STATE` — a check is already open for the character, or the server itself is playing
     the character (a sanctioned auto-play feature: a check would test the server, not the player).
@@ -101,7 +101,7 @@ uses it.
 
   Host-specific causes beyond these go into `problem.extensions`, never into new statuses.
 
-- [todo] R7. Upper bound: a check ends well inside `l2nx.commands.deferred-reply-max-ms` (R27). A
+- [done] R7. Upper bound: a check ends well inside `l2nx.commands.deferred-reply-max-ms` (R27). A
   host whose check can outlive the bound MUST raise the bound in its config, otherwise the adapter
   closes the reply with `INTERNAL_ERROR` and the real outcome is lost.
 

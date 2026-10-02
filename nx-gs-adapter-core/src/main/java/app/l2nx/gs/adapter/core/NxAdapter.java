@@ -14,6 +14,7 @@ import app.l2nx.gs.adapter.api.spi.capability.NxSync;
 import app.l2nx.gs.adapter.core.commands.CommandsBootstrap;
 import app.l2nx.gs.adapter.core.commands.CommandsConfig;
 import app.l2nx.gs.adapter.core.commands.CommandsConsumer;
+import app.l2nx.gs.adapter.core.commands.DeferredReplies;
 import app.l2nx.gs.adapter.core.config.AdapterConfig;
 import app.l2nx.gs.adapter.core.config.ConfigResolver;
 import app.l2nx.gs.adapter.core.connect.*;
@@ -88,6 +89,9 @@ public final class NxAdapter {
     private static volatile EventsPublisher eventsPublisher;
     private static volatile EventsConfig eventsConfig;
     private static volatile CommandsConsumer commandsConsumer;
+    /** Outlives consumer swaps so a deferred reply taken before a re-roll still completes. */
+    private static volatile DeferredReplies deferredReplies;
+
     private static volatile CommandsConfig commandsConfig;
     private static volatile ExecutorService ioExecutor;
     private static volatile NxEvents eventsFacade;
@@ -275,6 +279,7 @@ public final class NxAdapter {
             }
             commandsConsumer = null;
         }
+        shutdownDeferredReplies();
 
         ExecutorService io = ioExecutor;
         if (io != null) {
@@ -554,6 +559,14 @@ public final class NxAdapter {
         }
         CommandsConsumer.ReplySender replySender =
                 (record, callback) -> NxKafka.instance().sendBytesKeyRecord(record, callback);
+        DeferredReplies deferred = deferredReplies;
+        if (deferred == null) {
+            deferred = new DeferredReplies(
+                    commandsConfig != null
+                            ? commandsConfig.getDeferredReplyMaxMs()
+                            : CommandsConfig.DEFAULT_DEFERRED_REPLY_MAX_MS);
+            deferredReplies = deferred;
+        }
         NxCommands facade = commandsFacade;
         if (facade == null) {
             CommandsBootstrap.Started started = CommandsBootstrap.start(
@@ -566,6 +579,7 @@ public final class NxAdapter {
                     ioExecutor,
                     events,
                     sync,
+                    deferred,
                     replySender,
                     commandsConfig);
             commandsConsumer = started.consumer();
@@ -583,6 +597,7 @@ public final class NxAdapter {
                 ioExecutor,
                 events,
                 sync,
+                deferred,
                 replySender,
                 commandsConfig);
         return facade;
@@ -755,6 +770,7 @@ public final class NxAdapter {
             }
             commandsConsumer = null;
         }
+        shutdownDeferredReplies();
         EventsPublisher pub = eventsPublisher;
         if (pub != null) {
             try {
@@ -900,5 +916,17 @@ public final class NxAdapter {
      */
     static void primeModuleRegistryForTesting() {
         moduleRegistry = new ModuleRegistry();
+    }
+
+    private static void shutdownDeferredReplies() {
+        DeferredReplies deferred = deferredReplies;
+        if (deferred != null) {
+            try {
+                deferred.shutdown();
+            } catch (Throwable t) {
+                log.error("DeferredReplies.shutdown threw {}", t.getClass().getName(), t);
+            }
+            deferredReplies = null;
+        }
     }
 }
