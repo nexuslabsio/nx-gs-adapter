@@ -319,7 +319,53 @@ Ordering is forced by Maven Central propagation (~15-30 min) and the host build:
 No step is breaking, and steps 2 and 3 are independently useful — an interrupted rollout leaves a
 working system.
 
-## 7. Links
+## 7. Planned: platform ownership canon (not implemented)
+
+Agreed 2026-10-03. The platform-side design (table ownership, readers, rollout checklist) lives in
+`nx-gamedata/docs/specs/015-l2-gamedata-storage-v3-design.md` §29; this section records only what
+changes on the adapter side.
+
+**Principle.** The adapter is the source of truth for game data: it publishes what the host engine
+actually loaded (hardcoded rules, custom logic, overrides), which a datapack parse cannot reproduce.
+Platform-side parsing is reserved for what the adapter cannot derive (client-patch data,
+presentation). Each platform table has exactly one writer; the gd stream owns the core tables and
+nothing else writes their rows.
+
+**Entity renames.** The `template` suffix is kept only where an entity has instances (item, npc,
+skill):
+
+| today                                                 | target                                                                           |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `classtemplate` / `ClassTemplateProvider`             | `class` / `CharacterClassDefinition…` (`CharacterClass` is the class token enum) |
+| `recipetemplate` / `RecipeTemplateProvider`           | `recipe` / `Recipe…`                                                             |
+| `armorsettemplate` / `ArmorSetTemplateProvider`       | `armorset` / `ArmorSet…`                                                         |
+| `soulcrystaltemplate` / `SoulCrystalTemplateProvider` | `soulcrystal` / `SoulCrystal…`                                                   |
+
+Topic names come from the platform (`ctx.getSyncTopics().getGd()`), so the topic switch needs no
+adapter release. The DTO/SPI renames are breaking and follow the two-release `@Deprecated` rule
+(additive release, then removal once every host has moved), counted from the api 0.89 package
+layout (spec 034).
+
+**Payload changes.**
+
+- `instance`: carries the host's full instance template — level window, party size, duration,
+  reenter rules and children (reenter schedules, entry requirements, instance npcs) — not only
+  `id` + `name`.
+- `npctemplate`: one spawn row per host spawn definition with its real count (today a definition
+  of count N is emitted as N rows of count N); per-npc count/respawn overrides honoured;
+  `globalAggro` emitted.
+- `itemtemplate`: `material` must not collapse distinct host materials into one token.
+- `skill` and `itemtemplate` keep their full payloads (stats, skills, levels): the platform will
+  start consuming them as data moves from platform-side parsing to the gd stream.
+- Gear score: per-item effective values and the full ruleset — direction recorded in
+  `nx-gamedata/docs/specs/009-gear-score-design.md` §3.5, not scheduled.
+
+**Consumer guarantees** (platform side, protocol unchanged): a burst whose persisted row count does
+not match `SNAPSHOT_COMPLETE.count` is not reconciled; `count=0` is treated as an anomaly and never
+reconciles; infrastructure write failures are retried, not acknowledged. `gd.sync.*` retention
+rises from 3 h to 7 d.
+
+## 8. Links
 
 - Issue: [nexuslabsio/nx-gs-adapter#8](https://github.com/nexuslabsio/nx-gs-adapter/issues/8)
 - `docs/specs/023-platform-sync-fixes-2026-06.md` — Fix ③, the gear-score deploy gap that first
