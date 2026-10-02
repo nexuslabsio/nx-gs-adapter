@@ -11,7 +11,7 @@ contract every web-side caller of `NxCommandSender.sendSync(...)` is
 coding against.
 
 All commands ship under `app.l2nx.gs.adapter.api.kafka.commands.<group>.*`
-where group is one of: `announcement`, `ban`, `character`, `chat`, `gd`,
+where group is one of: `announcement`, `ban`, `captcha`, `character`, `chat`, `gd`,
 `item`, `mail`, `privatestore`, `sync`, `telegram`. The group is purely a
 code-organization split; on the wire every command travels on the single
 `<tenant>.gs.commands` topic, routed by the `Nx-Message-Type` header.
@@ -175,6 +175,50 @@ rather than posting twice.
 | `FORBIDDEN`         | Host policy refuses — chat ban, shadow ban, block list, academy level floor                                               |
 | `VALIDATION_FAILED` | Missing required field, `channel` outside the accepted whitelist, or `audienceId` absent where the `audience` requires it |
 | `INTERNAL_ERROR`    | Broadcast mechanism failed host-side                                                                                      |
+
+## Captcha commands
+
+### `SendCaptchaCommand`
+
+**Purpose.** Start the host's human-verification check on an online character and reply with what
+the player did. **Deferred reply** ([`spec.md`](./spec.md) R27): the reply arrives when the check
+ends — minutes after the command, not within the platform's synchronous window. Not idempotent and
+not deduped: one open check per character, a second command is `INVALID_STATE`. Full contract:
+[`033-captcha-command.md`](../033-captcha-command.md).
+
+**Inputs**
+
+| Field        | Type      | Required | Notes                                                     |
+| ------------ | --------- | -------- | --------------------------------------------------------- |
+| `charId`     | `Long`    | yes      | Target character's primary key                            |
+| `issuedBy`   | `String?` | no       | Staff login or service label; echoed in the result        |
+| `staffNotes` | `String?` | no       | Internal staff note; not shown to the player              |
+
+**Result** (`SendCaptchaResult`)
+
+| Field        | Type                       | Notes                                                                     |
+| ------------ | -------------------------- | ------------------------------------------------------------------------- |
+| `charId`     | `Long`                     | Echo                                                                      |
+| `issuedBy`   | `String?`                  | Echo                                                                      |
+| `outcome`    | `String`                   | `WellKnownCaptchaOutcomes`: `PASSED`, `FAILED_WRONG`, `FAILED_TIMEOUT`, `LOGOUT`, `ABORTED` |
+| `startedAt`  | `Instant`                  | Host clock, UTC                                                           |
+| `finishedAt` | `Instant`                  | Host clock, UTC                                                           |
+| `durationMs` | `long`                     | Whole check                                                               |
+| `rounds`     | `List<CaptchaRoundResult>` | `index`, `questionType`, `pickedSlot?`, `correct`, `answerTimeMs?`        |
+| `metadata`   | `Map<String,String>`       | Host-defined consequences (`ban.type`, `ban.expiresAt`, `kick`, …); keys not stable |
+
+**Errors** (immediate, no deferred reply taken)
+
+| Status              | When                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `VALIDATION_FAILED` | `charId` missing / out of range                                                        |
+| `NOT_FOUND`         | No such character, or not in the world                                                 |
+| `INVALID_STATE`     | `reason=ALREADY_ACTIVE` (check open) / `reason=SERVER_PLAYS_CHARACTER` (auto-play on)  |
+| `RATE_LIMITED`      | Per-character cooldown between checks                                                  |
+| `UNAVAILABLE`       | Check disabled, concurrent-check limit, no picture                                     |
+| `INTERNAL_ERROR`    | Unexpected failure; also `deferred-reply-expired` when the host never completed        |
+
+---
 
 ## Character commands
 

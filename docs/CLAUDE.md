@@ -5,7 +5,8 @@ feature carries companion docs (`module-discovery.md`, `flow.md`, `catalog.md`, 
 a zero-padded sequential id, and one feature keeps one living spec — iterations update it instead of
 taking a new number.
 
-Any spec change (new spec, rename, re-scope, deletion) updates this table in the same pass.
+Any spec change (new spec, rename, re-scope, deletion) updates this table in the same pass. Deferred
+work lives in [`TODO.md`](TODO.md).
 
 | #   | Feature                           | Date       | File                                                   |
 | --- | --------------------------------- | ---------- | ------------------------------------------------------ |
@@ -41,6 +42,8 @@ Any spec change (new spec, rename, re-scope, deletion) updates this table in the
 | 030 | gamedata-sync                     | 2026-08-15 | [spec](specs/030-gamedata-sync.md)                     |
 | 031 | character-log-events              | 2026-09-01 | [spec](specs/031-character-log-events.md)              |
 | 032 | character-admin-commands          | 2026-09-17 | [spec](specs/032-character-admin-commands.md)          |
+| 033 | captcha-command                   | 2026-10-02 | [spec](specs/033-captcha-command.md)                   |
+| 034 | api-package-layout                | 2026-10-02 | [spec](specs/034-api-package-layout.md)                |
 
 Companion docs of the folder-form specs:
 

@@ -106,7 +106,7 @@ errorDetails` triple. Dropped before first release in favour of R23 + R24: three
   returning `CommandResult<R>` from `handle(C command, CommandContext ctx)`. The bound
   `C extends NxCommand<R>` forces the handler's reply payload type to match the command class's
   declared type at compile time. The handler runs synchronously on the adapter's commands
-  consumer thread; game-state mutations require an explicit `ctx.host().sync(...)` hop and
+  consumer thread (an outcome that exists only later goes through the deferred reply, R27); game-state mutations require an explicit `ctx.host().sync(...)` hop and
   blocking IO requires an explicit `ctx.io()` hop.
 
 - [done] R7. `nx-gs-adapter-api.spi.CommandContext` MUST expose:
@@ -349,6 +349,31 @@ replies-published == 0}` is visible as a failure rather than as silence
   the header value) and when sibling commands share one `R` class. The bytes are encoded once at
   registration and cached on the binding, keeping the dispatch hot path allocation-free.
 
+- [todo] R27. **Deferred reply.** A handler whose outcome exists only later (a player's answer, a
+  long host-side process) MUST be able to reply after `handle(...)` returns, without holding the
+  consumer thread:
+  - `CommandContext` exposes `<R> DeferredReply<R> deferReply()`;
+    `nx-gs-adapter-api.spi.capability.DeferredReply<R>` exposes `boolean complete(CommandResult<R>)`
+    and `CommandResult<R> pending()`. The handler returns `pending()` — a marker the dispatcher
+    recognises by identity and never serializes.
+  - `complete(...)` publishes the reply exactly as R13 would have (same correlation id, R26 type
+    header, replies topic) from the calling thread. It is thread-safe and first-wins: it returns
+    `true` for the call that published, `false` (WARN) for every later call. A `null` result is
+    published as `INTERNAL_ERROR`, `error.cause = "deferred-null-result"`.
+  - Bound: a handle not completed within `l2nx.commands.deferred-reply-max-ms` (default `300000`)
+    is completed by the adapter with `INTERNAL_ERROR`, `error.cause = "deferred-reply-expired"`,
+    `timeout.ms`. The host's late `complete(...)` then returns `false`.
+  - Handler returns `pending()` of a handle it did not take from this `ctx` → `INTERNAL_ERROR`,
+    `error.cause = "foreign-deferred-marker"`. Handler takes a handle but returns a regular result →
+    that result is published immediately and the handle is closed (later `complete` → `false`).
+  - Adapter stop completes every open handle with `UNAVAILABLE`, `error.cause = "host-shutdown"`,
+    best-effort before the producer closes (R17). A handshake re-roll (R10) keeps open handles:
+    they publish through the live producer behind the facade.
+  - Heartbeat `CommandsStats` gains `deferred-open` (gauge) and `deferred-expired-total`.
+
+  The platform sees an ordinary reply that simply arrives late; correlation is unchanged. Open
+  handles live in memory only — a host restart loses them and the caller gets no reply.
+
 **Non-goals:**
 
 - **Per-domain Kafka topics** — single topic; cross-domain ordering per character is the more
@@ -393,6 +418,10 @@ replies-published == 0}` is visible as a failure rather than as silence
   `shutdown-timeout-ms`; the current record finishes and its reply is handed to the producer
   before the IO pool and the events publisher go down (R17). Records already committed but not yet
   dispatched are lost by design.
+- **Deferred handle never completed** — closed by the adapter at `deferred-reply-max-ms` with
+  `INTERNAL_ERROR` (R27); a host bug, visible as `deferred-expired-total` rising.
+- **Deferred reply after the platform gave up waiting** — published anyway; the platform's durable
+  reply reconciler is what records it (nx-gameservers `docs/specs/075-command-reply.md`).
 - **`NxAdapter.hostExecutor(...)` never called** — read-only handlers keep working; anything
   hopping to `ctx.host()` throws `IllegalStateException`. WARN at bootstrap (R19).
 - **Handshake re-roll mid-life** — the previous consumer is stopped and a new one built behind the

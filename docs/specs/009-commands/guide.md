@@ -573,6 +573,34 @@ If you forget: `ctx.host().sync(...)` throws `IllegalStateException` the
 first time a handler tries to hop. The adapter logs a WARN at startup
 when `commandsTopic` is configured but `hostExecutor` is missing.
 
+## Deferred replies
+
+Some outcomes do not exist when the handler runs — a player has to click
+something, a host process has to finish. Do not block the consumer thread
+for them: take a deferred reply and complete it later (spec R27).
+
+```java
+nx.commands().on(SendCaptchaCommand.class, (cmd, ctx) -> {
+    StartResult started = ctx.host().sync(() -> captcha.start(cmd.getCharId(), listener));
+    if (started != StartResult.STARTED) {
+        return toError(started);              // immediate reply, no handle taken
+    }
+    DeferredReply<SendCaptchaResult> reply = ctx.deferReply();
+    listener.onFinish(outcome -> reply.complete(CommandResult.ok(toResult(outcome))));
+    return reply.pending();
+});
+```
+
+- `complete(...)` may run on any thread; the first call publishes, later
+  calls return `false`.
+- Take the handle only once the work has really started — every early
+  rejection is a plain immediate result.
+- Make sure every path that ends the work completes the handle. A handle
+  left open is closed by the adapter after `l2nx.commands.deferred-reply-max-ms`
+  with `INTERNAL_ERROR`, and the real outcome is lost.
+- Open handles do not survive a host restart; adapter stop closes them with
+  `UNAVAILABLE` (`error.cause = "host-shutdown"`).
+
 ## Replies — how the platform sees them
 
 The adapter publishes replies to `<tenant>.gs.commands.replies` with:
@@ -583,15 +611,14 @@ The adapter publishes replies to `<tenant>.gs.commands.replies` with:
 - **Headers**:
   - `Nx-Server-Id` (auto, from connect handshake)
   - `Nx-Correlation-Id` (echoed from inbound)
-  - `Nx-Message-Type = "<OriginalCommandClass>Result"` (e.g.
-    `"TransferItemToCharacterCommandResult"`)
+  - `Nx-Message-Type` = command simple name with `Command` replaced by
+    `Result` (`TransferItemToCharacterCommand` → `TransferItemToCharacterResult`)
 - **Value** = `gson.toJson(commandResult)`
 
 The platform-side correlator listens on the replies topic, extracts
-`Nx-Correlation-Id` from headers, matches against pending requests,
-returns the result to the original web caller. Web doesn't have to
-consume the body if it doesn't care — `null` body is a valid
-`CommandResult` (`success=true, payload=null`).
+`Nx-Correlation-Id` from headers and matches it against pending requests;
+a reply that arrives after the caller stopped waiting is picked up by the
+platform's durable reconciler.
 
 ## Heartbeat & observability
 
