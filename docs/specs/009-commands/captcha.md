@@ -116,7 +116,7 @@ uses it.
 
 Additive on the wire: new command, new result, new model types. `SendCaptchaCommand` is a new simple
 name — unique across the catalog. A host on an older api jar does not register the handler and the
-platform gets `UNSUPPORTED_COMMAND`. Ships in `api/v0.89.0` + `core/v0.38.0` together with R27 and the
+platform gets `UNSUPPORTED_COMMAND`. Ships in `api/v0.89.0` + `core/v0.38.1` together with R27 and the
 api package layout change ([`api-package-layout`](../034-api-package-layout.md)).
 
 ## Non-goals

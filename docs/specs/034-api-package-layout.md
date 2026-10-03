@@ -90,7 +90,7 @@ Source- and binary-breaking for every consumer that imports a moved type; wire-c
 the wire references a package). Because nothing changes on the wire, the two-release `@Deprecated`
 path (root `CLAUDE.md` → "Versioning") does not apply — there is no producer/consumer deploy window,
 only a compile break. Released in one step as `api/v0.89.0`, with every module that compiles
-against the api re-released in the same pass (`core/v0.38.0`, `db-sync`, `runtime-sync`, `gd-sync`),
+against the api re-released in the same pass (`core/v0.38.1`, `db-sync`, `runtime-sync`, `gd-sync`),
 since their published jars reference the old packages. Each consumer bumps and fixes imports in the
 same pass; an un-bumped consumer keeps working on the old jars until it next upgrades.
 
