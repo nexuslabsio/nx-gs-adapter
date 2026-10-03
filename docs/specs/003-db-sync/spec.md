@@ -492,8 +492,8 @@ design end-to-end.
     - `spi/ConnectContext.java` — context object passed to
       `AdapterModule.onConnect`; carries identity bundle + per-entity Kafka topic
       map (`syncTopics`)
-    - `spi/DbSchemaProvider.java` — Tier-2 SPI interface (api/0.7.0)
-    - `spi/EntityMapping.java` — Tier-2 SPI; one per synced entity (api/0.7.0)
+    - `spi/provider/DbSchemaProvider.java` — Tier-2 SPI interface (api/0.7.0)
+    - `spi/model/EntityMapping.java` — Tier-2 SPI; one per synced entity (api/0.7.0)
     - `kafka/sync/db/SyncEvent.java` — typed wire envelope `SyncEvent<T>` with
       `String entityName`, `long pk`, `String op`, `T payload`, `long timestampEpochMs`
       (api/0.7.0). `op=DELETED` carries `payload=null` in JSON but is NOT a Kafka

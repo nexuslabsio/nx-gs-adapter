@@ -158,7 +158,7 @@ the reason this fix is a readiness contract rather than a log-severity change.
 New optional Tier-2 SPI in `nx-gs-adapter-api`:
 
 ```java
-package app.l2nx.gs.adapter.api.spi;
+package app.l2nx.gs.adapter.api.spi.provider;
 
 public interface GameDataReadinessProvider {
     boolean ready();

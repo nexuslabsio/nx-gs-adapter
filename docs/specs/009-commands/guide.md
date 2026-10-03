@@ -136,18 +136,18 @@ established this convention.
 
 ```java
 import app.l2nx.gs.adapter.api.kafka.commands.CommandResult;
-import app.l2nx.gs.adapter.api.kafka.commands.character.KickCommand;
-import app.l2nx.gs.adapter.api.kafka.commands.character.KickResult;
+import app.l2nx.gs.adapter.api.kafka.commands.character.KickCharacterCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.character.KickCharacterResult;
 import app.l2nx.gs.adapter.api.spi.CommandContext;
 import app.l2nx.gs.adapter.api.spi.capability.NxCommands;
 
 public final class HostCommandHandlers {
 
     public static void register(NxCommands commands) {
-        commands.on(KickCommand.class, HostCommandHandlers::handleKick);
+        commands.on(KickCharacterCommand.class, HostCommandHandlers::handleKick);
     }
 
-    static CommandResult<KickResult> handleKick(KickCommand cmd, CommandContext ctx) {
+    static CommandResult<KickCharacterResult> handleKick(KickCharacterCommand cmd, CommandContext ctx) {
         boolean wasOnline = ctx.host().sync(() -> {
             Player p = GameObjectsStorage.getPlayer(cmd.getCharId().intValue());
             if (p == null) return false;
@@ -157,7 +157,7 @@ public final class HostCommandHandlers {
         if (!wasOnline) {
             return CommandResult.notFound("Character not online", "charId", cmd.getCharId());
         }
-        return CommandResult.ok(new KickResult(cmd.getCharId()));
+        return CommandResult.ok(KickCharacterResult.builder().charId(cmd.getCharId()).build());
     }
 }
 ```
@@ -173,7 +173,7 @@ Registration (inside the adapter's `onConnect` callback — typically an
 `AdapterModule`):
 
 ```java
-ctx.commands().on(KickCommand.class, HostCommandHandlers::handleKick);
+ctx.commands().on(KickCharacterCommand.class, HostCommandHandlers::handleKick);
 ```
 
 That's the whole story. The rest is "why" and edge cases.
@@ -719,8 +719,8 @@ return CommandResult.notFound("...");
 **Forgetting to register**
 
 ```
-Symptom: web sees UNSUPPORTED_COMMAND replies for KickCommand
-Cause:   ctx.commands().on(KickCommand.class, ...) was never called
+Symptom: web sees UNSUPPORTED_COMMAND replies for KickCharacterCommand
+Cause:   ctx.commands().on(KickCharacterCommand.class, ...) was never called
 ```
 
 **Slow handler that doesn't hop**

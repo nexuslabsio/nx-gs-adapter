@@ -258,7 +258,7 @@ field at all.
 
 ### Structure
 
-- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/` — Tier-3 SPI
+- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/provider/` — Tier-3 SPI
   alongside Tier-1 SPI types (single api package for every SPI tier)
   - `JdbcConnectionSource.java` — the SPI interface (R1, R7, R8); imports
     `app.l2nx.gs.adapter.api.kafka.ops.model.PoolStats` for the optional `stats()` method

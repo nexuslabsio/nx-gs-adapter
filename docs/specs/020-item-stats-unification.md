@@ -58,7 +58,7 @@ unchanged. The only item-stat datum that stays outside the map is `magicWeapon`
 | Decision                                                                | Choice                                                                               |
 |-------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
 | Where canonicalization happens                                          | At source — host item-template provider                                              |
-| Canonical vocabulary home                                               | New `ItemStat` enum in `nx-gs-adapter-api`                                           |
+| Canonical vocabulary home                                               | New `Stat` enum in `nx-gs-adapter-api`                                           |
 | Token style                                                             | Short L2-community shorthand (`P_ATK`, `M_ATK`, …)                                   |
 | Weapon mechanics (`soulshots`/`spiritshots`/`mpConsume`/`randomDamage`) | Folded into the unified map (full uniformity — one place)                            |
 | `attackRange`                                                           | Folded into the map as `ATK_RANGE`                                                   |
@@ -67,20 +67,20 @@ unchanged. The only item-stat datum that stays outside the map is `magicWeapon`
 | Unmapped L2J stat-funcs                                                 | Dropped + logged once — vocabulary stays closed                                      |
 | Rollout                                                                 | Coordinated cutover (no transient dual-emit)                                         |
 
-## Canonical vocabulary — `ItemStat` enum
+## Canonical vocabulary — `Stat` enum
 
-New enum `app.l2nx.gs.adapter.api.domain.item.ItemStat` (Java 8 enum,
+Enum `app.l2nx.gs.adapter.api.domain.stat.Stat` (originally introduced as `ItemStat`, later unified across items/NPCs/skills) (Java 8 enum,
 UPPER_SNAKE). It is the closed, build-agnostic stat vocabulary and the source of
 truth for both production (at source) and the frontend `@Schema`. This
 introduces a new `domain` package root in `nx-gs-adapter-api` (siblings:
 `kafka`, `rest`, `spi`, `ops`) for shared domain vocabulary types that wire DTOs
-reference but that are not themselves wire payloads — `ItemStat` is the first
+reference but that are not themselves wire payloads — `Stat` is the first
 resident.
 
-The `Stats → ItemStat` translation is **build-specific knowledge** and lives in
+The `Stats → Stat` translation is **build-specific knowledge** and lives in
 the host integration, never in the enum or the wire.
 
-### Token mapping (raw L2J source → canonical `ItemStat`)
+### Token mapping (raw L2J source → canonical `Stat`)
 
 Offense:
 
@@ -152,7 +152,7 @@ STR, DEX, CON, INT, WIT, MEN
 
 **Unmapped funcs**: a func whose `Stats` value has no entry in the
 host translation table is dropped from the map and logged once per
-unknown stat. Adding support for a new stat = one `ItemStat` constant + one
+unknown stat. Adding support for a new stat = one `Stat` constant + one
 mapping entry — the same discipline as every other enum-like vocabulary on the
 platform.
 
@@ -165,7 +165,7 @@ thin container:
   `attackSpeed`, `criticalRate`, `attackRange`, `randomDamage`, `soulshots`,
   `spiritshots`, `mpConsume`.
 - `statBonuses` → **renamed `stats`**, keys switch from raw L2J names to
-  canonical `ItemStat` tokens. Wire type stays `Map<String,Double>` (open
+  canonical `Stat` tokens. Wire type stays `Map<String,Double>` (open
   string), consistent with the platform's enum-like-vocab convention: the enum
   is the source of truth for producing and documenting the values, not a hard
   wire-key type.
@@ -181,7 +181,7 @@ updated in lockstep.
 
 The host's item-template provider:
 
-- New `Stats → ItemStat` translator (build-specific, lives here). Drives the
+- New `Stats → Stat` translator (build-specific, lives here). Drives the
   unmapped-stat logging.
 - `buildStats(Item)` → fold all stat-funcs through the translator into the
   canonical `stats` map; additionally fold the weapon accessors
@@ -235,7 +235,7 @@ in-migration backfill (see `nx-gamedata` below) and filling the 76k-vs-44k gap
   it so `ItemTemplateDetailedDto.stats` is a flat
   `@Nullable Map<String,Double> stats` directly (one map under `stats`, no
   nested `statBonuses`).
-- `@Schema` on `stats` enumerates the canonical `ItemStat` keys (kept in sync
+- `@Schema` on `stats` enumerates the canonical `Stat` keys (kept in sync
   with the enum) so the frontend builds its own translations.
 - `ItemTemplate` domain record + `ItemTemplateRepositoryAdapter` SQL: drop the
   11 combat fields/columns, read the renamed `stats` JSONB; delete the
@@ -261,7 +261,7 @@ in-migration backfill (see `nx-gamedata` below) and filling the 76k-vs-44k gap
 The platform is co-developed and `gd.sync`'s only consumer is `nx-gamedata`, so
 a coordinated cutover beats transient dual-emit:
 
-1. `nx-gs-adapter-api` — add `ItemStat`, collapse `ItemStats`, release
+1. `nx-gs-adapter-api` — add `Stat`, collapse `ItemStats`, release
    `api/vX.Y.Z`.
 2. Host integration — adopt the enum + translator, emit the canonical `stats` map;
    deploy → full re-sync repopulates `stats`.
@@ -283,15 +283,15 @@ host full re-sync refreshes `stats` with freshly-computed canonical values.
 
 - `combat` removed (no replacement block — folded into `stats`).
 - `stats` flattened: was `stats.statBonuses{}`, now `stats{}` directly.
-- `stats` keys renamed to canonical `ItemStat` tokens, and now also carry the
+- `stats` keys renamed to canonical `Stat` tokens, and now also carry the
   former combat/weapon values (`P_ATK`, `ATK_SPD`, `SOULSHOT_COUNT`, …).
-- Before/after JSON + the full enumerated `ItemStat` key list with descriptions
+- Before/after JSON + the full enumerated `Stat` key list with descriptions
   for translation.
 
 ## Out of scope
 
 - Armor-set stat bonuses (`ArmorSetStatBonus`, base-stat `STR/DEX/…`) are a
-  separate slice. The `ItemStat` enum is item-template-scoped for now; reuse for
+  separate slice. The `Stat` enum was item-template-scoped at introduction; reuse for
   armor-set bonuses can follow if desired.
 - Localized display names / translations for the stat keys — owned by the
   frontend, driven off the enumerated `@Schema` list.

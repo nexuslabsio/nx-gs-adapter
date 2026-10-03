@@ -102,7 +102,7 @@ errorDetails` triple. Dropped before first release in favour of R23 + R24: three
   numeric or list context (required-vs-available adena, rejected item ids) without stringifying
   it. No `ErrorCode` type exists in the api.
 
-- [done] R6. `nx-gs-adapter-api.spi.CommandHandler<C extends NxCommand<R>, R>` MUST ship as a SAM
+- [done] R6. `nx-gs-adapter-api.spi.capability.CommandHandler<C extends NxCommand<R>, R>` MUST ship as a SAM
   returning `CommandResult<R>` from `handle(C command, CommandContext ctx)`. The bound
   `C extends NxCommand<R>` forces the handler's reply payload type to match the command class's
   declared type at compile time. The handler runs synchronously on the adapter's commands
@@ -122,7 +122,7 @@ errorDetails` triple. Dropped before first release in favour of R23 + R24: three
   `host()`, `events()`, `io()` and `sync()` are session-scoped; only `correlationId()` is
   per-record.
 
-- [done] R8. `nx-gs-adapter-api.spi.HostExecutor` MUST expose `void sync(Runnable)`,
+- [done] R8. `nx-gs-adapter-api.spi.capability.HostExecutor` MUST expose `void sync(Runnable)`,
   `<T> T sync(Supplier<T>)` and `void async(Runnable)`.
 
   `sync` blocks the caller on a latch until the host executor finishes the task OR
@@ -137,7 +137,7 @@ errorDetails` triple. Dropped before first release in favour of R23 + R24: three
   rather than reaching the host thread's UEH. Every method throws `IllegalStateException` when no
   host executor is registered (R12).
 
-- [done] R9. `nx-gs-adapter-api.spi.NxCommands` MUST expose
+- [done] R9. `nx-gs-adapter-api.spi.capability.NxCommands` MUST expose
   `<R, C extends NxCommand<R>> void on(Class<C> type, CommandHandler<C, R> handler)`, acquired via
   `ConnectContext.commands()`. The bound makes handler/command reply types agree at registration
   time. The registration window opens at `onConnect(ctx)`; late registration after the consumer

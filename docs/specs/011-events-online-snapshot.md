@@ -83,7 +83,7 @@ plugging in a snapshot-builder.
   Consumers MUST NOT reject snapshots that violate it (transient race during
   the tick walk can produce minor drift).
 
-- [todo] R4. `nx-gs-adapter-api.spi.NxEvents` MUST gain a single new method
+- [todo] R4. `nx-gs-adapter-api.spi.capability.NxEvents` MUST gain a single new method
   `void publishServerOnlineSnapshot(ServerOnlineSnapshotEvent event)` mirroring `publishPremiumPurchase` exactly:
   null event → silent no-op + WARN log, unregistered subtype → drop + WARN,
   family disabled (no topic in `MessagingTopics.events.serveronline`) → drop + DEBUG,
@@ -242,11 +242,11 @@ the four canonical buckets, and publishing.
 
 ### Structure
 
-- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/events/online/`
+- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/events/serveronline/`
   - `ServerOnlineSnapshotEvent.java` — abstract family base (empty body, type-bound)
   - `ServerOnlineSnapshotEvent.java` — Phase-1 concrete DTO + Builder
   - `WellKnownServerOnlineBuckets.java` — canonical bucket-key constants
-- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/`
+- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/capability/`
   - `NxEvents.java` — adds `publishServerOnlineSnapshot(ServerOnlineSnapshotEvent)`
   - `NoOpEvents.java` — adds the no-op variant
 - `nx-gs-adapter-core/src/main/java/app/l2nx/gs/adapter/core/events/`

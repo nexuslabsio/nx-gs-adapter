@@ -127,7 +127,7 @@ host-side authors hooking raid-death paths.
   (the adapter attaches no detection logic to it). The enum is shared by the
   raid-kill facts and the boss-respawn snapshot.
 
-- [todo] R5. `nx-gs-adapter-api.spi.NxEvents` MUST accept `RaidKillEvent`
+- [todo] R5. `nx-gs-adapter-api.spi.capability.NxEvents` MUST accept `RaidKillEvent`
   through the single generic `void publish(Object event)` method (the
   per-family methods were collapsed in this slice — see Open questions). The
   game-loop-safety contract is unchanged: null event → silent WARN + drop,

@@ -374,11 +374,11 @@ the reference integration.
   `:nx-gs-commons`; no engine-internal copy
 - `nx-gs-runtime-sync-core/src/main/resources/META-INF/services/app.l2nx.gs.adapter.api.spi.AdapterModule`
   [planned] — ServiceLoader descriptor
-- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/RuntimeStateProvider.java`
+- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/provider/RuntimeStateProvider.java`
   [planned] — Tier-2 SPI
-- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/RuntimeEntityMapping.java`
+- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/model/RuntimeEntityMapping.java`
   [planned] — per-entity mapping contract
-- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/RuntimeRow.java`
+- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/model/RuntimeRow.java`
   [planned] — `{ long pk, T dto }` row record
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/sync/runtime/character/CharacterRuntimeDto.java`
   [planned] — wire DTO

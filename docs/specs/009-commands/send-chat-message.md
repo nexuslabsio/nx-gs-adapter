@@ -98,13 +98,13 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
 - [done] R13. **Phase 1 (expand).** The platform's announcement scheduler sends the new command and,
   on an `UNSUPPORTED_COMMAND` reply, immediately re-sends the legacy `AnnounceNowCommand`. The
   fallback is counted by a metric. `AnnounceNowHandler` stays registered host-side.
-- [todo] R14. **Phase 2 (contract).** Once the fallback stops firing on every **live** server — the
+- [done] R14. **Phase 2 (contract).** Once the fallback stops firing on every **live** server — the
   trigger is that observation, not a date — the fallback, `AnnounceNowHandler`, `AnnounceNowCommand`
   and `AnnounceResult` are all removed. Naming the trigger is what makes the compatibility layer a
   phase instead of a permanent straddle. Met once every live server answers the new command with `OK`;
   a non-production build that never received the handler is excluded and stays on the legacy path
   until its branch converges with the release line.
-- [todo] R15. Removing the command from the api module MUST NOT strand the platform's command audit.
+- [done] R15. Removing the command from the api module MUST NOT strand the platform's command audit.
   `Command.ANNOUNCE_NOW` on the platform side is not only a dispatch type: it is also the discriminator
   persisted on every historical audit row, so deleting it breaks reading them. The platform migrates
   those rows onto `SEND_CHAT_MESSAGE` in the same release — see `nx-gameservers/docs/specs/073-chat.md`

@@ -456,7 +456,7 @@ health check — created once at init, reused.
   (additive); existing fields untouched
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/ConnectContext.java`
   [planned] — adds `NxEvents events()` accessor
-- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/NxEvents.java`
+- `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/spi/capability/NxEvents.java`
   [planned] — new SPI; one method per event family
 - `nx-gs-adapter-api/src/main/java/app/l2nx/gs/adapter/api/kafka/events/`
   [planned] — package root for event families

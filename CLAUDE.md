@@ -97,7 +97,7 @@ Adapter-owned threads (all daemon — never block JVM exit):
 | `nx-gs-kafka-health`     | 1            | Persistent `AdminClient.describeCluster` health ticks |
 | `nx-events-publisher`    | 1            | Bounded-queue fan-out for `NxEvents`                  |
 | `nx-commands-consumer`   | 1            | Kafka poll + dispatch for `NxCommands`                |
-| `nx-commands-deferred`   | 0-1          | Expiry timer for open deferred replies (lazy)         |
+| `nx-commands-deferred`   | 0-1          | Publishes deferred replies + expiry timer (lazy)      |
 | `nx-io-N`                | configurable | Adapter-owned IO pool (`ctx.io()` for JDBC/HTTP hops) |
 | `nx-cdc-pool-<schema>-N` | configurable | Shared CDC engine pool (db-sync, all entities)        |
 | `nx-runtime-sync-pool-N` | configurable | Shared runtime-sync engine pool (all entities)        |
