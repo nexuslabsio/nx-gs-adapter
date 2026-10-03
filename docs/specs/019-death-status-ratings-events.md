@@ -4,7 +4,7 @@
 
 Cross-repo feature. Wire contracts originate in `nx-gs-adapter` (this repo);
 platform-side work spans the host integration, `nx-tenants`, `nx-gameservers`,
-`nx-telegram`, and the Kafka topic runbooks in `nx-infra`. The feature is split
+`nx-social`, and the Kafka topic runbooks in `nx-infra`. The feature is split
 into three independently-shippable milestones (A, B, C); each adds a new outbound
 event shape plus its platform consumers.
 
@@ -108,7 +108,7 @@ bot), operators (server-status menu section), and platform-side consumers
   does not break the existing presence ingest. nx-gameservers stores nothing for
   deaths in this milestone (Non-goal: death history).
 
-- [todo] R6. `nx-telegram` MUST deliver a death notification to the linked
+- [todo] R6. `nx-social` MUST deliver a death notification to the linked
   character's owners, gated by a new per-linked-character toggle:
     - New `LinkedCharacterNotificationType.DEATH`.
     - The character-family consumer dispatches on `Nx-Message-Type`; on
@@ -178,7 +178,7 @@ bot), operators (server-status menu section), and platform-side consumers
   (PK `(tenant_id, server_id)`), watermark-gated by `eventId` timestamp so
   out-of-order/replayed records do not regress state.
 
-- [todo] R12. `nx-telegram` MUST add a **"Статус сервера"** section to the
+- [todo] R12. `nx-social` MUST add a **"Статус сервера"** section to the
   information menu (`InfoMenuHandler` / `InfoMenuRenderer` hub), mirroring the
   existing Events / Bosses / Castles sections:
     - Display: 🟢/🔴 status, uptime (`now − started_at`), and current online by
@@ -191,7 +191,7 @@ bot), operators (server-status menu section), and platform-side consumers
       (server-scoped `activity_key`, e.g. the serverId).
     - Gated by a new `MenuFeatures` flag `info-server` (default OFF) — see R26.
 
-- [todo] R13. `nx-telegram` MUST deliver server START/STOP notifications via a
+- [todo] R13. `nx-social` MUST deliver server START/STOP notifications via a
   **new event-driven path** (the existing time-driven `ActivityNotificationScheduler`
   does not fit push events):
     - A new Kafka consumer on the `*.gs.events.serveronline` family filtering
@@ -295,7 +295,7 @@ bot), operators (server-status menu section), and platform-side consumers
   store opened by the seller; BID = buy store opened by the buyer) — i.e. the
   notification recipient. Read via `Player.getAdena()` at publish time.
 
-- [todo] R25. `nx-telegram` `PrivateStoreEventsConsumer` / formatter MUST read
+- [todo] R25. `nx-social` `PrivateStoreEventsConsumer` / formatter MUST read
   `metadata.store_owner_adena` and append a "current adena" line to the trade
   notification (the recipient's balance now, since CDC character sync lags).
   ru/en/uk keys; line omitted gracefully when the key is absent.

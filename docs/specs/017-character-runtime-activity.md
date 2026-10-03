@@ -119,7 +119,7 @@ runtime character mapping.
   parsing, the platform stays agnostic to fishing's keys). Display-only, no new
   filter or sort.
 
-- [done] R10. The `nx-telegram` bot MUST show fishing info in the character
+- [done] R10. The `nx-social` bot MUST show fishing info in the character
   detail view, **only while the character is fishing**, positioned **above the
   HP/CP/MP block**. Renders from `customActivity` when `type=fishing`: time spent
   fishing (`elapsed_seconds`), current `penalty_multiplier`, and the countdown to
@@ -216,7 +216,7 @@ runtime character mapping.
   `nx-gs-kafka` — no contract change (the runtime engine hashes whatever the
   mapping mixes).
 - the host: `CharacterRuntimeMapping` populates + hashes both fields.
-- `nx-telegram` — character detail view renders the fishing block (R10).
+- `nx-social` — character detail view renders the fishing block (R10).
 - `nx-gameservers` — Liquibase `v2.3.0_character_activity.sql`, runtime upsert,
   read API.
 
@@ -251,7 +251,7 @@ runtime character mapping.
   `ALTER … RENAME COLUMN` migration is needed). `CharacterRepository` serializes
   the `List<CustomActivity>`; read API field `customActivities` stays
   `@JsonRawValue` raw-JSON passthrough (now an array).
-- **A5. `nx-telegram`** — `CharacterStats.activity` → `activities`
+- **A5. `nx-social`** — `CharacterStats.activity` → `activities`
   (`List<CharacterActivity>`); adapter parses the JSONB array; char-info screen
   renders one block per activity (fishing as before + a new `autofarming` block
   showing remaining time). New localization keys `chars.info.autofarming.{title,

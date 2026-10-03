@@ -139,7 +139,7 @@ two message types**, no db-sync entity, no runtime entity.
 - No per-clan siege standings aggregation (CubeJS concern downstream).
 - No castle tax / treasury / functions on the wire (not requested; add later as
   open `metadata` keys if needed — the envelope is already open).
-- No nx-telegram surfacing this round (only the three repos + the new topic).
+- No nx-social surfacing this round (only the three repos + the new topic).
 
 ## Wire shapes
 

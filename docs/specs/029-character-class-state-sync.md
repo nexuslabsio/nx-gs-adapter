@@ -6,7 +6,7 @@
 
 - nx-gameservers `docs/specs/062-character-class-state.md` — platform side: the
   `gs_character_classes` table, the active-class projection on `gs_characters`, the REST contract.
-- nx-telegram `docs/specs/031-character-classes-via-gameservers.md` — bot moves off direct DB reads.
+- nx-social `docs/specs/031-character-classes-via-gameservers.md` — bot moves off direct DB reads.
 - nx-cube `docs/specs/004-character-classes-cube/spec.md` — cube rename.
 
 ## Problem
@@ -188,7 +188,7 @@ Hence the transition release is additive rather than a swap:
 adapter-api once the cutover is done. That one IS breaking and takes its own version bump.
 
 The transition release itself is a minor version bump — every change in it is additive. Deploy ordering
-is in the nx-gameservers spec: platform, then nx-telegram, then adapter-api to Maven Central, then
+is in the nx-gameservers spec: platform, then nx-social, then adapter-api to Maven Central, then
 the host, then force-resync.
 
 ## Tests
