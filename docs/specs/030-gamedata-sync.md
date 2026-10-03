@@ -363,7 +363,7 @@ layout (spec 034).
 **Consumer guarantees** (platform side, protocol unchanged): a burst whose persisted row count does
 not match `SNAPSHOT_COMPLETE.count` is not reconciled; `count=0` is treated as an anomaly and never
 reconciles; infrastructure write failures are retried, not acknowledged. `gd.sync.*` retention
-rises from 3 h to 7 d.
+rises from 3 h to 48 h.
 
 ## 8. Links
 
