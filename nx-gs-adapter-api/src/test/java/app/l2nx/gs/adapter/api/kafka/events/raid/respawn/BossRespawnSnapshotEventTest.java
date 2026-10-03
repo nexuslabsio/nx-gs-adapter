@@ -115,6 +115,17 @@ class BossRespawnSnapshotEventTest {
     }
 
     @Test
+    void entry_shouldAcceptNullKind() {
+        BossRespawnEntry entry = BossRespawnEntry.builder()
+                .npcId(29019)
+                .status(WellKnownBossStatuses.ALIVE)
+                .build();
+
+        assertNull(entry.getKind());
+        assertEquals(entry, entry.toBuilder().build());
+    }
+
+    @Test
     void entry_metadata_shouldBeUnmodifiableAndDefensivelyCopied() {
         Map<String, String> source = new HashMap<>();
         source.put("zone", "antharas-lair");

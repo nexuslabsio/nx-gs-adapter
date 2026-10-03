@@ -28,6 +28,15 @@ it is picked up, it moves to "Done / moved into a spec".
   a host handler sidestepped it by switching to `host().async`.
 - **Related:** [`009-commands`](specs/009-commands/spec.md).
 
+### 3. Remove the deprecated boss-kind and division shim
+
+- **Want:** delete `RaidBossKind`, `RaidKillEvent.bossKind`, `BossRespawnEntry.kind`, `WellKnownBossDivisions` and `WellKnownBossMetadata.DIVISION` in a breaking removal release.
+- **To decide:** nothing - gate only. Remove once every host runs the adapter version carrying
+  `WellKnownNpcTypes` and the raid topic is drained of old events.
+- **Why:** the platform no longer reads them; boss classification is `NpcTemplate.type`
+  (`RAID_BOSS` / `EPIC_BOSS`). They stay on the wire meanwhile so old and new hosts interoperate.
+- **Related:** [`014-events-raid`](specs/014-events-raid.md) R4; code carries `// TODO:` markers.
+
 ## Done / moved into a spec
 
 —

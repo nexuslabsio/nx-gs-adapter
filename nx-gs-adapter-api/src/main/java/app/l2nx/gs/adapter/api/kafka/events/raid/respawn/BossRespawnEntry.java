@@ -13,22 +13,18 @@ import org.jspecify.annotations.Nullable;
  * One tracked raid boss in a {@link BossRespawnSnapshotEvent}.
  *
  * <ul>
- *   <li>{@code npcId} - upsert key; the consumer resolves the name from its own NPC catalog (names are
- *   NOT on the wire).</li>
- *   <li>{@code kind} - only {@link RaidBossKind#RAID} or {@link RaidBossKind#EPIC}; instance bosses have
- *   no server-wide respawn timer.</li>
- *   <li>{@code status} - open string, canonical values in {@link WellKnownBossStatuses}; consumers map
- *   unknown values to "not dead".</li>
+ *   <li>{@code npcId} - upsert key; names are NOT on the wire.</li>
+ *   <li>{@code kind} - deprecated and optional; when present only {@link RaidBossKind#RAID} or
+ *   {@link RaidBossKind#EPIC}, as instance bosses have no server-wide respawn timer.</li>
+ *   <li>{@code status} - open string ({@link WellKnownBossStatuses}); consumers map unknown values to "not dead".</li>
  *   <li>{@code nextRespawnAt} - set only when {@code dead} with a known respawn time.</li>
- *   <li>{@code metadata} - open string map; hosts MAY add keys without an API release, consumers ignore
- *   unknown ones.</li>
  * </ul>
  */
 public final class BossRespawnEntry {
 
     private final int npcId;
     private final @Nullable Integer level;
-    private final RaidBossKind kind;
+    private final @Nullable RaidBossKind kind;
     private final String status;
     private final @Nullable Instant nextRespawnAt;
     private final @Nullable Map<String, String> metadata;
@@ -37,7 +33,7 @@ public final class BossRespawnEntry {
     public BossRespawnEntry(
             int npcId,
             @Nullable Integer level,
-            RaidBossKind kind,
+            @Nullable RaidBossKind kind,
             String status,
             @Nullable Instant nextRespawnAt,
             @Nullable Map<String, String> metadata,
@@ -60,7 +56,13 @@ public final class BossRespawnEntry {
         return level;
     }
 
-    public RaidBossKind getKind() {
+    /**
+     * @deprecated the platform no longer reads it; use the NPC template {@code type} instead.
+     * {@code null} when the host omits it.
+     */
+    @Deprecated
+    // TODO: remove once all hosts run this adapter version and the raid topic is drained
+    public @Nullable RaidBossKind getKind() {
         return kind;
     }
 
@@ -146,7 +148,12 @@ public final class BossRespawnEntry {
             return this;
         }
 
-        public Builder kind(RaidBossKind kind) {
+        /**
+         * @deprecated see {@link BossRespawnEntry#getKind()}.
+         */
+        @Deprecated
+        // TODO: remove once all hosts run this adapter version and the raid topic is drained
+        public Builder kind(@Nullable RaidBossKind kind) {
             this.kind = kind;
             return this;
         }

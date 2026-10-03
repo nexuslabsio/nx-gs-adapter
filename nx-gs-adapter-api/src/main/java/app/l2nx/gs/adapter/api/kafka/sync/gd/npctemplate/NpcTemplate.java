@@ -137,7 +137,8 @@ public final class NpcTemplate {
     }
 
     /**
-     * Open string (e.g. {@code MONSTER} / {@code RAID_BOSS}); the set is fork-dependent.
+     * Platform business taxonomy of the NPC, not the fork's raw engine class. Open string; for bosses the
+     * host classifies {@link WellKnownNpcTypes#RAID_BOSS} vs {@link WellKnownNpcTypes#EPIC_BOSS}.
      */
     public String getType() {
         return type;

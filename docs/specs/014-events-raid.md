@@ -22,8 +22,9 @@ rail — single-event per kill, multi-aggregate payload.
 
 Boss scope is intentionally broad: any `Attackable.isRaid() && !isRaidMinion()`
 death by a player. World grand bosses and instance bosses share the same wire
-shape; differentiation is the `bossKind` enum (`RAID` / `EPIC` /
-`INSTANCE_BOSS`), letting consumers split dashboards downstream.
+shape; instance kills are told apart by `instanceId`. `bossKind` (`RAID` / `EPIC` /
+`INSTANCE_BOSS`) is **deprecated** and no longer read by the platform: boss
+classification is `NpcTemplate.type` (`RAID_BOSS` / `EPIC_BOSS`, see R4).
 
 Audience: platform-side consumers (dashboards / leaderboards / clan analytics);
 host-side authors hooking raid-death paths.
@@ -48,7 +49,9 @@ host-side authors hooking raid-death paths.
     - `@Nullable String bossName` — display name at kill time. Optional;
       platform resolves via its name catalog when null.
     - `@Nullable Integer bossLevel` — level at spawn.
-    - `RaidBossKind bossKind` — REQUIRED. `RAID` / `EPIC` / `INSTANCE_BOSS`.
+    - `@Nullable RaidBossKind bossKind` — OPTIONAL, `@Deprecated`. `RAID` / `EPIC` / `INSTANCE_BOSS`.
+      Kept on the wire so old hosts interoperate, but no longer required: new hosts may omit it
+      (`null`), and `BossRespawnEntry.kind` is optional the same way.
     - `@Nullable Long instanceId` — instance world id when killed inside a
       reflection / instance zone; `null` for open-world kills.
     - `@Nullable RaidActor lastHit` — final-blow character + affiliation
@@ -126,6 +129,14 @@ host-side authors hooking raid-death paths.
   boss is classified: the host integration assigns the value per its own rules
   (the adapter attaches no detection logic to it). The enum is shared by the
   raid-kill facts and the boss-respawn snapshot.
+  **Deprecated:** the enum, `RaidKillEvent.bossKind` and `BossRespawnEntry.kind`
+  are `@Deprecated` and `@Nullable` (the platform no longer reads them) but stay on the wire.
+  Boss classification moved to `NpcTemplate.type`, with the constants
+  `WellKnownNpcTypes.RAID_BOSS` / `EPIC_BOSS`; the host decides which bosses
+  are epic. Removal gate: every host runs this adapter version and the raid
+  topic is drained ([`TODO §3`](../TODO.md)). The `division` metadata key
+  (`WellKnownBossMetadata.DIVISION`) and `WellKnownBossDivisions` are likewise
+  `@Deprecated`; grouping is platform-side and the platform no longer reads them.
 
 - [todo] R5. `nx-gs-adapter-api.spi.capability.NxEvents` MUST accept `RaidKillEvent`
   through the single generic `void publish(Object event)` method (the

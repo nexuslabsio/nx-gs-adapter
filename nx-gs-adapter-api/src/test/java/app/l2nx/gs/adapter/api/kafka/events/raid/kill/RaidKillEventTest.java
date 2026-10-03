@@ -22,13 +22,15 @@ class RaidKillEventTest {
     }
 
     @Test
-    void constructor_shouldThrow_whenBossKindNull() {
-        assertThrows(
-                NullPointerException.class,
-                () -> RaidKillEvent.builder()
-                        .eventId(UUID.randomUUID())
-                        .bossNpcId(29028)
-                        .build());
+    void constructor_shouldAcceptNullBossKind() {
+        RaidKillEvent event = RaidKillEvent.builder()
+                .eventId(UUID.randomUUID())
+                .bossNpcId(29028)
+                .build();
+
+        assertNull(event.getBossKind());
+        assertEquals(event, event.toBuilder().build());
+        assertTrue(event.toString().contains("bossKind=null"));
     }
 
     @Test

@@ -5,23 +5,15 @@ import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Published to the {@code raid} family topic when a non-minion raid boss dies. One event per kill,
- * regardless of fight scale.
- *
- * <p>{@code eventId} MUST be a UUIDv7 (upper 48 bits = kill timestamp); consumers dedupe on it
- * (at-least-once). Partition key is {@code bossNpcId} (8-byte big-endian), so per-boss history is ordered.</p>
+ * Published to the {@code raid} topic when a non-minion raid boss dies, one event per kill. {@code eventId}
+ * MUST be a UUIDv7 (consumers dedupe on it, at-least-once); the partition key is {@code bossNpcId}.
  *
  * <ul>
- *   <li>{@code lastHit} - final-blow character; {@code null} for non-player sources (trap, owner-less
- *   summon). Does NOT confer drop rights.</li>
- *   <li>{@code dropOwner} - host {@code mainDamageDealer} holding drop protection. Group-first: when
- *   {@code partyId} is non-null the party owns the drop and {@code charId} is just its representative
- *   (do NOT aggregate by it); when null the kill was solo and {@code charId} is the owner. {@code null}
- *   when no resolvable player damager (admin kill, empty aggro list).</li>
- *   <li>{@code participants} - characters on the aggro list (damage or hate) plus Party / CommandChannel
- *   teammates of any contributor. Producers SHOULD sort by {@code damageDealt} desc.</li>
- *   <li>{@code metadata} - open string map; hosts MAY add keys without an API release, consumers ignore
- *   unknown ones.</li>
+ *   <li>{@code lastHit} - final-blow character; does NOT confer drop rights.</li>
+ *   <li>{@code dropOwner} - group-first: when {@code partyId} is non-null the party owns the drop and
+ *   {@code charId} is only its representative (do NOT aggregate by it).</li>
+ *   <li>{@code participants} - aggro-list characters plus party / command-channel teammates of any contributor;
+ *   producers SHOULD sort by {@code damageDealt} desc.</li>
  * </ul>
  */
 public final class RaidKillEvent {
@@ -30,7 +22,7 @@ public final class RaidKillEvent {
     private final int bossNpcId;
     private final @Nullable String bossName;
     private final @Nullable Integer bossLevel;
-    private final RaidBossKind bossKind;
+    private final @Nullable RaidBossKind bossKind;
     private final @Nullable Long instanceId;
     private final @Nullable RaidActor lastHit;
     private final @Nullable RaidActor dropOwner;
@@ -43,7 +35,7 @@ public final class RaidKillEvent {
             int bossNpcId,
             @Nullable String bossName,
             @Nullable Integer bossLevel,
-            RaidBossKind bossKind,
+            @Nullable RaidBossKind bossKind,
             @Nullable Long instanceId,
             @Nullable RaidActor lastHit,
             @Nullable RaidActor dropOwner,
@@ -54,7 +46,7 @@ public final class RaidKillEvent {
         this.bossNpcId = bossNpcId;
         this.bossName = bossName;
         this.bossLevel = bossLevel;
-        this.bossKind = Objects.requireNonNull(bossKind, "RaidKillEvent.bossKind is required");
+        this.bossKind = bossKind;
         this.instanceId = instanceId;
         this.lastHit = lastHit;
         this.dropOwner = dropOwner;
@@ -82,7 +74,13 @@ public final class RaidKillEvent {
         return bossLevel;
     }
 
-    public RaidBossKind getBossKind() {
+    /**
+     * @deprecated the platform no longer reads it; use the NPC template {@code type} instead.
+     * {@code null} when the host omits it.
+     */
+    @Deprecated
+    // TODO: remove once all hosts run this adapter version and the raid topic is drained
+    public @Nullable RaidBossKind getBossKind() {
         return bossKind;
     }
 
@@ -221,7 +219,12 @@ public final class RaidKillEvent {
             return this;
         }
 
-        public Builder bossKind(RaidBossKind bossKind) {
+        /**
+         * @deprecated see {@link RaidKillEvent#getBossKind()}.
+         */
+        @Deprecated
+        // TODO: remove once all hosts run this adapter version and the raid topic is drained
+        public Builder bossKind(@Nullable RaidBossKind bossKind) {
             this.bossKind = bossKind;
             return this;
         }
