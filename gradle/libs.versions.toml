@@ -3,7 +3,7 @@
 kafka-clients = "3.9.1"
 gson = "2.13.2"
 slf4j = "2.0.17"
-fastutil-core = "8.5.15"
+fastutil-core = "8.5.19"
 jspecify = "1.0.0"
 # tests
 junit = "5.14.3"
