@@ -1,17 +1,17 @@
 package app.l2nx.gs.adapter.api.kafka.commands.chat;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.OwnerVerified;
 import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
  * A shadow-banned or filtered speaker is not refused: reply is {@code OK}, nothing is delivered, the echo is flagged
- * {@link app.l2nx.gs.adapter.api.kafka.events.chat.ChatMetadataKeys#SHADOWED}. Delivery is at-most-once, so a
- * re-issue after a reply timeout looks fresh and {@code messageId} dedup needs a host-side window of seen ids.
- * Gson bypasses the constructor, so the handler must re-validate required fields.
+ * {@link app.l2nx.gs.adapter.api.kafka.events.chat.ChatMetadataKeys#SHADOWED}. At-most-once delivery: a re-issue after
+ * a reply timeout looks fresh, so {@code messageId} dedup needs a host-side window. Gson bypasses the constructor.
  */
-public final class SendChatMessageCommand implements NxCommand<SendChatMessageResult> {
+public final class SendChatMessageCommand implements OwnerVerified, NxCommand<SendChatMessageResult> {
 
     private final UUID messageId;
     private final String channel;
@@ -22,7 +22,13 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
     private final String source;
     private final String text;
     private final @Nullable String targetCharacterName;
+    private final boolean ownerVerified;
 
+    /**
+     * @deprecated use the overload with a trailing {@code ownerVerified}; this one sends {@code false}. Removed
+     *     once nx-gameservers builds every owner-verified command through that overload.
+     */
+    @Deprecated
     public SendChatMessageCommand(
             UUID messageId,
             String channel,
@@ -33,6 +39,30 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
             String source,
             String text,
             @Nullable String targetCharacterName) {
+        this(
+                messageId,
+                channel,
+                audience,
+                audienceId,
+                senderCharacterId,
+                senderDisplayName,
+                source,
+                text,
+                targetCharacterName,
+                false);
+    }
+
+    public SendChatMessageCommand(
+            UUID messageId,
+            String channel,
+            String audience,
+            @Nullable Long audienceId,
+            @Nullable Long senderCharacterId,
+            @Nullable String senderDisplayName,
+            String source,
+            String text,
+            @Nullable String targetCharacterName,
+            boolean ownerVerified) {
         this.messageId = Objects.requireNonNull(messageId, "messageId");
         this.channel = requireText(channel, "channel");
         this.audience = requireText(audience, "audience");
@@ -49,6 +79,7 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
         this.source = requireText(source, "source");
         this.text = requireText(text, "text");
         this.targetCharacterName = targetCharacterName;
+        this.ownerVerified = ownerVerified;
     }
 
     private static void validateAudience(
@@ -130,6 +161,11 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
         return targetCharacterName;
     }
 
+    @Override
+    public boolean isOwnerVerified() {
+        return ownerVerified;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .messageId(messageId)
@@ -140,7 +176,8 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
                 .senderDisplayName(senderDisplayName)
                 .source(source)
                 .text(text)
-                .targetCharacterName(targetCharacterName);
+                .targetCharacterName(targetCharacterName)
+                .ownerVerified(ownerVerified);
     }
 
     public static Builder builder() {
@@ -160,7 +197,8 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
                 && Objects.equals(senderDisplayName, that.senderDisplayName)
                 && Objects.equals(source, that.source)
                 && Objects.equals(text, that.text)
-                && Objects.equals(targetCharacterName, that.targetCharacterName);
+                && Objects.equals(targetCharacterName, that.targetCharacterName)
+                && ownerVerified == that.ownerVerified;
     }
 
     @Override
@@ -174,7 +212,8 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
                 senderDisplayName,
                 source,
                 text,
-                targetCharacterName);
+                targetCharacterName,
+                ownerVerified);
     }
 
     @Override
@@ -187,7 +226,8 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
                 + ", senderDisplayName=" + senderDisplayName
                 + ", source=" + source
                 + ", text=" + text
-                + ", targetCharacterName=" + targetCharacterName + "]";
+                + ", targetCharacterName=" + targetCharacterName
+                + ", ownerVerified=" + ownerVerified + "]";
     }
 
     public static final class Builder {
@@ -200,6 +240,7 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
         private String source;
         private String text;
         private @Nullable String targetCharacterName;
+        private boolean ownerVerified;
 
         public Builder messageId(UUID messageId) {
             this.messageId = messageId;
@@ -246,6 +287,11 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
             return this;
         }
 
+        public Builder ownerVerified(boolean ownerVerified) {
+            this.ownerVerified = ownerVerified;
+            return this;
+        }
+
         public SendChatMessageCommand build() {
             return new SendChatMessageCommand(
                     messageId,
@@ -256,7 +302,8 @@ public final class SendChatMessageCommand implements NxCommand<SendChatMessageRe
                     senderDisplayName,
                     source,
                     text,
-                    targetCharacterName);
+                    targetCharacterName,
+                    ownerVerified);
         }
     }
 }

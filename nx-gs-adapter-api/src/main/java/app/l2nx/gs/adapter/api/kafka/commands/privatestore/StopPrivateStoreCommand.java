@@ -1,27 +1,43 @@
 package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.OwnerVerified;
 import java.util.Objects;
 
 /**
- * Closes whatever private store the character has open; executed on the character's game thread.
- * Reply: {@code success(StopPrivateStoreResult)}; errors: {@code NOT_FOUND} (char not online),
- * {@code INVALID_STATE} (no store open).
+ * Closes whatever private store the character has open, on the game thread. Errors: {@code NOT_FOUND} (char not
+ * online), {@code INVALID_STATE} (no store open).
  */
-public final class StopPrivateStoreCommand implements NxCommand<StopPrivateStoreResult> {
+public final class StopPrivateStoreCommand implements OwnerVerified, NxCommand<StopPrivateStoreResult> {
 
     private final int charId;
+    private final boolean ownerVerified;
 
+    /**
+     * @deprecated use the overload with a trailing {@code ownerVerified}; this one sends {@code false}. Removed
+     *     once nx-gameservers builds every owner-verified command through that overload.
+     */
+    @Deprecated
     public StopPrivateStoreCommand(int charId) {
+        this(charId, false);
+    }
+
+    public StopPrivateStoreCommand(int charId, boolean ownerVerified) {
         this.charId = charId;
+        this.ownerVerified = ownerVerified;
     }
 
     public int getCharId() {
         return charId;
     }
 
+    @Override
+    public boolean isOwnerVerified() {
+        return ownerVerified;
+    }
+
     public Builder toBuilder() {
-        return new Builder().charId(charId);
+        return new Builder().charId(charId).ownerVerified(ownerVerified);
     }
 
     public static Builder builder() {
@@ -33,29 +49,35 @@ public final class StopPrivateStoreCommand implements NxCommand<StopPrivateStore
         if (this == o) return true;
         if (!(o instanceof StopPrivateStoreCommand)) return false;
         StopPrivateStoreCommand that = (StopPrivateStoreCommand) o;
-        return charId == that.charId;
+        return charId == that.charId && ownerVerified == that.ownerVerified;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(charId);
+        return Objects.hash(charId, ownerVerified);
     }
 
     @Override
     public String toString() {
-        return "StopPrivateStoreCommand[charId=" + charId + "]";
+        return "StopPrivateStoreCommand[charId=" + charId + ", ownerVerified=" + ownerVerified + "]";
     }
 
     public static final class Builder {
         private int charId;
+        private boolean ownerVerified;
 
         public Builder charId(int charId) {
             this.charId = charId;
             return this;
         }
 
+        public Builder ownerVerified(boolean ownerVerified) {
+            this.ownerVerified = ownerVerified;
+            return this;
+        }
+
         public StopPrivateStoreCommand build() {
-            return new StopPrivateStoreCommand(charId);
+            return new StopPrivateStoreCommand(charId, ownerVerified);
         }
     }
 }

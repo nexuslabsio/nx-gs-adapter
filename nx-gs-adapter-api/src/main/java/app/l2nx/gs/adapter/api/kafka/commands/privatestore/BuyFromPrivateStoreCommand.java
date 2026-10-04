@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.commands.privatestore;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
+import app.l2nx.gs.adapter.api.kafka.commands.OwnerVerified;
 import app.l2nx.gs.adapter.api.kafka.commands.privatestore.model.BuyLine;
 import java.time.Instant;
 import java.util.HashSet;
@@ -9,30 +10,16 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Buys lots from another character's open sell-store on behalf of {@code buyerCharId} (remote "buy now"); the buyer
- * need not be online, in range, or in the same world instance as the seller.
- *
- * <p>{@code VALIDATION_FAILED}: malformed lines, blank mail text, buyer equals seller. {@code NOT_FOUND}: seller absent
- * or no open sell-store. {@code INVALID_STATE}: lot changed, store type not served, buyer cannot receive the goods.
- * {@code FORBIDDEN}: buyer barred from trading. {@code COMMAND_EXPIRED}: deadline passed, nothing moved.
- * Gson bypasses the constructor, so the handler re-checks.</p>
- *
- * <p>Every non-OK reply carries a stable {@code reason} code in
- * {@link app.l2nx.gs.adapter.api.kafka.commands.CommandProblem#getExtensions() CommandProblem.extensions}, with numeric
- * context in sibling keys. The platform localizes; the host sends no player-facing text and writes the
- * already-localized mail text verbatim.</p>
- *
- * <p>All-or-nothing: every line is bought at exactly the requested count and price, or nothing is charged or moved.
- * The host validates all lots against the seller's live trade list before entering the engine, so a stale order book
- * fails instead of silently buying less.</p>
+ * Remote "buy now" from another character's open sell-store. All-or-nothing: every line at exactly the requested count
+ * and price, validated against the live trade list first, or nothing is charged or moved. Errors: {@code VALIDATION_FAILED},
+ * {@code NOT_FOUND}, {@code INVALID_STATE}, {@code FORBIDDEN}, {@code COMMAND_EXPIRED}, each with a stable {@code reason}
+ * in {@link app.l2nx.gs.adapter.api.kafka.commands.CommandProblem#getExtensions() CommandProblem.extensions}.
  */
-public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivateStoreResult> {
+public final class BuyFromPrivateStoreCommand implements OwnerVerified, NxCommand<BuyFromPrivateStoreResult> {
 
     public static final int MAX_TAX_PERCENT = 50;
 
-    /**
-     * Delivery is one mail with a slot per line; the engine's attachment cap ({@code Config.MAIL_MAX_ATTACHMENTS}) is 36.
-     */
+    /** One mail slot per line; the engine's attachment cap ({@code Config.MAIL_MAX_ATTACHMENTS}) is 36. */
     public static final int MAX_LINES = 36;
 
     private final int buyerCharId;
@@ -43,7 +30,13 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
     private final String mailSender;
     private final String mailSubject;
     private final String mailBody;
+    private final boolean ownerVerified;
 
+    /**
+     * @deprecated use the overload with a trailing {@code ownerVerified}; this one sends {@code false}. Removed
+     *     once nx-gameservers builds every owner-verified command through that overload.
+     */
+    @Deprecated
     public BuyFromPrivateStoreCommand(
             int buyerCharId,
             int sellerCharId,
@@ -53,6 +46,19 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
             String mailSender,
             String mailSubject,
             String mailBody) {
+        this(buyerCharId, sellerCharId, lines, tax, deadline, mailSender, mailSubject, mailBody, false);
+    }
+
+    public BuyFromPrivateStoreCommand(
+            int buyerCharId,
+            int sellerCharId,
+            List<BuyLine> lines,
+            int tax,
+            Instant deadline,
+            String mailSender,
+            String mailSubject,
+            String mailBody,
+            boolean ownerVerified) {
         if (buyerCharId <= 0) {
             throw new IllegalArgumentException("buyerCharId must be positive (got " + buyerCharId + ")");
         }
@@ -89,6 +95,7 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         this.mailSender = requireText(mailSender, "mailSender");
         this.mailSubject = requireText(mailSubject, "mailSubject");
         this.mailBody = requireText(mailBody, "mailBody");
+        this.ownerVerified = ownerVerified;
     }
 
     private static String requireText(String value, String field) {
@@ -98,7 +105,7 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         return value;
     }
 
-    /** Need not be online; the host loads an offline character for the deal. */
+    /** Need not be online, in range or in the seller's instance; the host loads an offline character. */
     public int getBuyerCharId() {
         return buyerCharId;
     }
@@ -121,8 +128,8 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
     }
 
     /**
-     * The host MUST refuse after this ({@code COMMAND_EXPIRED}, nothing moves), checked before touching the seller's trade
-     * list. Guards against executing stale after sitting in the Kafka backlog (retention ~3h) while the game-server was down.
+     * The host refuses after this ({@code COMMAND_EXPIRED}, nothing moves), before touching the trade list: guards
+     * against stale execution from the Kafka backlog (retention ~3h).
      */
     public Instant getDeadline() {
         return deadline;
@@ -141,6 +148,11 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         return mailBody;
     }
 
+    @Override
+    public boolean isOwnerVerified() {
+        return ownerVerified;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .buyerCharId(buyerCharId)
@@ -150,7 +162,8 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
                 .deadline(deadline)
                 .mailSender(mailSender)
                 .mailSubject(mailSubject)
-                .mailBody(mailBody);
+                .mailBody(mailBody)
+                .ownerVerified(ownerVerified);
     }
 
     public static Builder builder() {
@@ -169,12 +182,14 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
                 && Objects.equals(deadline, that.deadline)
                 && Objects.equals(mailSender, that.mailSender)
                 && Objects.equals(mailSubject, that.mailSubject)
-                && Objects.equals(mailBody, that.mailBody);
+                && Objects.equals(mailBody, that.mailBody)
+                && ownerVerified == that.ownerVerified;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(buyerCharId, sellerCharId, lines, tax, deadline, mailSender, mailSubject, mailBody);
+        return Objects.hash(
+                buyerCharId, sellerCharId, lines, tax, deadline, mailSender, mailSubject, mailBody, ownerVerified);
     }
 
     @Override
@@ -186,7 +201,8 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
                 + ", deadline=" + deadline
                 + ", mailSender=" + mailSender
                 + ", mailSubject=" + mailSubject
-                + ", mailBody=" + mailBody + "]";
+                + ", mailBody=" + mailBody
+                + ", ownerVerified=" + ownerVerified + "]";
     }
 
     public static final class Builder {
@@ -198,6 +214,7 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
         private String mailSender;
         private String mailSubject;
         private String mailBody;
+        private boolean ownerVerified;
 
         public Builder buyerCharId(int buyerCharId) {
             this.buyerCharId = buyerCharId;
@@ -239,9 +256,14 @@ public final class BuyFromPrivateStoreCommand implements NxCommand<BuyFromPrivat
             return this;
         }
 
+        public Builder ownerVerified(boolean ownerVerified) {
+            this.ownerVerified = ownerVerified;
+            return this;
+        }
+
         public BuyFromPrivateStoreCommand build() {
             return new BuyFromPrivateStoreCommand(
-                    buyerCharId, sellerCharId, lines, tax, deadline, mailSender, mailSubject, mailBody);
+                    buyerCharId, sellerCharId, lines, tax, deadline, mailSender, mailSubject, mailBody, ownerVerified);
         }
     }
 }

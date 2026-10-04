@@ -160,6 +160,7 @@ rather than posting twice.
 | `source`            | `String` | yes      | Where the message originates (`MINIAPP` — legacy `TMA` —, `AUTO_ANNOUNCEMENT`, …). Echoed into the event metadata under `ChatMetadataKeys.SOURCE`; the host cannot infer the surface, and without it analysis cannot tell platform traffic from what players typed in-game |
 | `text`              | `String` | yes      | Body in the neutral chat micro-format: plain text, LF hard line breaks, bare `http(s)://` URLs for auto-linking; URL translation is a host concern. Planned (spec R25): item links as game-native `\b\tType=1 \tID=<objectId> ...\b` tokens built by the platform and ownership-verified by the host (foreign / missing item is `VALIDATION_FAILED`)                                                                  |
 | `targetCharacterName` | `String?` | cond. | Whisper addressee by name, used with audience `CHARACTER` when `audienceId` is `null`; trailing `*` stripped. Exactly one of the two for `CHARACTER`; both or neither is `VALIDATION_FAILED` (planned, spec R24)
+| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
 
 **Result** (`SendChatMessageResult`)
 
@@ -573,6 +574,7 @@ all.
 | `charId` | `int`            | yes      | Character to open the store for                                                                                                                                                                                                                       |
 | `title`  | `String?`        | no       | Store banner text shown above the seller. `null` falls back to the host's default                                                                                                                                                                     |
 | `lines`  | `List<SellLine>` | yes      | Offered stacks, non-empty. Each `SellLine`: `itemId` (`int`, inventory instance object-id), `count` (`long`, positive), `priceAdena` (`long`, non-negative — `0` is a valid give-away price; engine charges `count * priceAdena` for the whole stack) |
+| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
 
 **Result** (`StartPrivateStoreResult`)
 
@@ -608,6 +610,7 @@ detail beyond that equivalence).
 | `charId` | `int`            | yes      | Character to open the store for                                                                                      |
 | `title`  | `String?`        | no       | Store banner text shown above the seller. `null` falls back to the host's default                                    |
 | `lines`  | `List<SellLine>` | yes      | Bundled stacks, non-empty, all-or-nothing at purchase time (same `SellLine` shape as `StartPrivateStoreSellCommand`) |
+| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
 
 **Result** (`StartPrivateStoreResult`) — same shape as
 `StartPrivateStoreSellCommand`'s result, above.
@@ -627,6 +630,7 @@ subsystem on the character's game thread.
 | Field    | Type  | Required | Notes                               |
 | -------- | ----- | -------- | ----------------------------------- |
 | `charId` | `int` | yes      | Character whose open store to close |
+| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
 
 **Result** (`StopPrivateStoreResult`)
 
@@ -673,6 +677,7 @@ verbatim — it composes no text of its own.
 | `mailSender`   | `String`        | yes      | Author shown on the delivery mail, non-blank. Platform-authored, player-facing, already localized; written verbatim                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `mailSubject`  | `String`        | yes      | Subject of the delivery mail, non-blank. Same rules as `mailSender`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `mailBody`     | `String`        | yes      | Body of the delivery mail, non-blank, final text (no placeholders). Same rules as `mailSender`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
 
 **Result** (`BuyFromPrivateStoreResult`)
 
@@ -811,6 +816,20 @@ resolve + side-channel send; no sync trigger needed.
 ---
 
 ## Cross-cutting
+
+### Owner verification
+
+Commands the platform sends on behalf of a player acting with their own character implement
+`OwnerVerified` and carry `ownerVerified` (spec R28): `SendChatMessageCommand`,
+`StartPrivateStoreSellCommand`, `StartPrivateStorePackageSellCommand`, `StopPrivateStoreCommand`,
+`BuyFromPrivateStoreCommand`.
+
+- `true` means the platform verified, against fresh master-account data, that the acting user owns
+  the character. Everything else sends `false`: staff actions, socially linked characters, the
+  platform speaking for itself, commands it did not verify freshly.
+- It is not authorization. A host MAY use `true` only to relax checks bound to the player's device or
+  game session, which a platform-issued command can never satisfy (a device-bound item lock is the
+  typical one). Everything else is checked the same way regardless of the flag.
 
 ### Sync triggers
 

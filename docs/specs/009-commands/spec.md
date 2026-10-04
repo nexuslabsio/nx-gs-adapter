@@ -379,6 +379,30 @@ replies-published == 0}` is visible as a failure rather than as silence
   The platform sees an ordinary reply that simply arrives late; correlation is unchanged. Open
   handles live in memory only — a host restart loses them and the caller gets no reply.
 
+- [planned, `api/v0.92.0`] R28. **Owner verification.** `nx-gs-adapter-api.kafka.commands.OwnerVerified`
+  is an interface with one method, `boolean isOwnerVerified()`. Every command the platform issues on
+  behalf of a player acting with their own character MUST implement it. Today:
+  `BuyFromPrivateStoreCommand`, `StartPrivateStoreSellCommand`, `StartPrivateStorePackageSellCommand`,
+  `StopPrivateStoreCommand`, `SendChatMessageCommand`. A new command of that kind implements it from
+  its first release; the catalog marks each one (see `catalog.md` › Owner verification).
+  - `true` — the platform verified, against fresh master-account data, that the acting user owns the
+    character. "Fresh" is the platform's bounded-staleness guarantee, not a replica it happened to have.
+    `false` — no such attestation: staff acting on any character, a character the user only linked
+    socially, the platform speaking for itself (`SendChatMessageCommand` without `senderCharacterId`),
+    a command the platform did not need to verify freshly, a failed fresh verification, or a producer
+    that predates the field.
+  - It is **not authorization**. The platform authorizes every command before sending it, and a host
+    MUST NOT allow on `true` anything it refuses on `false` other than the checks below.
+  - A host MAY use `true` only to relax checks bound to the player's own device or game session —
+    checks a platform-issued command can never satisfy because it carries no device, such as a
+    device-bound item lock. The master-account verification stands in for the device. Which checks a
+    host relaxes is the host's decision and belongs in its own command documentation.
+  - Wire: a plain `boolean ownerVerified` field. Absent in JSON (old producer) deserializes to
+    `false`; an old host ignores it. Additive both ways, no ordering constraint.
+  - Java: each implementing command gains a constructor with a trailing `boolean ownerVerified`. The
+    existing constructor stays, `@Deprecated`, delegating with `false`; it goes in a later breaking
+    release once nx-gameservers constructs every such command with the new one.
+
 **Non-goals:**
 
 - **Per-domain Kafka topics** — single topic; cross-domain ordering per character is the more
@@ -531,8 +555,17 @@ poll(pollTimeoutMs)
 - **Replies bypass the events queue.** The events publisher's bounded queue drops on overflow,
   which is correct for a stale snapshot and wrong for a reply — a dropped reply has no semantic
   recovery, only a timeout.
+- **Owner verification is a typed field behind an interface, not a header (R28).** It is a business
+  attestation the handler acts on, and handlers receive the payload, not the record headers. A field
+  shows up in the command's contract and its catalog entry; the interface lets a host read it
+  generically instead of per command. A header would have needed new plumbing into the handler
+  context and left the contract silent about which commands carry it.
 
 ## Rollout
+
+`OwnerVerified` (R28) ships additively in `api/v0.92.0`: an absent field reads as `false`, so a new
+host with an old platform keeps its checks, and an old host ignores the field. Release order is free;
+the relaxed check takes effect once both the platform sends `true` and the host honours it.
 
 `COMMAND_EXPIRED` (R23) is an added enum constant, which is safe only in platform-first order:
 release `api/vX.Y.Z`, deploy the platform consumer, and only then let a host start emitting it.
@@ -607,3 +640,4 @@ NxCommand<Void>` is the sanctioned exception, and payload-less `CommandResult.ok
 - Sibling feature (`NxSync` / force-resync): [`docs/specs/021-force-resync.md`](../021-force-resync.md)
 - Follow-up command slice: [`docs/specs/009-commands/send-mail.md`](send-mail.md)
 - Follow-up command slice: [`docs/specs/009-commands/ban.md`](ban.md)
+- Platform side of owner verification (R28): `nx-gameservers/docs/specs/053-character-ownership.md`

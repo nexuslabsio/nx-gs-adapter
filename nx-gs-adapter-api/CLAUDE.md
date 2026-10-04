@@ -29,7 +29,7 @@ Root package `app.l2nx.gs.adapter.api`.
 | `kafka.sync.gd.<entity>`      | static game-data catalog DTOs, payload of `GameDataSyncEvent<T>`                                                                  | 030        |
 | `kafka.sync.runtime.<entity>` | volatile runtime-state DTOs                                                                                                       | 006        |
 | `kafka.events.<family>`       | outbound discrete-fact / snapshot event DTOs, grouped by family                                                                   | per family |
-| `kafka.commands.<group>`      | inbound command DTOs; the package root holds `NxCommand`, `CommandResult`, `CommandStatus` (+ nested `Tier`) and `CommandProblem` | 009        |
+| `kafka.commands.<group>`      | inbound command DTOs; the package root holds `NxCommand`, `CommandResult`, `CommandStatus` (+ nested `Tier`), `CommandProblem` and the `OwnerVerified` marker | 009        |
 | `kafka.ops`                   | `HeartbeatEvent`; its stats and state payloads in `kafka.ops.model`                                                              | 001        |
 | `spi`                         | `AdapterModule`, the two contexts, package-private `NoOp*`; sub-packages `provider`, `model`, `capability`                       | 002, 034   |
 
