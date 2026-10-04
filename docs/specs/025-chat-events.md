@@ -3,7 +3,7 @@
 > Owner: @n1rmata
 
 Living spec of the `chat` family's inbound fact (`ChatMessageEvent`, host → platform). The outbound
-command (`SendChatMessageCommand`, R8–R15) lives in
+command (`SendChatMessageCommand`, R8–R15 and R22–R27) lives in
 [`009-commands/send-chat-message.md`](009-commands/send-chat-message.md).
 
 **Counterpart specs (cross-repo):**
@@ -46,18 +46,25 @@ path.
     > functional gain. New fields on this family follow the canon; the platform maps names at its
     > consumer boundary.
 
-  - `@Nullable String charName` — sender display name; OPTIONAL.
+  - `@Nullable String charName` — clean sender character name (no offline postfix); OPTIONAL.
+  - `@Nullable String senderDisplayName` — `[planned]` name as the game client renders it, e.g.
+    `Vasya*`; see R16.
   - `String channel` — REQUIRED. A `WellKnownChatChannels` code, or the raw string `UNKNOWN_<int>`
     for a build-specific channel this catalog does not yet name. Null-checked in the constructor.
   - `String text` — REQUIRED. Message body, already sanitized host-side. Null-checked in the
     constructor.
   - `@Nullable Long targetCharId` / `@Nullable String targetCharName` — whisper recipient.
     Populated ONLY on the `WHISPER` channel; both `null` on every other channel. `targetCharId` is
-    `null` when the recipient is offline / unresolvable, while `targetCharName` may still carry the
-    typed recipient name.
+    `null` only when the recipient cannot be resolved at all; an offline addressee is resolved by
+    name (R20), and `targetCharName` carries the typed recipient name.
   - `@Nullable Map<String, String> metadata` — OPTIONAL open string→string map of build-agnostic
     attributes. Hosts MAY add arbitrary keys without an api release; consumers ignore unknown keys.
     `null` when absent; normalized to an unmodifiable copy when present.
+  - `@Nullable List<Long> recipientCharacterIds` — `[planned]`, see R17.
+  - `@Nullable List<ChatItemSnapshot> items` — `[planned]`, see R18.
+
+  The three `[planned]` fields are additive: a host built before them omits them (they read as
+  `null`), and consumers MUST tolerate their absence.
 
 - [done] R2. `nx-gs-adapter-api.kafka.events.chat.WellKnownChatChannels` MUST ship the canonical
   `UPPER_SNAKE_CASE` open-string channel vocabulary used as the `channel` value. A host maps its
@@ -78,7 +85,8 @@ path.
   `ConnectResponse.messagingTopics.events`, resolving to `<tenant-slug> + ".gs.events.chat"`.
 
 - [done] R6. The host MUST hook its chat-handler path and publish one
-  `ChatMessageEvent` per player-typed message via the cached `NxEvents` facade. Sanitize `text`
+  `ChatMessageEvent` per player-typed message via the cached `NxEvents` facade — and, `[planned]`
+  (R19), only after the channel handler actually delivered it. Sanitize `text`
   host-side; map the build's numeric chat type to a `WellKnownChatChannels` code (or
   `UNKNOWN_<int>`); set `targetCharId` / `targetCharName` only for whispers. Any uncaught `Throwable`
   in the publish path is caught and logged, never propagated to the game thread.
@@ -88,25 +96,79 @@ path.
   is a consumer-side concern, not Kafka's. Design: `nx-gameservers/docs/specs/073-chat.md`.
 
 - [done] R7. On the `CLAN` and `ALLIANCE` channels the host SHOULD carry the speaker's clan id in
-  `metadata` under the key `clanId`. The platform scopes clan-chat reads by it. Resolving the clan
+  `metadata` under the key `clanId` (the alliance id travels under its own key, R21). The platform scopes clan-chat reads by it. Resolving the clan
   from the platform's own replica instead is wrong: the replica lags, so a message from a character
   who just left the clan lands in the wrong scope, while the host knows the clan at the moment of
   speaking. No api release is needed — `metadata` is the open map R1 provides for exactly this.
 
+- [planned] R16. `ChatMessageEvent.senderDisplayName` MUST carry the name exactly as the game client
+  renders it. The host appends `*` (no space) when the speaking character is not in game (offline or
+  offline-trader mode); `charName` stays the clean character name. The postfix format is owned by the
+  host, not the platform: it is also a player-facing protocol (an in-game whisper to `Vasya*` routes
+  to the offline character, R20), so it must not depend on a platform deploy. `null` from hosts that
+  predate the field; consumers fall back to `charName`.
+
+- [planned] R17. `ChatMessageEvent.recipientCharacterIds` MUST be filled only for `GENERAL` and
+  `PARTY` (`null` elsewhere): the characters that actually received the packet, plus the speaker.
+  Party has no stable id and the `GENERAL` audience is positional, so the recipient list is the only
+  way to scope those channels on the read side. Clan / alliance scoping keeps using metadata ids.
+
+- [planned] R18. `ChatMessageEvent.items` MUST hold an immutable `ChatItemSnapshot` for every item link
+  present in `text`, one per objectId, taken at send time: the item's later state (enchant, augment,
+  owner) cannot be reconstructed through chat. New wire class
+  `nx-gs-adapter-api.kafka.events.chat.ChatItemSnapshot` (Java-8 POJO, same conventions as R1):
+  - `long itemObjectId`, `int itemTemplateId`, `int enchantLevel`
+  - `Map<String, Integer> attributes` — elemental type (`FIRE` / `WATER` / `WIND` / `EARTH` / `HOLY` /
+    `DARK`) to power; empty when none, never `null`
+  - `@Nullable ItemAugmentationDbDto augmentation` = `{int option1Id; @Nullable Integer option2Id}` — the
+    item-sync class itself (`kafka.sync.db.item`), not a chat copy: one domain concept, one wire shape
+
+  No ensoul: not supported on this build, and a special ability is a separate item template.
+  Augmentation option localization is out of scope (a future platform option catalog, nx-gamedata
+  `TODO §6`).
+
+  **`text` stays in the game's native form in both directions.** Item links are
+  tokens (`\b\tType=1 \tID=<objectId> ...\b`).
+  Normalizing them to any platform format is the platform's job: the DTO format must not depend on
+  host deploys. The objectId on the wire is fine.
+
+- [planned] R19. **Publish semantics.** The host MUST publish the event only after the channel handler
+  actually delivered the message; a message the handler rejected (ban, level floor, block list, ...)
+  produces no event. A contract, not an implementation detail: the stored corpus then equals what
+  players could have read.
+
+- [planned] R20. `WHISPER`: `targetCharId` MUST be set also when the addressee is offline; the host
+  resolves by name, including the `Name*` form (R16).
+
+- [planned] R21. `ChatMetadataKeys.ALLIANCE_ID = "allianceId"` MUST carry the speaker's alliance id as a
+  decimal string on the `CLAN` and `ALLIANCE` channels, same rationale as R7. Naming follows the
+  platform canon (full words: alliance, character); the shipped `charId` / `targetCharId` /
+  `targetCharName` are NOT renamed.
+
+- [planned] R21a. `ChatMetadataKeys.SHADOWED = "shadowed"` (`"true"`) MUST mark a message the host
+  delivered only to the speaker (shadow-ban, broadcast filter). Such a message is still published
+  (R19 counts it as delivered — it is exactly the spam the corpus exists for); `recipientCharacterIds`
+  is `[speaker]` on `GENERAL` / `PARTY`. Consumers store it but show it only to the speaker.
+
+> Host-internal, not wire: the host keeps a bounded snapshot cache (objectId -> item info, TTL 6h,
+> re-link refreshes) so in-game players can open links sent by offline characters.
+
 ## Topic & wire summary
 
-| Item              | Value                                                    |
-| ----------------- | -------------------------------------------------------- |
-| Family            | `chat`                                                   |
-| Event topic       | `<tenant>.gs.events.chat`  |
-| `Nx-Message-Type` | `ChatMessageEvent`                                       |
-| Partition key     | `charId` (8-byte big-endian)                             |
-| Idempotency       | `eventId` (UUIDv7), at-least-once delivery               |
+| Item              | Value                                      |
+| ----------------- | ------------------------------------------ |
+| Family            | `chat`                                     |
+| Event topic       | `<tenant>.gs.events.chat`                  |
+| `Nx-Message-Type` | `ChatMessageEvent`                         |
+| Partition key     | `charId` (8-byte big-endian)               |
+| Idempotency       | `eventId` (UUIDv7), at-least-once delivery |
 
 ## Compatibility
 
 Purely additive and already released — `ChatMessageEvent` + `WellKnownChatChannels` in
-`api/v0.67.0`, the registry binding in `core/v0.32.0`.
+`api/v0.67.0`, the registry binding in `core/v0.32.0`. R16-R21 are additive on top of that: new
+nullable event fields, one new wire class, one new metadata key; old hosts omit them and consumers
+tolerate absence. The one behavioral change is R19 (publish after delivery).
 
 ## Non-goals
 

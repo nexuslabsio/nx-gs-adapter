@@ -1,26 +1,18 @@
 package app.l2nx.gs.adapter.api.kafka.events.chat;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Raw chat fact published to {@code <tenant>.gs.events.chat} for every player-typed message; pattern matching
- * lives in the platform.
- *
- * <p>{@code eventId} is a UUIDv7: its upper 48 bits carry the occurrence time (no {@code occurredAt} field), and consumers dedupe on it (at-least-once delivery).</p>
- *
- * <p>{@code charId} is the sender id and partition key (8-byte big-endian). {@code 0} means no legal sender (the
- * platform itself spoke); consumers store it as an absent character, not object id zero.</p>
- *
- * <p>Target fields are set only on {@link WellKnownChatChannels#WHISPER}. {@code targetCharId} is {@code null}
- * when the recipient is offline or unresolved, while {@code targetCharName} may still hold the typed name.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} preserves constructor parameter names so Jackson / Gson bind without
- * {@code @JsonProperty}.</p>
+ * {@code eventId} is a UUIDv7 (upper 48 bits carry the occurrence time) and the dedup key under at-least-once
+ * delivery. {@code charId} {@code 0} means the platform spoke: store an absent character. {@code senderDisplayName},
+ * {@code recipientCharacterIds} and {@code items} are additive: hosts that predate them send {@code null}.
  */
 public final class ChatMessageEvent {
 
@@ -32,6 +24,9 @@ public final class ChatMessageEvent {
     private final @Nullable Long targetCharId;
     private final @Nullable String targetCharName;
     private final @Nullable Map<String, String> metadata;
+    private final @Nullable String senderDisplayName;
+    private final @Nullable List<Long> recipientCharacterIds;
+    private final @Nullable List<ChatItemSnapshot> items;
 
     public ChatMessageEvent(
             UUID eventId,
@@ -41,7 +36,10 @@ public final class ChatMessageEvent {
             String text,
             @Nullable Long targetCharId,
             @Nullable String targetCharName,
-            @Nullable Map<String, String> metadata) {
+            @Nullable Map<String, String> metadata,
+            @Nullable String senderDisplayName,
+            @Nullable List<Long> recipientCharacterIds,
+            @Nullable List<ChatItemSnapshot> items) {
         this.eventId = Objects.requireNonNull(eventId, "eventId");
         this.charId = charId;
         this.charName = charName;
@@ -51,6 +49,11 @@ public final class ChatMessageEvent {
         this.targetCharName = targetCharName;
         this.metadata =
                 metadata == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(metadata));
+        this.senderDisplayName = senderDisplayName;
+        this.recipientCharacterIds = recipientCharacterIds == null
+                ? null
+                : Collections.unmodifiableList(new ArrayList<Long>(recipientCharacterIds));
+        this.items = items == null ? null : Collections.unmodifiableList(new ArrayList<ChatItemSnapshot>(items));
     }
 
     public UUID getEventId() {
@@ -65,20 +68,15 @@ public final class ChatMessageEvent {
         return charName;
     }
 
-    /**
-     * {@link WellKnownChatChannels} code, or {@code UNKNOWN_<int>} for a build-specific channel the catalog does not name.
-     */
     public String getChannel() {
         return channel;
     }
 
+    /** Game-native, with {@code ...ID=<objectId>...} item tokens. */
     public String getText() {
         return text;
     }
 
-    /**
-     * Whisper recipient id; {@code null} on other channels and when the recipient is offline / unresolved.
-     */
     public @Nullable Long getTargetCharId() {
         return targetCharId;
     }
@@ -91,6 +89,19 @@ public final class ChatMessageEvent {
         return metadata;
     }
 
+    public @Nullable String getSenderDisplayName() {
+        return senderDisplayName;
+    }
+
+    /** Characters that received the packet plus the speaker; only for {@code GENERAL} and {@code PARTY}. */
+    public @Nullable List<Long> getRecipientCharacterIds() {
+        return recipientCharacterIds;
+    }
+
+    public @Nullable List<ChatItemSnapshot> getItems() {
+        return items;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .eventId(eventId)
@@ -100,7 +111,10 @@ public final class ChatMessageEvent {
                 .text(text)
                 .targetCharId(targetCharId)
                 .targetCharName(targetCharName)
-                .metadata(metadata);
+                .metadata(metadata)
+                .senderDisplayName(senderDisplayName)
+                .recipientCharacterIds(recipientCharacterIds)
+                .items(items);
     }
 
     public static Builder builder() {
@@ -119,12 +133,26 @@ public final class ChatMessageEvent {
                 && Objects.equals(text, that.text)
                 && Objects.equals(targetCharId, that.targetCharId)
                 && Objects.equals(targetCharName, that.targetCharName)
-                && Objects.equals(metadata, that.metadata);
+                && Objects.equals(metadata, that.metadata)
+                && Objects.equals(senderDisplayName, that.senderDisplayName)
+                && Objects.equals(recipientCharacterIds, that.recipientCharacterIds)
+                && Objects.equals(items, that.items);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(eventId, charId, charName, channel, text, targetCharId, targetCharName, metadata);
+        return Objects.hash(
+                eventId,
+                charId,
+                charName,
+                channel,
+                text,
+                targetCharId,
+                targetCharName,
+                metadata,
+                senderDisplayName,
+                recipientCharacterIds,
+                items);
     }
 
     @Override
@@ -136,7 +164,10 @@ public final class ChatMessageEvent {
                 + ", text=" + text
                 + ", targetCharId=" + targetCharId
                 + ", targetCharName=" + targetCharName
-                + ", metadata=" + metadata + "]";
+                + ", metadata=" + metadata
+                + ", senderDisplayName=" + senderDisplayName
+                + ", recipientCharacterIds=" + recipientCharacterIds
+                + ", items=" + items + "]";
     }
 
     public static final class Builder {
@@ -148,6 +179,9 @@ public final class ChatMessageEvent {
         private @Nullable Long targetCharId;
         private @Nullable String targetCharName;
         private @Nullable Map<String, String> metadata;
+        private @Nullable String senderDisplayName;
+        private @Nullable List<Long> recipientCharacterIds;
+        private @Nullable List<ChatItemSnapshot> items;
 
         public Builder eventId(UUID eventId) {
             this.eventId = eventId;
@@ -189,9 +223,34 @@ public final class ChatMessageEvent {
             return this;
         }
 
+        public Builder senderDisplayName(@Nullable String senderDisplayName) {
+            this.senderDisplayName = senderDisplayName;
+            return this;
+        }
+
+        public Builder recipientCharacterIds(@Nullable List<Long> recipientCharacterIds) {
+            this.recipientCharacterIds = recipientCharacterIds;
+            return this;
+        }
+
+        public Builder items(@Nullable List<ChatItemSnapshot> items) {
+            this.items = items;
+            return this;
+        }
+
         public ChatMessageEvent build() {
             return new ChatMessageEvent(
-                    eventId, charId, charName, channel, text, targetCharId, targetCharName, metadata);
+                    eventId,
+                    charId,
+                    charName,
+                    channel,
+                    text,
+                    targetCharId,
+                    targetCharName,
+                    metadata,
+                    senderDisplayName,
+                    recipientCharacterIds,
+                    items);
         }
     }
 }

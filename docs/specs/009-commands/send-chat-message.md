@@ -4,7 +4,8 @@
 
 Outbound half of the `chat` family (`SendChatMessageCommand`, platform → host). The inbound fact
 `ChatMessageEvent` and the problem statement live in [`025-chat-events.md`](../025-chat-events.md);
-requirements keep their original numbers (R8–R15) so existing references stay valid.
+requirements keep their original numbers (R8–R15) so existing references stay valid. The whisper /
+party / alliance / item-link slice continues as R22–R27 (R16–R21 live in the events spec).
 
 **Counterpart spec (cross-repo):** `nx-gameservers/docs/specs/073-chat.md` — announcement-scheduler
 cutover and the platform send path.
@@ -13,7 +14,7 @@ cutover and the platform send path.
 
 The reverse direction of the chat feature. Writing into game chat from outside used to be
 impossible except for one narrow path — `AnnounceNowCommand`, which broadcasts to the announcement
-channel and nothing else. The mini app needs to post into clan chat as the player's own character
+channel and nothing else. The mini app (Telegram, VK and Discord surfaces) needs to post into clan chat as the player's own character
 (including while that character is offline), and announcements need to reach a player's private chat
 under an arbitrary display name ("System", "Дед Мороз").
 
@@ -30,12 +31,13 @@ under an arbitrary display name ("System", "Дед Мороз").
   own name with a suffix); a "Дед Мороз" announcement carries only the second. Collapsing them into a
   single field cannot express either the persona or the audit trail.
 
-  **The display name is composed platform-side, in full.** The host writes the string as given —
+  **The display name is composed platform-side, in full, for nameless senders.** (With a
+  `senderCharacterId` the host builds the name instead, R23.) The host writes the string as given —
   `CreatureSay` serializes the sender name with `writeS`, so an arbitrary string renders without any
   client change. Keeping composition on the platform means the suffix format changes without an
   adapter or game-core release. This relies on the standing rule that the adapter trusts the platform.
 
-  **`audience` is an axis of its own**, orthogonal to `channel`: `CHARACTER` | `CLAN` | `ALL_ONLINE`.
+  **`audience` is an axis of its own**, orthogonal to `channel`: `CHARACTER` | `CLAN` | `ALLIANCE` | `PARTY` | `ALL_ONLINE`.
   A whisper to one player and a whisper fanned out to everyone online are the same frame with
   different recipient lists. Without the axis, DM announcements would need a second command carrying a
   copy of every field.
@@ -50,8 +52,8 @@ under an arbitrary display name ("System", "Дед Мороз").
   without the marker the stored corpus cannot separate platform traffic from what players typed
   in-game — which is the distinction every abuse query starts from.
 
-  **Accepted channels are a whitelist that grows per slice.** The first slice accepts `CLAN` (mini-app clan chat) and `ANNOUNCEMENT` (the absorbed announcement path);
-  anything outside the current whitelist is answered `VALIDATION_FAILED`. `CRITICAL_ANNOUNCEMENT` is
+  **Accepted channels are a whitelist that grows per slice.** The first slice accepted `CLAN` and `ANNOUNCEMENT`; the current whitelist is `CLAN`, `ALLIANCE`,
+  `PARTY`, `WHISPER`, `ANNOUNCEMENT` (R22). Anything outside the current whitelist is answered `VALIDATION_FAILED`. `CRITICAL_ANNOUNCEMENT` is
   deliberately absent — see R11.
 
 - [done] R9. The host handler MUST publish a `ChatMessageEvent` for every message it sends, reusing
@@ -60,8 +62,11 @@ under an arbitrary display name ("System", "Дед Мороз").
   ends up with two sources of truth.
 
 - [done] R10. The host handler MUST run the same gates as the native chat handler for the target
-  channel — for `CLAN` that is `isChatBanned` + `Config.BAN_CHAT_CHANNELS`, the shadow-ban check, and
-  the academy level floor. Skipping them turns the command into a chat-ban bypass. An offline speaker
+  channel — for `CLAN` that is `isChatBanned` + `Config.BAN_CHAT_CHANNELS` and the academy level floor;
+  the other channels have their own gates (R22). Skipping them turns the command into a chat-ban bypass.
+  A shadow-banned speaker (and text matching the host's broadcast filter) is treated as in game: not
+  refused — that would reveal the ban — but answered `OK` with nothing delivered, and the echo carries
+  `metadata.shadowed=true` so the platform stores it and shows it to the speaker only. An offline speaker
   is resolved through the clan table rather than a live `Player`, and the clan broadcast reaches the
   online members.
 
@@ -111,6 +116,49 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
   §5.4. Nothing is required of the adapter beyond dropping the classes in `api/v0.87.0`; hosts pinned
   to `0.86.0` keep compiling.
 
+## Whisper, party, alliance and item links
+
+- [planned] R22. The channel whitelist MUST grow to `CLAN`, `ALLIANCE`, `PARTY`, `WHISPER`,
+  `ANNOUNCEMENT`, and `ChatAudiences` MUST gain:
+  - `ALLIANCE` — `audienceId` = allianceId;
+  - `PARTY` — `audienceId` = `null`; the host resolves the party from the sender, who therefore MUST
+    be online and in a party, else `INVALID_STATE`;
+  - `CHARACTER` (whisper) is now allowed for an **offline** addressee. The host runs the same gates as
+    the in-game whisper — sender chat ban, min level 40, the addressee's block list (read from the DB
+    when offline), message refusal mode — sends a packet only if the addressee is online, and
+    publishes the echo with `targetCharId` set either way (events R20).
+
+- [planned] R23. **Sender identity.** `senderDisplayName` is nullable when `senderCharacterId` is
+  set. If present, an updated host IGNORES it and builds the name itself, including the `*` postfix
+  for an offline speaker (events R16); an older host writes it verbatim. This keeps the rollout safe:
+  the platform deploys before hosts restart and the pre-R23 handler rejects a command without the
+  field, so the platform keeps sending it until every live host is updated. For nameless
+  announcements (`senderCharacterId == null`) it stays required (empty string = nameless line).
+
+- [planned] R24. **Whisper addressee.** The command gains `@Nullable String targetCharacterName`. For
+  audience `CHARACTER` exactly one of `audienceId` (character id) / `targetCharacterName` MUST be
+  given; the platform sends the name typed in the UI, and the host resolves it by name, stripping a
+  trailing `*`. Both or neither is `VALIDATION_FAILED`; an unknown name is `NOT_FOUND`.
+
+- [planned] R25. **`text` carries game-native item tokens**, built by the platform (plain text, LF
+  breaks and bare URLs keep the R12 micro-format; item links are the one addition). The host parses
+  tokens like the native `Say2` handler (by `ID=`), verifies ownership — online: the live inventory on
+  the game thread; offline: the DB, location `INVENTORY` / `PAPERDOLL` only — and rebuilds a canonical
+  token. A foreign or missing item is `VALIDATION_FAILED`. Anything outside a valid token (stray
+  `\b`, control characters) is stripped, and the rest is filtered with the game chat whitelist
+  (ASCII 32-126, Cyrillic U+0400-04FF, Latin-1 U+00C0-00FF).
+
+- [planned] R26. **`source` for the mini app is `MINIAPP`** (the legacy value `TMA` existed; the mini
+  app now runs on Telegram, VK and Discord, so the old name misleads). `source` stays an open
+  string; stored `TMA` rows are not rewritten.
+
+- [planned] R27. The echo (R9) for the new channels carries `senderDisplayName`,
+  `recipientCharacterIds` (`PARTY`) and `items` (R25) as defined in the events spec, and is published
+  only after delivery (events R19); for an offline addressee it is published although no packet went
+  out, and for a shadowed speaker (R10) it is published with `shadowed=true` although nothing went
+  out. Host-internal, not wire: a bounded item snapshot cache (objectId -> item info, TTL 6h, re-link
+  refreshes) lets in-game players open links sent by offline characters.
+
 ## Topic & wire summary
 
 | Item              | Value                                                   |
@@ -121,14 +169,16 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
 
 ## Compatibility
 
-Additive on release: a host built against an older api never registers the handler, and the platform
+Additive on release (R22-R27 too: one new nullable field, new audience and channel codes; a host older
+than the slice answers `VALIDATION_FAILED` for them): a host built against an older api never registers the handler, and the platform
 sees `UNSUPPORTED_COMMAND` — exactly the signal phase 1 relies on. The removal in R14 is the only
 breaking step, and it is gated on the fallback metric.
 
 ## Non-goals
 
-- **Delivery to offline recipients.** A whisper needs a live `Player` to receive the packet; an
-  offline inbox with catch-up delivery is a platform-side design, not a wire concern.
+- **Catch-up delivery to offline recipients.** A whisper to an offline addressee is gated, echoed and
+  stored (R22), but no packet is queued for later; an offline inbox is a platform-side design, not a
+  wire concern.
 
 ## Links
 

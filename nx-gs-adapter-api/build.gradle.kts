@@ -13,10 +13,8 @@ java {
 
 tasks.withType<JavaCompile> {
     options.release.set(8)
-    // -Xlint:-options suppresses "source/target value 8 is obsolete" — Java 8 target
-    // is intentional (host JVMs span Java 8 to 25+); JDK recommends this exact flag.
-    // -parameters preserves constructor parameter names so JSON binders (Spring/Jackson)
-    // can deserialize into the POJOs via parameter-name binding, without @JsonProperty.
+    // Java 8 target is intentional (host JVMs span 8 to 25+); -Xlint:-options mutes its obsolescence warning.
+    // -parameters lets JSON binders map constructor params without @JsonProperty.
     options.compilerArgs.addAll(listOf("-Xlint:deprecation", "-Xlint:-options", "-parameters"))
 }
 
@@ -28,6 +26,7 @@ dependencies {
     api(libs.jspecify)
 
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.gson)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
@@ -37,8 +36,7 @@ tasks.test {
     }
 }
 
-// Silence "missing comment" javadoc warnings on getters / builder methods.
-// Keeps other doclint categories active (broken @link, syntax errors, etc.).
+// Missing-comment doclint is off; other categories stay on.
 tasks.withType<Javadoc>().configureEach {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:-missing", "-quiet")
 }
