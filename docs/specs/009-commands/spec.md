@@ -379,7 +379,7 @@ replies-published == 0}` is visible as a failure rather than as silence
   The platform sees an ordinary reply that simply arrives late; correlation is unchanged. Open
   handles live in memory only — a host restart loses them and the caller gets no reply.
 
-- [planned, `api/v0.92.0`] R28. **Owner verification.** `nx-gs-adapter-api.kafka.commands.OwnerVerified`
+- [done, `api/v0.92.0`] R28. **Owner verification.** `nx-gs-adapter-api.kafka.commands.OwnerVerified`
   is an interface with one method, `boolean isOwnerVerified()`. Every command the platform issues on
   behalf of a player acting with their own character MUST implement it. Today:
   `BuyFromPrivateStoreCommand`, `StartPrivateStoreSellCommand`, `StartPrivateStorePackageSellCommand`,
