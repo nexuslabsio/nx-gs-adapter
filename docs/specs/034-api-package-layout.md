@@ -56,7 +56,6 @@ the slice's contract from its supporting types. The same smell exists inside cor
   | `kafka.events.olympiad`        | `OlympiadGameType`, `OlympiadMatchReason`, `OlympiadMatchResult`                                                            |
   | `kafka.events.character`       | `WellKnownDeathMetadata`, `WellKnownFarmModes`, `WellKnownKillerTypes`, `WellKnownPresenceMetadata`                         |
   | `kafka.events.serveronline`    | `WellKnownServerOnlineBuckets`, `WellKnownServerStartMetadata`                                                              |
-  | `kafka.events.raid`            | `RaidBossKind`, `WellKnownBossDivisions`, `WellKnownBossMetadata` (all deprecated)                                         |
   | `kafka.ops`                    | `ChangesSummary`, `CommandsStats`, `EntityState`, `EntityStats`, `EventsStats`, `ModuleStates`, `ModuleStatus`, `PoolStats` |
   | `kafka.sync.runtime.character` | `Activity`, `WellKnownActivities`, `WellKnownActivityMetadata`, `WellKnownAiStatuses`                                       |
   | `kafka.sync.gd.npctemplate`    | `WellKnownNpcTypes`                                                                                                         |

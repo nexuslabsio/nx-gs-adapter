@@ -2,7 +2,6 @@ package app.l2nx.gs.adapter.api.kafka.events.raid.kill;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -15,22 +14,7 @@ class RaidKillEventTest {
     void constructor_shouldThrow_whenEventIdNull() {
         assertThrows(
                 NullPointerException.class,
-                () -> RaidKillEvent.builder()
-                        .bossNpcId(29028)
-                        .bossKind(RaidBossKind.EPIC)
-                        .build());
-    }
-
-    @Test
-    void constructor_shouldAcceptNullBossKind() {
-        RaidKillEvent event = RaidKillEvent.builder()
-                .eventId(UUID.randomUUID())
-                .bossNpcId(29028)
-                .build();
-
-        assertNull(event.getBossKind());
-        assertEquals(event, event.toBuilder().build());
-        assertTrue(event.toString().contains("bossKind=null"));
+                () -> RaidKillEvent.builder().bossNpcId(29028).build());
     }
 
     @Test
@@ -38,7 +22,6 @@ class RaidKillEventTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUID.randomUUID())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .build();
 
         assertTrue(event.getParticipants().isEmpty());
@@ -49,7 +32,6 @@ class RaidKillEventTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUID.randomUUID())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .build();
 
         assertTrue(event.getDrops().isEmpty());
@@ -60,7 +42,6 @@ class RaidKillEventTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUID.randomUUID())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .build();
 
         assertNull(event.getBossName());
@@ -75,7 +56,6 @@ class RaidKillEventTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUID.randomUUID())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .participants(Collections.singletonList(
                         RaidActor.builder().charId(1L).damageDealt(100L).build()))
                 .build();
@@ -90,7 +70,6 @@ class RaidKillEventTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUID.randomUUID())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .drops(Collections.singletonList(
                         RaidDropItem.builder().itemId(57).count(1L).build()))
                 .build();
@@ -106,7 +85,6 @@ class RaidKillEventTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUID.randomUUID())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .participants(source)
                 .build();
 
@@ -123,7 +101,6 @@ class RaidKillEventTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUID.randomUUID())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .drops(source)
                 .build();
 
@@ -148,7 +125,6 @@ class RaidKillEventTest {
                 .bossNpcId(29028)
                 .bossName("Valakas")
                 .bossLevel(85)
-                .bossKind(RaidBossKind.EPIC)
                 .lastHit(killer)
                 .dropOwner(killer)
                 .participants(Collections.singletonList(killer))

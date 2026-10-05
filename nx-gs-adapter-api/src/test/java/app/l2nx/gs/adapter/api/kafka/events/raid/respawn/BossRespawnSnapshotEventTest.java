@@ -2,7 +2,6 @@ package app.l2nx.gs.adapter.api.kafka.events.raid.respawn;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -17,7 +16,6 @@ class BossRespawnSnapshotEventTest {
         return BossRespawnEntry.builder()
                 .npcId(29020)
                 .level(75)
-                .kind(RaidBossKind.EPIC)
                 .status(WellKnownBossStatuses.DEAD)
                 .nextRespawnAt(Instant.parse("2026-06-01T12:00:00Z"))
                 .build();
@@ -104,25 +102,12 @@ class BossRespawnSnapshotEventTest {
         BossRespawnEntry alive = BossRespawnEntry.builder()
                 .npcId(25035)
                 .level(40)
-                .kind(RaidBossKind.RAID)
                 .status(WellKnownBossStatuses.ALIVE)
                 .build();
 
         assertEquals(WellKnownBossStatuses.ALIVE, alive.getStatus());
         assertNull(alive.getNextRespawnAt());
         assertNull(alive.getMetadata());
-        assertEquals(RaidBossKind.RAID, alive.getKind());
-    }
-
-    @Test
-    void entry_shouldAcceptNullKind() {
-        BossRespawnEntry entry = BossRespawnEntry.builder()
-                .npcId(29019)
-                .status(WellKnownBossStatuses.ALIVE)
-                .build();
-
-        assertNull(entry.getKind());
-        assertEquals(entry, entry.toBuilder().build());
     }
 
     @Test
@@ -132,7 +117,6 @@ class BossRespawnSnapshotEventTest {
 
         BossRespawnEntry entry = BossRespawnEntry.builder()
                 .npcId(29019)
-                .kind(RaidBossKind.EPIC)
                 .status(WellKnownBossStatuses.DEAD)
                 .nextRespawnAt(Instant.parse("2026-06-02T00:00:00Z"))
                 .metadata(source)

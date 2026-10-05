@@ -11,7 +11,7 @@ class ActivityTest {
     @Test
     void builder_shouldCarryTypeAndMetadata() {
         Map<String, String> meta = new LinkedHashMap<>();
-        meta.put(WellKnownActivityMetadata.ELAPSED_SECONDS, "1820");
+        meta.put(WellKnownActivityMetadata.ELAPSED, "PT30M20S");
         meta.put(WellKnownActivityMetadata.PENALTY_TIER, WellKnownActivityMetadata.TIER_1);
 
         Activity activity = Activity.builder()
@@ -20,18 +20,18 @@ class ActivityTest {
                 .build();
 
         assertEquals("fishing", activity.getType());
-        assertEquals("1820", activity.getMetadata().get("elapsed_seconds"));
+        assertEquals("PT30M20S", activity.getMetadata().get("elapsed"));
         assertEquals("tier1", activity.getMetadata().get("penalty_tier"));
     }
 
     @Test
     void metadata_shouldBeDefensivelyCopiedAndUnmodifiable() {
         Map<String, String> meta = new LinkedHashMap<>();
-        meta.put("elapsed_seconds", "10");
+        meta.put("elapsed", "10");
         Activity activity = Activity.builder().type("fishing").metadata(meta).build();
 
-        meta.put("elapsed_seconds", "999");
-        assertEquals("10", activity.getMetadata().get("elapsed_seconds"));
+        meta.put("elapsed", "999");
+        assertEquals("10", activity.getMetadata().get("elapsed"));
 
         assertThrows(
                 UnsupportedOperationException.class,
@@ -49,15 +49,15 @@ class ActivityTest {
     void equalsHashCode_shouldReflectTypeAndMetadata() {
         Activity a = Activity.builder()
                 .type("fishing")
-                .metadata(java.util.Collections.singletonMap("elapsed_seconds", "5"))
+                .metadata(java.util.Collections.singletonMap("elapsed", "5"))
                 .build();
         Activity b = Activity.builder()
                 .type("fishing")
-                .metadata(java.util.Collections.singletonMap("elapsed_seconds", "5"))
+                .metadata(java.util.Collections.singletonMap("elapsed", "5"))
                 .build();
         Activity c = Activity.builder()
                 .type("fishing")
-                .metadata(java.util.Collections.singletonMap("elapsed_seconds", "6"))
+                .metadata(java.util.Collections.singletonMap("elapsed", "6"))
                 .build();
 
         assertEquals(a, b);

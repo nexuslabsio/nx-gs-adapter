@@ -7,7 +7,6 @@ import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStorePurchaseEve
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.PrivateStoreSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatestore.model.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.raid.kill.RaidKillEvent;
-import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.model.WellKnownServerOnlineBuckets;
 import app.l2nx.gs.commons.UUIDv7;
@@ -298,7 +297,6 @@ class NxEventsImplTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUIDv7.generate())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .build();
 
         events.publish(event);
@@ -334,7 +332,6 @@ class NxEventsImplTest {
         events.publish(RaidKillEvent.builder()
                 .eventId(UUIDv7.generate())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .build());
 
         assertEquals(0, publisher.queueDepth(), "disabled family must not enqueue an envelope");

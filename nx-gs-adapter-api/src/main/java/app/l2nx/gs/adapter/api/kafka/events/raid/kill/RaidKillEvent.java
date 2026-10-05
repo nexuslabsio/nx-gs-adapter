@@ -1,6 +1,5 @@
 package app.l2nx.gs.adapter.api.kafka.events.raid.kill;
 
-import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 
@@ -22,7 +21,6 @@ public final class RaidKillEvent {
     private final int bossNpcId;
     private final @Nullable String bossName;
     private final @Nullable Integer bossLevel;
-    private final @Nullable RaidBossKind bossKind;
     private final @Nullable Long instanceId;
     private final @Nullable RaidActor lastHit;
     private final @Nullable RaidActor dropOwner;
@@ -35,7 +33,6 @@ public final class RaidKillEvent {
             int bossNpcId,
             @Nullable String bossName,
             @Nullable Integer bossLevel,
-            @Nullable RaidBossKind bossKind,
             @Nullable Long instanceId,
             @Nullable RaidActor lastHit,
             @Nullable RaidActor dropOwner,
@@ -46,7 +43,6 @@ public final class RaidKillEvent {
         this.bossNpcId = bossNpcId;
         this.bossName = bossName;
         this.bossLevel = bossLevel;
-        this.bossKind = bossKind;
         this.instanceId = instanceId;
         this.lastHit = lastHit;
         this.dropOwner = dropOwner;
@@ -72,16 +68,6 @@ public final class RaidKillEvent {
 
     public @Nullable Integer getBossLevel() {
         return bossLevel;
-    }
-
-    /**
-     * @deprecated the platform no longer reads it; use the NPC template {@code type} instead.
-     * {@code null} when the host omits it.
-     */
-    @Deprecated
-    // TODO: remove once all hosts run this adapter version and the raid topic is drained
-    public @Nullable RaidBossKind getBossKind() {
-        return bossKind;
     }
 
     /** {@code null} for open-world kills. */
@@ -118,7 +104,6 @@ public final class RaidKillEvent {
                 .bossNpcId(bossNpcId)
                 .bossName(bossName)
                 .bossLevel(bossLevel)
-                .bossKind(bossKind)
                 .instanceId(instanceId)
                 .lastHit(lastHit)
                 .dropOwner(dropOwner)
@@ -147,7 +132,6 @@ public final class RaidKillEvent {
                 && eventId.equals(that.eventId)
                 && Objects.equals(bossName, that.bossName)
                 && Objects.equals(bossLevel, that.bossLevel)
-                && bossKind == that.bossKind
                 && Objects.equals(instanceId, that.instanceId)
                 && Objects.equals(lastHit, that.lastHit)
                 && Objects.equals(dropOwner, that.dropOwner)
@@ -159,17 +143,7 @@ public final class RaidKillEvent {
     @Override
     public int hashCode() {
         return Objects.hash(
-                eventId,
-                bossNpcId,
-                bossName,
-                bossLevel,
-                bossKind,
-                instanceId,
-                lastHit,
-                dropOwner,
-                participants,
-                drops,
-                metadata);
+                eventId, bossNpcId, bossName, bossLevel, instanceId, lastHit, dropOwner, participants, drops, metadata);
     }
 
     @Override
@@ -177,7 +151,6 @@ public final class RaidKillEvent {
         return "RaidKillEvent[eventId=" + eventId
                 + ", bossNpcId=" + bossNpcId
                 + ", bossName=" + bossName
-                + ", bossKind=" + bossKind
                 + ", instanceId=" + instanceId
                 + ", lastHit=" + lastHit
                 + ", dropOwner=" + dropOwner
@@ -191,7 +164,6 @@ public final class RaidKillEvent {
         private int bossNpcId;
         private @Nullable String bossName;
         private @Nullable Integer bossLevel;
-        private @Nullable RaidBossKind bossKind;
         private @Nullable Long instanceId;
         private @Nullable RaidActor lastHit;
         private @Nullable RaidActor dropOwner;
@@ -216,16 +188,6 @@ public final class RaidKillEvent {
 
         public Builder bossLevel(@Nullable Integer bossLevel) {
             this.bossLevel = bossLevel;
-            return this;
-        }
-
-        /**
-         * @deprecated see {@link RaidKillEvent#getBossKind()}.
-         */
-        @Deprecated
-        // TODO: remove once all hosts run this adapter version and the raid topic is drained
-        public Builder bossKind(@Nullable RaidBossKind bossKind) {
-            this.bossKind = bossKind;
             return this;
         }
 
@@ -265,7 +227,6 @@ public final class RaidKillEvent {
                     bossNpcId,
                     bossName,
                     bossLevel,
-                    bossKind,
                     instanceId,
                     lastHit,
                     dropOwner,

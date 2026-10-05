@@ -18,23 +18,6 @@ public final class WellKnownActivityMetadata {
     public static final String REMAINING = "remaining";
 
     /**
-     * Raw-seconds spelling of {@link #ELAPSED}.
-     *
-     * @deprecated use {@link #ELAPSED} (ISO-8601). Removed once every host emits the ISO key -
-     *     i.e. after the host's first game-server restart following the release that switched.
-     */
-    @Deprecated
-    public static final String ELAPSED_SECONDS = "elapsed_seconds";
-
-    /**
-     * Raw-seconds spelling of {@link #REMAINING}.
-     *
-     * @deprecated use {@link #REMAINING} (ISO-8601). Same removal gate as {@link #ELAPSED_SECONDS}.
-     */
-    @Deprecated
-    public static final String SECONDS_REMAINING = "seconds_remaining";
-
-    /**
      * Catch-chance multiplier as a decimal string (e.g. {@code "0.5"}); absent when the host's penalty system is off.
      */
     public static final String PENALTY_MULTIPLIER = "penalty_multiplier";
@@ -48,15 +31,6 @@ public final class WellKnownActivityMetadata {
      * Omitted at the worst tier (no next).
      */
     public static final String TIME_TO_NEXT_TIER = "time_to_next_tier";
-
-    /**
-     * Raw-seconds spelling of {@link #TIME_TO_NEXT_TIER}.
-     *
-     * @deprecated use {@link #TIME_TO_NEXT_TIER} (ISO-8601). Same removal gate as
-     *     {@link #ELAPSED_SECONDS}.
-     */
-    @Deprecated
-    public static final String SECONDS_TO_NEXT_TIER = "seconds_to_next_tier";
 
     public static final String TIER_NONE = "none";
 

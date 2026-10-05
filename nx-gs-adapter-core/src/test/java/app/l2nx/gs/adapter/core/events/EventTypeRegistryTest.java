@@ -21,7 +21,6 @@ import app.l2nx.gs.adapter.api.kafka.events.privatestore.model.PrivateStoreSide;
 import app.l2nx.gs.adapter.api.kafka.events.privatetrade.PrivateTradeFinishedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.privatetrade.TradeParty;
 import app.l2nx.gs.adapter.api.kafka.events.raid.kill.RaidKillEvent;
-import app.l2nx.gs.adapter.api.kafka.events.raid.model.RaidBossKind;
 import app.l2nx.gs.adapter.api.kafka.events.serveronline.ServerOnlineSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.sync.ResyncCompletedEvent;
 import app.l2nx.gs.commons.UUIDv7;
@@ -212,7 +211,6 @@ class EventTypeRegistryTest {
         RaidKillEvent event = RaidKillEvent.builder()
                 .eventId(UUIDv7.generate())
                 .bossNpcId(29028)
-                .bossKind(RaidBossKind.EPIC)
                 .build();
 
         byte[] key = binding.partitionKeyExtractor().apply(event);

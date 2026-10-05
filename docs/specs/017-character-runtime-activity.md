@@ -68,10 +68,12 @@ runtime character mapping.
 - [done] R4. `nx-gs-adapter-api` MUST ship `WellKnownCustomActivities` (the
   `type` discriminator values `fishing` / `reading`) **and**
   `WellKnownCustomActivityMetadata` (the canonical metadata keys: common
-  `elapsed_seconds`; fishing `penalty_multiplier` / `penalty_tier` /
-  `seconds_to_next_tier` + tier values `none` / `tier1` / `tier2`). Both
+  `elapsed`; fishing `penalty_multiplier` / `penalty_tier` /
+  `time_to_next_tier` + tier values `none` / `tier1` / `tier2`; durations are ISO-8601). Both
   documented as non-exhaustive / open: a host MAY emit its own type or keys
-  without an API release; consumers ignore unknowns.
+  without an API release; consumers ignore unknowns. The raw-seconds keys `elapsed_seconds`,
+  `seconds_remaining` and `seconds_to_next_tier` (and their `WellKnownActivityMetadata` constants)
+  were removed in `api/v0.93.0`.
 
 - [done] R5. Both fields are additive. The single canonical `CharacterRuntimeDto`
   constructor is **extended** to 15 args (NOT a second overload) — matching how
