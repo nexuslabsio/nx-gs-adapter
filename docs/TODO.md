@@ -30,7 +30,7 @@ it is picked up, it moves to "Done / moved into a spec".
 
 ## Done / moved into a spec
 
-- **Deprecated boss-kind and division shim, raw-seconds activity keys** - removed in `api/v0.93.0`
+- **Deprecated boss-kind and division shim, raw-seconds activity keys** - removed in `api/v0.93.1`
   (`RaidBossKind`, `RaidKillEvent.bossKind`, `BossRespawnEntry.kind`, `WellKnownBossDivisions`,
   `WellKnownBossMetadata`, `WellKnownActivityMetadata.ELAPSED_SECONDS` / `SECONDS_REMAINING` /
   `SECONDS_TO_NEXT_TIER`). See [`014-events-raid`](specs/014-events-raid.md) R4,

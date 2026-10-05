@@ -379,7 +379,7 @@ replies-published == 0}` is visible as a failure rather than as silence
   The platform sees an ordinary reply that simply arrives late; correlation is unchanged. Open
   handles live in memory only — a host restart loses them and the caller gets no reply.
 
-- [done, `api/v0.92.0`; legacy constructors removed in `api/v0.93.0`] R28. **Owner verification.** `nx-gs-adapter-api.kafka.commands.OwnerVerified`
+- [done, `api/v0.92.0`; legacy constructors removed in `api/v0.93.1`] R28. **Owner verification.** `nx-gs-adapter-api.kafka.commands.OwnerVerified`
   is an interface with one method, `boolean isOwnerVerified()`. Every command the platform issues on
   behalf of a player acting with their own character MUST implement it. Today:
   `BuyFromPrivateStoreCommand`, `StartPrivateStoreSellCommand`, `StartPrivateStorePackageSellCommand`,
@@ -401,7 +401,7 @@ replies-published == 0}` is visible as a failure rather than as silence
     `false`; an old host ignores it. Additive both ways, no ordering constraint.
   - Java: each implementing command takes `boolean ownerVerified` as the trailing constructor argument;
     its builder defaults it to `false`. The pre-R28 constructors without it were removed in
-    `api/v0.93.0` (breaking for Java callers only; the wire is unchanged).
+    `api/v0.93.1` (breaking for Java callers only; the wire is unchanged).
 
 **Non-goals:**
 
@@ -566,7 +566,7 @@ poll(pollTimeoutMs)
 `OwnerVerified` (R28) ships additively in `api/v0.92.0`: an absent field reads as `false`, so a new
 host with an old platform keeps its checks, and an old host ignores the field. Release order is free;
 the relaxed check takes effect once both the platform sends `true` and the host honours it. The
-`@Deprecated` constructors without the flag were the Java-side straddle; `api/v0.93.0` drops them after
+`@Deprecated` constructors without the flag were the Java-side straddle; `api/v0.93.1` drops them after
 bohpts-core with R28 went live (2026-10-05). The wire stays additive: an old producer still reads as `false`.
 
 `COMMAND_EXPIRED` (R23) is an added enum constant, which is safe only in platform-first order:

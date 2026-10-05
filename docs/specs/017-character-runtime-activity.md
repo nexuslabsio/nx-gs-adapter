@@ -73,7 +73,7 @@ runtime character mapping.
   documented as non-exhaustive / open: a host MAY emit its own type or keys
   without an API release; consumers ignore unknowns. The raw-seconds keys `elapsed_seconds`,
   `seconds_remaining` and `seconds_to_next_tier` (and their `WellKnownActivityMetadata` constants)
-  were removed in `api/v0.93.0`.
+  were removed in `api/v0.93.1`.
 
 - [done] R5. Both fields are additive. The single canonical `CharacterRuntimeDto`
   constructor is **extended** to 15 args (NOT a second overload) — matching how

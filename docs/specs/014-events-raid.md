@@ -23,7 +23,7 @@ rail — single-event per kill, multi-aggregate payload.
 Boss scope is intentionally broad: any `Attackable.isRaid() && !isRaidMinion()`
 death by a player. World grand bosses and instance bosses share the same wire
 shape; instance kills are told apart by `instanceId`. Boss classification is `NpcTemplate.type` (`RAID_BOSS` / `EPIC_BOSS`, see R4); the former
-`bossKind` field was removed in `api/v0.93.0`.
+`bossKind` field was removed in `api/v0.93.1`.
 
 Audience: platform-side consumers (dashboards / leaderboards / clan analytics);
 host-side authors hooking raid-death paths.
@@ -123,7 +123,7 @@ host-side authors hooking raid-death paths.
   `WellKnownNpcTypes.RAID_BOSS` / `EPIC_BOSS`; the host decides which bosses are epic. The contract
   carries no boss-kind or division fields: `RaidBossKind`, `RaidKillEvent.bossKind`,
   `BossRespawnEntry.kind`, `WellKnownBossDivisions` and `WellKnownBossMetadata` (the `division` key)
-  were removed in `api/v0.93.0`. Grouping is platform-side.
+  were removed in `api/v0.93.1`. Grouping is platform-side.
 
 - [todo] R5. `nx-gs-adapter-api.spi.capability.NxEvents` MUST accept `RaidKillEvent`
   through the single generic `void publish(Object event)` method (the
