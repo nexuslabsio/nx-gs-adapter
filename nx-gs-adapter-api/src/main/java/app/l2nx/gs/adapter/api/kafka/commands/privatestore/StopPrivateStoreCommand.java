@@ -13,15 +13,6 @@ public final class StopPrivateStoreCommand implements OwnerVerified, NxCommand<S
     private final int charId;
     private final boolean ownerVerified;
 
-    /**
-     * @deprecated use the overload with a trailing {@code ownerVerified}; this one sends {@code false}. Removed
-     *     once nx-gameservers builds every owner-verified command through that overload.
-     */
-    @Deprecated
-    public StopPrivateStoreCommand(int charId) {
-        this(charId, false);
-    }
-
     public StopPrivateStoreCommand(int charId, boolean ownerVerified) {
         this.charId = charId;
         this.ownerVerified = ownerVerified;

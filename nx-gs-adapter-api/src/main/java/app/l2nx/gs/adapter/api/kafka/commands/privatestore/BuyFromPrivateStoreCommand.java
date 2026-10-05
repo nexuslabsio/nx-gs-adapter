@@ -32,23 +32,6 @@ public final class BuyFromPrivateStoreCommand implements OwnerVerified, NxComman
     private final String mailBody;
     private final boolean ownerVerified;
 
-    /**
-     * @deprecated use the overload with a trailing {@code ownerVerified}; this one sends {@code false}. Removed
-     *     once nx-gameservers builds every owner-verified command through that overload.
-     */
-    @Deprecated
-    public BuyFromPrivateStoreCommand(
-            int buyerCharId,
-            int sellerCharId,
-            List<BuyLine> lines,
-            int tax,
-            Instant deadline,
-            String mailSender,
-            String mailSubject,
-            String mailBody) {
-        this(buyerCharId, sellerCharId, lines, tax, deadline, mailSender, mailSubject, mailBody, false);
-    }
-
     public BuyFromPrivateStoreCommand(
             int buyerCharId,
             int sellerCharId,

@@ -24,34 +24,6 @@ public final class SendChatMessageCommand implements OwnerVerified, NxCommand<Se
     private final @Nullable String targetCharacterName;
     private final boolean ownerVerified;
 
-    /**
-     * @deprecated use the overload with a trailing {@code ownerVerified}; this one sends {@code false}. Removed
-     *     once nx-gameservers builds every owner-verified command through that overload.
-     */
-    @Deprecated
-    public SendChatMessageCommand(
-            UUID messageId,
-            String channel,
-            String audience,
-            @Nullable Long audienceId,
-            @Nullable Long senderCharacterId,
-            @Nullable String senderDisplayName,
-            String source,
-            String text,
-            @Nullable String targetCharacterName) {
-        this(
-                messageId,
-                channel,
-                audience,
-                audienceId,
-                senderCharacterId,
-                senderDisplayName,
-                source,
-                text,
-                targetCharacterName,
-                false);
-    }
-
     public SendChatMessageCommand(
             UUID messageId,
             String channel,

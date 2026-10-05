@@ -19,15 +19,6 @@ public final class StartPrivateStoreSellCommand implements OwnerVerified, NxComm
     private final List<SellLine> lines;
     private final boolean ownerVerified;
 
-    /**
-     * @deprecated use the overload with a trailing {@code ownerVerified}; this one sends {@code false}. Removed
-     *     once nx-gameservers builds every owner-verified command through that overload.
-     */
-    @Deprecated
-    public StartPrivateStoreSellCommand(int charId, @Nullable String title, List<SellLine> lines) {
-        this(charId, title, lines, false);
-    }
-
     public StartPrivateStoreSellCommand(
             int charId, @Nullable String title, List<SellLine> lines, boolean ownerVerified) {
         if (lines == null || lines.isEmpty()) {

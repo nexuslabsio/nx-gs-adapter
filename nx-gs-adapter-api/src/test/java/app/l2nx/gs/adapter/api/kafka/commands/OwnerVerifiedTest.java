@@ -72,42 +72,10 @@ class OwnerVerifiedTest {
                         true)));
     }
 
-    @SuppressWarnings("deprecation")
-    private static Stream<Arguments> legacyCommands() {
-        SellLine sell = new SellLine(1, 1L, 10L);
-        BuyLine buy = BuyLine.builder()
-                .itemId(1)
-                .itemTemplateId(57L)
-                .count(1L)
-                .unitPriceAdena(100L)
-                .build();
-        return Stream.of(
-                Arguments.of(new StopPrivateStoreCommand(1)),
-                Arguments.of(new StartPrivateStoreSellCommand(1, "t", Collections.singletonList(sell))),
-                Arguments.of(new StartPrivateStorePackageSellCommand(1, "t", Collections.singletonList(sell))),
-                Arguments.of(new BuyFromPrivateStoreCommand(
-                        1,
-                        2,
-                        Collections.singletonList(buy),
-                        5,
-                        Instant.parse("2026-08-11T12:00:00Z"),
-                        "Courier",
-                        "Subject",
-                        "Body")),
-                Arguments.of(new SendChatMessageCommand(
-                        UUID.randomUUID(), "CLAN", ChatAudiences.CLAN, 7L, 100L, null, "MINIAPP", "hello", null)));
-    }
-
     @ParameterizedTest(name = "{0}")
     @MethodSource("verifiedCommands")
     void command_shouldImplementOwnerVerified(OwnerVerified command) {
         assertTrue(command.isOwnerVerified());
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("legacyCommands")
-    void deprecatedConstructor_shouldYieldNotVerified(OwnerVerified command) {
-        assertFalse(command.isOwnerVerified());
     }
 
     @ParameterizedTest(name = "{0}")
