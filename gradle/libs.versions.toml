@@ -12,7 +12,7 @@ wiremock = "2.35.2"
 # integ tests
 testcontainers = "1.21.4"
 # formatting
-spotless = "7.0.2"
+spotless = "7.2.1"
 palantir = "2.93.0"
 
 [libraries]
