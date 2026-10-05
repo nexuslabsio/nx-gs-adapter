@@ -118,7 +118,7 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
 
 ## Whisper, party, alliance and item links
 
-- [planned] R22. The channel whitelist MUST grow to `CLAN`, `ALLIANCE`, `PARTY`, `WHISPER`,
+- [done] R22. The channel whitelist MUST grow to `CLAN`, `ALLIANCE`, `PARTY`, `WHISPER`,
   `ANNOUNCEMENT`, and `ChatAudiences` MUST gain:
   - `ALLIANCE` — `audienceId` = allianceId;
   - `PARTY` — `audienceId` = `null`; the host resolves the party from the sender, who therefore MUST
@@ -128,19 +128,17 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
     when offline), message refusal mode — sends a packet only if the addressee is online, and
     publishes the echo with `targetCharId` set either way (events R20).
 
-- [planned] R23. **Sender identity.** `senderDisplayName` is nullable when `senderCharacterId` is
-  set. If present, an updated host IGNORES it and builds the name itself, including the `*` postfix
-  for an offline speaker (events R16); an older host writes it verbatim. This keeps the rollout safe:
-  the platform deploys before hosts restart and the pre-R23 handler rejects a command without the
-  field, so the platform keeps sending it until every live host is updated. For nameless
+- [done] R23. **Sender identity.** `senderDisplayName` is nullable when `senderCharacterId` is
+  set. The host builds the name itself, including the `*` postfix for an offline speaker (events
+  R16), and ignores a value sent alongside a sender; the platform sends none. For nameless
   announcements (`senderCharacterId == null`) it stays required (empty string = nameless line).
 
-- [planned] R24. **Whisper addressee.** The command gains `@Nullable String targetCharacterName`. For
+- [done] R24. **Whisper addressee.** The command gains `@Nullable String targetCharacterName`. For
   audience `CHARACTER` exactly one of `audienceId` (character id) / `targetCharacterName` MUST be
   given; the platform sends the name typed in the UI, and the host resolves it by name, stripping a
   trailing `*`. Both or neither is `VALIDATION_FAILED`; an unknown name is `NOT_FOUND`.
 
-- [planned] R25. **`text` carries game-native item tokens**, built by the platform (plain text, LF
+- [done] R25. **`text` carries game-native item tokens**, built by the platform (plain text, LF
   breaks and bare URLs keep the R12 micro-format; item links are the one addition). The host parses
   tokens like the native `Say2` handler (by `ID=`), verifies ownership — online: the live inventory on
   the game thread; offline: the DB, location `INVENTORY` / `PAPERDOLL` only — and rebuilds a canonical
@@ -148,11 +146,11 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
   `\b`, control characters) is stripped, and the rest is filtered with the game chat whitelist
   (ASCII 32-126, Cyrillic U+0400-04FF, Latin-1 U+00C0-00FF).
 
-- [planned] R26. **`source` for the mini app is `MINIAPP`** (the legacy value `TMA` existed; the mini
+- [done] R26. **`source` for the mini app is `MINIAPP`** (the legacy value `TMA` existed; the mini
   app now runs on Telegram, VK and Discord, so the old name misleads). `source` stays an open
   string; stored `TMA` rows are not rewritten.
 
-- [planned] R27. The echo (R9) for the new channels carries `senderDisplayName`,
+- [done] R27. The echo (R9) for the new channels carries `senderDisplayName`,
   `recipientCharacterIds` (`PARTY`) and `items` (R25) as defined in the events spec, and is published
   only after delivery (events R19); for an offline addressee it is published although no packet went
   out, and for a shadowed speaker (R10) it is published with `shadowed=true` although nothing went
