@@ -2,7 +2,7 @@
 # runtime deps
 kafka-clients = "3.9.2"
 gson = "2.13.2"
-slf4j = "2.0.17"
+slf4j = "2.0.20"
 fastutil-core = "8.5.19"
 jspecify = "1.0.1"
 # tests
