@@ -8,7 +8,7 @@ jspecify = "1.0.1"
 # tests
 junit = "5.14.4"
 mockito = "5.24.0"
-wiremock = "2.35.2"
+wiremock = "3.0.1"
 # integ tests
 testcontainers = "1.21.4"
 # formatting
