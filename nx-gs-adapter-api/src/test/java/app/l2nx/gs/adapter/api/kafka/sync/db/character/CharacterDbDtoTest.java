@@ -24,8 +24,10 @@ class CharacterDbDtoTest {
                 .accountName("kiryl@nexus")
                 .title("Hellbound")
                 .level(85)
-                .sex(CharacterSex.FEMALE)
-                .race(CharacterRace.ELF)
+                .display(CharacterDisplayDbDto.builder()
+                        .race(CharacterRace.ELF)
+                        .sex(CharacterSex.FEMALE)
+                        .build())
                 .classId(CharacterClass.EVA_SAINT)
                 .baseClassId(CharacterClass.ELDER)
                 .clanId(909L)
@@ -45,8 +47,8 @@ class CharacterDbDtoTest {
         assertEquals("kiryl@nexus", ch.getAccountName());
         assertEquals("Hellbound", ch.getTitle());
         assertEquals(Integer.valueOf(85), ch.getLevel());
-        assertEquals(CharacterSex.FEMALE, ch.getSex());
-        assertEquals(CharacterRace.ELF, ch.getRace());
+        assertEquals(CharacterRace.ELF, ch.getDisplay().getRace());
+        assertEquals(CharacterSex.FEMALE, ch.getDisplay().getSex());
         assertEquals(CharacterClass.EVA_SAINT, ch.getClassId());
         assertEquals(CharacterClass.ELDER, ch.getBaseClassId());
         assertEquals(Long.valueOf(909L), ch.getClanId());
@@ -70,8 +72,7 @@ class CharacterDbDtoTest {
         assertNull(ch.getAccountName());
         assertNull(ch.getTitle());
         assertNull(ch.getLevel());
-        assertNull(ch.getSex());
-        assertNull(ch.getRace());
+        assertNull(ch.getDisplay());
         assertNull(ch.getClassId());
         assertNull(ch.getBaseClassId());
         assertNull(ch.getClanId());
@@ -154,7 +155,7 @@ class CharacterDbDtoTest {
         CharacterDbDto fromBuilder = CharacterDbDto.builder().id(1L).name("X").build();
         CharacterDbDto fromCtor = new CharacterDbDto(
                 1L, "X", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -190,8 +191,7 @@ class CharacterDbDtoTest {
                 "acc",
                 "",
                 10,
-                CharacterSex.MALE,
-                CharacterRace.HUMAN,
+                new CharacterDisplayDbDto(CharacterRace.HUMAN, CharacterSex.MALE, 1, 2, 3, 0x00FF00, null),
                 CharacterClass.HUMAN_FIGHTER,
                 CharacterClass.HUMAN_FIGHTER,
                 classes,

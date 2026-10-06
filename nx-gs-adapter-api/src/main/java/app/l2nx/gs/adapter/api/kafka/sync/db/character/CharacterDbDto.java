@@ -1,7 +1,5 @@
 package app.l2nx.gs.adapter.api.kafka.sync.db.character;
 
-import app.l2nx.gs.adapter.api.domain.character.CharacterRace;
-import app.l2nx.gs.adapter.api.domain.character.CharacterSex;
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import java.time.Instant;
 import java.util.Collections;
@@ -10,15 +8,9 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire DTO for one player character, payload of {@code SyncEvent<CharacterDbDto>}.
- *
- * Only {@code id} and {@code name} are required (builder throws NPE on null name); every other
- * field is optional and null when the tenant does not surface it. Sentinel zero (no clan, not
- * pending deletion) and SQL NULL are mapped to null by schema providers.
- *
- * Tick-frequency state (hp/mp/position/lastAccess) is deliberately absent: hashing it would
- * cause an UPDATE storm per cycle. Online time and per-class exp/sp are persisted-only values
- * and ride along unhashed.
+ * Wire DTO for one player character. Only {@code id} and {@code name} are required; every other field is
+ * null when the tenant does not surface it, including zero sentinels (no clan, not pending deletion).
+ * Tick-frequency state (hp/mp/position/lastAccess) is absent: hashing it would storm UPDATEs each cycle.
  */
 public final class CharacterDbDto {
 
@@ -27,8 +19,7 @@ public final class CharacterDbDto {
     private final @Nullable String accountName;
     private final @Nullable String title;
     private final @Nullable Integer level;
-    private final @Nullable CharacterSex sex;
-    private final @Nullable CharacterRace race;
+    private final @Nullable CharacterDisplayDbDto display;
     private final @Nullable CharacterClass classId;
     private final @Nullable CharacterClass baseClassId;
     private final @Nullable List<CharacterClassDbDto> classes;
@@ -54,8 +45,7 @@ public final class CharacterDbDto {
             @Nullable String accountName,
             @Nullable String title,
             @Nullable Integer level,
-            @Nullable CharacterSex sex,
-            @Nullable CharacterRace race,
+            @Nullable CharacterDisplayDbDto display,
             @Nullable CharacterClass classId,
             @Nullable CharacterClass baseClassId,
             @Nullable List<CharacterClassDbDto> classes,
@@ -79,8 +69,7 @@ public final class CharacterDbDto {
         this.accountName = accountName;
         this.title = title;
         this.level = level;
-        this.sex = sex;
-        this.race = race;
+        this.display = display;
         this.classId = classId;
         this.baseClassId = baseClassId;
         this.classes = classes == null ? null : Collections.unmodifiableList(classes);
@@ -123,12 +112,9 @@ public final class CharacterDbDto {
         return level;
     }
 
-    public @Nullable CharacterSex getSex() {
-        return sex;
-    }
-
-    public @Nullable CharacterRace getRace() {
-        return race;
+    /** Null when the provider does not sync appearance; the consumer then leaves the stored appearance as is. */
+    public @Nullable CharacterDisplayDbDto getDisplay() {
+        return display;
     }
 
     /** Null when the source id is not in the canonical {@link CharacterClass} set. */
@@ -175,7 +161,7 @@ public final class CharacterDbDto {
         return scheduledDeletionAt;
     }
 
-    /** Persisted online flag; coarse CDC backstop (~60s) reconciled platform-side with the runtime channel and presence events. */
+    /** Coarse (~60s) CDC backstop; the platform reconciles it with the runtime channel. */
     public @Nullable Boolean getOnline() {
         return online;
     }
@@ -190,7 +176,6 @@ public final class CharacterDbDto {
         return hero;
     }
 
-    /** From legacy char-var {@code blockedEXP@} ({@code "1"} = blocked). */
     public @Nullable Boolean getExpBlocked() {
         return expBlocked;
     }
@@ -226,8 +211,7 @@ public final class CharacterDbDto {
                 .accountName(accountName)
                 .title(title)
                 .level(level)
-                .sex(sex)
-                .race(race)
+                .display(display)
                 .classId(classId)
                 .baseClassId(baseClassId)
                 .classes(classes)
@@ -262,8 +246,7 @@ public final class CharacterDbDto {
                 && Objects.equals(accountName, that.accountName)
                 && Objects.equals(title, that.title)
                 && Objects.equals(level, that.level)
-                && sex == that.sex
-                && race == that.race
+                && Objects.equals(display, that.display)
                 && classId == that.classId
                 && baseClassId == that.baseClassId
                 && Objects.equals(classes, that.classes)
@@ -292,8 +275,7 @@ public final class CharacterDbDto {
                 accountName,
                 title,
                 level,
-                sex,
-                race,
+                display,
                 classId,
                 baseClassId,
                 classes,
@@ -321,8 +303,7 @@ public final class CharacterDbDto {
                 + ", accountName=" + accountName
                 + ", title=" + title
                 + ", level=" + level
-                + ", sex=" + sex
-                + ", race=" + race
+                + ", display=" + display
                 + ", classId=" + classId
                 + ", baseClassId=" + baseClassId
                 + ", classes=" + classes
@@ -349,8 +330,7 @@ public final class CharacterDbDto {
         private @Nullable String accountName;
         private @Nullable String title;
         private @Nullable Integer level;
-        private @Nullable CharacterSex sex;
-        private @Nullable CharacterRace race;
+        private @Nullable CharacterDisplayDbDto display;
         private @Nullable CharacterClass classId;
         private @Nullable CharacterClass baseClassId;
         private @Nullable List<CharacterClassDbDto> classes;
@@ -395,13 +375,8 @@ public final class CharacterDbDto {
             return this;
         }
 
-        public Builder sex(@Nullable CharacterSex sex) {
-            this.sex = sex;
-            return this;
-        }
-
-        public Builder race(@Nullable CharacterRace race) {
-            this.race = race;
+        public Builder display(@Nullable CharacterDisplayDbDto display) {
+            this.display = display;
             return this;
         }
 
@@ -502,8 +477,7 @@ public final class CharacterDbDto {
                     accountName,
                     title,
                     level,
-                    sex,
-                    race,
+                    display,
                     classId,
                     baseClassId,
                     classes,

@@ -46,6 +46,7 @@ work lives in [`TODO.md`](TODO.md).
 | 030 | gamedata-sync                     | 2026-08-15 | [spec](specs/030-gamedata-sync.md)                     |
 | 031 | character-log-events              | 2026-09-01 | [spec](specs/031-character-log-events.md)              |
 | 034 | api-package-layout                | 2026-10-02 | [spec](specs/034-api-package-layout.md)                |
+| 035 | character-display                 | 2026-10-06 | [spec](specs/035-character-display.md)                 |
 
 Companion docs of the folder-form specs:
 

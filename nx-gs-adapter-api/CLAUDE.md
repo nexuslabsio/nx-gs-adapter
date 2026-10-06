@@ -21,17 +21,17 @@ provider SPIs.
 
 Root package `app.l2nx.gs.adapter.api`.
 
-| package                       | what lives there                                                                                                                  | design     |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `rest`                        | `/connect` request/response, Kafka credentials, `SyncTopics`, `MessagingTopics`                                                   | 001        |
-| `kafka`                       | `NxHeaders` — the wire-level header contract                                                                                      | 008        |
-| `kafka.sync.db.<entity>`      | CDC per-entity DTOs                                                                                                               | 003, 005   |
-| `kafka.sync.gd.<entity>`      | static game-data catalog DTOs, payload of `GameDataSyncEvent<T>`                                                                  | 030        |
-| `kafka.sync.runtime.<entity>` | volatile runtime-state DTOs                                                                                                       | 006        |
-| `kafka.events.<family>`       | outbound discrete-fact / snapshot event DTOs, grouped by family                                                                   | per family |
+| package                       | what lives there                                                                                                                                              | design     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `rest`                        | `/connect` request/response, Kafka credentials, `SyncTopics`, `MessagingTopics`                                                                               | 001        |
+| `kafka`                       | `NxHeaders` — the wire-level header contract                                                                                                                  | 008        |
+| `kafka.sync.db.<entity>`      | CDC per-entity DTOs                                                                                                                                           | 003, 005   |
+| `kafka.sync.gd.<entity>`      | static game-data catalog DTOs, payload of `GameDataSyncEvent<T>`                                                                                              | 030        |
+| `kafka.sync.runtime.<entity>` | volatile runtime-state DTOs                                                                                                                                   | 006        |
+| `kafka.events.<family>`       | outbound discrete-fact / snapshot event DTOs, grouped by family                                                                                               | per family |
 | `kafka.commands.<group>`      | inbound command DTOs; the package root holds `NxCommand`, `CommandResult`, `CommandStatus` (+ nested `Tier`), `CommandProblem` and the `OwnerVerified` marker | 009        |
-| `kafka.ops`                   | `HeartbeatEvent`; its stats and state payloads in `kafka.ops.model`                                                              | 001        |
-| `spi`                         | `AdapterModule`, the two contexts, package-private `NoOp*`; sub-packages `provider`, `model`, `capability`                       | 002, 034   |
+| `kafka.ops`                   | `HeartbeatEvent`; its stats and state payloads in `kafka.ops.model`                                                                                           | 001        |
+| `spi`                         | `AdapterModule`, the two contexts, package-private `NoOp*`; sub-packages `provider`, `model`, `capability`                                                    | 002, 034   |
 
 Current entity / family / group names (the directory listing is authoritative — check it before
 assuming):
@@ -100,6 +100,10 @@ They all live here so a host provider depends on the contracts artifact alone.
   deliberate UNHASHED ride-alongs — read in `mapRow` but absent from `hashedColumns()`, because they
   tick on every kill — so they never trigger a sync event and are only as fresh as the source's last
   full store. The runtime channel carries the live values.
+- **`CharacterDbDto.display` null ≠ empty appearance.** `null` = the provider does not sync
+  appearance (the consumer keeps what it stored); a present object with `null` fields = "this value is
+  unknown / not set" and overwrites. Colors are only what the player set persistently, in RGB — never
+  the color a host renders after its own overrides (spec 035).
 - **Partition keys are per event TYPE, not per family.** A family can mix keyed and round-robin
   types (`raid`: `RaidKillEvent` keys on `bossNpcId`, `BossRespawnSnapshotEvent` uses `null`). The
   authoritative mapping is one `register(...)` line per type in adapter-core's `EventTypeRegistry` —
