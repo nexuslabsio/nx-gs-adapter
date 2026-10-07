@@ -4,7 +4,7 @@
 
 ## Problem
 
-`nx-gameservers` docs/specs/061-character-inventory-capacity.md needs a character's inventory
+`nx-gameservers` docs/specs/009-characters.md (§4.5) needs a character's inventory
 capacity — occupied/max regular slots, occupied/max quest slots, current/max carried weight — so a
 Telegram Mini App can render an inventory screen with the same numbers the player sees in game.
 

@@ -4,7 +4,7 @@
 **Status:** design (not implemented)
 **Related specs:**
 
-- nx-gameservers `docs/specs/062-character-class-state.md` — platform side: the
+- nx-gameservers `docs/specs/009-characters.md` (§4.3) — platform side: the
   `gs_character_classes` table, the active-class projection on `gs_characters`, the REST contract.
 - nx-social `docs/specs/031-character-classes-via-gameservers.md` — bot moves off direct DB reads.
 - nx-cube `docs/specs/004-character-classes-cube/spec.md` — cube rename.

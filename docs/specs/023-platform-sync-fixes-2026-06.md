@@ -187,7 +187,7 @@ game world / access) in each locale.
 ### API changelog
 
 Public API change (new endpoint) → produce a front-end changelog at
-`nx-gameservers/docs/specs/020-character-lock-update-api-changelog.md`
+`nx-gameservers/docs/archive/020-character-lock-update-api-changelog.md`
 and surface it in the session.
 
 ---

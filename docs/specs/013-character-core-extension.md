@@ -58,7 +58,7 @@ online=false}`) для каждого id, который был в `previousOnli
   `previousOnline` пуст; mapping НЕ эмитит OFFLINE-tombstones для
   игроков, которые залогаутились пока adapter был down. Восстановление
   таких stale `online=true` строк — забота platform-side sweeper
-  (см. `nx-gameservers/docs/specs/032-character-core-extension/spec.md`
+  (см. `nx-gameservers/docs/specs/009-characters.md` §4
   R10).
 
 - [done] R12. Discrete `CharacterPresenceEvent` (events.character family,
@@ -129,7 +129,7 @@ online=false}`) для каждого id, который был в `previousOnli
 - Parent feature: [`docs/specs/006-runtime-sync.md`](006-runtime-sync.md) —
   runtime engine для `CharacterRuntimeDto`.
 - Deferred backlog: [Deferred fields and filters](#deferred-fields-and-filters-backlog).
-- Platform side: `nx-gameservers/docs/specs/032-character-core-extension/`.
+- Platform side: `nx-gameservers/docs/specs/009-characters.md`.
 
 ---
 

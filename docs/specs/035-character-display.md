@@ -4,7 +4,7 @@
 **Status:** implemented (api 0.94.0)
 **Related specs:**
 
-- nx-gameservers `docs/specs/083-character-display.md` — platform side: the `gs_character_display`
+- nx-gameservers `docs/specs/009-characters.md` (§4.6) — platform side: the `gs_character_display`
   table, ingest, the move of `sex` / `race` off `gs_characters`.
 - Host integrations — each host's character entity mapping fills `display` from its own storage.
 
@@ -102,4 +102,4 @@ One release on every side; the platform goes first.
 
 ## Links
 
-- nx-gameservers `docs/specs/083-character-display.md`
+- nx-gameservers `docs/specs/009-characters.md` (§4.6)
