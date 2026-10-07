@@ -74,8 +74,18 @@ online=false}`) для каждого id, который был в `previousOnli
 
 - [done] R13. `CharacterDbDto.online` (CDC source) + runtime tombstones
   - discrete events MUST все идти в одну колонку `gs_characters.online`
-    с timestamp-gated UPSERT (newest `last_seen_at` wins). Чтение —
+    с timestamp-gated UPSERT (newest `presence_at` wins). Чтение —
     тривиальный `SELECT online`.
+
+- [done] R14. Logout-событие `CharacterPresenceEvent` (`online=false`) MUST
+  нести причину закрытия сессии в `metadata.logout_reason`
+  (`WellKnownPresenceMetadata`): `disconnect` — потеря соединения;
+  `offline_trade` — игрок ушёл, персонаж остался офлайн-торговцем (сессия
+  закрыта, торговцу новая не открывается, в том числе после рестарта);
+  `server_stop` — host шлёт каждому игроку в мире при остановке сервера.
+  Выход сам / кик — без ключа. Платформа строит из этого журнал сессий и
+  «последний вход / выход» (`nx-gameservers/docs/specs/043-sessions/spec.md`);
+  уведомление о выходе шлётся только на `disconnect`.
 
 **Should:**
 

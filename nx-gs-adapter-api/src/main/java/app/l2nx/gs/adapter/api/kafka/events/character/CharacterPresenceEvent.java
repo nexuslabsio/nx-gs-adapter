@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
  * {@code sessionId}: a login and its matching logout carry the SAME id, fresh per login-session; {@code null} on builds
  * that do not emit it, in which case the platform leaves the session's logout time unset.
  * {@code hwid} only on cores with HWID tracking. {@code metadata}: open map, {@code null} when absent; canonical keys in
- * {@link WellKnownPresenceMetadata} (today {@code logout_reason=disconnect} for involuntary connection loss).
+ * {@link WellKnownPresenceMetadata}.
  */
 public final class CharacterPresenceEvent {
 
