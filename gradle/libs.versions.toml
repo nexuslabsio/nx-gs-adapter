@@ -1,6 +1,6 @@
 [versions]
 # runtime deps
-kafka-clients = "3.9.2"
+kafka-clients = "4.3.1"
 gson = "2.14.0"
 slf4j = "2.0.20"
 fastutil-core = "8.5.19"
