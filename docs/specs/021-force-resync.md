@@ -423,8 +423,7 @@ predates the cycle.
 - [assumed: operation TTL default `PT1H` — generous against the longest
   realistic forced items cycle, small against operator patience.]
 - [assumed: completion events ride a new `sync` event family rather than an
-  existing one — unlike `LevelExpTableSnapshotEvent` (which piggybacked the
-  `character` family), resync completion spans all db entities and has no
+  existing one — resync completion spans all db entities and has no
   semantically adjacent family to borrow.]
 - [assumed: per-client schema providers (reference host) declare `parentRefs` for
   item → character in their own repos; this repo's vanilla modules only

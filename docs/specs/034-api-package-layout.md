@@ -33,7 +33,7 @@ the slice's contract from its supporting types. The same smell exists inside cor
   `ConnectContext`, `DirectExecutor`, `HostExecutorTimeoutException`:
   - `spi.provider` — `ArmorSetTemplateProvider`, `ClassTemplateProvider`, `InstanceTemplateProvider`,
     `ItemTemplateProvider`, `NpcTemplateProvider`, `RecipeTemplateProvider`, `SkillProvider`,
-    `SoulCrystalTemplateProvider`, `GearScoreRulesetProvider`, `GameDataReadinessProvider`,
+    `SoulCrystalTemplateProvider`, `ExperienceLevelProvider`, `GearScoreRulesetProvider`, `GameDataReadinessProvider`,
     `DbSchemaProvider`, `RuntimeStateProvider`, `JdbcConnectionSource`.
   - `spi.model` — `EntityMapping`, `PrimarySource`, `ChildSource`, `ParentRef`,
     `RuntimeEntityMapping`, `RuntimeRow`.

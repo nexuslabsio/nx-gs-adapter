@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import app.l2nx.gs.adapter.api.kafka.events.account.AccountAuthAttemptEvent;
 import app.l2nx.gs.adapter.api.kafka.events.account.AuthOutcomes;
 import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
-import app.l2nx.gs.adapter.api.kafka.events.leveldata.LevelExpTableSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailAcceptedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailCancelledEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.MailReturnedEvent;
@@ -88,31 +87,6 @@ class EventTypeRegistryTest {
     @Test
     void knownFamilies_shouldContainServerOnline() {
         assertTrue(new EventTypeRegistry().knownFamilies().contains("serveronline"));
-    }
-
-    @Test
-    void lookup_shouldResolveLevelExpTableSnapshotEvent() {
-        EventTypeBinding binding = new EventTypeRegistry().lookup(LevelExpTableSnapshotEvent.class);
-
-        assertNotNull(binding);
-        assertEquals("character", binding.familyKey());
-        assertEquals("LevelExpTableSnapshotEvent", binding.messageType());
-    }
-
-    @Test
-    void partitionKeyExtractor_shouldReturnNull_forLevelExpTableSnapshotEvent() {
-        EventTypeBinding binding = new EventTypeRegistry().lookup(LevelExpTableSnapshotEvent.class);
-        LevelExpTableSnapshotEvent event =
-                LevelExpTableSnapshotEvent.builder().eventId(UUIDv7.generate()).build();
-
-        assertNull(binding.partitionKeyExtractor().apply(event));
-    }
-
-    @Test
-    void levelExpTableSnapshotEvent_shouldRideCharacterFamily_notItsOwn() {
-        EventTypeRegistry registry = new EventTypeRegistry();
-        assertTrue(!registry.knownFamilies().contains("leveldata"));
-        assertTrue(registry.knownFamilies().contains("character"));
     }
 
     @Test

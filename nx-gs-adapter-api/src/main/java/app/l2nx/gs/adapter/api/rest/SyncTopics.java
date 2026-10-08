@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *     <li>{@link #getDb()} - {@code db-sync}: {@code <tenant>.gs.sync.db.<entity>}.</li>
  *     <li>{@link #getRuntime()} - {@code runtime-sync}: {@code <tenant>.gs.sync.runtime.<entity>}.</li>
- *     <li>{@link #getGd()} - {@code gd-sync} (datapack templates): {@code <tenant>.gd.sync.<entity>}.</li>
+ *     <li>{@link #getGd()} - {@code gd-sync} (datapack templates): entity -> topic; currently all entities share {@code <tenant>.gd.sync}.</li>
  * </ul>
  * The same entity name may appear in several namespaces. Maps are copied defensively and exposed unmodifiable; {@code null} is normalized to empty, which both mean {@code DISABLED} for that module.
  */

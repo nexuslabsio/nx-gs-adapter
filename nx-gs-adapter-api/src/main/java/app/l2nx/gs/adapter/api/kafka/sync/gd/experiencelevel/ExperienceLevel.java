@@ -1,36 +1,22 @@
-package app.l2nx.gs.adapter.api.kafka.events.leveldata;
+package app.l2nx.gs.adapter.api.kafka.sync.gd.experiencelevel;
 
 import java.util.Objects;
 
-/**
- * Level to required-exp row of a {@link LevelExpTableSnapshotEvent}: the cumulative EXP at the start of that level.
- *
- * <p>Progress within a level is derived by the consumer:
- * {@code pct = (exp - requiredExp[level]) / (requiredExp[level + 1] - requiredExp[level])}.</p>
- *
- * <p>Java-8 POJO; {@code -parameters} preserves constructor parameter names so Jackson / Gson bind without
- * {@code @JsonProperty}.</p>
- */
-public final class LevelExpEntry {
+/** One row of the experience table; {@code requiredExp} is cumulative, not per-level. */
+public final class ExperienceLevel {
 
     private final int level;
     private final long requiredExp;
 
-    public LevelExpEntry(int level, long requiredExp) {
+    public ExperienceLevel(int level, long requiredExp) {
         this.level = level;
         this.requiredExp = requiredExp;
     }
 
-    /**
-     * Character level, 1-based; the per-row key the consumer upserts on.
-     */
     public int getLevel() {
         return level;
     }
 
-    /**
-     * Cumulative experience required to be at {@link #getLevel() level}.
-     */
     public long getRequiredExp() {
         return requiredExp;
     }
@@ -46,8 +32,8 @@ public final class LevelExpEntry {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof LevelExpEntry)) return false;
-        LevelExpEntry that = (LevelExpEntry) o;
+        if (!(o instanceof ExperienceLevel)) return false;
+        ExperienceLevel that = (ExperienceLevel) o;
         return level == that.level && requiredExp == that.requiredExp;
     }
 
@@ -58,7 +44,7 @@ public final class LevelExpEntry {
 
     @Override
     public String toString() {
-        return "LevelExpEntry[level=" + level + ", requiredExp=" + requiredExp + "]";
+        return "ExperienceLevel[level=" + level + ", requiredExp=" + requiredExp + "]";
     }
 
     public static final class Builder {
@@ -75,8 +61,8 @@ public final class LevelExpEntry {
             return this;
         }
 
-        public LevelExpEntry build() {
-            return new LevelExpEntry(level, requiredExp);
+        public ExperienceLevel build() {
+            return new ExperienceLevel(level, requiredExp);
         }
     }
 }

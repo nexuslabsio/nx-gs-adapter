@@ -5,8 +5,7 @@ package app.l2nx.gs.adapter.api.spi.provider;
  * implementation; none registered means always ready.
  *
  * <p>The adapter connects before the datapack is parsed, and an empty (non-{@code null}) snapshot
- * would publish {@code SNAPSHOT_COMPLETE count=0}, making the platform's reconcile delete the whole
- * catalog. So the module skips the pass while {@link #ready()} is {@code false}.</p>
+ * would publish a {@code SNAPSHOT_COMPLETE count=0} that raises a platform alert. So the module skips the pass while {@link #ready()} is {@code false}.</p>
  *
  * <p>Polled from the module's scheduler thread: must be cheap, non-blocking and thread-safe,
  * typically a volatile flag.</p>

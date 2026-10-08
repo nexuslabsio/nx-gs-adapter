@@ -58,7 +58,7 @@ public final class GameDataSnapshotPublisher {
             return null;
         }
         if (items == null) {
-            // no marker: a count=0 SNAPSHOT_COMPLETE would reconcile-delete the whole catalog
+            // no marker: count=0 would raise a platform alert
             reportNullSnapshot(entity);
             return null;
         }

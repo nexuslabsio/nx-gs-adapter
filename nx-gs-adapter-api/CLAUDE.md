@@ -37,10 +37,10 @@ Current entity / family / group names (the directory listing is authoritative �
 assuming):
 
 - **db sync**: `alliance`, `announcement`, `ban`, `character`, `clan`, `item`, `rating`
-- **gd sync**: `armorsettemplate`, `classtemplate`, `gearscore`, `instancetemplate`, `itemtemplate`,
-  `npctemplate`, `recipetemplate`, `skill`, `soulcrystaltemplate`
+- **gd sync**: `armorsettemplate`, `classtemplate`, `experiencelevel`, `gearscore`, `instancetemplate`,
+  `itemtemplate`, `npctemplate`, `recipetemplate`, `skill`, `soulcrystaltemplate`
 - **runtime sync**: `character`
-- **events**: `account`, `castle`, `character`, `characterlog`, `chat`, `gameevents`, `leveldata`,
+- **events**: `account`, `castle`, `character`, `characterlog`, `chat`, `gameevents`,
   `mail`, `olympiad`, `premiumpurchase`, `privatestore`, `privatetrade`, `raid`, `schedule`,
   `serveronline`, `sync`
 - **commands**: `announcement`, `ban`, `captcha`, `character`, `gd`, `item`, `mail`, `privatestore`,
@@ -108,11 +108,9 @@ They all live here so a host provider depends on the contracts artifact alone.
   types (`raid`: `RaidKillEvent` keys on `bossNpcId`, `BossRespawnSnapshotEvent` uses `null`). The
   authoritative mapping is one `register(...)` line per type in adapter-core's `EventTypeRegistry` —
   read it there; the same file also holds the `Nx-Message-Type` value used for polymorphic dispatch.
-- **A family's topic is not implied by its Java package.** `events.leveldata.LevelExpTableSnapshotEvent`
-  rides the `character` topic — a table synced once per boot did not justify its own
-  topic/consumer/group.
-- **`SNAPSHOT_COMPLETE count=0` deletes a catalog.** A gd provider with nothing to give returns
-  `null` (burst aborted, nothing reconciled), never an empty collection. See spec 030 §2.
+- **`SNAPSHOT_COMPLETE count=0` is ignored by the platform** (no-op + alert, nothing is deleted; reconcile is also
+  skipped when count != rows received). A gd provider with nothing to give yet should return `null` (burst
+  aborted, no marker) rather than an empty collection. See spec 030 §2.
 - **`ConnectContext.io()` / `CommandContext.io()` (binary-breaking for external implementers).**
   `CommandContext.io()` is abstract — any external implementer (test doubles, alternate adapters)
   MUST implement it. `ConnectContext` gained an `io` field and now has a 10-arg canonical constructor

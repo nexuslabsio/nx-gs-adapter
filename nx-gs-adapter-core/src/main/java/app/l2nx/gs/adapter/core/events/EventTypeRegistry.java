@@ -8,7 +8,6 @@ import app.l2nx.gs.adapter.api.kafka.events.character.CharacterPresenceEvent;
 import app.l2nx.gs.adapter.api.kafka.events.characterlog.CharacterLogEvent;
 import app.l2nx.gs.adapter.api.kafka.events.chat.ChatMessageEvent;
 import app.l2nx.gs.adapter.api.kafka.events.gameevents.GameEventSnapshotEvent;
-import app.l2nx.gs.adapter.api.kafka.events.leveldata.LevelExpTableSnapshotEvent;
 import app.l2nx.gs.adapter.api.kafka.events.mail.*;
 import app.l2nx.gs.adapter.api.kafka.events.olympiad.HeroGrantedEvent;
 import app.l2nx.gs.adapter.api.kafka.events.olympiad.OlympiadMatchResultEvent;
@@ -67,7 +66,6 @@ final class EventTypeRegistry {
                 CharacterDeathEvent.class,
                 "character",
                 evt -> LongBytes.bigEndian(((CharacterDeathEvent) evt).getCharId()));
-        register(map, families, LevelExpTableSnapshotEvent.class, "character", evt -> null);
         register(
                 map,
                 families,

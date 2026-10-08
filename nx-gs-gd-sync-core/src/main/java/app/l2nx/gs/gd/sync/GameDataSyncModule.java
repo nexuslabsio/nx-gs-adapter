@@ -9,6 +9,7 @@ import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStates;
 import app.l2nx.gs.adapter.api.kafka.ops.model.ModuleStatus;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.armorsettemplate.ArmorSetTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.classtemplate.ClassTemplate;
+import app.l2nx.gs.adapter.api.kafka.sync.gd.experiencelevel.ExperienceLevel;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.gearscore.GearScoreRuleset;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.instancetemplate.InstanceTemplate;
 import app.l2nx.gs.adapter.api.kafka.sync.gd.itemtemplate.ItemTemplate;
@@ -20,6 +21,7 @@ import app.l2nx.gs.adapter.api.spi.*;
 import app.l2nx.gs.adapter.api.spi.capability.NxGameData;
 import app.l2nx.gs.adapter.api.spi.provider.ArmorSetTemplateProvider;
 import app.l2nx.gs.adapter.api.spi.provider.ClassTemplateProvider;
+import app.l2nx.gs.adapter.api.spi.provider.ExperienceLevelProvider;
 import app.l2nx.gs.adapter.api.spi.provider.GameDataReadinessProvider;
 import app.l2nx.gs.adapter.api.spi.provider.GearScoreRulesetProvider;
 import app.l2nx.gs.adapter.api.spi.provider.InstanceTemplateProvider;
@@ -48,7 +50,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
  * Publishes static game-data templates onto the {@code gd} sync stream, one independent {@link EntitySync} per
  * present provider SPI. Every pass is gated on the optional {@link GameDataReadinessProvider}: the adapter
  * connects before the datapack is parsed, and an ungated pass would force-load host parsers out of order and
- * let the {@code gearscore} singleton publish a {@code count=0} marker that reconcile-deletes the ruleset.
+ * publish snapshots from half-initialized host state (e.g. {@code gearscore} before the ruleset loads).
  * Hooks catch {@link Throwable} and never propagate to the host JVM.
  */
 public final class GameDataSyncModule implements AdapterModule {
@@ -137,6 +139,11 @@ public final class GameDataSyncModule implements AdapterModule {
                 SoulCrystalTemplateProvider::entityName,
                 SoulCrystalTemplateProvider::snapshot,
                 t -> (long) t.getId()));
+        list.add(new EntityDescriptor<ExperienceLevelProvider, ExperienceLevel>(
+                ExperienceLevelProvider.class,
+                ExperienceLevelProvider::entityName,
+                ExperienceLevelProvider::snapshot,
+                t -> (long) t.getLevel()));
         list.add(new EntityDescriptor<ClassTemplateProvider, ClassTemplate>(
                 ClassTemplateProvider.class,
                 ClassTemplateProvider::entityName,
@@ -147,7 +154,7 @@ public final class GameDataSyncModule implements AdapterModule {
                 InstanceTemplateProvider::entityName,
                 InstanceTemplateProvider::snapshot,
                 t -> (long) t.getId()));
-        // Singleton: Optional adapted to a 0-or-1 list; empty is a legal count=0 snapshot that deletes the row.
+        // Singleton: Optional adapted to a 0-or-1 list; empty publishes a count=0 marker the platform ignores.
         list.add(new EntityDescriptor<GearScoreRulesetProvider, GearScoreRuleset>(
                 GearScoreRulesetProvider.class,
                 GearScoreRulesetProvider::entityName,
@@ -169,7 +176,7 @@ public final class GameDataSyncModule implements AdapterModule {
                 || ctx.getSyncTopics().getGd() == null
                 || ctx.getSyncTopics().getGd().isEmpty()) {
             log.warn("ConnectContext carries no gd sync topics — gd-sync DISABLED. "
-                    + "Platform must publish per-entity topics under syncTopics.gd in /connect "
+                    + "Platform must publish an entity -> topic map under syncTopics.gd in /connect "
                     + "for the module to run.");
             state = STATE_DISABLED;
             return;
@@ -224,7 +231,7 @@ public final class GameDataSyncModule implements AdapterModule {
         state = STATE_ACTIVE;
     }
 
-    /** No provider = always ready; a throwing provider = NOT ready, since a broken signal risks a reconcile-delete. */
+    /** No provider = always ready; a throwing one = NOT ready, to avoid publishing from an unloaded host. */
     private boolean hostReady() {
         GameDataReadinessProvider provider = readiness;
         if (provider == null) {

@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire envelope for the {@code gd} sync stream, one per record on {@code <tenant>.gd.sync.<entity>}; mirrors
+ * Wire envelope for the {@code gd} sync stream, one per record on the entity's {@code syncTopics.gd} topic; mirrors
  * {@link app.l2nx.gs.adapter.api.kafka.sync.db.SyncEvent} except {@code pk} is nullable (the marker has no row key).
  * {@code serverId} rides the {@code Nx-Server-Id} header and the tenant comes from the topic slug, not the body.
  *
