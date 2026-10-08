@@ -14,13 +14,15 @@ public final class ChatItemSnapshot {
     private final int enchantLevel;
     private final Map<String, Integer> attributes;
     private final @Nullable ItemAugmentationDbDto augmentation;
+    private final @Nullable Long count;
 
     public ChatItemSnapshot(
             long itemObjectId,
             int itemTemplateId,
             int enchantLevel,
             @Nullable Map<String, Integer> attributes,
-            @Nullable ItemAugmentationDbDto augmentation) {
+            @Nullable ItemAugmentationDbDto augmentation,
+            @Nullable Long count) {
         this.itemObjectId = itemObjectId;
         this.itemTemplateId = itemTemplateId;
         this.enchantLevel = enchantLevel;
@@ -28,9 +30,9 @@ public final class ChatItemSnapshot {
                 ? Collections.<String, Integer>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, Integer>(attributes));
         this.augmentation = augmentation;
+        this.count = count;
     }
 
-    /** The {@code ID=} value of the item token in the message text. */
     public long getItemObjectId() {
         return itemObjectId;
     }
@@ -51,13 +53,21 @@ public final class ChatItemSnapshot {
         return augmentation;
     }
 
+    /**
+     * Stack count when the message was sent; null when not reported. Never backfill from a later inventory read.
+     */
+    public @Nullable Long getCount() {
+        return count;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .itemObjectId(itemObjectId)
                 .itemTemplateId(itemTemplateId)
                 .enchantLevel(enchantLevel)
                 .attributes(attributes)
-                .augmentation(augmentation);
+                .augmentation(augmentation)
+                .count(count);
     }
 
     public static Builder builder() {
@@ -73,12 +83,13 @@ public final class ChatItemSnapshot {
                 && itemTemplateId == that.itemTemplateId
                 && enchantLevel == that.enchantLevel
                 && Objects.equals(attributes, that.attributes)
-                && Objects.equals(augmentation, that.augmentation);
+                && Objects.equals(augmentation, that.augmentation)
+                && Objects.equals(count, that.count);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(itemObjectId, itemTemplateId, enchantLevel, attributes, augmentation);
+        return Objects.hash(itemObjectId, itemTemplateId, enchantLevel, attributes, augmentation, count);
     }
 
     @Override
@@ -87,7 +98,8 @@ public final class ChatItemSnapshot {
                 + ", itemTemplateId=" + itemTemplateId
                 + ", enchantLevel=" + enchantLevel
                 + ", attributes=" + attributes
-                + ", augmentation=" + augmentation + "]";
+                + ", augmentation=" + augmentation
+                + ", count=" + count + "]";
     }
 
     public static final class Builder {
@@ -96,6 +108,7 @@ public final class ChatItemSnapshot {
         private int enchantLevel;
         private @Nullable Map<String, Integer> attributes;
         private @Nullable ItemAugmentationDbDto augmentation;
+        private @Nullable Long count;
 
         public Builder itemObjectId(long itemObjectId) {
             this.itemObjectId = itemObjectId;
@@ -122,8 +135,13 @@ public final class ChatItemSnapshot {
             return this;
         }
 
+        public Builder count(@Nullable Long count) {
+            this.count = count;
+            return this;
+        }
+
         public ChatItemSnapshot build() {
-            return new ChatItemSnapshot(itemObjectId, itemTemplateId, enchantLevel, attributes, augmentation);
+            return new ChatItemSnapshot(itemObjectId, itemTemplateId, enchantLevel, attributes, augmentation, count);
         }
     }
 }

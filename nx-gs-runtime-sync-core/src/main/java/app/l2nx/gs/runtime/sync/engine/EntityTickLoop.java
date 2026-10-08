@@ -3,6 +3,7 @@ package app.l2nx.gs.runtime.sync.engine;
 import app.l2nx.gs.adapter.api.spi.model.RuntimeEntityMapping;
 import app.l2nx.gs.adapter.api.spi.model.RuntimeRow;
 import app.l2nx.gs.commons.concurrent.SafeRunnable;
+import app.l2nx.gs.commons.hash.Fnv1a64;
 import app.l2nx.gs.log.NxLog;
 import app.l2nx.gs.log.NxLogFactory;
 import app.l2nx.gs.runtime.sync.engine.publish.SyncEventPublisher;
@@ -16,11 +17,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.kafka.clients.producer.RecordMetadata;
 
-/**
- * One tick loop per runtime entity: snapshot, hash, diff against the previous tick, publish CREATED/UPDATED.
- * Vanished pks are silently dropped (no tombstone); the previous snapshot advances only for acked pks, so
- * failed publishes replay next tick.
- */
 public final class EntityTickLoop {
 
     /** Sentinel because fastutil's default return value collides with a legitimate hash of 0. */
@@ -129,6 +125,13 @@ public final class EntityTickLoop {
                 long hash;
                 try {
                     hash = mapping.hash(dto);
+                    if (row.getStateStamp() != 0L) {
+                        hash = Fnv1a64.mix(hash, row.getStateStamp());
+                    }
+                    // a host-chosen stamp could land on the absence sentinel and republish the row as CREATED forever
+                    if (hash == MISSING_HASH) {
+                        hash++;
+                    }
                 } catch (Throwable t) {
                     log.warn(
                             "entity '{}' hash(pk={}) threw {} — skipping row",
@@ -157,7 +160,6 @@ public final class EntityTickLoop {
         long created = 0L;
         long updated = 0L;
 
-        // one prev.get() classifies the pk; MISSING_HASH distinguishes absence from hash=0
         LongIterator it = currentSnapshot.keySet().iterator();
         while (it.hasNext()) {
             long pk = it.nextLong();
@@ -195,7 +197,6 @@ public final class EntityTickLoop {
         statsTracker.recordCycleResult(entityName, result);
     }
 
-    /** Done futures are drained first; pending ones share one {@code publishFlushSeconds} deadline. Failures carry the previous hash forward. */
     private long[] walkInFlight(
             Long2ObjectMap<CompletableFuture<RecordMetadata>> inFlight,
             Long2LongMap prev,

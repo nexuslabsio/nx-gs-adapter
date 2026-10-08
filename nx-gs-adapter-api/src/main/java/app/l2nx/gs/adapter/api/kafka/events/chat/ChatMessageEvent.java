@@ -10,9 +10,9 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@code eventId} is a UUIDv7 (upper 48 bits carry the occurrence time) and the dedup key under at-least-once
- * delivery. {@code charId} {@code 0} means the platform spoke: store an absent character. {@code senderDisplayName},
- * {@code recipientCharacterIds} and {@code items} are additive: hosts that predate them send {@code null}.
+ * {@code eventId} is the dedup key under at-least-once delivery. {@code charId} {@code 0} means the platform spoke:
+ * store an absent character. {@code senderDisplayName}, {@code recipientCharacterIds} and {@code items} are additive:
+ * hosts that predate them send {@code null}.
  */
 public final class ChatMessageEvent {
 
@@ -93,7 +93,7 @@ public final class ChatMessageEvent {
         return senderDisplayName;
     }
 
-    /** Characters that received the packet plus the speaker; only for {@code GENERAL} and {@code PARTY}. */
+    /** Receivers plus the speaker; only for {@code GENERAL}, {@code PARTY} and a regional {@code SHOUT}. */
     public @Nullable List<Long> getRecipientCharacterIds() {
         return recipientCharacterIds;
     }

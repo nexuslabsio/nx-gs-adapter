@@ -59,6 +59,35 @@ class EntityTickLoopTest {
     }
 
     @Test
+    void tick_shouldEmitUpdated_whenOnlyStateStampChanges() {
+        Map<Long, Long> hashes = new HashMap<Long, Long>();
+        hashes.put(1L, 100L);
+        StubMapping mapping = new StubMapping(hashes);
+        CapturingSender sender = new CapturingSender();
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        try {
+            EntityTickLoop loop = new EntityTickLoop(
+                    mapping,
+                    e -> "topic.character",
+                    new SyncEventPublisher(sender),
+                    new EntityStatsTracker(),
+                    new EngineConfig(10, 5),
+                    scheduler);
+            loop.tick();
+            sender.captured.clear();
+
+            loop.tick();
+            assertEquals(0, sender.captured.size());
+
+            mapping.stampsByPk.put(1L, 7L);
+            loop.tick();
+            assertOpsContains(sender.captured, "UPDATED", 1);
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
+
+    @Test
     void tick_shouldDropGonePks_withoutEmittingTombstone() {
         Map<Long, Long> hashes = new HashMap<Long, Long>();
         hashes.put(1L, 100L);
@@ -175,7 +204,6 @@ class EntityTickLoopTest {
                     @Override
                     public RuntimeRow<String> next() {
                         served = true;
-                        // Faulty provider: lies about hasNext, then throws CME mid-stream.
                         throw new java.util.ConcurrentModificationException("live view mutated");
                     }
                 };
@@ -311,6 +339,7 @@ class EntityTickLoopTest {
 
     private static final class StubMapping implements RuntimeEntityMapping<String> {
         private final Map<Long, Long> hashesByPk;
+        private final Map<Long, Long> stampsByPk = new HashMap<Long, Long>();
 
         StubMapping(Map<Long, Long> hashesByPk) {
             this.hashesByPk = new HashMap<Long, Long>(hashesByPk);
@@ -330,7 +359,8 @@ class EntityTickLoopTest {
         public Iterable<RuntimeRow<String>> snapshot() {
             List<RuntimeRow<String>> rows = new ArrayList<RuntimeRow<String>>();
             for (Map.Entry<Long, Long> e : hashesByPk.entrySet()) {
-                rows.add(new RuntimeRow<String>(e.getKey(), "dto-" + e.getKey()));
+                Long stamp = stampsByPk.get(e.getKey());
+                rows.add(new RuntimeRow<String>(e.getKey(), "dto-" + e.getKey(), stamp == null ? 0L : stamp));
             }
             return rows;
         }

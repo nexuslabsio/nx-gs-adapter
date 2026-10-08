@@ -77,10 +77,12 @@ state, siege participants, raid boss vitals).
     iterable before tick processing — implementation can return a defensive copy
     (e.g. `new ArrayList<>(World.getAllPlayers())`) if the underlying collection
     is concurrently mutated.
-  - `RuntimeRow<T>` is a lightweight value: `{ long pk, T dto }`. The engine reads
+  - `RuntimeRow<T>` is a lightweight value: `{ long pk, T dto, long stateStamp }`. The engine reads
     `pk` as the entity identity, computes a 64-bit FNV-1a hash over `dto`'s
     hash-relevant fields (declared via the mapping), and uses the resulting hash
-    to detect "changed" rows.
+    to detect "changed" rows. `stateStamp` (default `0`, runtime-sync 0.4.0) is a host-side change
+    marker for state the DTO does not carry; it is mixed into the row hash and never sent (spec 036
+    R6).
   - `long hash(T dto)` — implementation-supplied hash function that returns a stable
     64-bit FNV-1a hash over the fields the operator wants to track for change
     detection. Provider author controls which fields participate (and which are
@@ -253,8 +255,9 @@ failedAcks, timedOutAcks, consecutiveErrors}`. Same shape as `db-sync` per
 
 - **Pets / summons / NPCs / mobs** — only player characters in MVP. Boss-runtime is a
   separate slice once a real platform consumer needs it.
-- **Buff / debuff state** — separate entity (`character_effects` or similar) in a follow-up
-  slice. Not bundled into `CharacterRuntimeDto`.
+- **Buff / debuff state as a separate entity** — delivered instead as the `effects` field of
+  `CharacterRuntimeDto` (spec [036](036-character-effects.md)); there is no `character_effects`
+  entity.
 - **Position smoothing / interpolation** — engine emits raw coordinates from the snapshot;
   client-side interpolation is the platform consumer's concern.
 - **Per-field deltas** — every change emits the full DTO. Field-level diff is a
@@ -456,7 +459,8 @@ End-to-end per tick (one entity, e.g. `character`):
    `player.isOnline()`). On throw → `CycleResult.degraded(elapsed)` + WARN, no
    publishes, entity transitions to `DEGRADED` for this tick.
 3. For each `RuntimeRow{pk, dto}`:
-   - Compute `hash = mapping.hash(dto)` (FNV-1a 64-bit over vitals + coords)
+   - Compute `hash = mapping.hash(dto)`, mixed with `row.stateStamp` via FNV-1a when the stamp is non-zero (FNV-1a 64-bit over vitals + coords,
+     plus the host change marker)
    - Insert `{pk → hash}` into `currentSnapshot: Long2LongOpenHashMap` whose
      `defaultReturnValue` is `MISSING_HASH = Long.MIN_VALUE`
 4. Diff `currentSnapshot` vs `prevSnapshot` (both share the `MISSING_HASH`

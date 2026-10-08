@@ -3,7 +3,10 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
+import app.l2nx.gs.adapter.api.domain.skill.SkillEffectCategory;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.Activity;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.CharacterEffect;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.CharacterEffectOffline;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownActivities;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownActivityMetadata;
 import java.util.ArrayList;
@@ -17,6 +20,16 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 class CharacterRuntimeDtoTest {
+
+    private static CharacterEffect haste() {
+        return CharacterEffect.builder()
+                .skillId(1086)
+                .skillLevel(2)
+                .category(SkillEffectCategory.BUFF)
+                .remainingSec(1180)
+                .offline(CharacterEffectOffline.FROZEN)
+                .build();
+    }
 
     private static Activity fishing() {
         return Activity.builder()
@@ -90,7 +103,8 @@ class CharacterRuntimeDtoTest {
                 12,
                 50,
                 45000,
-                60000);
+                60000,
+                Collections.singletonList(haste()));
 
         assertEquals(original, original.toBuilder().build());
     }
@@ -207,7 +221,13 @@ class CharacterRuntimeDtoTest {
                         CharacterRuntimeDto.builder().id(1L).curWeight(1).build()),
                 Arguments.of(
                         "maxWeight",
-                        CharacterRuntimeDto.builder().id(1L).maxWeight(1).build()));
+                        CharacterRuntimeDto.builder().id(1L).maxWeight(1).build()),
+                Arguments.of(
+                        "effects",
+                        CharacterRuntimeDto.builder()
+                                .id(1L)
+                                .effects(Collections.<CharacterEffect>emptyList())
+                                .build()));
     }
 
     @Test
@@ -276,7 +296,7 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto fromBuilder = CharacterRuntimeDto.builder().id(7L).build();
         CharacterRuntimeDto fromCtor = new CharacterRuntimeDto(
                 7L, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         assertEquals(fromCtor, fromBuilder);
         assertEquals(fromCtor.hashCode(), fromBuilder.hashCode());
@@ -350,7 +370,6 @@ class CharacterRuntimeDtoTest {
         assertNull(dto.getMaxWeight());
     }
 
-    /** Overloads break implicit constructor-parameter-name binding, so exactly one constructor must exist. */
     @Test
     void class_shouldExposeExactlyOneConstructor() {
         assertEquals(1, CharacterRuntimeDto.class.getDeclaredConstructors().length);
@@ -378,5 +397,33 @@ class CharacterRuntimeDtoTest {
         CharacterRuntimeDto sameValues = base.toBuilder().build();
         assertEquals(base, sameValues);
         assertEquals(base.hashCode(), sameValues.hashCode());
+    }
+
+    @Test
+    void effects_shouldBeUnmodifiableAndDefensivelyCopied() {
+        List<CharacterEffect> source = new ArrayList<CharacterEffect>(Collections.singletonList(haste()));
+        CharacterRuntimeDto dto =
+                CharacterRuntimeDto.builder().id(1L).effects(source).build();
+
+        source.clear();
+
+        assertEquals(Collections.singletonList(haste()), dto.getEffects());
+        assertThrows(UnsupportedOperationException.class, () -> dto.getEffects().add(haste()));
+    }
+
+    @Test
+    void equalsAndHashCode_shouldDifferWhenEffectsDiffer() {
+        CharacterRuntimeDto base = CharacterRuntimeDto.builder()
+                .id(1L)
+                .effects(Collections.singletonList(haste()))
+                .build();
+        CharacterRuntimeDto otherTimer = base.toBuilder()
+                .effects(Collections.singletonList(
+                        haste().toBuilder().remainingSec(null).build()))
+                .build();
+
+        assertNotEquals(base, otherTimer);
+        assertNotEquals(base, base.toBuilder().effects(null).build());
+        assertEquals(base.hashCode(), base.toBuilder().build().hashCode());
     }
 }

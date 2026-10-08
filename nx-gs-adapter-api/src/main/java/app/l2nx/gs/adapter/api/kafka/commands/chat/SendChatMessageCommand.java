@@ -2,14 +2,15 @@ package app.l2nx.gs.adapter.api.kafka.commands.chat;
 
 import app.l2nx.gs.adapter.api.kafka.commands.NxCommand;
 import app.l2nx.gs.adapter.api.kafka.commands.OwnerVerified;
+import app.l2nx.gs.adapter.api.kafka.events.chat.WellKnownChatChannels;
 import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A shadow-banned or filtered speaker is not refused: reply is {@code OK}, nothing is delivered, the echo is flagged
- * {@link app.l2nx.gs.adapter.api.kafka.events.chat.ChatMetadataKeys#SHADOWED}. At-most-once delivery: a re-issue after
- * a reply timeout looks fresh, so {@code messageId} dedup needs a host-side window. Gson bypasses the constructor.
+ * A shadow-banned or filtered speaker still gets {@code OK}; the echo is flagged
+ * {@link app.l2nx.gs.adapter.api.kafka.events.chat.ChatMetadataKeys#SHADOWED}. At-most-once: a re-issue after a reply
+ * timeout looks fresh, so {@code messageId} dedup needs a host-side window. Gson bypasses the constructor.
  */
 public final class SendChatMessageCommand implements OwnerVerified, NxCommand<SendChatMessageResult> {
 
@@ -44,7 +45,7 @@ public final class SendChatMessageCommand implements OwnerVerified, NxCommand<Se
         }
         this.audienceId = audienceId;
         this.senderCharacterId = senderCharacterId;
-        if (senderCharacterId == null) {
+        if (senderCharacterId == null && !WellKnownChatChannels.ANNOUNCEMENT.equals(channel)) {
             Objects.requireNonNull(senderDisplayName, "senderDisplayName");
         }
         this.senderDisplayName = senderDisplayName;
@@ -123,8 +124,7 @@ public final class SendChatMessageCommand implements OwnerVerified, NxCommand<Se
         return source;
     }
 
-    /** Plain text, literal {@code
-     * } line breaks, bare {@code http(s)://} URLs; the host translates to wire tokens. */
+    /** Plain text with literal line breaks and bare URLs; the host translates them to wire tokens. */
     public String getText() {
         return text;
     }

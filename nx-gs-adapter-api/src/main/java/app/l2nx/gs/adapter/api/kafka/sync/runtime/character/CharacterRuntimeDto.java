@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.Activity;
+import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.CharacterEffect;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownActivities;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownActivityMetadata;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.WellKnownAiStatuses;
@@ -12,14 +13,11 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Volatile runtime state of one character; payload of {@code SyncEvent<CharacterRuntimeDto>}. Shares {@code id}
- * with {@code CharacterDbDto}; only {@code id} is required.
+ * Volatile runtime state of one character; only {@code id} is required. {@code online} null/omitted means ONLINE;
+ * explicit {@code false} is a one-shot tombstone with everything else null.
  *
- * <p>{@code online} null/omitted means ONLINE; explicit {@code false} is a one-shot tombstone with everything else null.
- * An offline trader is not a tombstone: it ticks with {@code online=false} and an {@link WellKnownActivities#OFFLINE_TRADE} activity.</p>
- *
- * <p>{@code aiStatus} and {@code activities} are independent signals, both null on tombstones. Inventory and weight
- * caps ride this channel because they are stat-derived; consumers keep last-known values after logout.</p>
+ * <p>An offline trader is not a tombstone: it ticks with {@code online=false} and an
+ * {@link WellKnownActivities#OFFLINE_TRADE} activity.</p>
  */
 public final class CharacterRuntimeDto {
 
@@ -48,12 +46,11 @@ public final class CharacterRuntimeDto {
     private final @Nullable Integer maxQuestInventorySlots;
     private final @Nullable Integer curWeight;
     private final @Nullable Integer maxWeight;
+    private final @Nullable List<CharacterEffect> effects;
 
     /**
-     * Prefer {@link #builder()}.
-     *
-     * <p>Must stay the only non-default constructor: the DTO binds by implicit parameter names, and an overload makes
-     * creator detection ambiguous so consumers fail to deserialize the whole channel. Grow the wire by appending parameters.</p>
+     * Must stay the only constructor: an overload makes creator detection ambiguous and consumers stop deserializing
+     * the whole channel. Grow the wire by appending parameters.
      */
     public CharacterRuntimeDto(
             long id,
@@ -80,7 +77,8 @@ public final class CharacterRuntimeDto {
             @Nullable Integer curQuestInventorySlots,
             @Nullable Integer maxQuestInventorySlots,
             @Nullable Integer curWeight,
-            @Nullable Integer maxWeight) {
+            @Nullable Integer maxWeight,
+            @Nullable List<CharacterEffect> effects) {
         this.id = id;
         this.curHp = curHp;
         this.maxHp = maxHp;
@@ -106,10 +104,11 @@ public final class CharacterRuntimeDto {
         this.maxQuestInventorySlots = maxQuestInventorySlots;
         this.curWeight = curWeight;
         this.maxWeight = maxWeight;
+        this.effects = copy(effects);
     }
 
-    private static @Nullable List<Activity> copy(@Nullable List<Activity> activities) {
-        return activities == null ? null : Collections.unmodifiableList(new ArrayList<Activity>(activities));
+    private static <T> @Nullable List<T> copy(@Nullable List<T> values) {
+        return values == null ? null : Collections.unmodifiableList(new ArrayList<T>(values));
     }
 
     public long getId() {
@@ -117,11 +116,8 @@ public final class CharacterRuntimeDto {
     }
 
     /**
-     * Whether this row carries observed state rather than being the offline tombstone (only {@code id} and
-     * {@code online=false}). Not the same as {@link #getOnline() online}: offline traders carry real vitals.
-     *
-     * <p>Enumerates this class's own fields so a newly added volatile field gets added here; a missed field turns an
-     * ordinary tick into a tombstone for every consumer.</p>
+     * False only for the tombstone; offline traders still carry state. Enumerates every volatile field by hand: a
+     * missed one turns an ordinary tick into a tombstone for every consumer.
      */
     public boolean carriesState() {
         return curHp != null
@@ -146,7 +142,8 @@ public final class CharacterRuntimeDto {
                 || curQuestInventorySlots != null
                 || maxQuestInventorySlots != null
                 || curWeight != null
-                || maxWeight != null;
+                || maxWeight != null
+                || effects != null;
     }
 
     public @Nullable Integer getCurHp() {
@@ -173,9 +170,6 @@ public final class CharacterRuntimeDto {
         return maxCp;
     }
 
-    /**
-     * Null on cores without vitality.
-     */
     public @Nullable Integer getCurVit() {
         return curVit;
     }
@@ -196,31 +190,23 @@ public final class CharacterRuntimeDto {
         return z;
     }
 
-    /**
-     * Null/omitted is read as ONLINE; see {@link #isOnlineEffective()}.
-     */
     public @Nullable Boolean getOnline() {
         return online;
     }
 
-    /**
-     * Open string; canonical values in {@link WellKnownAiStatuses}. Null when unreported or on tombstones.
-     */
+    /** Open string; canonical values in {@link WellKnownAiStatuses}. */
     public @Nullable String getAiStatus() {
         return aiStatus;
     }
 
     /**
-     * Class that {@link #getLevel()}, {@link #getExp()} and {@link #getSp()} describe (the subclass when one is active).
-     * Null when the source ID is outside {@link CharacterClass} and on tombstones.
+     * Class that {@link #getLevel()}, {@link #getExp()} and {@link #getSp()} describe, not necessarily the main class;
+     * {@code exp} is an absolute total. Null when the source ID is outside {@link CharacterClass}.
      */
     public @Nullable CharacterClass getClassId() {
         return classId;
     }
 
-    /**
-     * Level of the class named by {@link #getClassId()}, not necessarily the main class.
-     */
     public @Nullable Integer getLevel() {
         return level;
     }
@@ -229,16 +215,10 @@ public final class CharacterRuntimeDto {
         return sp;
     }
 
-    /**
-     * Absolute EXP total of the class named by {@link #getClassId()}, not a within-level delta.
-     */
     public @Nullable Long getExp() {
         return exp;
     }
 
-    /**
-     * One slot per item stack, equipped items included; quest items are counted separately.
-     */
     public @Nullable Integer getCurInventorySlots() {
         return curInventorySlots;
     }
@@ -255,9 +235,6 @@ public final class CharacterRuntimeDto {
         return maxQuestInventorySlots;
     }
 
-    /**
-     * Sum of {@code itemWeight * count} over all items including quest items, minus any build-specific penalty reduction.
-     */
     public @Nullable Integer getCurWeight() {
         return curWeight;
     }
@@ -266,17 +243,19 @@ public final class CharacterRuntimeDto {
         return maxWeight;
     }
 
-    /**
-     * Null when there are none, the host does not report them, or on tombstones; otherwise unmodifiable.
-     * Independent of {@link #getAiStatus() aiStatus}; metadata keys in {@link WellKnownActivityMetadata}.
-     */
+    /** Independent of {@link #getAiStatus() aiStatus}; metadata keys in {@link WellKnownActivityMetadata}. */
     public @Nullable List<Activity> getActivities() {
         return activities;
     }
 
     /**
-     * True for null/true, false only for an explicit {@code false} tombstone.
+     * Status-bar effects in bar order. Null on a state-carrying row means the host does not report effects, which
+     * leaves the consumer with none; an empty list also means none.
      */
+    public @Nullable List<CharacterEffect> getEffects() {
+        return effects;
+    }
+
     public boolean isOnlineEffective() {
         return online == null || online;
     }
@@ -307,7 +286,8 @@ public final class CharacterRuntimeDto {
                 .curQuestInventorySlots(curQuestInventorySlots)
                 .maxQuestInventorySlots(maxQuestInventorySlots)
                 .curWeight(curWeight)
-                .maxWeight(maxWeight);
+                .maxWeight(maxWeight)
+                .effects(effects);
     }
 
     public static Builder builder() {
@@ -343,7 +323,8 @@ public final class CharacterRuntimeDto {
                 && Objects.equals(curQuestInventorySlots, that.curQuestInventorySlots)
                 && Objects.equals(maxQuestInventorySlots, that.maxQuestInventorySlots)
                 && Objects.equals(curWeight, that.curWeight)
-                && Objects.equals(maxWeight, that.maxWeight);
+                && Objects.equals(maxWeight, that.maxWeight)
+                && Objects.equals(effects, that.effects);
     }
 
     @Override
@@ -373,7 +354,8 @@ public final class CharacterRuntimeDto {
                 curQuestInventorySlots,
                 maxQuestInventorySlots,
                 curWeight,
-                maxWeight);
+                maxWeight,
+                effects);
     }
 
     @Override
@@ -394,7 +376,8 @@ public final class CharacterRuntimeDto {
                 + ", curInventorySlots=" + curInventorySlots + ", maxInventorySlots=" + maxInventorySlots
                 + ", curQuestInventorySlots=" + curQuestInventorySlots
                 + ", maxQuestInventorySlots=" + maxQuestInventorySlots
-                + ", curWeight=" + curWeight + ", maxWeight=" + maxWeight + "]";
+                + ", curWeight=" + curWeight + ", maxWeight=" + maxWeight
+                + ", effects=" + effects + "]";
     }
 
     public static final class Builder {
@@ -423,6 +406,7 @@ public final class CharacterRuntimeDto {
         private @Nullable Integer maxQuestInventorySlots;
         private @Nullable Integer curWeight;
         private @Nullable Integer maxWeight;
+        private @Nullable List<CharacterEffect> effects;
 
         public Builder id(long id) {
             this.id = id;
@@ -514,9 +498,6 @@ public final class CharacterRuntimeDto {
             return this;
         }
 
-        /**
-         * Defensively copied on {@link #build()}.
-         */
         public Builder activities(@Nullable List<Activity> activities) {
             this.activities = activities;
             return this;
@@ -552,6 +533,11 @@ public final class CharacterRuntimeDto {
             return this;
         }
 
+        public Builder effects(@Nullable List<CharacterEffect> effects) {
+            this.effects = effects;
+            return this;
+        }
+
         public CharacterRuntimeDto build() {
             return new CharacterRuntimeDto(
                     id,
@@ -578,7 +564,8 @@ public final class CharacterRuntimeDto {
                     curQuestInventorySlots,
                     maxQuestInventorySlots,
                     curWeight,
-                    maxWeight);
+                    maxWeight,
+                    effects);
         }
     }
 }

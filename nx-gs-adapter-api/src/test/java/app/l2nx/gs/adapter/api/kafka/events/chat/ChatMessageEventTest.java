@@ -27,6 +27,7 @@ class ChatMessageEventTest {
                 .enchantLevel(7)
                 .attributes(attributes)
                 .augmentation(new ItemAugmentationDbDto(16341, 18000))
+                .count(1L)
                 .build();
     }
 
@@ -138,6 +139,16 @@ class ChatMessageEventTest {
 
             assertTrue(item.getAttributes().isEmpty());
             assertNull(item.getAugmentation());
+        }
+
+        @Test
+        void count_shouldBeNull_whenHostDoesNotReportIt() {
+            assertNull(ChatItemSnapshot.builder().itemObjectId(1L).build().getCount());
+        }
+
+        @Test
+        void equals_shouldDiffer_whenCountDiffers() {
+            assertNotEquals(snapshot(), snapshot().toBuilder().count(2L).build());
         }
 
         @Test

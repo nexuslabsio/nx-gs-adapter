@@ -2,6 +2,7 @@ package app.l2nx.gs.adapter.api.kafka.commands.chat;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import app.l2nx.gs.adapter.api.kafka.events.chat.WellKnownChatChannels;
 import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,17 @@ class SendChatMessageCommandTest {
                     .build();
 
             assertEquals("", command.getSenderDisplayName());
+        }
+
+        @Test
+        void build_shouldAcceptNullDisplayName_whenAnnouncement() {
+            SendChatMessageCommand command = base().channel(WellKnownChatChannels.ANNOUNCEMENT)
+                    .audience(ChatAudiences.ALL_ONLINE)
+                    .audienceId(null)
+                    .senderCharacterId(null)
+                    .build();
+
+            assertNull(command.getSenderDisplayName());
         }
 
         @Test

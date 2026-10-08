@@ -107,10 +107,11 @@ path.
   to the offline character, R20), so it must not depend on a platform deploy. `null` from hosts that
   predate the field; consumers fall back to `charName`.
 
-- [done] R17. `ChatMessageEvent.recipientCharacterIds` MUST be filled only for `GENERAL` and
-  `PARTY` (`null` elsewhere): the characters that actually received the packet, plus the speaker.
-  Party has no stable id and the `GENERAL` audience is positional, so the recipient list is the only
-  way to scope those channels on the read side. Clan / alliance scoping keeps using metadata ids.
+- [done] R17. `ChatMessageEvent.recipientCharacterIds` MUST be filled only for `GENERAL`, `PARTY` and
+  regional `SHOUT` (R28) (`null` elsewhere): the characters that actually received the packet, plus
+  the speaker. Party has no stable id and the `GENERAL` / regional `SHOUT` audience is positional, so
+  the recipient list is the only way to scope those channels on the read side. Clan / alliance scoping
+  keeps using metadata ids.
 
 - [done] R18. `ChatMessageEvent.items` MUST hold an immutable `ChatItemSnapshot` for every item link
   present in `text`, one per objectId, taken at send time: the item's later state (enchant, augment,
@@ -121,6 +122,11 @@ path.
     `DARK`) to power; empty when none, never `null`
   - `@Nullable ItemAugmentationDbDto augmentation` = `{int option1Id; @Nullable Integer option2Id}` — the
     item-sync class itself (`kafka.sync.db.item`), not a chat copy: one domain concept, one wire shape
+  - `@Nullable Long count` — stack count of the linked item at send time. The host fills it for both
+    in-game `Say2` links and command-echo links (outbound R25). `null` = unknown (a host older than
+    this field). Consumers MUST NOT backfill it from a current inventory: the count in the inventory
+    now is not the count the link showed when it was sent, and a stale number in a stored message is
+    worse than an absent one. Additive: older hosts omit it, consumers tolerate `null`.
 
   No ensoul: not supported on this build, and a special ability is a separate item template.
   Augmentation option localization is out of scope (a future platform option catalog, nx-gamedata
@@ -149,6 +155,19 @@ path.
   (R19 counts it as delivered — it is exactly the spam the corpus exists for); `recipientCharacterIds`
   is `[speaker]` on `GENERAL` / `PARTY`. Consumers store it but show it only to the speaker.
 
+- [done] R28. **`SHOUT` is readable on the platform** (read-only: platform sending stays `CLAN` /
+  `ALLIANCE` / `PARTY` / `WHISPER`, outbound R22). Reach depends on the host's shout mode:
+  - **Regional shout** (the host limits `SHOUT` to the speaker's map region and reflection, and does
+    not deliver to recipients blocking the speaker): the host publishes `recipientCharacterIds` as for
+    `GENERAL` (R17), so the read side scopes the message to the characters who could actually see it.
+  - **Global shout** (the host broadcasts `SHOUT` to every online player): a recipient list would be
+    the whole online set on every message, so the host publishes **no** list and instead marks the
+    event with `ChatMetadataKeys.SERVER_WIDE = "serverWide"`, value `"true"` (key absent otherwise).
+    Consumers treat a `serverWide` `SHOUT` like `WORLD` / `HERO`: visible server-wide.
+  Without the marker a consumer would see a `SHOUT` with neither a list nor a scope key and could only
+  guess between "nobody" and "everybody". `metadata` is the open map R1 provides, so the key needs no
+  new field; consumers ignore it on hosts that never send it.
+
 > Host-internal, not wire: the host keeps a bounded snapshot cache (objectId -> item info, TTL 6h,
 > re-link refreshes) so in-game players can open links sent by offline characters.
 
@@ -165,9 +184,14 @@ path.
 ## Compatibility
 
 Purely additive and already released — `ChatMessageEvent` + `WellKnownChatChannels` in
-`api/v0.67.0`, the registry binding in `core/v0.32.0`. R16-R21 are additive on top of that: new
-nullable event fields, one new wire class, one new metadata key; old hosts omit them and consumers
-tolerate absence. The one behavioral change is R19 (publish after delivery).
+`api/v0.67.0`, the registry binding in `core/v0.32.0`. R16-R21 and R28 are additive on top of that: new
+nullable event fields, one new wire class, new metadata keys, `ChatItemSnapshot.count`; old hosts omit
+them and consumers tolerate absence. The one behavioral change is R19 (publish after delivery).
+
+**Constructor rule.** `ChatItemSnapshot.count` is appended at the end of its canonical constructor; no
+overload keeping the old signature (two visible constructors break parameter-name binding for every
+consumer). On the wire nothing breaks; a host calling the constructor positionally adds one `null` and
+recompiles — hosts use `builder()`.
 
 ## Non-goals
 

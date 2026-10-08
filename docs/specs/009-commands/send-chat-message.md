@@ -157,6 +157,18 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
   out. Host-internal, not wire: a bounded item snapshot cache (objectId -> item info, TTL 6h, re-link
   refreshes) lets in-game players open links sent by offline characters.
 
+- [done] R29. **`text` is limited to 150 characters.** One value across the platform config, the
+  platform DTO validation and the host handler (the host's previous limit was 300). A limit that
+  differs between layers lets a message pass the platform check and fail on the host with
+  `VALIDATION_FAILED`, after the user already saw it accepted.
+
+- [done] R30. **`ANNOUNCEMENT` has no speaker, so `senderDisplayName` may be `null`.** For channel
+  `ANNOUNCEMENT` the host accepts `senderDisplayName = null` (a nameless line); the "required without
+  `senderCharacterId`" check of R23 is by presence, and a blank `""` used to pass it only because it
+  was non-null. Absence is `null`, not an empty string. The platform keeps sending its current value
+  until hosts with this change are restarted (platform-side follow-up), so both forms must be accepted
+  and rendered as the same nameless line.
+
 ## Topic & wire summary
 
 | Item              | Value                                                   |
@@ -167,7 +179,7 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
 
 ## Compatibility
 
-Additive on release (R22-R27 too: one new nullable field, new audience and channel codes; a host older
+Additive on release (R22-R27 and R30 too: one new nullable field, new audience and channel codes; a host older
 than the slice answers `VALIDATION_FAILED` for them): a host built against an older api never registers the handler, and the platform
 sees `UNSUPPORTED_COMMAND` — exactly the signal phase 1 relies on. The removal in R14 is the only
 breaking step, and it is gated on the fallback metric.
