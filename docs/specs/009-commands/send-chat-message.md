@@ -157,10 +157,9 @@ is registered for the `Nx-Message-Type`. That is an explicit, fast, per-server n
   out. Host-internal, not wire: a bounded item snapshot cache (objectId -> item info, TTL 6h, re-link
   refreshes) lets in-game players open links sent by offline characters.
 
-- [done] R29. **`text` is limited to 150 characters.** One value across the platform config, the
-  platform DTO validation and the host handler (the host's previous limit was 300). A limit that
-  differs between layers lets a message pass the platform check and fail on the host with
-  `VALIDATION_FAILED`, after the user already saw it accepted.
+- [done] R29. **`text` is limited to 300 characters on the host.** A platform MAY enforce a lower
+  limit of its own; it must never exceed the host's, otherwise a message accepted by the platform fails
+  on the host with `VALIDATION_FAILED`.
 
 - [done] R30. **`ANNOUNCEMENT` has no speaker, so `senderDisplayName` may be `null`.** For channel
   `ANNOUNCEMENT` the host accepts `senderDisplayName = null` (a nameless line); the "required without
