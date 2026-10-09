@@ -57,5 +57,5 @@ Companion docs of the folder-form specs:
 - `005-cdc-engine/flow.md` — block diagrams of the two-phase cycle.
 - `009-commands/catalog.md` — per-command wire contract (inputs, results, error statuses).
 - `009-commands/guide.md` — handler author's guide (lifecycle, threading, registration).
-- `009-commands/<command>.md` — one per command family: `send-mail`, `ban`, `send-chat-message`,
-  `character-admin`, `captcha`.
+- `009-commands/<command>.md` — one per command family: `send-mail`, `send-player-mail`, `ban`,
+  `send-chat-message`, `character-admin`, `captcha`.

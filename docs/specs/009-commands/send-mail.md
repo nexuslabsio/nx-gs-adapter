@@ -44,6 +44,9 @@ authors composing `SendMailCommand` records onto the commands topic.
   - `@Nullable List<MailItem> items` — OPTIONAL. Attachment lines; null/empty
     produces a text-only mail. Stored as an unmodifiable list; null normalized
     to `Collections.emptyList()` on read.
+  - `@Nullable Long adena` — OPTIONAL. Adena placed in the mail; the host creates it as an
+    item-template attachment (template `57`). Positive when present; `null` = no adena. Additive
+    field: an old host ignores it, an old producer reads as `null`. [todo]
 
   Constructor enforces non-null `charId` and `title` via `IllegalArgumentException`
   for programmatic construction. Wire-path Gson bypasses the constructor; handler
@@ -119,6 +122,9 @@ authors composing `SendMailCommand` records onto the commands topic.
 
 **Non-goals:**
 
+- **Mail from a character.** `SendMailCommand` is system-sender only. The character-sender
+  counterpart (items and adena taken from the sender, COD, durable idempotency) is
+  [`SendPlayerMailCommand`](send-player-mail.md).
 - **Removing legacy RabbitMQ `SendMailRequestV1` cases.** Per per-command cutover
   the legacy switch arms in `RabbitMqTgConsumer` / `RabbitMqWebAdminConsumer`
   remain live until the web side stops emitting on RabbitMQ.
@@ -165,6 +171,7 @@ authors composing `SendMailCommand` records onto the commands topic.
 
 ## Links
 
+- Character-sender counterpart: [`send-player-mail.md`](send-player-mail.md)
 - Sibling feature (commands runtime + dispatch + reply path):
   [`docs/specs/009-commands/spec.md`](spec.md)
 - Platform counterpart (send path, ingest, defects, planned outbox/idempotency layers):
@@ -248,6 +255,7 @@ Example value (recipient not found):
 | `items`                  | `[MailItem]?` | No       | Attachments; null/empty → text-only mail         |
 | `items[].itemTemplateId` | `Long`        | Yes      | Catalog template id (NOT object-id)              |
 | `items[].count`          | `Long`        | Yes      | Stack size, positive                             |
+| `adena`                  | `Long?`       | No       | Adena in the mail (template 57); positive        |
 
 Reply payload:
 
@@ -330,7 +338,12 @@ turns boot recovery into a duplicate generator for mail.
 #### Mitigations until the platform reuses the correlation id
 
 - **Platform-side idempotency key.** The send-side flow attaches a stable token and
-  reuses it on retry, so the existing dedup decorator actually fires.
+  reuses it on retry, so the existing dedup decorator actually fires. For admin system
+  mail the platform derives one correlation id per recipient from the required
+  `requestId`, after name resolution and de-duplication by `charId`:
+  `UUIDv5(namespace = requestId, name = "SEND_MAIL:" + charId)`. A retry of the same
+  request therefore reuses the same ids; the in-memory dedup still does not survive a
+  restart, so the durable receipt remains the open part (R7).
 - **Operational compensation runbook.** If a paid-mail flow is retried mid-batch,
   ops MUST audit the resulting mails by `correlationId` <->
   `Message.author / charId / sent_at` triplet and manually compensate

@@ -323,7 +323,7 @@ replies-published == 0}` is visible as a failure rather than as silence
   the host picked it up, so it was refused without running — nothing read, charged or moved. It is
   deliberately distinct from `INVALID_STATE`: the world was never consulted, so retrying with a
   fresh deadline is meaningful whereas re-sending the same command never is. First user is
-  `BuyFromPrivateStoreCommand.getDeadline()` (REQUIRED field, guards a command that sat in the
+  `BuyFromPrivateStoreCommand.getDeadline()` (REQUIRED field; `SendPlayerMailCommand` and the store commands use it the same way; guards a command that sat in the
   ~3h Kafka backlog while the game-server was down). No host emits it yet — no host reads
   `getDeadline()` today. Rollout ordering is below.
 
@@ -383,7 +383,7 @@ replies-published == 0}` is visible as a failure rather than as silence
   is an interface with one method, `boolean isOwnerVerified()`. Every command the platform issues on
   behalf of a player acting with their own character MUST implement it. Today:
   `BuyFromPrivateStoreCommand`, `StartPrivateStoreSellCommand`, `StartPrivateStorePackageSellCommand`,
-  `StopPrivateStoreCommand`, `SendChatMessageCommand`. A new command of that kind implements it from
+  `StopPrivateStoreCommand`, `SendChatMessageCommand`, `SendPlayerMailCommand` (produced only for the owner of the sender; the host still validates the wire). A new command of that kind implements it from
   its first release; the catalog marks each one (see `catalog.md` › Owner verification).
   - `true` — the platform verified, against fresh master-account data, that the acting user owns the
     character. "Fresh" is the platform's bounded-staleness guarantee, not a replica it happened to have.
@@ -641,5 +641,6 @@ NxCommand<Void>` is the sanctioned exception, and payload-less `CommandResult.ok
   [`docs/specs/007-per-server-sync.md`](../007-per-server-sync.md)
 - Sibling feature (`NxSync` / force-resync): [`docs/specs/021-force-resync.md`](../021-force-resync.md)
 - Follow-up command slice: [`docs/specs/009-commands/send-mail.md`](send-mail.md)
+- Follow-up command slice: [`docs/specs/009-commands/send-player-mail.md`](send-player-mail.md)
 - Follow-up command slice: [`docs/specs/009-commands/ban.md`](ban.md)
 - Platform side of owner verification (R28): `nx-gameservers/docs/specs/053-character-ownership.md`

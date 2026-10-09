@@ -149,18 +149,18 @@ rather than posting twice.
 
 **Inputs**
 
-| Field               | Type     | Required | Notes                                                                                                                                                                                                                                                 |
-| ------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `messageId`         | `UUID`   | yes      | UUIDv7 minted by the platform. The host echoes it as the `eventId` of the resulting `ChatMessageEvent`, and dedupes re-deliveries on it                                                                                                               |
-| `channel`           | `String` | yes      | `WellKnownChatChannels` code. Accepted values are a whitelist that grows per slice — planned `CLAN`, `ALLIANCE`, `PARTY`, `WHISPER`, `ANNOUNCEMENT` (shipped: `CLAN`, `ANNOUNCEMENT`); anything else is `VALIDATION_FAILED`. `CRITICAL_ANNOUNCEMENT` is deliberately not part of the contract                      |
-| `audience`          | `String` | yes      | `CHARACTER`, `CLAN`, `ALLIANCE`, `PARTY` or `ALL_ONLINE` — the recipient list, orthogonal to `channel` (`ALLIANCE` / `PARTY` planned, spec R22)                                                                                                                                                                     |
-| `audienceId`        | `Long?`  | cond.    | Character id for `CHARACTER` (or `targetCharacterName` instead), clan id for `CLAN`, alliance id for `ALLIANCE`; `null` for `PARTY` and `ALL_ONLINE`                                                                                                                                                                             |
-| `senderCharacterId` | `Long?`  | no       | Who speaks legally — drives the host's gates, the packet's `objectId` and platform attribution. `null` means the platform itself speaks                                                                                                               |
-| `senderDisplayName` | `String?` | cond.   | What the client renders for nameless senders (`"System"`, `"Дед Мороз"`; empty string reproduces the nameless announcement line). Planned (spec R23): nullable when `senderCharacterId` is set — if present an updated host ignores it and builds the name itself, incl. the offline `*` postfix (older hosts use it verbatim); required when `senderCharacterId` is `null`, except channel `ANNOUNCEMENT`, where `null` renders the nameless announcement line (spec R30)                                                                                      |
-| `source`            | `String` | yes      | Where the message originates (`MINIAPP` — legacy `TMA` —, `AUTO_ANNOUNCEMENT`, …). Echoed into the event metadata under `ChatMetadataKeys.SOURCE`; the host cannot infer the surface, and without it analysis cannot tell platform traffic from what players typed in-game |
-| `text`              | `String` | yes      | Body in the neutral chat micro-format, at most 300 characters (spec R29): plain text, LF hard line breaks, bare `http(s)://` URLs for auto-linking; URL translation is a host concern. Planned (spec R25): item links as game-native `\b\tType=1 \tID=<objectId> ...\b` tokens built by the platform and ownership-verified by the host (foreign / missing item is `VALIDATION_FAILED`)                                                                  |
-| `targetCharacterName` | `String?` | cond. | Whisper addressee by name, used with audience `CHARACTER` when `audienceId` is `null`; trailing `*` stripped. Exactly one of the two for `CHARACTER`; both or neither is `VALIDATION_FAILED` (planned, spec R24)
-| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
+| Field                 | Type      | Required | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------- | --------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `messageId`           | `UUID`    | yes      | UUIDv7 minted by the platform. The host echoes it as the `eventId` of the resulting `ChatMessageEvent`, and dedupes re-deliveries on it                                                                                                                                                                                                                                                                                                                                    |
+| `channel`             | `String`  | yes      | `WellKnownChatChannels` code. Accepted values are a whitelist that grows per slice — planned `CLAN`, `ALLIANCE`, `PARTY`, `WHISPER`, `ANNOUNCEMENT` (shipped: `CLAN`, `ANNOUNCEMENT`); anything else is `VALIDATION_FAILED`. `CRITICAL_ANNOUNCEMENT` is deliberately not part of the contract                                                                                                                                                                              |
+| `audience`            | `String`  | yes      | `CHARACTER`, `CLAN`, `ALLIANCE`, `PARTY` or `ALL_ONLINE` — the recipient list, orthogonal to `channel` (`ALLIANCE` / `PARTY` planned, spec R22)                                                                                                                                                                                                                                                                                                                            |
+| `audienceId`          | `Long?`   | cond.    | Character id for `CHARACTER` (or `targetCharacterName` instead), clan id for `CLAN`, alliance id for `ALLIANCE`; `null` for `PARTY` and `ALL_ONLINE`                                                                                                                                                                                                                                                                                                                       |
+| `senderCharacterId`   | `Long?`   | no       | Who speaks legally — drives the host's gates, the packet's `objectId` and platform attribution. `null` means the platform itself speaks                                                                                                                                                                                                                                                                                                                                    |
+| `senderDisplayName`   | `String?` | cond.    | What the client renders for nameless senders (`"System"`, `"Дед Мороз"`; empty string reproduces the nameless announcement line). Planned (spec R23): nullable when `senderCharacterId` is set — if present an updated host ignores it and builds the name itself, incl. the offline `*` postfix (older hosts use it verbatim); required when `senderCharacterId` is `null`, except channel `ANNOUNCEMENT`, where `null` renders the nameless announcement line (spec R30) |
+| `source`              | `String`  | yes      | Where the message originates (`MINIAPP` — legacy `TMA` —, `AUTO_ANNOUNCEMENT`, …). Echoed into the event metadata under `ChatMetadataKeys.SOURCE`; the host cannot infer the surface, and without it analysis cannot tell platform traffic from what players typed in-game                                                                                                                                                                                                 |
+| `text`                | `String`  | yes      | Body in the neutral chat micro-format, at most 300 characters (spec R29): plain text, LF hard line breaks, bare `http(s)://` URLs for auto-linking; URL translation is a host concern. Planned (spec R25): item links as game-native `\b\tType=1 \tID=<objectId> ...\b` tokens built by the platform and ownership-verified by the host (foreign / missing item is `VALIDATION_FAILED`)                                                                                    |
+| `targetCharacterName` | `String?` | cond.    | Whisper addressee by name, used with audience `CHARACTER` when `audienceId` is `null`; trailing `*` stripped. Exactly one of the two for `CHARACTER`; both or neither is `VALIDATION_FAILED` (planned, spec R24)                                                                                                                                                                                                                                                           |
+| `ownerVerified`       | `boolean` | no       | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification                                                                                                                                                                                                                                                                                        |
 
 **Result** (`SendChatMessageResult`)
 
@@ -174,7 +174,7 @@ rather than posting twice.
 | Status              | When                                                                                                                      |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `INVALID_STATE`     | `PARTY` audience while the sender is offline or not in a party (planned)                                                  |
-| `NOT_FOUND`         | `senderCharacterId`, `audienceId` or `targetCharacterName` resolves to nothing on this server                                                    |
+| `NOT_FOUND`         | `senderCharacterId`, `audienceId` or `targetCharacterName` resolves to nothing on this server                             |
 | `FORBIDDEN`         | Host policy refuses — chat ban, shadow ban, block list, academy level floor                                               |
 | `VALIDATION_FAILED` | Missing required field, `channel` outside the accepted whitelist, or `audienceId` absent where the `audience` requires it |
 | `INTERNAL_ERROR`    | Broadcast mechanism failed host-side                                                                                      |
@@ -191,35 +191,35 @@ not deduped: one open check per character, a second command is `INVALID_STATE`. 
 
 **Inputs**
 
-| Field        | Type      | Required | Notes                                                     |
-| ------------ | --------- | -------- | --------------------------------------------------------- |
-| `characterId`     | `Long`    | yes      | Target character's primary key                            |
-| `issuedBy`   | `String?` | no       | Staff login or service label; echoed in the result        |
-| `staffNotes` | `String?` | no       | Internal staff note; not shown to the player              |
+| Field         | Type      | Required | Notes                                              |
+| ------------- | --------- | -------- | -------------------------------------------------- |
+| `characterId` | `Long`    | yes      | Target character's primary key                     |
+| `issuedBy`    | `String?` | no       | Staff login or service label; echoed in the result |
+| `staffNotes`  | `String?` | no       | Internal staff note; not shown to the player       |
 
 **Result** (`SendCaptchaResult`)
 
-| Field        | Type                       | Notes                                                                     |
-| ------------ | -------------------------- | ------------------------------------------------------------------------- |
-| `characterId`     | `Long`                     | Echo                                                                      |
-| `issuedBy`   | `String?`                  | Echo                                                                      |
-| `outcome`    | `String`                   | `WellKnownCaptchaOutcomes`: `PASSED`, `FAILED_WRONG`, `FAILED_TIMEOUT`, `LOGOUT`, `ABORTED` |
-| `startedAt`  | `Instant`                  | Host clock, UTC                                                           |
-| `finishedAt` | `Instant`                  | Host clock, UTC                                                           |
-| `durationMs` | `long`                     | Whole check                                                               |
-| `rounds`     | `List<CaptchaRoundResult>` | `index`, `questionType`, `pickedSlot?`, `correct`, `answerTimeMs?`        |
-| `metadata`   | `Map<String,String>`       | Host-defined consequences (`ban.type`, `ban.expiresAt`, `kick`, …); keys not stable |
+| Field         | Type                       | Notes                                                                                       |
+| ------------- | -------------------------- | ------------------------------------------------------------------------------------------- |
+| `characterId` | `Long`                     | Echo                                                                                        |
+| `issuedBy`    | `String?`                  | Echo                                                                                        |
+| `outcome`     | `String`                   | `WellKnownCaptchaOutcomes`: `PASSED`, `FAILED_WRONG`, `FAILED_TIMEOUT`, `LOGOUT`, `ABORTED` |
+| `startedAt`   | `Instant`                  | Host clock, UTC                                                                             |
+| `finishedAt`  | `Instant`                  | Host clock, UTC                                                                             |
+| `durationMs`  | `long`                     | Whole check                                                                                 |
+| `rounds`      | `List<CaptchaRoundResult>` | `index`, `questionType`, `pickedSlot?`, `correct`, `answerTimeMs?`                          |
+| `metadata`    | `Map<String,String>`       | Host-defined consequences (`ban.type`, `ban.expiresAt`, `kick`, …); keys not stable         |
 
 **Errors** (immediate, no deferred reply taken)
 
-| Status              | When                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| `VALIDATION_FAILED` | `characterId` missing / out of range                                                        |
-| `NOT_FOUND`         | No such character, or not in the world                                                 |
-| `INVALID_STATE`     | `reason=ALREADY_ACTIVE` (check open) / `reason=SERVER_PLAYS_CHARACTER` (auto-play on)  |
-| `RATE_LIMITED`      | Per-character cooldown between checks                                                  |
-| `UNAVAILABLE`       | Check disabled, concurrent-check limit, no picture                                     |
-| `INTERNAL_ERROR`    | Unexpected failure; also `deferred-reply-expired` when the host never completed        |
+| Status              | When                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `VALIDATION_FAILED` | `characterId` missing / out of range                                                  |
+| `NOT_FOUND`         | No such character, or not in the world                                                |
+| `INVALID_STATE`     | `reason=ALREADY_ACTIVE` (check open) / `reason=SERVER_PLAYS_CHARACTER` (auto-play on) |
+| `RATE_LIMITED`      | Per-character cooldown between checks                                                 |
+| `UNAVAILABLE`       | Check disabled, concurrent-check limit, no picture                                    |
+| `INTERNAL_ERROR`    | Unexpected failure; also `deferred-reply-expired` when the host never completed       |
 
 ---
 
@@ -326,7 +326,7 @@ or to the offline row otherwise. `staffNotes` is a staff-only note (see
 | `NOT_FOUND`         | Character does not exist (offline path)                                                                                          |
 | `INVALID_STATE`     | A login raced the offline write                                                                                                  |
 | `VALIDATION_FAILED` | `charId` / `accessLevel` missing, `accessLevel` not an integer, negative (bans go through `BanCommand`), or level not registered |
-| `FORBIDDEN`         | Level above the host's platform-grantable ceiling (e.g. `5`); the in-game command is not capped                               |
+| `FORBIDDEN`         | Level above the host's platform-grantable ceiling (e.g. `5`); the in-game command is not capped                                  |
 | `UNAVAILABLE`       | DB error on the offline path                                                                                                     |
 | `INTERNAL_ERROR`    | Unexpected host failure (offline dispatch threw)                                                                                 |
 
@@ -533,6 +533,7 @@ the mail itself is still delivered with whatever succeeded.
 | `title`  | `String`         | yes      | Mail subject (≤ 128 chars per L2 wire limit)           |
 | `body`   | `String?`        | no       | Mail body (≤ 512 chars per L2 wire limit)              |
 | `items`  | `List<MailItem>` | no       | Each `MailItem`: `itemTemplateId: Long`, `count: Long` |
+| `adena`  | `Long?`          | no       | Adena in the mail (host creates template 57); positive |
 
 **Result** (`SendMailResult`)
 
@@ -554,6 +555,49 @@ entity is its own sync subject when configured.
 
 ---
 
+### `SendPlayerMailCommand`
+
+**Purpose.** Send a mail from a character (the character-sender counterpart
+of `SendMailCommand`): text, items taken from the sender's inventory, adena
+and cash on delivery (COD). The sender may be online or offline. One recipient
+per command. All-or-nothing: no partial mails. Idempotent per `correlationId`
+through the host's durable receipts. Full contract:
+[`send-player-mail.md`](send-player-mail.md).
+
+**Inputs**
+
+| Field             | Type                   | Required | Notes                                                                                                                                                                      |
+| ----------------- | ---------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `senderCharId`    | `Long`                 | yes      | Character the mail is sent from                                                                                                                                            |
+| `recipientCharId` | `Long`                 | yes      | Single recipient, MUST differ from the sender                                                                                                                              |
+| `title`           | `String`               | yes      | Non-blank; at most 128 chars and 255 UTF-8 bytes; text allowlist                                                                                                           |
+| `body`            | `String?`              | no       | `null` = empty; at most 512 chars; text allowlist                                                                                                                          |
+| `items`           | `List<PlayerMailItem>` | no       | Lines `PlayerMailItem{Long itemId, Long count}`: sender inventory instance id, positive count, no duplicate id; an adena stack is refused, adena goes only through `adena` |
+| `adena`           | `Long?`                | no       | Adena in the mail; positive; counts as one attachment line (limit and fee)                                                                                                 |
+| `codPrice`        | `Long?`                | no       | COD, positive, requires an attachment (`COD_REQUIRES_ITEMS`); paid to the sender                                                                                           |
+| `ownerVerified`   | `boolean`              | no       | See Cross-cutting › Owner verification; `true` bypasses the item lock. The command is produced only for the owner of the sender; the host still validates the wire         |
+| `deadline`        | `Instant`              | yes      | Host replies `COMMAND_EXPIRED` before touching anything once passed; `null` from an older platform reads as "no expiry"                                                    |
+
+**Result** (`SendPlayerMailResult`)
+
+| Field      | Type   | Notes                                  |
+| ---------- | ------ | -------------------------------------- |
+| `mailId`   | `long` | Created mail                           |
+| `feeAdena` | `long` | Adena the host charged for the sending |
+
+**Errors** — `extensions.reason` per status (full table in the command spec):
+
+| Status              | Reasons                                                                                                                                                                                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NOT_FOUND`         | `RECIPIENT_NOT_FOUND`                                                                                                                                                                                                                                          |
+| `FORBIDDEN`         | `CHARACTER_PUNISHED`, `TRANSACTIONS_FORBIDDEN`, `ITEM_LOCKED`, `RECIPIENT_BLOCKED_SENDER`, `RECIPIENT_GM_ONLY`                                                                                                                                                 |
+| `VALIDATION_FAILED` | `SELF_SEND`, `TOO_MANY_ATTACHMENTS`, `TOO_MANY_LINES`, `ADENA_OVERFLOW`, `COD_REQUIRES_ITEMS`, `ITEM_NOT_TRANSFERABLE`; malformed command (id out of `int` range, duplicate `itemId`, adena stack in `items`, text outside the allowlist, title/body too long) |
+| `INVALID_STATE`     | `NOT_ENOUGH_ADENA`, `RECIPIENT_INBOX_FULL`, `OUTBOX_FULL`, `CHARACTER_BUSY`, `MAIL_DISABLED`, `ATTACHMENTS_DISABLED`, `LEVEL_TOO_LOW`, `RESTORE_IN_PROGRESS`                                                                                                   |
+| `COMMAND_EXPIRED`   | its own status; `deadline` passed, nothing changed                                                                                                                                                                                                             |
+| `INTERNAL_ERROR`    | `MAIL_DELIVERY_FAILED` (dirty rollback / persist failure); `OUTCOME_UNKNOWN` for a replay that finds the first attempt in flight (platform holds its guard, not retry-safe)                                                                                    |
+
+---
+
 ## Privatestore commands
 
 ### `StartPrivateStoreSellCommand`
@@ -569,12 +613,14 @@ all.
 
 **Inputs**
 
-| Field    | Type             | Required | Notes                                                                                                                                                                                                                                                 |
-| -------- | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `charId` | `int`            | yes      | Character to open the store for                                                                                                                                                                                                                       |
-| `title`  | `String?`        | no       | Store banner text shown above the seller. `null` falls back to the host's default                                                                                                                                                                     |
-| `lines`  | `List<SellLine>` | yes      | Offered stacks, non-empty. Each `SellLine`: `itemId` (`int`, inventory instance object-id), `count` (`long`, positive), `priceAdena` (`long`, non-negative — `0` is a valid give-away price; engine charges `count * priceAdena` for the whole stack) |
-| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
+| Field            | Type             | Required | Notes                                                                                                                                                                                                                                                            |
+| ---------------- | ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `charId`         | `int`            | yes      | Character to open the store for                                                                                                                                                                                                                                  |
+| `title`          | `String?`        | no       | Store banner text shown above the seller, max 29 characters, host-sanitized. `null` falls back to the host's default                                                                                                                                             |
+| `lines`          | `List<SellLine>` | yes      | Offered stacks, non-empty. Each `SellLine`: `itemId` (`int`, inventory instance object-id), `count` (`long`, positive), `priceAdena` (`long`, non-negative — `0` is a valid give-away price; engine charges `count * priceAdena` for the whole stack)            |
+| `offlineAllowed` | `Boolean`        | no       | Platform's verdict on the offline-store quota, taken before dispatch. `false`: the host's offline branch refuses with `OFFLINE_QUOTA_EXCEEDED` (`INVALID_STATE`) before loading anything; the online branch ignores it. `null` (older platform) reads as allowed |
+| `ownerVerified`  | `boolean`        | no       | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification                                                                              |
+| `deadline`       | `Instant`        | yes      | Moment after which the host MUST refuse with `COMMAND_EXPIRED` instead of running the command; checked before anything is read or changed. `null` (older platform) reads as "no expiry"                                                                          |
 
 **Result** (`StartPrivateStoreResult`)
 
@@ -582,6 +628,7 @@ all.
 | --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `storeType`     | `String`            | Open-string store-type token the host opened (e.g. `"SELL"` / `"PACKAGE_SELL"`); host-defined vocabulary, not a closed adapter enum                                                                                                                                                                                                                                                |
 | `acceptedCount` | `int`               | Number of requested lines the host actually listed                                                                                                                                                                                                                                                                                                                                 |
+| `offline`       | `boolean`           | `true` when the store was opened through the host's offline branch (it occupies an offline seat), `false` for an online start. The platform uses it to keep or release the offline-quota slot it took before dispatch                                                                                                                                                              |
 | `dropped`       | `List<DroppedLine>` | Requested lines the host rejected when opening the store. Non-null; empty when every line was accepted. Each `DroppedLine`: `itemId` (`int`), `reason` (`String`, open `UPPER_SNAKE_CASE` token — known values `NOT_FOUND`, `NOT_TRADEABLE`, `ITEM_BLOCKED`, `EQUIPPED`, `BAD_COUNT`, `PRICE_OVERFLOW`, `REJECTED`; the set is not closed, consumers MUST tolerate unknown tokens) |
 
 **Errors**
@@ -591,6 +638,7 @@ all.
 | `NOT_FOUND`         | `charId` does not exist / is not online on this server                            |
 | `VALIDATION_FAILED` | `lines` missing/empty, or any `SellLine` entry is malformed                       |
 | `INVALID_STATE`     | The character cannot open a store right now (in combat, already trading, dead, …) |
+| `COMMAND_EXPIRED`   | `deadline` already passed when the host picked up the command; nothing changed    |
 
 ---
 
@@ -605,12 +653,16 @@ detail beyond that equivalence).
 
 **Inputs**
 
-| Field    | Type             | Required | Notes                                                                                                                |
-| -------- | ---------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
-| `charId` | `int`            | yes      | Character to open the store for                                                                                      |
-| `title`  | `String?`        | no       | Store banner text shown above the seller. `null` falls back to the host's default                                    |
-| `lines`  | `List<SellLine>` | yes      | Bundled stacks, non-empty, all-or-nothing at purchase time (same `SellLine` shape as `StartPrivateStoreSellCommand`) |
-| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
+| Field            | Type             | Required | Notes                                                                                                                                                                                   |
+| ---------------- | ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `charId`         | `int`            | yes      | Character to open the store for                                                                                                                                                         |
+| `title`          | `String?`        | no       | Store banner text shown above the seller, max 29 characters, host-sanitized. `null` falls back to the host's default                                                                    |
+| `lines`          | `List<SellLine>` | yes      | Bundled stacks, non-empty, all-or-nothing at purchase time (same `SellLine` shape as `StartPrivateStoreSellCommand`)                                                                    |
+| `offlineAllowed` | `Boolean`        | no       | Same semantics as on `StartPrivateStoreSellCommand`: `false` refuses the offline branch with `OFFLINE_QUOTA_EXCEEDED`; `null` reads as allowed                                          |
+| `ownerVerified`  | `boolean`        | no       | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification     |
+| `deadline`       | `Instant`        | yes      | Moment after which the host MUST refuse with `COMMAND_EXPIRED` instead of running the command; checked before anything is read or changed. `null` (older platform) reads as "no expiry" |
+
+**Reasons.** Refusals carry a stable `extensions.reason` code (the platform localizes; known values include `IN_COMBAT`, `SELLING_BUFFS`, `CANNOT_ACT`, `NOT_IN_TRADE_ZONE`, `NO_FREE_SEAT`, `ADENA_OVERFLOW`, `TOO_MANY_LINES`, `CHARACTER_PUNISHED`, `OFFLINE_FEE_UNPAID`, `OFFLINE_QUOTA_EXCEEDED` (`INVALID_STATE`; `offlineAllowed = false` on the offline branch), `RESTORE_IN_PROGRESS`, `COMMAND_EXPIRED`, `ITEM_LOCKED`; the set is open). When every line is rejected the reply is `VALIDATION_FAILED` carrying `dropped[]` with per-line reasons. A duplicate `itemId` in `lines` is `VALIDATION_FAILED`. Applies to the start and stop commands alike.
 
 **Result** (`StartPrivateStoreResult`) — same shape as
 `StartPrivateStoreSellCommand`'s result, above.
@@ -627,10 +679,11 @@ subsystem on the character's game thread.
 
 **Inputs**
 
-| Field    | Type  | Required | Notes                               |
-| -------- | ----- | -------- | ----------------------------------- |
-| `charId` | `int` | yes      | Character whose open store to close |
-| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
+| Field           | Type      | Required | Notes                                                                                                                                                                                   |
+| --------------- | --------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `charId`        | `int`     | yes      | Character whose open store to close                                                                                                                                                     |
+| `ownerVerified` | `boolean` | no       | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification     |
+| `deadline`      | `Instant` | yes      | Moment after which the host MUST refuse with `COMMAND_EXPIRED` instead of running the command; checked before anything is read or changed. `null` (older platform) reads as "no expiry" |
 
 **Result** (`StopPrivateStoreResult`)
 
@@ -640,10 +693,11 @@ subsystem on the character's game thread.
 
 **Errors**
 
-| Status          | When                                                   |
-| --------------- | ------------------------------------------------------ |
-| `NOT_FOUND`     | `charId` does not exist / is not online on this server |
-| `INVALID_STATE` | The character has no private store open                |
+| Status            | When                                                   |
+| ----------------- | ------------------------------------------------------ |
+| `NOT_FOUND`       | `charId` does not exist / is not online on this server |
+| `INVALID_STATE`   | The character has no private store open                |
+| `COMMAND_EXPIRED` | `deadline` already passed; nothing changed             |
 
 ---
 
@@ -667,17 +721,17 @@ verbatim — it composes no text of its own.
 
 **Inputs**
 
-| Field          | Type            | Required | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| -------------- | --------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `buyerCharId`  | `int`           | yes      | Character paying for the goods. Need not be online — the host loads an offline character for the duration of the deal                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `sellerCharId` | `int`           | yes      | Character whose open sell-store is being bought from. MUST be in the world (online or offline-trading) with a sell-store open. MUST differ from `buyerCharId`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `lines`        | `List<BuyLine>` | yes      | Lots to buy, non-empty, at most `MAX_LINES` = 36 entries, no duplicate `itemId`. Each `BuyLine`: `itemId` (`int`, the instance object-id the buyer saw — primary identity key), `itemTemplateId` (`long`), `enchantLevel` (`Integer?`, `0..127`, `null` if the offer carried none), `attributes` (`Map<Attribute,Integer>`, empty if the offer carried none), `count` (`long`, positive — host buys exactly this many or fails, never silently shrinks), `unitPriceAdena` (`long`, non-negative). Fields beyond `itemId` are an optimistic lock, not a search filter — a mismatch against the live lot fails the whole command rather than buying something else |
-| `tax`          | `int`           | yes      | Buyer-side surcharge in whole percent (`5` = 5%) charged on top of the lot price and burned — the seller receives the lot price only. Host clamps to `0..MAX_TAX_PERCENT` (50). Fractional rates unsupported; `0` means no surcharge                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `deadline`     | `Instant`       | yes      | Moment after which the host MUST refuse to execute this command instead of running it — checked before resolving the seller or touching the seller's trade list. Guards against a command sitting in the Kafka backlog while the game-server was down                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `mailSender`   | `String`        | yes      | Author shown on the delivery mail, non-blank. Platform-authored, player-facing, already localized; written verbatim                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `mailSubject`  | `String`        | yes      | Subject of the delivery mail, non-blank. Same rules as `mailSender`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `mailBody`     | `String`        | yes      | Body of the delivery mail, non-blank, final text (no placeholders). Same rules as `mailSender`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `ownerVerified` | `boolean` | no | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification |
+| Field           | Type            | Required | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------- | --------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `buyerCharId`   | `int`           | yes      | Character paying for the goods. Need not be online — the host loads an offline character for the duration of the deal                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `sellerCharId`  | `int`           | yes      | Character whose open sell-store is being bought from. MUST be in the world (online or offline-trading) with a sell-store open. MUST differ from `buyerCharId`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `lines`         | `List<BuyLine>` | yes      | Lots to buy, non-empty, at most `MAX_LINES` = 36 entries, no duplicate `itemId`. Each `BuyLine`: `itemId` (`int`, the instance object-id the buyer saw — primary identity key), `itemTemplateId` (`long`), `enchantLevel` (`Integer?`, `0..127`, `null` if the offer carried none), `attributes` (`Map<Attribute,Integer>`, empty if the offer carried none), `count` (`long`, positive — host buys exactly this many or fails, never silently shrinks), `unitPriceAdena` (`long`, non-negative). Fields beyond `itemId` are an optimistic lock, not a search filter — a mismatch against the live lot fails the whole command rather than buying something else |
+| `tax`           | `int`           | yes      | Buyer-side surcharge in whole percent (`5` = 5%) charged on top of the lot price and burned — the seller receives the lot price only. Host clamps to `0..MAX_TAX_PERCENT` (50). Fractional rates unsupported; `0` means no surcharge                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `deadline`      | `Instant`       | yes      | Moment after which the host MUST refuse to execute this command instead of running it — checked before resolving the seller or touching the seller's trade list. Guards against a command sitting in the Kafka backlog while the game-server was down                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `mailSender`    | `String`        | yes      | Author shown on the delivery mail, non-blank. Platform-authored, player-facing, already localized; written verbatim                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `mailSubject`   | `String`        | yes      | Subject of the delivery mail, non-blank. Same rules as `mailSender`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `mailBody`      | `String`        | yes      | Body of the delivery mail, non-blank, final text (no placeholders). Same rules as `mailSender`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `ownerVerified` | `boolean`       | no       | `true` only when the platform verified, against fresh master-account data, that the acting user owns the character; absent reads as `false`. See Cross-cutting › Owner verification                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 **Result** (`BuyFromPrivateStoreResult`)
 
@@ -822,7 +876,7 @@ resolve + side-channel send; no sync trigger needed.
 Commands the platform sends on behalf of a player acting with their own character implement
 `OwnerVerified` and carry `ownerVerified` (spec R28): `SendChatMessageCommand`,
 `StartPrivateStoreSellCommand`, `StartPrivateStorePackageSellCommand`, `StopPrivateStoreCommand`,
-`BuyFromPrivateStoreCommand`.
+`BuyFromPrivateStoreCommand`, `SendPlayerMailCommand`.
 
 - `true` means the platform verified, against fresh master-account data, that the acting user owns
   the character. Everything else sends `false`: staff actions, socially linked characters, the
@@ -848,6 +902,7 @@ Mapping:
 | `TransferItemToCharacterCommand` | `item` (moved stack), `character` (from + to)     |
 | `TransferCharToAccountCommand`   | `character` (re-bound)                            |
 | `SendMailCommand`                | `character` (recipient)                           |
+| `SendPlayerMailCommand`          | `character` (sender + recipient)                  |
 | `TelegramCharLinkCommand`        | none                                              |
 
 > The remaining commands added to this catalog (`announcement`, `ban`,
