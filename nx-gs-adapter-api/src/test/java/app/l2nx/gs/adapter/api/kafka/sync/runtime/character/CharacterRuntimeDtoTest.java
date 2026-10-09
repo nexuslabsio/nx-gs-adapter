@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.domain.character.clazz.CharacterClass;
 import app.l2nx.gs.adapter.api.domain.skill.SkillEffectCategory;
+import app.l2nx.gs.adapter.api.domain.skill.SkillEnchant;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.Activity;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.CharacterEffect;
 import app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model.CharacterEffectOffline;
@@ -422,7 +423,13 @@ class CharacterRuntimeDtoTest {
                         haste().toBuilder().remainingSec(null).build()))
                 .build();
 
+        CharacterRuntimeDto enchanted = base.toBuilder()
+                .effects(Collections.singletonList(
+                        haste().toBuilder().enchant(new SkillEnchant(1, 2)).build()))
+                .build();
+
         assertNotEquals(base, otherTimer);
+        assertNotEquals(base, enchanted);
         assertNotEquals(base, base.toBuilder().effects(null).build());
         assertEquals(base.hashCode(), base.toBuilder().build().hashCode());
     }

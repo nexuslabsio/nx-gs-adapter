@@ -1,6 +1,7 @@
 package app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model;
 
 import app.l2nx.gs.adapter.api.domain.skill.SkillEffectCategory;
+import app.l2nx.gs.adapter.api.domain.skill.SkillEnchant;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -11,26 +12,35 @@ public final class CharacterEffect {
     private final SkillEffectCategory category;
     private final @Nullable Integer remainingSec;
     private final CharacterEffectOffline offline;
+    private final @Nullable SkillEnchant enchant;
 
     public CharacterEffect(
             int skillId,
             int skillLevel,
             SkillEffectCategory category,
             @Nullable Integer remainingSec,
-            CharacterEffectOffline offline) {
+            CharacterEffectOffline offline,
+            @Nullable SkillEnchant enchant) {
         this.skillId = skillId;
         this.skillLevel = skillLevel;
         this.category = Objects.requireNonNull(category, "category");
         this.remainingSec = remainingSec;
         this.offline = Objects.requireNonNull(offline, "offline");
+        this.enchant = enchant;
     }
 
     public int getSkillId() {
         return skillId;
     }
 
+    /** Together with {@code skillId} and {@code enchant} keys one gd-sync skill record. */
     public int getSkillLevel() {
         return skillLevel;
+    }
+
+    /** Enchant step of the record; null = the skill is not enchanted. */
+    public @Nullable SkillEnchant getEnchant() {
+        return enchant;
     }
 
     public SkillEffectCategory getCategory() {
@@ -55,7 +65,8 @@ public final class CharacterEffect {
                 .skillLevel(skillLevel)
                 .category(category)
                 .remainingSec(remainingSec)
-                .offline(offline);
+                .offline(offline)
+                .enchant(enchant);
     }
 
     public static Builder builder() {
@@ -71,12 +82,13 @@ public final class CharacterEffect {
                 && skillLevel == that.skillLevel
                 && category == that.category
                 && Objects.equals(remainingSec, that.remainingSec)
-                && offline == that.offline;
+                && offline == that.offline
+                && Objects.equals(enchant, that.enchant);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(skillId, skillLevel, category, remainingSec, offline);
+        return Objects.hash(skillId, skillLevel, category, remainingSec, offline, enchant);
     }
 
     @Override
@@ -85,7 +97,8 @@ public final class CharacterEffect {
                 + ", skillLevel=" + skillLevel
                 + ", category=" + category
                 + ", remainingSec=" + remainingSec
-                + ", offline=" + offline + "]";
+                + ", offline=" + offline
+                + ", enchant=" + enchant + "]";
     }
 
     public static final class Builder {
@@ -94,6 +107,7 @@ public final class CharacterEffect {
         private @Nullable SkillEffectCategory category;
         private @Nullable Integer remainingSec;
         private @Nullable CharacterEffectOffline offline;
+        private @Nullable SkillEnchant enchant;
 
         public Builder skillId(int skillId) {
             this.skillId = skillId;
@@ -120,8 +134,13 @@ public final class CharacterEffect {
             return this;
         }
 
+        public Builder enchant(@Nullable SkillEnchant enchant) {
+            this.enchant = enchant;
+            return this;
+        }
+
         public CharacterEffect build() {
-            return new CharacterEffect(skillId, skillLevel, category, remainingSec, offline);
+            return new CharacterEffect(skillId, skillLevel, category, remainingSec, offline, enchant);
         }
     }
 }

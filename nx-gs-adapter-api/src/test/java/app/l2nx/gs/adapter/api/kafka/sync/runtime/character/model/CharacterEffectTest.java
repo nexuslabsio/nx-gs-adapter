@@ -3,6 +3,7 @@ package app.l2nx.gs.adapter.api.kafka.sync.runtime.character.model;
 import static org.junit.jupiter.api.Assertions.*;
 
 import app.l2nx.gs.adapter.api.domain.skill.SkillEffectCategory;
+import app.l2nx.gs.adapter.api.domain.skill.SkillEnchant;
 import org.junit.jupiter.api.Test;
 
 class CharacterEffectTest {
@@ -22,6 +23,29 @@ class CharacterEffectTest {
 
         assertEquals(original, original.toBuilder().build());
         assertEquals(original.hashCode(), original.toBuilder().build().hashCode());
+    }
+
+    @Test
+    void toBuilder_shouldKeepEnchant() {
+        CharacterEffect original = haste().enchant(new SkillEnchant(2, 3)).build();
+
+        assertEquals(new SkillEnchant(2, 3), original.toBuilder().build().getEnchant());
+        assertEquals(original, original.toBuilder().build());
+    }
+
+    @Test
+    void build_shouldAcceptNullEnchant_forNotEnchantedSkills() {
+        assertNull(haste().build().getEnchant());
+    }
+
+    @Test
+    void equals_shouldDiffer_whenEnchantDiffers() {
+        CharacterEffect plain = haste().build();
+        CharacterEffect enchanted = haste().enchant(new SkillEnchant(1, 1)).build();
+
+        assertNotEquals(plain, enchanted);
+        assertNotEquals(enchanted, haste().enchant(new SkillEnchant(1, 2)).build());
+        assertNotEquals(enchanted, haste().enchant(new SkillEnchant(2, 1)).build());
     }
 
     @Test

@@ -34,8 +34,9 @@ with the character row.
   - empty list = the character has no effects. A consumer MUST clear its stored effects.
 - [done] R2. `CharacterEffect` MUST carry `int skillId`, `int skillLevel`, `SkillEffectCategory
 category`, `@Nullable Integer remainingSec`, `CharacterEffectOffline offline`.
-  - `skillLevel` is the level as keyed in the gd-sync skill levels, so the platform joins the effect to
-    the catalog (icon, name, description) without translation.
+  - `(skillId, skillLevel, enchant)` is the key of one gd-sync skill record (a base level, or one step
+    of an enchant route — `SkillLevel` / `SkillEnchantRoute`), so the platform joins the effect to the
+    catalog (icon, name, description) without translation.
   - `remainingSec` is whole seconds left at snapshot time. `null` = the effect has no duration
     (toggle, aura). A host-internal "infinite" magic value (`-1`) MUST NOT reach the wire.
 - [done] R3. List order MUST be the client's status-bar order: plain buffs by application time, then
@@ -46,13 +47,22 @@ category`, `@Nullable Integer remainingSec`, `CharacterEffectOffline offline`.
 - [done] R5. Tombstones (`online=false` with a `null` state) MUST carry `effects=null`. Offline-trader
   ticks (`online=false` with a real state) carry the real effects.
 - [done] R6. The host SHOULD exclude `remainingSec` from the runtime hash and include `skillId`,
-  `skillLevel`, `category`, `offline` and the list position. A hash that included `remainingSec` would
+  `skillLevel`, `enchant`, `category`, `offline` and the list position. A hash that included `remainingSec` would
   republish every character with a timed buff on every tick. A re-cast or an in-place refresh of the same buff
   (a fresh timer, same ids, same position) is signalled through `RuntimeRow.stateStamp` (api 0.97.0,
   runtime-sync 0.4.0): the host derives it from a per-effect timer generation it bumps on every timer
   reset, the engine folds it into the
   change hash, and it never reaches the wire. A host-side application timestamp is not a safe stamp
   when the host resets it on every periodic tick of the effect.
+- [done] R7. `CharacterEffect` MUST carry `@Nullable SkillEnchant enchant` (api 0.98.0), and `skillLevel` MUST
+  be the base level of the record.
+  - `SkillEnchant { int route, int level }`: the enchant route number and the step within it, both
+    `> 0` — the same coordinates the gd-sync `SkillEnchantRoute` carries (`route`, `enchantLevel`). The
+    enchanted record's base level is the skill's max base level (`SkillEnchantRoute.baseLevel`).
+  - `null` = the effect's skill is not enchanted. No `0` / `0` sentinel.
+  - A host whose engine encodes the enchant into one level number MUST decode it before the wire, with
+    the same rule its gd-sync provider uses, so both channels key the same record. The encoding never
+    reaches the platform.
 
 **Non-goals:**
 
@@ -67,6 +77,9 @@ category`, `@Nullable Integer remainingSec`, `CharacterEffectOffline offline`.
 - A re-cast of the same buff resets the timer and keeps `skillId` / `skillLevel`: without the `stateStamp` (R6) the platform would keep showing the stale `remainingSec`.
 - A character with only untimed effects (toggles) never changes `remainingSec`, so it is published
   only when the list actually changes.
+- An enchanted buff whose enchant step is missing from the gd-sync catalog keeps its ids on the wire;
+  the platform renders the bare ids rather than substituting the base record, whose description would
+  understate the effect.
 
 ## Technical design
 
@@ -93,6 +106,9 @@ types that live with the character model; `CharacterRuntimeDto` gains the list.
   - `SONG_DANCE` — songs and dances. Hosts typically cannot tell the two apart, so they are one value.
   - `TOGGLE` — on/off skills with no duration.
   - `TRIGGERED` — effects granted by a triggered (chance / on-event) skill.
+- `SkillEnchant { int route, int level }` — `app.l2nx.gs.adapter.api.domain.skill`, next to
+  `SkillEffectCategory`: an enchant coordinate is a property of the skill record, reusable wherever a
+  skill reference crosses the wire later.
 - `CharacterEffectOffline { FROZEN, TICKING, DROPPED }` — what happens to the effect when the
   character logs out, so the platform can tell a player whether a buff survives logout:
   - `FROZEN` — persisted on logout; the timer stops while offline and resumes on login.
@@ -119,6 +135,11 @@ types that live with the character model; `CharacterRuntimeDto` gains the list.
   leave frozen-in-time effects behind. On a tombstone `null` is just "no state" and the stored set goes
   through the logout rules.
 - **No position field.** List order is the position; a second field would be a second source of truth.
+- **The host decodes the enchant, not the platform (R7).** How an engine numbers enchanted levels is
+  core-specific; a platform that knew one core's encoding would misread the next core. gd-sync already
+  ships the decoded coordinates, so the runtime channel matches it and the platform joins one key.
+- **Rejected: `enchant` as two nullable ints on `CharacterEffect`.** They are meaningful only together;
+  one nullable value object makes "both or neither" structural.
 - **Rejected: a separate `character_effects` runtime entity.** See Problem — extra entity, cadence,
   hash and tombstone for data that is always read with the character.
 
@@ -136,6 +157,11 @@ consumers ignore the unknown field (the wire is unknown-field tolerant, like eve
 runtime field); older hosts omit it and consumers read `null` (R1). Deploy order is the usual one:
 platform consumer first, then the api release, then the host. No deprecation gate — nothing is renamed
 or removed.
+
+**Enchant (R7, api 0.98.0).** Additive: `enchant` is appended at the end of the constructor and
+`skillLevel` keeps its name. An older host keeps sending its engine-encoded level with `enchant` absent;
+the platform then resolves the nearest base record, exactly as before the change, until the host
+restarts on a build that decodes. No field is renamed or removed, so no deprecation gate.
 
 **Constructor rule.** The new parameter is appended at the end of the canonical constructor; no
 overload keeping the old signature (see [`028`](028-character-inventory-capacity.md) — two visible
