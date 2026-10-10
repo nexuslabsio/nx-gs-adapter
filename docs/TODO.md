@@ -28,6 +28,19 @@ it is picked up, it moves to "Done / moved into a spec".
   a host handler sidestepped it by switching to `host().async`.
 - **Related:** [`009-commands`](specs/009-commands/spec.md).
 
+### 3. `skill_type` as an enum `SkillType` in `nx-gs-adapter-api`
+
+- **Want:** the gd-sync `Skill.skillType` (and the `gd_skills.skill_type` column it feeds) typed by an api enum
+  `SkillType` mirroring the engine's `l2e.gameserver.model.skills.SkillType` (62 values on prod, `BUFF`, `DEBUFF`,
+  `PHYSICAL_DAMAGE`, ...), instead of a free string.
+- **To decide:** the null policy (14k skills have no type: `NOTDONE` / blank in the datapack), how an unknown engine
+  value reaches consumers (accept-then-emit: consumers must tolerate a new constant before the host emits it), and
+  where nx-gamedata's `type` filter starts using it.
+- **Why:** the skill-type vocabulary is already a contract - nx-gamedata filters by it (`GET
+/gamedata/v1/skill-templates?type=BUFF`) and nx-social validates buff watches against it - but nothing pins its values.
+  Not to be confused with `SkillEffectCategory` (status-bar group of a hanging effect), which is a different axis.
+- **Related:** `nx-social/docs/specs/054-buff-item-watch.md` §2, `nx-gamedata/docs/specs/023-player-template-search.md`.
+
 ## Done / moved into a spec
 
 - **Deprecated boss-kind and division shim, raw-seconds activity keys** - removed in `api/v0.93.1`

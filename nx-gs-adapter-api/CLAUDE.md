@@ -42,7 +42,8 @@ assuming):
 - **runtime sync**: `character`
 - **events**: `account`, `castle`, `character`, `characterlog`, `chat`, `gameevents`,
   `mail`, `olympiad`, `premiumpurchase`, `privatestore`, `privatetrade`, `raid`, `schedule`,
-  `serveronline`, `sync`
+  `serveronline`, `sync`; `push` — facts published by platform services (not the host) to
+  `<tenant>.push.events` for nx-social pushes
 - **commands**: `announcement`, `ban`, `captcha`, `character`, `gd`, `item`, `mail`, `privatestore`,
   `sync`, `telegram`
 
