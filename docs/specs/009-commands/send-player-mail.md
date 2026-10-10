@@ -139,7 +139,7 @@ Same convention as the private-store buy reasons: the status classifies the refu
 | Status              | `extensions.reason`                                                                                         |
 | ------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `NOT_FOUND`         | `RECIPIENT_NOT_FOUND`                                                                                       |
-| `FORBIDDEN`         | `CHARACTER_PUNISHED` (jail or ban), `TRANSACTIONS_FORBIDDEN` (access level), `ITEM_LOCKED`, `RECIPIENT_BLOCKED_SENDER`, `RECIPIENT_GM_ONLY` |
+| `FORBIDDEN`         | `CHARACTER_BANNED`, `CHARACTER_JAILED`, `TRANSACTIONS_FORBIDDEN` (access level), `ITEM_LOCKED`, `RECIPIENT_BLOCKED_SENDER`, `RECIPIENT_GM_ONLY` |
 | `VALIDATION_FAILED` | `SELF_SEND`, `TOO_MANY_ATTACHMENTS`, `TOO_MANY_LINES`, `ADENA_OVERFLOW`, `COD_REQUIRES_ITEMS`, `ITEM_NOT_TRANSFERABLE` (+ `itemId`); malformed command (null required field, id out of `int` range, bad count, duplicate `itemId`, adena stack in `items`, text outside the allowlist, title or body too long) carries a `field` extension instead |
 | `INVALID_STATE`     | every other business refusal: `NOT_ENOUGH_ADENA`, `RECIPIENT_INBOX_FULL`, `OUTBOX_FULL`, `CHARACTER_BUSY`, `MAIL_DISABLED`, `ATTACHMENTS_DISABLED`, `LEVEL_TOO_LOW`, `RESTORE_IN_PROGRESS` |
 | `COMMAND_EXPIRED`   | its own status (rail R23), no reason needed: the deadline passed, nothing changed                           |
@@ -159,7 +159,7 @@ The handler is registered with plain `on(...)`, not `onDeduped`: dedup is the du
 3. Recipient re-check (exists, not self, GM-only recipients for GM senders, recipient block list,
    recipient inbox below its cap).
 4. Sender gates: mail and attachments enabled, minimum level, access level, jail/ban, item lock (R8),
-   outbox cap, attachment count, adena/COD caps. Punishment checks in the offline branch read the
+   outbox cap, attachment count, adena/COD caps. Ban and jail checks in the offline branch read the
    cached HWID/IP of the character plus account/character bans, because an offline load has no client.
 5. Refuse with `RESTORE_IN_PROGRESS` while offline traders are still being restored (the sender included).
    Take the sender's per-character mutation lock (short timeout, `CHARACTER_BUSY` on timeout) and branch on

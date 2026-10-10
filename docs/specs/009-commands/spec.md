@@ -403,6 +403,17 @@ replies-published == 0}` is visible as a failure rather than as silence
     its builder defaults it to `false`. The pre-R28 constructors without it were removed in
     `api/v0.93.1` (breaking for Java callers only; the wire is unchanged).
 
+- [host rule] R29. **Character-acting commands MUST NOT bypass in-game bans.** A host handler of any command that
+  acts on a character (spends from it, moves its items, opens its store, sends mail as it) MUST refuse when the
+  character has an active in-game BAN or JAIL by account, character, HWID or IP (plus a combined "hard" key where the
+  engine has one). BAN is checked before JAIL. The reply is `FORBIDDEN` with reasons `CHARACTER_BANNED` /
+  `CHARACTER_JAILED` in `problem.extensions.reason`.
+  - For an offline character (no network client) the host takes HWID / IP from the last persisted character values:
+    the engine's client-based check sees nothing there.
+  - The rail does not enforce this and the platform does not duplicate it; it only maps the two reason codes. A new
+    character-acting command applies the host's shared ban lookup from its first release, and the catalog lists the
+    two codes among its reasons.
+
 **Non-goals:**
 
 - **Per-domain Kafka topics** — single topic; cross-domain ordering per character is the more
